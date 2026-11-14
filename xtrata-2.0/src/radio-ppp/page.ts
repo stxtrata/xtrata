@@ -77,7 +77,7 @@ function start(root: HTMLElement) {
       // Interactive requests wait for the listener (up to 30 minutes) so a late confirm in the frame
       // is never signed and then dropped here. Everything else must answer quickly.
       const client = new WalletBridgeClient({ walletOrigin: origin, frame, timeoutMs: 30 * 60_000 });
-      const INTERACTIVE = new Set(['listening.unlock', 'listening.link', 'listening.prove', 'listening.approveSession', 'listening.prepareReturn']);
+      const INTERACTIVE = new Set(['listening.unlock', 'listening.link', 'listening.prove', 'listening.backup', 'listening.approveSession', 'listening.prepareReturn']);
       const request = <T,>(method: string, params?: unknown) => INTERACTIVE.has(method)
         ? client.request<T>(method as never, params)
         : Promise.race([
@@ -1151,6 +1151,8 @@ function start(root: HTMLElement) {
     if (['ready', 'fund'].includes(s.step) && (s.returnTo || s.gift) && (s.balance ?? 0n) > 0n)
       more.push(button(s.linked ? 'Return all to my wallet' : s.gift ? 'Return what is left…' : `Return all to ${who(s.returnTo)}`, () => void ppp.returnFunds('all'), 'quiet'));
     if (s.slot > 0 && s.gift?.player && ['ready', 'fund'].includes(s.step) && s.giftPlays > 20) more.push(topUpAlbumRow(s, 'quiet'));
+    // A player with backup words: write them down (in the wallet box, never on this page) so a lost passkey is not a lost player.
+    if (s.phrase && ['ready', 'fund', 'over'].includes(s.step)) more.push(button(s.backedUp ? 'Show my 24 backup words again' : 'Back up my player · 24 words', () => void ppp.backup(), 'quiet'));
     if (['ready', 'fund', 'link', 'over'].includes(s.step)) more.push(button('Lock', () => void ppp.lock(), 'quiet'));
     if (showFrame && !asking) more.push(button(walletShown ? 'Hide listening wallet box' : 'Show listening wallet box', () => { walletShown = !walletShown; render(ppp.snapshot()); }, 'quiet'));
 

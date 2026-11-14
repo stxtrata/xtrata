@@ -45,6 +45,8 @@ export type WalletMethod =
   | 'listening.unlock'
   /** Verify the main wallet's link signature and countersign with the listening key. */
   | 'listening.link'
+  /** Show the listener their backup words inside the frame; the page learns only that it was done. */
+  | 'listening.backup'
   /** The second passkey check a `quick` starter player skipped; nothing is signed. */
   | 'listening.prove'
   /** Ask the listener (inside the frame) to approve session spending terms. */
@@ -95,6 +97,7 @@ export const WALLET_METHODS: readonly WalletMethod[] = [
   'listening.unlock',
   'listening.link',
   'listening.prove',
+  'listening.backup',
   'listening.approveSession',
   'listening.signPlay',
   'listening.signLike',

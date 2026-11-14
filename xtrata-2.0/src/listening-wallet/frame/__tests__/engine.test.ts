@@ -4,7 +4,11 @@ import {
   signMessageHashRsv, TransactionVersion, cvToJSON, addressToString, PostConditionMode
 } from '@stacks/transactions';
 import { createListeningEngine, CancelledError, type Panel, type PasskeyPort } from '../engine';
-import { deriveListeningIdentity } from '../../../lib/listening-wallet/derive';
+import { deriveListeningIdentity as deriveOriginalIdentity } from '../../../lib/listening-wallet/derive';
+import { derivePhraseSlot, phraseBase } from '../../../lib/listening-wallet/phrase';
+/** The player a newly made passkey gives: one with a backup phrase (phrase.ts). */
+const deriveListeningIdentity = async (prf: Uint8Array) => derivePhraseSlot(await phraseBase(prf), 0);
+void deriveOriginalIdentity;
 import { linkHash, verifyLinkSignature } from '../../../lib/listening-wallet/link';
 import { verifySlotSignature } from '../../../lib/listening-wallet/slots';
 import { MIN_LIKE_INTERVAL_MS, MIN_PLAY_INTERVAL_MS, TARGET } from '../../../lib/listening-wallet/policy';
@@ -13,22 +17,24 @@ import { assertNoSecrets } from '../../../lib/wallet/passkey/bridge/protocol';
 import { validateSaved } from '../../../radio-test-wallet/chain';
 
 const PRF = Uint8Array.from({ length: 32 }, (_, i) => i);
-const ADDRESS = 'SPHRV6ESV321YCV6W990X4FKXB4S9D7F665FSCTV';
+const ADDRESS = 'SP1SY289GQAHCH7JZ1MSS5VMPNPH8GEK2DPRKKJ6N';
 const mainKey = privateKeyToString(makeRandomPrivKey()).slice(0, 64) + '01';
 const MAIN = getAddressFromPrivateKey(mainKey, TransactionVersion.Mainnet);
 const receipt = 'ab'.repeat(16);
 
-function setup(opts: { createPrf?: boolean; outputs?: Uint8Array[]; cancel?: Panel['kind'][]; available?: boolean } = {}) {
+function setup(opts: { handle?: string; store?: Record<string, string>; onPanel?: (p: Panel) => void; createPrf?: boolean; outputs?: Uint8Array[]; cancel?: Panel['kind'][]; available?: boolean } = {}) {
   let time = 1_760_000_000_000;
   const outputs = opts.outputs ?? [PRF, PRF, PRF, PRF];
   const panels: Panel[] = [];
   const idle: unknown[] = [];
-  const map = new Map<string, string>();
+  const map = new Map<string, string>(Object.entries(opts.store ?? {}));
   let evaluations = 0;
+  let handle: string | undefined = opts.handle;
   const passkey: PasskeyPort = {
     available: () => opts.available ?? true,
-    create: async () => ({ credentialId: 'cred-1', prf: opts.createPrf ? outputs[evaluations++].slice() : undefined }),
-    evaluate: async (id) => ({ credentialId: id ?? 'cred-1', prf: outputs[evaluations++].slice() })
+    // Like a real authenticator: the passkey keeps the public user id it was made with and hands it back on sign-in.
+    create: async (_exclude, _name, userId) => { handle = userId; return { credentialId: 'cred-1', prf: opts.createPrf ? outputs[evaluations++].slice() : undefined }; },
+    evaluate: async (id) => ({ credentialId: id ?? 'cred-1', prf: outputs[evaluations++].slice(), userHandle: handle })
   };
   const engine = createListeningEngine({
     passkey,
@@ -37,6 +43,7 @@ function setup(opts: { createPrf?: boolean; outputs?: Uint8Array[]; cancel?: Pan
     ui: {
       act: async (panel, action) => {
         panels.push(panel);
+        opts.onPanel?.(panel);
         if (opts.cancel?.includes(panel.kind)) throw new CancelledError();
         return action();
       },
@@ -46,7 +53,7 @@ function setup(opts: { createPrf?: boolean; outputs?: Uint8Array[]; cancel?: Pan
   });
   const h = engine.handlers;
   const terms = (maxPlays = 3) => ({ fee: '300', maxPlays, budget: String(Math.min(350 * maxPlays, 1_000_000)), expires: time + 3600_000 });
-  return { h, panels, map, idle, terms, evaluations: () => evaluations, tick: (ms: number) => { time += ms; }, now: () => time };
+  return { h, panels, map, idle, terms, handle: () => handle, evaluations: () => evaluations, tick: (ms: number) => { time += ms; }, now: () => time };
 }
 
 const play = (balance = '500000', nonce = '0') => ({ core: 3, song: 1234, receipt, fee: '300', nonce, balance });
@@ -54,7 +61,7 @@ const play = (balance = '500000', nonce = '0') => ({ core: 3, song: 1234, receip
 describe('listening wallet engine (wallet origin)', () => {
   it('creates a wallet only after two matching PRF results and stores no secrets', async () => {
     const s = setup();
-    expect(await s.h['listening.status']()).toEqual({ state: 'none', session: null, features: ['cancel', 'like', 'standalone', 'multi', 'partial', 'slots', 'rootLike', 'move'] });
+    expect(await s.h['listening.status']()).toEqual({ state: 'none', session: null, features: ['cancel', 'like', 'standalone', 'multi', 'partial', 'slots', 'rootLike', 'move', 'phrase'] });
     const r = await s.h['listening.unlock']({ mode: 'create' });
     expect(r.address).toBe(ADDRESS);
     expect(s.panels.map((p) => p.kind)).toEqual(['create', 'confirm-passkey', 'verify-passkey']);
@@ -77,7 +84,7 @@ describe('listening wallet engine (wallet origin)', () => {
     const other = Uint8Array.from(PRF); other[5] ^= 0xff;
     const s = setup({ outputs: [PRF, other] });
     await expect(s.h['listening.unlock']({ mode: 'create' })).rejects.toThrow(/stable/);
-    expect(await s.h['listening.status']()).toEqual({ state: 'none', session: null, features: ['cancel', 'like', 'standalone', 'multi', 'partial', 'slots', 'rootLike', 'move'] });
+    expect(await s.h['listening.status']()).toEqual({ state: 'none', session: null, features: ['cancel', 'like', 'standalone', 'multi', 'partial', 'slots', 'rootLike', 'move', 'phrase'] });
     // No wallet, and no half-made passkey kept either: an unstable passkey is dropped, not picked up again.
     const kept = JSON.parse(s.map.get('xtrata.listening-wallet.v1') ?? '{"wallets":[]}');
     expect(kept.wallets).toEqual([]);
@@ -528,8 +535,8 @@ describe('one listening wallet per main-wallet address', () => {
 });
 
 describe('one passkey, many wallets (slots)', () => {
-  const SLOT1 = 'SP3ANJ3MWZKPPAEN8JAHBXA7QZ85GDHDZR47V8ZC1';
-  const SLOT2 = 'SP1H6JGJNMR9KJPKGSR70TDRDBGH0TZZKAH9Q2THA';
+  const SLOT1 = 'SP16538G41XMAGHYB0JZAP29R7YBSKDR569QP1SMF';
+  const SLOT2 = 'SP12AWQYW7NNY64RYAP6VH6M4RD11KF0RTEFDT8QP';
 
   it('gives the address of any slot without a tap, only while unlocked, and never key material', async () => {
     const s = setup();
@@ -755,5 +762,110 @@ describe('quick create: a free starter player puts off the second passkey check'
     await bad.h['listening.lock']();
     await expect(bad.h['listening.unlock']({ mode: 'unlock' })).rejects.toThrow(/no longer gives the same wallet/);
     expect((await bad.h['listening.status']()).unproven).toBe(true);
+  });
+});
+
+describe('players with a backup phrase, and the original players beside them', () => {
+  const V1 = 'SPHRV6ESV321YCV6W990X4FKXB4S9D7F665FSCTV';         // the original player of this test passkey (derive.ts)
+  const V1_SLOT1 = 'SP3ANJ3MWZKPPAEN8JAHBXA7QZ85GDHDZR47V8ZC1';
+  const V1_SLOT2 = 'SP1H6JGJNMR9KJPKGSR70TDRDBGH0TZZKAH9Q2THA';
+  const PHRASE = 'average unfold gather orchard afraid keep biology verb sadness merry dust worry tube inject tube method screen goose label minor minor crowd very oil';
+  const KEY = 'xtrata.listening-wallet.v1';
+  const v1Store = (extra: object = {}) => ({ [KEY]: JSON.stringify({ version: 1, wallets: [{ credentialId: 'cred-1', address: V1, ...extra }], last: 'cred-1' }) });
+  /** Answers the "which word?" panels the way a listener who wrote the words down would (or, with `wrong`, would not). */
+  const answering = (wrong = false) => {
+    let words: string[] = [];
+    return (p: Panel) => {
+      if (p.kind === 'phrase') words = p.words!;
+      if (p.kind === 'phrase-check') {
+        const right = p.pick!.options.indexOf(words[Number(/word (\d+)/.exec(p.title)![1]) - 1]);
+        p.pick!.chosen = wrong ? (right + 1) % p.pick!.options.length : right;
+      }
+    };
+  };
+
+  it('an original player is untouched: same address, same album wallets, no phrase, nothing to back up', async () => {
+    const s = setup({ store: v1Store() });
+    expect(await s.h['listening.status']()).toMatchObject({ state: 'known', address: V1 });
+    expect((await s.h['listening.unlock']({ mode: 'unlock' })).address).toBe(V1);
+    expect((await s.h['listening.slotAddress']({ slot: 1 })).address).toBe(V1_SLOT1);
+    expect((await s.h['listening.slotAddress']({ slot: 2 })).address).toBe(V1_SLOT2);
+    const st = await s.h['listening.status']();
+    expect(st.phrase).toBeUndefined();
+    expect(st.backedUp).toBeUndefined();
+    await expect(s.h['listening.backup']()).rejects.toThrow(/made before backup words existed/);
+    expect(JSON.parse(s.map.get(KEY)!).wallets[0].v).toBeUndefined();
+  });
+
+  it('an original passkey synced to a new device still opens the original player (with or without a user id)', async () => {
+    for (const handle of [undefined, 'WE0CAAAAAAAAAAAAAAAAAA']) {
+      const s = setup({ handle });
+      expect((await s.h['listening.unlock']({ mode: 'unlock', anyPasskey: true })).address).toBe(V1);
+      expect((await s.h['listening.status']()).phrase).toBeUndefined();
+    }
+  });
+
+  it('a passkey half-made before backup phrases existed finishes as an original player', async () => {
+    const s = setup({ store: { [KEY]: JSON.stringify({ version: 1, wallets: [], pending: { at: 1_760_000_000_000 - 1000, tries: 0, credentialId: 'cred-1' } }) } });
+    expect((await s.h['listening.unlock']({ mode: 'create' })).address).toBe(V1);
+    expect(JSON.parse(s.map.get(KEY)!).wallets[0].v).toBeUndefined();
+  });
+
+  it('a new player has a phrase, and its passkey opens the same player on a device with no record of it', async () => {
+    const a = setup();
+    await a.h['listening.unlock']({ mode: 'create' });
+    expect(await a.h['listening.status']()).toMatchObject({ address: ADDRESS, phrase: true });
+    expect(JSON.parse(a.map.get(KEY)!).wallets[0]).toMatchObject({ v: 2, address: ADDRESS });
+    expect(ADDRESS).not.toBe(V1);
+    // The same passkey, synced to a device with no record: only its public user id says which kind of player it is.
+    const b = setup({ handle: a.handle() });
+    expect((await b.h['listening.unlock']({ mode: 'unlock', anyPasskey: true })).address).toBe(ADDRESS);
+    expect(await b.h['listening.status']()).toMatchObject({ address: ADDRESS, phrase: true });
+    expect(JSON.parse(b.map.get(KEY)!).wallets[0]).toMatchObject({ v: 2 });
+  });
+
+  it('the backup shows the 24 words only inside the frame, asks three back, and tells the page only that it was done', async () => {
+    const s = setup({ onPanel: answering() });
+    await s.h['listening.unlock']({ mode: 'create' });
+    const before = s.evaluations();
+    const r = await s.h['listening.backup']();
+    expect(r).toEqual({ backedUp: true });
+    assertNoSecrets(r);
+    expect(s.evaluations()).toBe(before + 1); // a fresh passkey tap before anything is shown
+    const kinds = s.panels.map((p) => p.kind).slice(-5);
+    expect(kinds).toEqual(['backup', 'phrase', 'phrase-check', 'phrase-check', 'phrase-check']);
+    const shown = s.panels.find((p) => p.kind === 'phrase')!;
+    expect(shown.words!.join(' ')).toBe(PHRASE);
+    for (const p of s.panels.filter((x) => x.kind === 'phrase-check')) {
+      expect(p.pick!.options).toHaveLength(4);
+      expect(new Set(p.pick!.options).size).toBe(4);
+    }
+    // Nothing of the phrase is stored, and the status says it is done.
+    const stored = [...s.map.values()].join(' ');
+    for (const w of ['orchard', 'biology', 'sadness', 'goose']) expect(stored).not.toContain(w);
+    expect(await s.h['listening.status']()).toMatchObject({ phrase: true, backedUp: true });
+    await s.h['listening.lock']();
+    expect(await s.h['listening.status']()).toMatchObject({ state: 'known', phrase: true, backedUp: true });
+  });
+
+  it('a wrong answer is asked again and records nothing; closing the box part-way records nothing', async () => {
+    const wrong = setup({ onPanel: answering(true) });
+    await wrong.h['listening.unlock']({ mode: 'create' });
+    await expect(wrong.h['listening.backup']()).rejects.toMatchObject({ retryable: true, message: expect.stringMatching(/That is not word \d+/) });
+    expect((await wrong.h['listening.status']()).backedUp).toBeUndefined();
+    const closed = setup({ cancel: ['phrase'] });
+    await closed.h['listening.unlock']({ mode: 'create' });
+    await expect(closed.h['listening.backup']()).rejects.toBeInstanceOf(CancelledError);
+    expect((await closed.h['listening.status']()).backedUp).toBeUndefined();
+  });
+
+  it('the backup needs an open player and the very passkey that opened it', async () => {
+    const locked = setup();
+    await expect(locked.h['listening.backup']()).rejects.toThrow(/Unlock/);
+    const other = Uint8Array.from({ length: 32 }, (_, i) => 255 - i);
+    const s = setup({ outputs: [PRF, PRF, other], onPanel: answering() });
+    await s.h['listening.unlock']({ mode: 'create' });
+    await expect(s.h['listening.backup']()).rejects.toThrow(/did not give this player/);
+    expect(s.panels.some((p) => p.kind === 'phrase')).toBe(false);
   });
 });

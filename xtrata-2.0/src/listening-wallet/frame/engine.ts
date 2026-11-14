@@ -10,6 +10,7 @@
  */
 import { makeContractCall, makeSTXTokenTransfer } from '@stacks/transactions';
 import { deriveSlotIdentity, isSlot, listeningBase, type ListeningIdentity } from '../../lib/listening-wallet/derive';
+import { decoyWords, derivePhraseSlot, isPhraseUserId, newPhraseUserId, phraseBase, phraseFromPrf, type PhraseBase } from '../../lib/listening-wallet/phrase';
 import { signSlotBinding, validateSlotBinding } from '../../lib/listening-wallet/slots';
 import { isMainnetStandardAddress, signLink, verifyLinkSignature } from '../../lib/listening-wallet/link';
 import {
@@ -22,7 +23,6 @@ import type {
 } from '../../lib/listening-wallet/messages';
 import { LISTENING_FEATURES } from '../../lib/listening-wallet/messages';
 
-const b64u = (bytes: Uint8Array) => btoa(String.fromCharCode(...bytes)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 
 export interface PasskeyPort {
   /** WebAuthn present at all. PRF support is only known after a real ceremony. */
@@ -52,7 +52,7 @@ export interface PasskeyPort {
 }
 
 export interface Panel {
-  kind: 'create' | 'confirm-passkey' | 'verify-passkey' | 'unlock' | 'session' | 'return' | 'link';
+  kind: 'create' | 'confirm-passkey' | 'verify-passkey' | 'unlock' | 'session' | 'return' | 'link' | 'backup' | 'phrase' | 'phrase-check';
   title: string;
   /**
    * One or two plain lines shown above the button. When set, `lines` and `warnings` fold into a
@@ -69,7 +69,23 @@ export interface Panel {
    * `alt` action and the frame has a #p-alt button; the radio never uses it.
    */
   altLabel?: string;
+  /** The backup words, shown in order as a numbered grid (kind 'phrase'). They exist only inside the wallet origin. */
+  words?: string[];
+  /**
+   * One question with a few answers to tap (kind 'phrase-check'). The frame writes the tapped answer's index into
+   * `chosen` and keeps confirm off until there is one; the action reads it.
+   */
+  pick?: { options: string[]; chosen: number | null };
 }
+
+/**
+ * The secret every wallet of a passkey is derived from, held in memory while unlocked. Version 1 (derive.ts): the
+ * passkey's secret itself, as a non-extractable key. Version 2 (phrase.ts): the accounts node of its 24-word phrase.
+ */
+export type WalletBase = { v: 1; key: CryptoKey } | { v: 2; phrase: PhraseBase };
+const baseFor = async (v: 1 | 2, prf: Uint8Array): Promise<WalletBase> => (v === 2 ? { v: 2, phrase: await phraseBase(prf) } : { v: 1, key: await listeningBase(prf) });
+const slotOf = async (b: WalletBase, n: number): Promise<ListeningIdentity> => (b.v === 2 ? derivePhraseSlot(b.phrase, n) : deriveSlotIdentity(b.key, n));
+const wipeBase = (b: WalletBase | null) => { if (b?.v === 2) b.phrase.wipe(); };
 
 export interface IdleView {
   state: StatusResult['state'];
@@ -113,6 +129,13 @@ interface WalletRecord {
    * The radio asks for that check before the listener adds anything of their own.
    */
   once?: true;
+  /**
+   * 2: a player with a backup phrase (phrase.ts). Absent: version 1, the passkey's secret itself (derive.ts). Fixed
+   * when the passkey was made; a version 1 player never becomes version 2 (its address would change).
+   */
+  v?: 2;
+  /** When the listener finished writing down and checking the backup words on this device. Version 2 only. */
+  backedUp?: number;
 }
 /**
  * A passkey this device has made but not yet proven. Only public ids are kept (never a secret). If the page reloads,
@@ -120,7 +143,7 @@ interface WalletRecord {
  * of making a second passkey beside it. Nothing is ever funded against it: it becomes a wallet only through `remember`,
  * after the PRF check (docs/PASSKEY-WALLET.md §3.1), and that clears it.
  */
-interface PendingPasskey { at: number; tries: number; credentialId?: string; userId?: string; label?: string }
+interface PendingPasskey { at: number; tries: number; credentialId?: string; userId?: string; label?: string; v?: 2 }
 interface Stored { version: 1; wallets: WalletRecord[]; last?: string; pending?: PendingPasskey }
 /** A half-made passkey is picked up for a day; after this many failed pick-ups it is dropped and a fresh one is made. */
 const PENDING_MAX_AGE_MS = 24 * 60 * 60 * 1000;
@@ -172,7 +195,7 @@ export function createListeningEngine(deps: {
   let identity: ListeningIdentity | null = null;
   /** The passkey's own wallet, and the non-extractable key every other wallet is derived from. Both drop on lock. */
   let root: ListeningIdentity | null = null;
-  let base: CryptoKey | null = null;
+  let base: WalletBase | null = null;
   let slot = 0;
   let credentialId: string | null = null;
   let ledger: SessionLedger | null = null;
@@ -245,19 +268,22 @@ export function createListeningEngine(deps: {
     const others = [...new Set(load().wallets.flatMap((w) => (w.link && !mine.has(w.link.main) ? [w.link.main] : [])))];
     return others.length ? { others } : {};
   };
+  /** Version 2 players can write down backup words; whether that was done on this device. */
+  const backupOf = (w: WalletRecord | undefined): { phrase?: true; backedUp?: true } =>
+    (w?.v === 2 ? { phrase: true as const, ...(w.backedUp ? { backedUp: true as const } : {}) } : {});
   const status = (main?: string): StatusResult => {
     if (!deps.passkey.available()) return { state: 'unsupported', session: null, features };
     if (identity) {
       const open = record(credentialId);
-      return { state: 'unlocked', address: identity.address, slot, root: (root ?? identity).address, linked: open?.link?.main, ...(open?.once ? { unproven: true as const } : {}), ...othersOf(open, main), session: summary(), features };
+      return { state: 'unlocked', address: identity.address, slot, root: (root ?? identity).address, linked: open?.link?.main, ...(open?.once ? { unproven: true as const } : {}), ...backupOf(open), ...othersOf(open, main), session: summary(), features };
     }
     const last = pick(main);
     return last
-      ? { state: 'known', address: last.address, linked: last.link?.main, ...(last.once ? { unproven: true as const } : {}), ...othersOf(last, main), session: null, features }
+      ? { state: 'known', address: last.address, linked: last.link?.main, ...(last.once ? { unproven: true as const } : {}), ...backupOf(last), ...othersOf(last, main), session: null, features }
       : { state: 'none', ...othersOf(undefined, main), session: null, features };
   };
   const refreshIdle = () => deps.ui.idle(status(viewMain));
-  const lockNow = () => { identity = null; root = null; base = null; slot = 0; ledger = null; credentialId = null; unlockedFor = undefined; };
+  const lockNow = () => { wipeBase(base); identity = null; root = null; base = null; slot = 0; ledger = null; credentialId = null; unlockedFor = undefined; };
 
   /** One panel at a time: the listener answers inside the frame, so stacking prompts would confuse. */
   async function interact<T>(run: () => Promise<T>): Promise<T> {
@@ -271,7 +297,7 @@ export function createListeningEngine(deps: {
     return identity;
   };
 
-  async function create(terms?: SessionTerms, main?: string, quick = false): Promise<{ id: ListeningIdentity; base: CryptoKey }> {
+  async function create(terms?: SessionTerms, main?: string, quick = false): Promise<{ id: ListeningIdentity; base: WalletBase }> {
     const existing = load().wallets;
     const exclude = main ? [] : existing.map((w) => w.credentialId);
     const name = main ? `Xtrata listening wallet · ${short(main)}` : undefined;
@@ -289,7 +315,7 @@ export function createListeningEngine(deps: {
       warnings: [
         'Keep no more than 1 STX in it.',
         'Anyone who can use this passkey on an unlocked device can spend it.',
-        'If you lose the passkey, whatever is in this wallet is lost. You can return funds to a wallet of yours at any time.',
+        'If you lose the passkey, only your 24 backup words can open this wallet. Write them down from your player once it is made. You can return funds to a wallet of yours at any time.',
         ...(existing.length
           ? [`This device already has a listening wallet (${existing.map((w) => short(w.address)).join(', ')}). A new one is a separate wallet${main ? ` for ${short(main)}: each address keeps its own plays, likes and funds. The old one is still there for the wallet it belongs to` : ': to reach the old one later, choose its passkey when unlocking'}.`]
           : [])
@@ -299,16 +325,19 @@ export function createListeningEngine(deps: {
     // A passkey made a moment ago that never got proven (reload, closed panel, discarded tab): finish that one.
     const resume = pendingNow();
     let created: { credentialId: string; prf?: Uint8Array };
+    // Every new player has a backup phrase (version 2). Only a passkey half-made before that existed finishes as version 1.
+    let version: 1 | 2 = 2;
     try {
       if (!deps.passkey.createsInNewTab?.() || !deps.passkey.openCreator) {
-        if (resume?.credentialId) created = { credentialId: resume.credentialId };
+        if (resume?.credentialId) { created = { credentialId: resume.credentialId }; version = resume.v === 2 ? 2 : 1; }
         else {
+          const uid = newPhraseUserId();
           created = await deps.ui.act(createPanel, () => deps.passkey.create(
             // A wallet for a specific address is meant to be a NEW passkey beside the others. Excluding the existing
             // credentials there makes the authenticator refuse ("already registered") on exactly the device that has them.
             // Without an address the old guard stays: do not quietly make a duplicate of a wallet this device already has.
-            exclude, name));
-          setPending({ at: now(), tries: 0, credentialId: created.credentialId });
+            exclude, name, uid));
+          setPending({ at: now(), tries: 0, credentialId: created.credentialId, v: 2 });
         }
       } else {
         // This browser will not make a passkey inside a frame: make it on wallet.xtrata.xyz in a new tab, then
@@ -321,7 +350,7 @@ export function createListeningEngine(deps: {
           userId = resume.userId; label = resume.label;
         } else {
           const idBytes = crypto.getRandomValues(new Uint8Array(16));
-          userId = b64u(idBytes);
+          userId = newPhraseUserId(idBytes);
           // Four characters to tell this passkey apart in the device's passkey list.
           const tag = Array.from(idBytes.slice(0, 2), (b) => b.toString(16).padStart(2, '0')).join('').toUpperCase();
           label = `${name ?? 'Xtrata listening wallet'} · ${tag}`;
@@ -347,7 +376,8 @@ export function createListeningEngine(deps: {
           }
           return r;
         });
-        setPending({ at: now(), tries: 0, credentialId: created.credentialId });
+        version = isPhraseUserId(userId) ? 2 : 1;
+        setPending({ at: now(), tries: 0, credentialId: created.credentialId, ...(version === 2 ? { v: 2 as const } : {}) });
       }
     } catch (e) {
       // A pick-up that fails or is cancelled counts; after a few, the half-made passkey is dropped and a fresh one is made.
@@ -380,10 +410,10 @@ export function createListeningEngine(deps: {
       const once = outputs.length < 2;
       if (!once && !equalBytes(outputs[0], outputs[1]))
         throw new Error('This passkey did not give a stable result, so pay-per-play is not available on this device. Nothing was funded. Listening stays free.');
-      const key = await listeningBase(outputs[0]);
-      const id = await deriveSlotIdentity(key, 0);
+      const key = await baseFor(version, outputs[0]);
+      const id = await slotOf(key, 0);
       credentialId = created.credentialId;
-      remember({ credentialId: created.credentialId, address: id.address, ...(once ? { once: true as const } : {}) });
+      remember({ credentialId: created.credentialId, address: id.address, ...(once ? { once: true as const } : {}), ...(version === 2 ? { v: 2 as const } : {}) });
       return { id, base: key };
     } catch (e) {
       afterFailure(resume, e);
@@ -396,7 +426,7 @@ export function createListeningEngine(deps: {
   /** A name from the page, kept to plain letters, digits and . _ - so it cannot carry anything but a name. */
   const cleanLabel = (v: unknown) => (typeof v === 'string' ? v.replace(/[^\p{L}\p{N}._ -]/gu, '').trim().slice(0, 40) : '');
 
-  async function unlockExisting(anyPasskey = false, terms?: SessionTerms, label?: string, forMain?: string): Promise<{ id: ListeningIdentity; base: CryptoKey }> {
+  async function unlockExisting(anyPasskey = false, terms?: SessionTerms, label?: string, forMain?: string): Promise<{ id: ListeningIdentity; base: WalletBase }> {
     const last = anyPasskey ? undefined : pick(forMain);
     // A listening wallet linked to a main wallet is that person's wallet: greet them by it. The listening
     // address is plumbing for them. Without a link (passkey-only) the listening address is the identity.
@@ -433,14 +463,17 @@ export function createListeningEngine(deps: {
         if (again.credentialId !== r.credentialId || !equalBytes(r.prf, again.prf))
           throw new Error('This passkey did not give a stable result on this device. Nothing was signed. Use the device where you created it.');
       }
-      const key = await listeningBase(r.prf);
-      const id = await deriveSlotIdentity(key, 0);
+      // Which kind of player this passkey is: this device's record says; for a passkey new to this device (synced
+      // from another) its public user id does. Without either it is read as the original kind, as it always was.
+      const version: 1 | 2 = known ? (known.v === 2 ? 2 : 1) : isPhraseUserId(r.userHandle) ? 2 : 1;
+      const key = await baseFor(version, r.prf);
+      const id = await slotOf(key, 0);
       if (known && known.address !== id.address)
         throw new Error('This passkey no longer gives the same wallet on this device. Nothing was signed. Use another device to return its funds.');
       credentialId = r.credentialId;
       // A passkey that was checked once at creation has now given the same wallet a second time: it is proven.
       const { once: _once, ...kept } = known ?? ({} as Partial<WalletRecord>);
-      remember({ ...kept, credentialId: r.credentialId, address: id.address });
+      remember({ ...kept, credentialId: r.credentialId, address: id.address, ...(version === 2 ? { v: 2 as const } : {}) });
       return { id, base: key };
     } finally {
       r.prf.fill(0);
@@ -532,7 +565,7 @@ export function createListeningEngine(deps: {
       requireUnlocked();
       const n = (params as SlotParams | undefined)?.slot;
       if (!isSlot(n) || !base) throw new Error('That wallet number is not available.');
-      return { slot: n, address: (await deriveSlotIdentity(base, n)).address };
+      return { slot: n, address: (await slotOf(base, n)).address };
     },
 
     'listening.openSlot': async (params: unknown): Promise<OpenSlotResult> => {
@@ -542,7 +575,7 @@ export function createListeningEngine(deps: {
       if (signing) throw new Error('Still signing. Switch again in a moment.');
       if (interactive) throw new Error('The listening wallet is waiting for you in its panel.');
       if (n === slot) return { slot, address: identity!.address, session: summary() };
-      const next = await deriveSlotIdentity(base, n);
+      const next = await slotOf(base, n);
       if (!identity || !base || signing) throw new Error('Wallet locked or busy. Nothing changed.');
       identity = next;
       slot = n;
@@ -555,7 +588,7 @@ export function createListeningEngine(deps: {
       const p = params as BindSlotParams | undefined;
       if (!base || !root) throw new Error('Unlock the listening wallet first.');
       if (!isSlot(p?.slot)) throw new Error('That wallet number is not available.');
-      const derived = await deriveSlotIdentity(base, p!.slot);
+      const derived = await slotOf(base, p!.slot);
       const binding = validateSlotBinding({ root: root.address, slot: p!.slot, address: derived.address, issued: p!.issued }, now());
       return { ...binding, rootSignature: signSlotBinding(binding, root.privateKey), slotSignature: signSlotBinding(binding, derived.privateKey) };
     },
@@ -575,8 +608,8 @@ export function createListeningEngine(deps: {
         if (amount < MOVE_MIN) throw new Error('That is too small to move.');
         if (fee < 1n || fee > MOVE_FEE_CAP) throw new Error('That network fee is not allowed.');
         if (balance < amount + fee + RESERVE) throw new Error('Not enough in that wallet to move this and keep its reserve.');
-        const source = fromSlot === slot ? open : fromSlot === 0 ? root : await deriveSlotIdentity(base, fromSlot);
-        const target = await deriveSlotIdentity(base, p!.to);
+        const source = fromSlot === slot ? open : fromSlot === 0 ? root : await slotOf(base, fromSlot);
+        const target = await slotOf(base, p!.to);
         const tx = await makeSTXTokenTransfer({ ...moveTransferOptions(target.address, amount, fee, nonce), senderKey: source.privateKey });
         if (identity !== open) throw new Error('Wallet locked before the move was signed. Nothing moved.');
         refreshIdle();
@@ -602,7 +635,7 @@ export function createListeningEngine(deps: {
         confirmLabel: 'Use passkey'
       }, () => deps.passkey.evaluate(id0));
       try {
-        const again = await deriveSlotIdentity(await listeningBase(r.prf), 0);
+        const again = await slotOf(await baseFor(rec.v === 2 ? 2 : 1, r.prf), 0);
         if (r.credentialId !== id0 || again.address !== rec.address)
           throw new Error('This passkey did not give the same player twice on this device. Do not add plays to it. Nothing was signed.');
         const { once: _once, ...kept } = rec;
@@ -611,6 +644,62 @@ export function createListeningEngine(deps: {
         save(s);
         return { proven: true as const };
       } finally { r.prf.fill(0); }
+    }),
+
+    /**
+     * Write down the backup words. Everything happens in this frame: a fresh passkey tap, the 24 words on screen,
+     * then three of them asked back. The words are never stored, never sent and never returned to the page: the
+     * answer is only that it was done. Version 2 players only (a version 1 player has no phrase).
+     */
+    'listening.backup': (): Promise<{ backedUp: true }> => interact(async () => {
+      if (!identity || !credentialId || !root) throw new Error('Unlock the listening wallet first.');
+      const id0 = credentialId, rootAddress = root.address;
+      if (record(id0)?.v !== 2) throw new Error('This player was made before backup words existed, so it has none. Its passkey is its only key.');
+      const phrase = await deps.ui.act({
+        kind: 'backup',
+        title: 'Back up your player',
+        summary: '24 words that open this player in any Stacks wallet. Only you ever see them: first make sure nobody can see your screen.',
+        lines: [
+          'The words are worked out on this device from your passkey. They are never stored and never sent anywhere, and Xtrata cannot show them to you again or recover them for you.',
+          'With them you can open this same wallet in Leather or Xverse, even if you lose this device and its passkey.'
+        ],
+        warnings: [
+          'Anyone who sees these words can take everything in this player. Make sure nobody is watching your screen.',
+          'Write them on paper. Do not take a screenshot, and never type them into a website. Xtrata will never ask for them.'
+        ],
+        confirmLabel: 'Show my 24 words'
+      }, async () => {
+        const r = await deps.passkey.evaluate(id0);
+        try {
+          if (r.credentialId !== id0) throw new Error('A different passkey was used. Nothing was shown.');
+          const b = await phraseBase(r.prf);
+          try { if (derivePhraseSlot(b, 0).address !== rootAddress) throw new Error('This passkey did not give this player just now. Nothing was shown.'); } finally { b.wipe(); }
+          return await phraseFromPrf(r.prf);
+        } finally { r.prf.fill(0); }
+      });
+      const words = phrase.split(' ');
+      await deps.ui.act({
+        kind: 'phrase', title: 'Write these 24 words down', summary: 'On paper, in this order. Three are asked back next.',
+        lines: [], words, confirmLabel: 'I have written them down'
+      }, async () => true);
+      // Three of them, asked back: a tap each, no typing.
+      const order = Array.from(crypto.getRandomValues(new Uint32Array(words.length)), (r, i) => [r, i]).sort((a, b) => a[0] - b[0]).slice(0, 3).map((x) => x[1]).sort((a, b) => a - b);
+      for (const at of order) {
+        const options = [words[at], ...decoyWords(3, words)];
+        const mix = crypto.getRandomValues(new Uint32Array(options.length));
+        const shuffled = options.map((w, i) => [mix[i], w] as const).sort((a, b) => a[0] - b[0]).map((x) => x[1]);
+        const panel: Panel = { kind: 'phrase-check', title: `Which is word ${at + 1}?`, summary: 'Tap the word you wrote down.', lines: [], pick: { options: shuffled, chosen: null }, confirmLabel: 'Check' };
+        await deps.ui.act(panel, async () => {
+          const c = panel.pick!.chosen;
+          if (c === null || shuffled[c] !== words[at]) throw Object.assign(new Error(`That is not word ${at + 1}. Look at what you wrote down and try again.`), { retryable: true });
+          return true;
+        });
+      }
+      if (credentialId !== id0) throw new Error('The wallet was locked before the backup was checked. Nothing was recorded.');
+      const s = load();
+      s.wallets = s.wallets.map((w) => (w.credentialId === id0 ? { ...w, backedUp: now() } : w));
+      save(s);
+      return { backedUp: true as const };
     }),
 
     'listening.approveSession': (params: unknown): Promise<SessionSummary> => interact(async () => {

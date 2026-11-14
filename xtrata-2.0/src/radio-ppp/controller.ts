@@ -138,6 +138,10 @@ export interface Snapshot {
   linked?: string;
   /** A free starter player whose passkey has had one check, not two: `prove()` runs the second before anything is added. */
   unproven: boolean;
+  /** This player has 24 backup words that open it in other Stacks wallets (players made since backup phrases). */
+  phrase: boolean;
+  /** The listener wrote the backup words down and checked them on this device. */
+  backedUp: boolean;
   balance?: bigint;
   balanceState?: BalanceState;
   playsLeft: number;
@@ -531,7 +535,7 @@ export function createPppController(deps: PppDeps) {
 
   const snapshot = (): Snapshot => ({
     step: step(), busy, message, error, notice: noticeText(), gate, main: creditMain(), mainConnected: !!deps.main(), standIn: standIn(),
-    listening: status?.address, linked: status?.linked, unproven: !!status?.unproven, balance,
+    listening: status?.address, linked: status?.linked, unproven: !!status?.unproven, phrase: !!status?.phrase, backedUp: !!status?.backedUp, balance,
     balanceState: balance === undefined ? undefined : balanceState(balance, fee()),
     playsLeft: balance === undefined ? 0 : playsCovered(balance, fee()),
     allowance: balance === undefined ? TARGET : fundingAllowance(balance, BigInt(pendingDeposit()?.amount ?? '0')),
@@ -1226,6 +1230,18 @@ export function createPppController(deps: PppDeps) {
       await bridge?.request('listening.stop');
       setPayingOn(false);
       say('Music support is off. Playback is paused.');
+    }),
+
+    /**
+     * Write down the backup words. The wallet box shows them and asks three back; this page never sees a word, only
+     * that it was done. For a player that has a phrase, while it is open.
+     */
+    backup: () => task('Showing your backup words in the box…', async () => {
+      if (!status?.phrase) throw new Error('This player was made before backup words existed, so it has none.');
+      const b = await ensureBridge();
+      await b.request('listening.backup');
+      status = await readStatus(b);
+      say('Backed up ✓ Keep those 24 words somewhere safe and private.');
     }),
 
     lock: () => task('Locking…', async () => {

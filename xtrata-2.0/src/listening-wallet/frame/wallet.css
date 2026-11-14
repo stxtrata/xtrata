@@ -34,6 +34,15 @@ button.primary:disabled { background: #2a6f66; color: #b9d9d3; border-color: #2a
 #p-more { margin-top: 2px; color: var(--muted); font-size: 13px; }
 #p-more summary { cursor: pointer; color: var(--accent); }
 #p-more-warn { margin: 6px 0; padding: 6px 6px 6px 22px; border: 1px solid var(--warn); border-radius: 8px; color: var(--warn); }
+/* Backup words: numbered, in order, three columns so all 24 fit the box without scrolling. Monospace so no word is
+   mistaken for its neighbour. Plain colours only (see the note on the confirm button's visibility check above). */
+#p-words { list-style: none; counter-reset: w; margin: 4px 0 0; padding: 5px 8px 4px; display: grid; grid-auto-flow: column; grid-template-rows: repeat(8, auto); grid-template-columns: repeat(3, 1fr); gap: 1px 8px; border: 1px solid var(--line); border-radius: 8px; font: 12.5px/1.32 ui-monospace, monospace; }
+#p-words[hidden], #p-pick[hidden] { display: none; }
+#p-words li { counter-increment: w; white-space: nowrap; }
+#p-words li::before { content: counter(w) " "; color: var(--muted); display: inline-block; min-width: 2.1em; }
+#p-pick { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 8px 0 2px; }
+#p-pick button { font-family: ui-monospace, monospace; }
+#p-pick button.on { border-color: var(--accent); color: var(--accent); background: #0f2a27; }
 /* The top-level create page (create.html). */
 .muted { color: var(--muted); }
 .ok { color: var(--accent); }
