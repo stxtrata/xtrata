@@ -469,7 +469,7 @@ history.replaceState(null,'',location.pathname+location.search);}catch(e){}})();
   .sheet-bar button{width:44px;height:44px;border:0;background:none;color:#c9ced6;font-size:24px;cursor:pointer;border-radius:12px}
   html[data-view=album][data-sheet] .ppp,html[data-view=album][data-asking] .ppp{display:block!important;border:0;background:none;padding:0;box-shadow:none}
   html[data-view=album][data-sheet] .ppp>*:not(.ppp-folds):not(.ppp-shelf):not(.ppp-msg):not(.ppp-err),
-  html[data-view=album][data-asking] .ppp>*:not(.ppp-frame):not(.ppp-msg):not(.ppp-err){display:none!important}
+  html[data-view=album][data-asking] .ppp>*:not(.ppp-frame):not(.ppp-msg):not(.ppp-err):not(.ppp-skin){display:none!important}
   html[data-view=album][data-sheet=device] .ppp>.ppp-frame:not([hidden]){display:block!important}
   html[data-view=album][data-asking] .ppp-folds,html[data-view=album][data-asking] .sheet-bar{display:none!important}
   html[data-view=album][data-sheet] .ppp-fold{display:none}
@@ -544,6 +544,15 @@ history.replaceState(null,'',location.pathname+location.search);}catch(e){}})();
   .ppp-featured__a:hover:not(:disabled),.ppp-featured__a:focus-visible{border-color:var(--cyan);outline:none}
   .al-album{width:100%;margin-top:8px;min-height:52px;border:1px solid #2a313b!important;border-radius:12px;padding:10px 14px!important;display:flex;flex-direction:column;align-items:flex-start;gap:2px;text-align:left;color:#f2f0ea!important}
   .al-album b{font-size:15px}.al-album span{font-size:12.5px;color:#a3aab5}
+  .al-album--art{flex-direction:row;align-items:center;gap:12px;padding:8px 14px 8px 8px!important}
+  .al-album__art{width:48px;height:48px;border-radius:8px;object-fit:cover;flex:none;background:#143a40}
+  .al-album__t{display:flex;flex-direction:column;gap:2px;min-width:0}
+  .ppp-skin{display:none}
+  html[data-asking] .ppp-skin:not([hidden]){display:flex;align-items:center;gap:12px;margin:2px 0 10px;padding:8px;border:1px solid #2a313b;border-radius:14px;background:#12151a}
+  .ppp-skin__art{width:52px;height:52px;border-radius:10px;object-fit:cover;flex:none;background:#143a40;display:grid;place-items:center;color:#7fe3f5;font-size:22px}
+  .ppp-skin__t{display:flex;flex-direction:column;gap:2px;min-width:0}
+  .ppp-skin__t b{font-size:15px;color:#f2f0ea;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .ppp-skin__t span{font-size:12.5px;color:#a3aab5;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .ppp-yours-item{border-top:1px solid var(--line);padding:2px 0}
   .ppp-yours-item summary{cursor:pointer;padding:9px 0;font-size:13.5px;font-weight:700}
   .ppp-yours-item p{margin:0 0 9px;font-size:13px;line-height:1.5}
@@ -828,6 +837,8 @@ history.replaceState(null,'',location.pathname+location.search);}catch(e){}})();
       <div class="ppp-key"></div>
       <div class="ppp-featured" hidden></div>
       <p class="ppp-frame-label" hidden><span>Listening wallet · approvals happen in this box</span></p>
+      <!-- While the box asks for a tap on an album: its cover, name and giver, drawn by the page above the box. -->
+      <div class="ppp-skin" hidden></div>
       <div class="ppp-frame" hidden></div>
       <div class="ppp-actions"></div>
       <p class="ppp-msg" role="status"></p>
@@ -1285,7 +1296,7 @@ function showUnavailable(){
 fetch('/radio/listening-wallet/config',{cache:'no-store',signal:AbortSignal.timeout(15000)})
   .then(function(r){return r.ok?r.json():{}})
   .then(function(c){
-    if(c?.enabled && (!paidHost || c.here)) return import('/radio/ppp.js?v=018d24f36b38');
+    if(c?.enabled && (!paidHost || c.here)) return import('/radio/ppp.js?v=d705e2446bbe');
     showUnavailable();
   }).catch(showUnavailable);
 </script>

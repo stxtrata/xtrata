@@ -136,3 +136,28 @@ export function thumb(id: string, known?: string): string {
   return '';
 }
 
+
+// An album's cover inscription: an image is used as it is; a page gives its first embedded image. Asked for once and
+// shared by every screen that shows the album (its own page, the welcome screens, the strip above the wallet box).
+const coverUrls = new Map<number, string>();
+const coverAsked = new Set<number>();
+/** The album cover's url, or '' (not known yet, or none): views draw again through `onArt` when it is found. */
+export function coverArt(id: number | null | undefined): string {
+  if (!id || !Number.isSafeInteger(id) || id < 0) return '';
+  if (coverUrls.has(id)) return coverUrls.get(id)!;
+  if (!coverAsked.has(id)) {
+    coverAsked.add(id);
+    fetch('/inscription/' + id, { signal: AbortSignal.timeout(20_000) })
+      .then(async (r) => {
+        const type = (r.headers.get('content-type') || '').toLowerCase();
+        if (!r.ok) { await r.body?.cancel(); throw new Error('no cover'); }
+        if (type.startsWith('image/')) { await r.body?.cancel(); return '/inscription/' + id; }
+        if (type.includes('text/html')) return ((await r.text()).match(/<img[^>]+src="(data:image\/[^"]+)"/i)?.[1] ?? '').replace(/&amp;/g, '&');
+        await r.body?.cancel();
+        return '';
+      })
+      .then((url) => { coverUrls.set(id, url); notify(); })
+      .catch(() => { coverAsked.delete(id); });
+  }
+  return '';
+}
