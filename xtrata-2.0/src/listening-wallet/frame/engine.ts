@@ -107,6 +107,12 @@ interface WalletRecord {
   credentialId: string;
   address: string;
   link?: { main: string; issued: number; mainSignature: string };
+  /**
+   * Checked once, not twice: a free starter player made with `quick` (one passkey tap fewer). Status reports it as
+   * `unproven`; the second, matching check happens at the next unlock or through `listening.prove`, and clears this.
+   * The radio asks for that check before the listener adds anything of their own.
+   */
+  once?: true;
 }
 /**
  * A passkey this device has made but not yet proven. Only public ids are kept (never a secret). If the page reloads,
@@ -243,11 +249,11 @@ export function createListeningEngine(deps: {
     if (!deps.passkey.available()) return { state: 'unsupported', session: null, features };
     if (identity) {
       const open = record(credentialId);
-      return { state: 'unlocked', address: identity.address, slot, root: (root ?? identity).address, linked: open?.link?.main, ...othersOf(open, main), session: summary(), features };
+      return { state: 'unlocked', address: identity.address, slot, root: (root ?? identity).address, linked: open?.link?.main, ...(open?.once ? { unproven: true as const } : {}), ...othersOf(open, main), session: summary(), features };
     }
     const last = pick(main);
     return last
-      ? { state: 'known', address: last.address, linked: last.link?.main, ...othersOf(last, main), session: null, features }
+      ? { state: 'known', address: last.address, linked: last.link?.main, ...(last.once ? { unproven: true as const } : {}), ...othersOf(last, main), session: null, features }
       : { state: 'none', ...othersOf(undefined, main), session: null, features };
   };
   const refreshIdle = () => deps.ui.idle(status(viewMain));
@@ -265,7 +271,7 @@ export function createListeningEngine(deps: {
     return identity;
   };
 
-  async function create(terms?: SessionTerms, main?: string): Promise<{ id: ListeningIdentity; base: CryptoKey }> {
+  async function create(terms?: SessionTerms, main?: string, quick = false): Promise<{ id: ListeningIdentity; base: CryptoKey }> {
     const existing = load().wallets;
     const exclude = main ? [] : existing.map((w) => w.credentialId);
     const name = main ? `Xtrata listening wallet · ${short(main)}` : undefined;
@@ -351,9 +357,13 @@ export function createListeningEngine(deps: {
 
     // Prove PRF is live AND stable before the address is ever shown for funding
     // (docs/PASSKEY-WALLET.md §3.1). A wallet whose PRF output changes is unreachable.
+    // `quick` (a free starter player only): one result from USING the passkey is enough to start listening, so the
+    // PRF is proven live, and the second, matching check is put off (see `once`). A result that came with creation
+    // alone never counts for this: the passkey must have been used at least once.
     const outputs: Uint8Array[] = created.prf ? [created.prf] : [];
+    let used = 0;
     try {
-      while (outputs.length < 2) {
+      while (outputs.length < 2 && !(quick && used > 0)) {
         const first = outputs.length === 0;
         const r = await deps.ui.act({
           kind: first ? 'confirm-passkey' : 'verify-passkey',
@@ -365,13 +375,15 @@ export function createListeningEngine(deps: {
         }, () => deps.passkey.evaluate(created.credentialId));
         if (r.credentialId !== created.credentialId) throw new Error('A different passkey was used. Start again with the new one.');
         outputs.push(r.prf);
+        used++;
       }
-      if (!equalBytes(outputs[0], outputs[1]))
+      const once = outputs.length < 2;
+      if (!once && !equalBytes(outputs[0], outputs[1]))
         throw new Error('This passkey did not give a stable result, so pay-per-play is not available on this device. Nothing was funded. Listening stays free.');
       const key = await listeningBase(outputs[0]);
       const id = await deriveSlotIdentity(key, 0);
       credentialId = created.credentialId;
-      remember({ credentialId: created.credentialId, address: id.address });
+      remember({ credentialId: created.credentialId, address: id.address, ...(once ? { once: true as const } : {}) });
       return { id, base: key };
     } catch (e) {
       afterFailure(resume, e);
@@ -426,7 +438,9 @@ export function createListeningEngine(deps: {
       if (known && known.address !== id.address)
         throw new Error('This passkey no longer gives the same wallet on this device. Nothing was signed. Use another device to return its funds.');
       credentialId = r.credentialId;
-      remember({ ...(known ?? {}), credentialId: r.credentialId, address: id.address });
+      // A passkey that was checked once at creation has now given the same wallet a second time: it is proven.
+      const { once: _once, ...kept } = known ?? ({} as Partial<WalletRecord>);
+      remember({ ...kept, credentialId: r.credentialId, address: id.address });
       return { id, base: key };
     } finally {
       r.prf.fill(0);
@@ -466,7 +480,8 @@ export function createListeningEngine(deps: {
       if (!identity) {
         // The terms are shown on the same panel as the passkey button, so that one confirm click
         // inside the frame both unlocks and approves paying as you listen.
-        const opened = p.mode === 'create' ? await create(terms, main) : await unlockExisting(p.anyPasskey === true, terms, p.label, main);
+        // `quick` is honoured only for a passkey-only player (no main wallet): the free starter claim.
+        const opened = p.mode === 'create' ? await create(terms, main, p.quick === true && !main) : await unlockExisting(p.anyPasskey === true, terms, p.label, main);
         identity = root = opened.id;
         base = opened.base;
         slot = 0;
@@ -570,6 +585,33 @@ export function createListeningEngine(deps: {
         signing = false;
       }
     },
+
+    /**
+     * The second passkey check a `quick` player skipped: the passkey must give the same wallet again. The radio asks
+     * for it before the listener adds anything of their own. Nothing is signed. Already proven: answers at once.
+     */
+    'listening.prove': (): Promise<{ proven: true }> => interact(async () => {
+      if (!identity || !credentialId) throw new Error('Unlock the listening wallet first.');
+      const id0 = credentialId;
+      const rec = record(id0);
+      if (!rec?.once) return { proven: true as const };
+      const r = await deps.ui.act({
+        kind: 'verify-passkey',
+        title: 'One more check',
+        lines: ['Before you add plays: tap your passkey once more, to check it gives the same player every time.'],
+        confirmLabel: 'Use passkey'
+      }, () => deps.passkey.evaluate(id0));
+      try {
+        const again = await deriveSlotIdentity(await listeningBase(r.prf), 0);
+        if (r.credentialId !== id0 || again.address !== rec.address)
+          throw new Error('This passkey did not give the same player twice on this device. Do not add plays to it. Nothing was signed.');
+        const { once: _once, ...kept } = rec;
+        const s = load();
+        s.wallets = s.wallets.map((w) => (w.credentialId === id0 ? kept : w));
+        save(s);
+        return { proven: true as const };
+      } finally { r.prf.fill(0); }
+    }),
 
     'listening.approveSession': (params: unknown): Promise<SessionSummary> => interact(async () => {
       requireUnlocked();

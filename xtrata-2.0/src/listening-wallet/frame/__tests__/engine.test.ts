@@ -691,3 +691,69 @@ describe('one passkey, many wallets (slots)', () => {
     await expect(h['listening.openSlot']({ slot: 1 })).resolves.toMatchObject({ address: SLOT1 });
   });
 });
+
+describe('quick create: a free starter player puts off the second passkey check', () => {
+  const other = Uint8Array.from({ length: 32 }, (_, i) => 255 - i);
+
+  it('starts after one use of the passkey and reports the wallet as unproven', async () => {
+    const s = setup();
+    await s.h['listening.unlock']({ mode: 'create', quick: true });
+    expect(s.panels.map((p) => p.kind)).toEqual(['create', 'confirm-passkey']);
+    expect(await s.h['listening.status']()).toMatchObject({ state: 'unlocked', address: ADDRESS, unproven: true });
+  });
+
+  it('a result that came with creation never counts alone: the passkey is still used once', async () => {
+    const s = setup({ createPrf: true });
+    await s.h['listening.unlock']({ mode: 'create', quick: true });
+    expect(s.panels.map((p) => p.kind)).toEqual(['create', 'verify-passkey']);
+    expect((await s.h['listening.status']()).unproven).toBeUndefined();
+  });
+
+  it('is ignored when a main wallet is connected, and without the flag nothing changes', async () => {
+    const a = setup();
+    await a.h['listening.unlock']({ mode: 'create', quick: true, main: MAIN });
+    expect(a.panels.map((p) => p.kind)).toEqual(['create', 'confirm-passkey', 'verify-passkey']);
+    expect((await a.h['listening.status']({ main: MAIN })).unproven).toBeUndefined();
+    const b = setup();
+    await b.h['listening.unlock']({ mode: 'create', quick: 'yes' as never });
+    expect(b.panels.map((p) => p.kind)).toEqual(['create', 'confirm-passkey', 'verify-passkey']);
+  });
+
+  it('listening.prove runs the second check, clears the flag and then answers without a panel', async () => {
+    const s = setup();
+    await s.h['listening.unlock']({ mode: 'create', quick: true });
+    expect(await s.h['listening.prove']()).toEqual({ proven: true });
+    expect(s.panels.at(-1)).toMatchObject({ kind: 'verify-passkey', title: 'One more check' });
+    expect((await s.h['listening.status']()).unproven).toBeUndefined();
+    const before = s.panels.length;
+    await s.h['listening.prove']();
+    expect(s.panels.length).toBe(before);
+  });
+
+  it('listening.prove refuses a passkey that gives a different wallet the second time, and keeps the flag', async () => {
+    const s = setup({ outputs: [PRF, other] });
+    await s.h['listening.unlock']({ mode: 'create', quick: true });
+    await expect(s.h['listening.prove']()).rejects.toThrow(/did not give the same player twice/);
+    expect((await s.h['listening.status']()).unproven).toBe(true);
+  });
+
+  it('listening.prove needs an open wallet', async () => {
+    const s = setup();
+    await expect(s.h['listening.prove']()).rejects.toThrow(/Unlock/);
+  });
+
+  it('the next ordinary unlock is the second check: a match proves it, a mismatch is refused', async () => {
+    const ok = setup();
+    await ok.h['listening.unlock']({ mode: 'create', quick: true });
+    await ok.h['listening.lock']();
+    expect((await ok.h['listening.status']()).unproven).toBe(true);
+    await ok.h['listening.unlock']({ mode: 'unlock' });
+    expect((await ok.h['listening.status']()).unproven).toBeUndefined();
+
+    const bad = setup({ outputs: [PRF, other] });
+    await bad.h['listening.unlock']({ mode: 'create', quick: true });
+    await bad.h['listening.lock']();
+    await expect(bad.h['listening.unlock']({ mode: 'unlock' })).rejects.toThrow(/no longer gives the same wallet/);
+    expect((await bad.h['listening.status']()).unproven).toBe(true);
+  });
+});

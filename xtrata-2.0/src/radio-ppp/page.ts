@@ -76,7 +76,7 @@ function start(root: HTMLElement) {
       // Interactive requests wait for the listener (up to 30 minutes) so a late confirm in the frame
       // is never signed and then dropped here. Everything else must answer quickly.
       const client = new WalletBridgeClient({ walletOrigin: origin, frame, timeoutMs: 30 * 60_000 });
-      const INTERACTIVE = new Set(['listening.unlock', 'listening.link', 'listening.approveSession', 'listening.prepareReturn']);
+      const INTERACTIVE = new Set(['listening.unlock', 'listening.link', 'listening.prove', 'listening.approveSession', 'listening.prepareReturn']);
       const request = <T,>(method: string, params?: unknown) => INTERACTIVE.has(method)
         ? client.request<T>(method as never, params)
         : Promise.race([
@@ -267,14 +267,14 @@ function start(root: HTMLElement) {
     // untouched: making the passkey still takes the visitor's tap inside the box.
     if (starter && !autoClaimTried && s.step === 'intro' && !s.busy && !s.armed && !s.error && !inApp) {
       autoClaimTried = true;
-      void ppp.create();
+      void ppp.create({ quick: true });
     }
     welcome.render({
       mode, status, asking: !!s.busy || s.armed, busy: !!s.busy, canStart: (s.step === 'intro' || s.step === 'locked') && !inApp,
       plays: starter ? starter.plays : mode === 'landed' ? s.playsLeft : null, from: starter?.from ?? null,
       tier: tierNow, mystery,
       albums: mode === 'landed' ? featured.map((p) => ({ title: p.title, by: p.subtitle, run: () => { showFull(); openFeatured(p, true); } })) : [],
-      start: () => void ppp.create(), unlock: () => void ppp.unlock(), returning: () => void ppp.unlock(true), restock: () => restock.open(),
+      start: () => void ppp.create({ quick: !!gifts.incomingStarter() }), unlock: () => void ppp.unlock(), returning: () => void ppp.unlock(true), restock: () => openRestock(),
       full: () => {
         // "Start listening" starts the music: it is the listener's own tap, and nothing is playing yet.
         const radio = (window as any).XtrataRadio;
@@ -306,6 +306,14 @@ function start(root: HTMLElement) {
     input: restockInput,
     copyButton: (key, label, text, cls) => copyButton(key, label, text, cls, () => { render(ppp.snapshot()); })
   });
+  /**
+   * "Add plays" for a starter player whose passkey has had one check: the second check comes first, in the wallet box,
+   * so nobody sends their own STX to a player that has not given the same wallet twice. Proven players open at once.
+   */
+  const openRestock = () => {
+    if (!ppp.snapshot().unproven) { restock.open(); return; }
+    void ppp.prove().then((ok) => { if (ok) restock.open(); });
+  };
 
   // The open album's songs, with their artwork and the plays left, in the panel where "Your Station" is.
   const albumListMount = document.getElementById('albumList');
@@ -559,7 +567,7 @@ function start(root: HTMLElement) {
     if (s.step === 'locked' && !s.armed && !s.busy) void ppp.unlock();
     if (s.step === 'ready' && s.giftStop?.reason === 'off' && !s.busy) void ppp.switchOn();
     // Out of plays with no Stacks wallet to deposit from: straight to "Add plays".
-    if (s.step === 'fund' && s.solo && !s.depositPending && !s.busy) { restock.open(); return; }
+    if (s.step === 'fund' && s.solo && !s.depositPending && !s.busy) { openRestock(); return; }
     focusPanel();
   };
   if (top) top.onclick = go;
@@ -1112,9 +1120,9 @@ function start(root: HTMLElement) {
     if (s.solo && s.listening && !s.depositPending) {
       const playedOut = s.step === 'fund';
       const low = s.step === 'ready' && (s.balanceState === 'low' || (!!s.gift && s.giftPlays <= 20));
-      if (playedOut) actions.unshift(button('Add plays', () => restock.open(), 'primary'));
-      else if (low) actions.push(button('Add plays', () => restock.open(), 'primary'));
-      else if (s.step === 'ready') more.push(button('Add plays', () => restock.open(), 'quiet'));
+      if (playedOut) actions.unshift(button('Add plays', () => openRestock(), 'primary'));
+      else if (low) actions.push(button('Add plays', () => openRestock(), 'primary'));
+      else if (s.step === 'ready') more.push(button('Add plays', () => openRestock(), 'quiet'));
     }
     if (s.solo && s.walletCannotSolo)
       lines.push(el('p', 'The listening wallet box is still updating. Paid plays work; returning to another address and likes start working once it has.', 'ppp-warn'));

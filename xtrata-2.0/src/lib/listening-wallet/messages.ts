@@ -21,6 +21,11 @@ export interface StatusResult {
   /** Main wallet this listening wallet is linked to, if verified on this device. */
   linked?: string;
   /**
+   * This wallet's passkey has been checked once, not twice (a free starter player made with `quick`). The radio asks
+   * for `listening.prove` before the listener adds anything of their own; an ordinary unlock clears it too.
+   */
+  unproven?: true;
+  /**
    * Main wallets that OTHER listening wallets on this device are linked to (public addresses, other than the
    * one reported here), so the page can say "this device already has a listening wallet for ...". Absent when none.
    */
@@ -76,6 +81,11 @@ export interface UnlockParams {
   label?: string;
   /** Optional: approve these session terms in the same step as the passkey tap. */
   terms?: TermsParams;
+  /**
+   * Create only, and only without `main`: a free starter player. One passkey use is enough to start listening; the
+   * second, matching check is put off until the next unlock or `listening.prove` (status says `unproven` meanwhile).
+   */
+  quick?: boolean;
 }
 
 export interface UnlockResult {
