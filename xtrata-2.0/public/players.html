@@ -314,8 +314,10 @@ footer{margin-top:44px;padding-top:16px;border-top:1px solid var(--line);font-si
   var dlg=$('detail');
   function fact(k,v){var li=document.createElement('li'),a=document.createElement('span'),b=document.createElement('b');a.textContent=k;b.textContent=v;li.appendChild(a);li.appendChild(b);return li;}
   function detail(n,tier){
-    // The framed record for this class (public/awards/<class>.html), with the player's number on its plaque.
-    $('dt-award').src='/awards/'+tier+'?n='+n;
+    // The framed record for this class (public/awards/<class>.html). Its plaque is engraved with the player's number
+    // and, once the server has said who claimed it, the address (see scripts/build-awards.py for what it accepts).
+    var award=$('dt-award'), plaque=function(a){award.src='/awards/'+tier+'?n='+n+(a?'&a='+a:'');};
+    award.removeAttribute('src');
     $('dt-title').textContent='Player No. '+pad(n);
     $('dt-sub').textContent=NAME[tier]+' player · claimed';
     var ul=$('dt-facts');ul.textContent='';ul.appendChild(fact('Details','Loading…'));
@@ -323,6 +325,7 @@ footer{margin-top:44px;padding-top:16px;border-top:1px solid var(--line);font-si
     if(dlg.showModal)dlg.showModal();else dlg.setAttribute('open','');
     fetch(API+'/spot/'+n).then(function(r){if(!r.ok)throw 0;return r.json();}).then(function(s){
       ul.textContent='';
+      plaque(typeof s.wallet==='string'&&/^S[PM][0-9A-Z]{28,41}$/.test(s.wallet)?s.wallet:'');
       if(s.plays)ul.appendChild(fact('Came with',s.plays.toLocaleString()+' plays'));
       if(s.claimedAt)ul.appendChild(fact('Claimed',new Date(s.claimedAt).toLocaleString([], {day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})));
       if(typeof s.wallet==='string'&&/^S[PM][0-9A-Z]{20,60}$/.test(s.wallet)){
@@ -336,7 +339,7 @@ footer{margin-top:44px;padding-top:16px;border-top:1px solid var(--line);font-si
         }).catch(function(){paid.lastChild.textContent='Unavailable';});
       }
       if(!ul.children.length)ul.appendChild(fact('Details','Unavailable'));
-    }).catch(function(){ul.textContent='';ul.appendChild(fact('Details','Unavailable right now'));});
+    }).catch(function(){ul.textContent='';ul.appendChild(fact('Details','Unavailable right now'));if(!award.getAttribute('src'))plaque('');});
   }
   $('dt-close').addEventListener('click',function(){dlg.close?dlg.close():dlg.removeAttribute('open');});
   dlg.addEventListener('click',function(e){if(e.target===dlg&&dlg.close)dlg.close();});
