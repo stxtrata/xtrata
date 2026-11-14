@@ -177,14 +177,19 @@ player nothing at all; that is optional and not in this plan yet.
   against there. Any surface that shows inscriptions from a blob would show an empty record. To settle before
   mainnet: either confirm no surface does that for HTML, or have the record fall back to the full
   `https://xtrata.xyz/i/<id>` address when it finds itself in a blob (about 80 more bytes per record).
-- **The testnet rehearsal is written but has not run.** `contracts/clarinet/scripts/awards-testnet-rehearsal.mjs` makes its
-  own throwaway wallets, uses the faucet, deploys the core as the simulation uses it, inscribes the Gold and Diamond
-  templates, deploys and funds the award contract, makes two claims, a forged claim and a second claim (both must be
-  refused), sends a record on, withdraws the balance, then reads everything back and reports the fee each step paid.
-  `--dry` builds all 20 transactions without a network; that passes. It could not be run from Claude's session: the
-  session's network rules refuse the Stacks testnet API. Sizes from the dry run: a claim is 626 to 657 bytes including
-  its post-condition; the award contract deploys at 9.2 KB; the Gold template inscribes in a 15.2 KB transaction.
-- **Still to show:** the flow on testnet with real fees, and the record drawing in the live app's own viewers.
+- **The testnet rehearsal ran on 2026-11-14: 14 of 14 checks passed.** `contracts/clarinet/scripts/awards-testnet-rehearsal.mjs`
+  made its own throwaway wallets, used the faucet, deployed the core as the simulation uses it, inscribed the Gold and
+  Diamond templates (ids 0 and 1), deployed and funded the award contract, and made two claims (Gold No. 412 with a
+  name, 309 bytes; Diamond No. 7 with the address only, 279 bytes). A forged claim was refused (u203) and a second
+  claim by the same hero was refused (u205). A record was sent on and still names the hero who earned it; the unused
+  balance was withdrawn. Both templates read back byte-for-byte; each record declares its template as its dependency.
+  Fees really paid at 1 microSTX per byte: a claim 626 to 656 microSTX, paid by the hero; the contract paid the
+  Xtrata fee of 0.102 STX per record from its balance (1 STX in, 0.796 left after two). Whole run, deploys included:
+  about 0.16 STX in network fees. Run through the site's own testnet proxy:
+  `NODE_USE_ENV_PROXY=1 STACKS_API=https://xtrata.xyz/rpc-testnet node scripts/awards-testnet-rehearsal.mjs`.
+- **Seen in the rehearsal:** the templates print only mainnet addresses (SP or SM) on the plaque, so a testnet
+  record shows its name, class, number and plays but no address. On mainnet the address shows. Deliberate for now.
+- **Still to show:** the record drawing in the live app's own viewers on mainnet.
 
 - Templates read the seed (`s`): same seed, same record, every time; a different seed, a visibly different record in
   the same class. Checked for all five (identical on reload; a bad seed falls back to the standard look).
