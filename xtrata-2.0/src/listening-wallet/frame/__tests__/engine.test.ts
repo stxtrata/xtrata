@@ -62,7 +62,7 @@ const play = (balance = '500000', nonce = '0') => ({ core: 3, song: 1234, receip
 describe('listening wallet engine (wallet origin)', () => {
   it('creates a wallet only after two matching PRF results and stores no secrets', async () => {
     const s = setup();
-    expect(await s.h['listening.status']()).toEqual({ state: 'none', session: null, features: ['cancel', 'like', 'standalone', 'multi', 'partial', 'slots', 'rootLike', 'move', 'phrase', 'award'] });
+    expect(await s.h['listening.status']()).toEqual({ state: 'none', session: null, features: ['cancel', 'like', 'standalone', 'multi', 'partial', 'slots', 'rootLike', 'move', 'phrase', 'award', 'sendRecord'] });
     const r = await s.h['listening.unlock']({ mode: 'create' });
     expect(r.address).toBe(ADDRESS);
     expect(s.panels.map((p) => p.kind)).toEqual(['create', 'confirm-passkey', 'verify-passkey']);
@@ -85,7 +85,7 @@ describe('listening wallet engine (wallet origin)', () => {
     const other = Uint8Array.from(PRF); other[5] ^= 0xff;
     const s = setup({ outputs: [PRF, other] });
     await expect(s.h['listening.unlock']({ mode: 'create' })).rejects.toThrow(/stable/);
-    expect(await s.h['listening.status']()).toEqual({ state: 'none', session: null, features: ['cancel', 'like', 'standalone', 'multi', 'partial', 'slots', 'rootLike', 'move', 'phrase', 'award'] });
+    expect(await s.h['listening.status']()).toEqual({ state: 'none', session: null, features: ['cancel', 'like', 'standalone', 'multi', 'partial', 'slots', 'rootLike', 'move', 'phrase', 'award', 'sendRecord'] });
     // No wallet, and no half-made passkey kept either: an unstable passkey is dropped, not picked up again.
     const kept = JSON.parse(s.map.get('xtrata.listening-wallet.v1') ?? '{"wallets":[]}');
     expect(kept.wallets).toEqual([]);
@@ -970,5 +970,48 @@ describe('claiming a Music Hero record', () => {
     const r = await s.h['listening.signAward'](ask({ record: hexOf(recordFor({ name: null })) }));
     expect(r.name).toBeNull();
     expect(s.panels.at(-1)!.summary).toContain('No. 0412 · SP1SY2…KJ6N · 50 paid plays');
+  });
+});
+
+describe('sending a record on', () => {
+  const TO = 'SP16538G41XMAGHYB0JZAP29R7YBSKDR569QP1SMF';
+  const ask = (over: Record<string, unknown> = {}) => ({ inscription: 48213, recipient: TO, fee: '1500', nonce: '9', balance: '20000', ...over });
+  const opened = async (opts: Parameters<typeof setup>[0] = {}) => { const s = setup(opts); await s.h['listening.unlock']({ mode: 'create' }); return s; };
+
+  it('signs a transfer of that one inscription on the Xtrata core, which can move nothing else', async () => {
+    const s = await opened();
+    await s.h['listening.openSlot']({ slot: 1 }); // an album is open: the record is still the player's own
+    const r = await s.h['listening.signSendRecord'](ask());
+    expect(r).toMatchObject({ from: ADDRESS, recipient: TO, inscription: 48213, fee: '1500' });
+    assertNoSecrets(r);
+    const tx = deserializeTransaction(r.raw) as any;
+    expect(`${addressToString(tx.payload.contractAddress)}.${tx.payload.contractName.content}`).toBe('SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-v3-2-3');
+    expect(tx.payload.functionName.content).toBe('transfer');
+    expect(tx.payload.functionArgs.map((a: any) => cvToJSON(a).value)).toEqual(['48213', ADDRESS, TO]);
+    expect(addressToString({ type: 0, version: 22, hash160: tx.auth.spendingCondition.signer } as any)).toBe(ADDRESS);
+    expect(tx.postConditionMode).toBe(PostConditionMode.Deny);
+    expect(tx.postConditions.values).toHaveLength(1);
+    const pc = tx.postConditions.values[0];
+    expect(addressToString(pc.principal.address)).toBe(ADDRESS);
+    expect(pc.assetInfo.assetName.content).toBe('xtrata-inscription');
+    expect(cvToJSON(pc.assetName).value).toBe('48213');
+    const panel = s.panels.at(-1)!;
+    expect(panel).toMatchObject({ kind: 'send-record', confirmLabel: 'Send it' });
+    expect(panel.summary).toBeUndefined();                       // nothing folded away: the full address is in view
+    expect(panel.lines[0]).toBe(`Send Xtrata inscription #48213 to this address: ${TO}`);
+  });
+
+  it('refuses a bad destination, number or fee before anything is shown, and signs nothing unless confirmed', async () => {
+    const s = await opened();
+    const cases: [Record<string, unknown>, RegExp][] = [
+      [{ recipient: ADDRESS }, /this player itself/], [{ recipient: 'ST2294HSREF13E7W9N7ATV92WPTWH4NM9FKHGMH41' }, /mainnet/], [{ recipient: 'jim.btc' }, /mainnet/],
+      [{ recipient: 'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.contract' }, /mainnet/], [{ inscription: -1 }, /cannot be sent/], [{ inscription: 1.5 }, /cannot be sent/],
+      [{ inscription: '48213' }, /cannot be sent/], [{ fee: '10001' }, /fee is not allowed/], [{ balance: '100' }, /network fee/]
+    ];
+    for (const [over, why] of cases) await expect(s.h['listening.signSendRecord'](ask(over)), JSON.stringify(over)).rejects.toThrow(why);
+    expect(s.panels.some((p) => p.kind === 'send-record')).toBe(false);
+    const closed = await opened({ cancel: ['send-record'] });
+    await expect(closed.h['listening.signSendRecord'](ask())).rejects.toBeInstanceOf(CancelledError);
+    await expect(setup().h['listening.signSendRecord'](ask())).rejects.toThrow(/Unlock/);
   });
 });

@@ -55,9 +55,10 @@ export interface StatusResult {
  * `rootLike` (listening.signLike always signs with the passkey's own wallet, whichever album wallet is open, and status reports it as `root`),
  * `move` (listening.signMove: move STX between two wallets of the same passkey, no panel),
  * `award` (listening.signAward: claim a Music Hero record from the one award contract the box knows),
+ * `sendRecord` (listening.signSendRecord: send an inscription the player holds to an address confirmed in the box),
  * `phrase` (new players have a 24-word backup phrase that opens in other Stacks wallets; listening.backup shows it in the box).
  */
-export const LISTENING_FEATURES = ['cancel', 'like', 'standalone', 'multi', 'partial', 'slots', 'rootLike', 'move', 'phrase', 'award'] as const;
+export const LISTENING_FEATURES = ['cancel', 'like', 'standalone', 'multi', 'partial', 'slots', 'rootLike', 'move', 'phrase', 'award', 'sendRecord'] as const;
 
 /** `listening.status`: the connected main wallet, if any, so the box answers for that address's listening wallet. */
 export interface StatusParams {
@@ -195,6 +196,25 @@ export interface SignAwardResult extends SignedResult {
   number: number;
   cls: number;
   name: string | null;
+  fee: string;
+}
+
+/**
+ * `listening.signSendRecord`: send an inscription the player holds (its Music Hero record) to another address. The
+ * listener confirms the inscription number and the FULL address inside the box. The transaction can move that one
+ * inscription and nothing else. `balance` and `nonce` are the passkey's own wallet's.
+ */
+export interface SendRecordParams {
+  inscription: number;
+  recipient: string;
+  fee: string;
+  nonce: string;
+  balance: string;
+}
+export interface SendRecordResult extends SignedResult {
+  from: string;
+  recipient: string;
+  inscription: number;
   fee: string;
 }
 

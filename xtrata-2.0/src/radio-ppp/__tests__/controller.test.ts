@@ -1802,3 +1802,46 @@ describe('the Music Hero award', () => {
     expect(s.ppp.snapshot().award).not.toHaveProperty('claimTx');
   });
 });
+
+describe('sending a claimed record on', () => {
+  const TO = 'SP16538G41XMAGHYB0JZAP29R7YBSKDR569QP1SMF';
+  const claimed = (holds: boolean | null) => ({ state: 'claimed', cls: 'gold', number: 412, inscription: 48213, holds });
+  const player = async (view: any) => {
+    const s = setup({ passkeyOnly: true }); s.setMain(undefined);
+    s.awards.view = view;
+    await s.ppp.forceRefresh(); await s.ppp.create();
+    s.chain.balance = 100_000n;
+    await s.ppp.forceRefresh();
+    return s;
+  };
+
+  it('sends that inscription, once, to the address given, and shows it on its way until the server says it has gone', async () => {
+    const s = await player(claimed(true));
+    await s.ppp.sendAward(` ${TO} `);
+    expect(s.ppp.snapshot().error).toBe('');
+    expect(s.chain.broadcasts).toHaveLength(1);
+    const tx = deserializeTransaction(s.chain.broadcasts[0]) as any;
+    expect(tx.payload.functionName.content).toBe('transfer');
+    expect(tx.payload.functionArgs.map((a: any) => cvToJSON(a).value)).toEqual(['48213', LISTENING, TO]);
+    expect(s.ppp.snapshot().award).toMatchObject({ state: 'claimed', holds: true, sendTx: expect.stringMatching(/^0x/) });
+    await s.ppp.sendAward(TO);
+    expect(s.chain.broadcasts).toHaveLength(1);
+    s.awards.view = claimed(false);
+    s.tick(21_000); await s.ppp.forceRefresh();
+    const a = s.ppp.snapshot().award!;
+    expect(a).toMatchObject({ state: 'claimed', holds: false });
+    expect(a).not.toHaveProperty('sendTx');
+  });
+
+  it('sends nothing without a record it is known to hold, or to something that is not an address', async () => {
+    for (const [view, to, why] of [
+      [{ state: 'ready', cls: 'gold', number: 412, need: 50, have: 50 }, TO, /no record to send/], [claimed(false), TO, /already been sent/], [claimed(null), TO, /Could not check/],
+      [claimed(true), 'jim.btc', /starting SP/], [claimed(true), LISTENING, /your player itself/]
+    ] as const) {
+      const s = await player(view);
+      await s.ppp.sendAward(to);
+      expect(s.ppp.snapshot().error).toMatch(why);
+      expect(s.chain.broadcasts).toHaveLength(0);
+    }
+  });
+});

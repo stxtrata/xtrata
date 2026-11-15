@@ -16,7 +16,7 @@ import {
   type BalanceState, type ReturnMode
 } from '../lib/listening-wallet/policy';
 import { AWARDS_CONTRACT, RADIO_CORE_INDEX } from '../lib/listening-wallet/tx';
-import type { SignAwardResult } from '../lib/listening-wallet/messages';
+import type { SendRecordResult, SignAwardResult } from '../lib/listening-wallet/messages';
 import type { BindSlotResult, MoveResult, OpenSlotResult, ReturnResult, SessionSummary, SignedResult, StatusResult, TermsParams } from '../lib/listening-wallet/messages';
 import type { Entry } from '../radio-test-wallet/model';
 
@@ -162,7 +162,7 @@ export interface Snapshot {
    * The player's Music Hero record: where it stands, the name it would carry (`undefined` while that is not known),
    * and a claim on its way (`claimTx`). Null when awards are off, this is not a numbered player, or nothing is known yet.
    */
-  award: (AwardView & { name?: string | null; claimTx?: string }) | null;
+  award: (AwardView & { name?: string | null; claimTx?: string; /** the record is on its way to another address */ sendTx?: string }) | null;
   /** A backed-up player holding more than 1 STX: allowed, and it keeps paying. The page says so quietly; nothing is blocked. */
   aboveTarget: boolean;
   balance?: bigint;
@@ -463,6 +463,10 @@ export function createPppController(deps: PppDeps) {
   let awardNameRes: { for: string; name: string | null | undefined; at: number } | null = null;
   let awardLooking = false;
   const claimKey = (player: string) => key('award-claim', player);
+  const sendKey = (player: string) => key('award-send', player);
+  const sendNow = (player: string): { txid: string; at: number } | null => {
+    try { const v = JSON.parse(deps.store.get(sendKey(player)) || 'null'); return v && typeof v.txid === 'string' && deps.now() - v.at < 2 * 3600_000 ? v : null; } catch { return null; }
+  };
   const claimNow = (player: string): { txid: string; at: number } | null => {
     try { const v = JSON.parse(deps.store.get(claimKey(player)) || 'null'); return v && typeof v.txid === 'string' && deps.now() - v.at < 2 * 3600_000 ? v : null; } catch { return null; }
   };
@@ -475,13 +479,14 @@ export function createPppController(deps: PppDeps) {
     if (!player || !deps.awardStatus || awardLooking) return;
     const known = awardRes?.for === player ? awardRes : null;
     const s = known?.view.state;
-    const wait = !known ? 0 : s === 'off' || s === 'not-a-player' ? 30 * 60_000 : claimNow(player) ? 20_000 : s === 'claimed' ? 10 * 60_000 : 60_000;
+    const wait = !known ? 0 : s === 'off' || s === 'not-a-player' ? 30 * 60_000 : claimNow(player) || sendNow(player) ? 20_000 : s === 'claimed' ? 10 * 60_000 : 60_000;
     if (known && !force && deps.now() - known.at < wait) return;
     awardLooking = true;
     try {
       const view = await deps.awardStatus(player);
       awardRes = { for: player, view, at: deps.now() };
       if (view.state === 'claimed') deps.store.set(claimKey(player), '');
+      if (view.state === 'claimed' && view.holds === false) deps.store.set(sendKey(player), '');
       // The name its record would carry, once there is a record to claim (asked once; "Check again" asks afresh).
       if (view.state === 'ready' && deps.awardName && awardNameRes?.for !== player) {
         try { awardNameRes = { for: player, name: await deps.awardName(player), at: deps.now() }; }
@@ -497,7 +502,8 @@ export function createPppController(deps: PppDeps) {
     const v = awardRes.view;
     if (v.state === 'off' || v.state === 'not-a-player') return null;
     const claim = v.state === 'claimed' ? null : claimNow(player);
-    return { ...v, ...(awardNameRes?.for === player ? { name: awardNameRes.name } : {}), ...(claim ? { claimTx: claim.txid } : {}) };
+    const send = v.state === 'claimed' && v.holds !== false ? sendNow(player) : null;
+    return { ...v, ...(awardNameRes?.for === player ? { name: awardNameRes.name } : {}), ...(claim ? { claimTx: claim.txid } : {}), ...(send ? { sendTx: send.txid } : {}) };
   }
 
   async function lookupGift() {
@@ -1345,6 +1351,38 @@ export function createPppController(deps: PppDeps) {
       balanceAt = -Infinity;
       if (awardRes) awardRes = { ...awardRes, at: -Infinity };
       say('Record claimed ✓ It is being made now: about a minute.');
+    }),
+
+    /**
+     * Send the player's claimed record to another address. The wallet box shows the inscription and the full address
+     * and the listener confirms there; the transaction can move that one inscription and nothing else.
+     */
+    sendAward: (to: string) => task('Confirm in the listening wallet…', async () => {
+      const player = playerAddr();
+      const a = awardNow();
+      if (status?.state !== 'unlocked' || !player) throw new Error('Unlock your player first.');
+      if (a?.state !== 'claimed' || a.inscription === undefined) throw new Error('There is no record to send yet.');
+      if (a.holds === false) throw new Error('This record has already been sent.');
+      if (a.holds !== true) throw new Error('Could not check that your player still holds the record. Try again shortly.');
+      if (sendNow(player)) throw new Error('Your record is already on its way.');
+      const recipient = to.trim();
+      if (!isMainnetStandardAddress(recipient)) throw new Error('Enter a Stacks address starting SP. A .btc name will not work here.');
+      if (recipient === player) throw new Error('That is your player itself. Enter the address to send it to.');
+      if (walletLacks('sendRecord')) throw new Error('The listening wallet box needs an update before it can send a record. Try again shortly.');
+      if (paying || liking || checkingLike || unresolvedAll().length) throw new Error('A payment is still confirming. Send as soon as it has.');
+      await holdTab();
+      const { balance: bal, nonce } = await deps.chain.account(player);
+      if (bal < AWARD_FEE) throw new Error('Your player needs a little STX for the network fee. Add plays first.');
+      const b = await ensureBridge();
+      const r = await b.request<SendRecordResult>('listening.signSendRecord', { inscription: a.inscription, recipient, fee: AWARD_FEE.toString(), nonce: nonce.toString(), balance: bal.toString() });
+      const tx = deserializeTransaction(r.raw) as any;
+      if (r.from !== player || r.recipient !== recipient || r.inscription !== a.inscription || tx.payload?.functionName?.content !== 'transfer' || cvToJSON(tx.payload.functionArgs?.[2]).value !== recipient)
+        throw new Error('The signed send does not match what was asked. Nothing was sent.');
+      await deps.chain.broadcast(r.raw, r.txid);
+      deps.store.set(sendKey(player), JSON.stringify({ txid: r.txid, at: deps.now() }));
+      balanceAt = -Infinity;
+      if (awardRes) awardRes = { ...awardRes, at: -Infinity };
+      say('Record sent ✓ It arrives in a minute or two.');
     }),
 
     lock: () => task('Locking…', async () => {

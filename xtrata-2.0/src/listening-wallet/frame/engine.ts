@@ -16,11 +16,11 @@ import { isMainnetStandardAddress, signLink, verifyLinkSignature } from '../../l
 import {
   costPerPlay, LIKE_FEE, MOVE_FEE_CAP, MOVE_MIN, RESERVE, returnPlan, SessionLedger, stx, TARGET, validateSessionTerms, type SessionTerms
 } from '../../lib/listening-wallet/policy';
-import { AWARDS_DROP, awardClaimOptions, likeCallOptions, moveTransferOptions, playCallOptions, returnTransferOptions } from '../../lib/listening-wallet/tx';
+import { AWARDS_DROP, awardClaimOptions, inscriptionSendOptions, likeCallOptions, moveTransferOptions, playCallOptions, returnTransferOptions } from '../../lib/listening-wallet/tx';
 import { AWARD_CLASS, AWARD_CLASS_NAME, parseRecord } from '../../lib/music-awards/record';
 import type {
   BindSlotParams, BindSlotResult, LinkParams, LinkResult, MoveParams, MoveResult, OpenSlotResult, ReturnParams, ReturnResult, SessionSummary, SignedResult, SignLikeParams,
-  SignAwardParams, SignAwardResult, SignPlayParams, SlotAddressResult, SlotParams, StatusParams, StatusResult, TermsParams, UnlockParams, UnlockResult
+  SendRecordParams, SendRecordResult, SignAwardParams, SignAwardResult, SignPlayParams, SlotAddressResult, SlotParams, StatusParams, StatusResult, TermsParams, UnlockParams, UnlockResult
 } from '../../lib/listening-wallet/messages';
 import { LISTENING_FEATURES } from '../../lib/listening-wallet/messages';
 
@@ -53,7 +53,7 @@ export interface PasskeyPort {
 }
 
 export interface Panel {
-  kind: 'create' | 'confirm-passkey' | 'verify-passkey' | 'unlock' | 'session' | 'return' | 'link' | 'backup' | 'phrase' | 'phrase-check' | 'award';
+  kind: 'create' | 'confirm-passkey' | 'verify-passkey' | 'unlock' | 'session' | 'return' | 'link' | 'backup' | 'phrase' | 'phrase-check' | 'award' | 'send-record';
   title: string;
   /**
    * One or two plain lines shown above the button. When set, `lines` and `warnings` fold into a
@@ -843,6 +843,41 @@ export function createListeningEngine(deps: {
       try {
         const tx = await makeContractCall({ ...options, senderKey: hero.privateKey });
         return { raw: toHex(tx.serialize()), txid: '0x' + tx.txid(), hero: hero.address, number: says.number, cls: p.cls, name: says.name, fee: fee.toString() };
+      } finally { signing = false; }
+    }),
+
+    /**
+     * Send an inscription the player holds (its Music Hero record) to another address. The box cannot read the chain,
+     * so it cannot know what the inscription is: it shows its number and the FULL destination, the listener confirms
+     * both here, and the transaction is built so that it can move that one inscription and nothing else (Deny mode).
+     * If the player does not hold it, the network refuses and nothing moves. Signed as the passkey's own wallet.
+     */
+    'listening.signSendRecord': (params: unknown): Promise<SendRecordResult> => interact(async () => {
+      const open = requireUnlocked();
+      const from = root ?? open;
+      const p = params as SendRecordParams | undefined;
+      const recipient = typeof p?.recipient === 'string' ? p.recipient.trim() : '';
+      if (!isMainnetStandardAddress(recipient)) throw new Error('Choose a standard mainnet address (starting SP) to send to.');
+      if (recipient === from.address) throw new Error('That is this player itself. Choose a different address.');
+      const fee = bigintParam(p?.fee, 'fee'), nonce = bigintParam(p?.nonce, 'nonce'), balance = bigintParam(p?.balance, 'balance');
+      const options = inscriptionSendOptions(from.address, from.publicKey, { inscription: p?.inscription as number, recipient, fee, nonce });
+      if (balance < fee) throw new Error('Your player needs a little STX for the network fee. Add plays first.');
+      await deps.ui.act({
+        kind: 'send-record',
+        title: 'Send your record',
+        lines: [
+          `Send Xtrata inscription #${p!.inscription} to this address: ${recipient}`,
+          'Check every character. Once sent it belongs to that address and cannot be taken back. Your player goes back to plain.',
+          `Network fee ${stx(fee)} STX from this player. Nothing else can move: only this one inscription.`
+        ],
+        confirmLabel: 'Send it'
+      }, async () => undefined);
+      if (identity !== open || (root ?? open) !== from) throw new Error('Wallet locked before the send was signed.');
+      if (signing) throw new Error('Still signing. Try again in a moment.');
+      signing = true;
+      try {
+        const tx = await makeContractCall({ ...options, senderKey: from.privateKey });
+        return { raw: toHex(tx.serialize()), txid: '0x' + tx.txid(), from: from.address, recipient, inscription: p!.inscription, fee: fee.toString() };
       } finally { signing = false; }
     }),
 

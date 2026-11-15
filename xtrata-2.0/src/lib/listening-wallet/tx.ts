@@ -8,8 +8,11 @@
 import {
   AnchorMode,
   Cl,
+  createAssetInfo,
   FungibleConditionCode,
+  makeStandardNonFungiblePostCondition,
   makeStandardSTXPostCondition,
+  NonFungibleConditionCode,
   PostConditionMode
 } from '@stacks/transactions';
 import { StacksMainnet } from '@stacks/network';
@@ -136,5 +139,34 @@ export function awardClaimOptions(address: string, publicKey: string, p: AwardCl
     anchorMode: AnchorMode.Any,
     postConditionMode: PostConditionMode.Allow,
     postConditions: [makeStandardSTXPostCondition(address, FungibleConditionCode.Equal, 0n)]
+  };
+}
+
+/** The Xtrata core, where every inscription (a Music Hero record among them) lives as a token. */
+export const CORE_CONTRACT = 'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-v3-2-3';
+export const CORE_ASSET = 'xtrata-inscription';
+
+/**
+ * transfer(id, sender, recipient) on the Xtrata core: send one inscription the player holds to another address.
+ * Deny mode with one post-condition: the sender sends exactly this inscription. So the transaction can move that
+ * one token and nothing else: no STX, no other inscription.
+ */
+export function inscriptionSendOptions(address: string, publicKey: string, p: { inscription: number; recipient: string; fee: bigint; nonce: bigint }) {
+  if (!Number.isSafeInteger(p.inscription) || p.inscription < 0) throw new Error('That inscription cannot be sent.');
+  if (typeof p.fee !== 'bigint' || p.fee < 1n || p.fee > AWARD_FEE_CAP) throw new Error('That network fee is not allowed.');
+  if (typeof p.nonce !== 'bigint' || p.nonce < 0n) throw new Error('Invalid nonce.');
+  const [contractAddress, contractName] = CORE_CONTRACT.split('.');
+  return {
+    contractAddress,
+    contractName,
+    functionName: 'transfer',
+    functionArgs: [Cl.uint(p.inscription), Cl.standardPrincipal(address), Cl.standardPrincipal(p.recipient)],
+    publicKey,
+    fee: p.fee,
+    nonce: p.nonce,
+    network: new StacksMainnet(),
+    anchorMode: AnchorMode.Any,
+    postConditionMode: PostConditionMode.Deny,
+    postConditions: [makeStandardNonFungiblePostCondition(address, NonFungibleConditionCode.Sends, createAssetInfo(contractAddress, contractName, CORE_ASSET), Cl.uint(p.inscription))]
   };
 }

@@ -159,9 +159,22 @@ awards are open, or later numbers shift (the contract would still refuse a numbe
   record away loses its class colours. `GET /radio/awards/name` gives the preview its name.
 - Claims pay `AWARD_FEE` (1,500 microSTX) from the player; a claim waits while a play or like is still confirming.
 
-Not built yet: the full-screen walk-through from the storyboard (this is the panel version), the wall showing
-claimed records, sending a record on from inside the player (it can be sent from Leather or Xverse once the player's
-words are imported there), and a guided "get a name" step (the card points to "Make it yours").
+Added 15 Nov 2026 (second pass):
+
+- **The walk-through** (`src/radio-ppp/award-view.ts`): full-screen, three lights (Earned, Claim, Yours). It opens
+  by itself when a record is earned ("Later" puts it away for a day; the card in the panel stays), asks "Put your
+  name on it?", carries on through "Making your record" to "It's yours". The wallet box sheet shows a strip naming
+  the record while it asks.
+- **Getting a name on it**, inside the walk-through: "I have a name in Leather or Xverse" (lights Connect, Link,
+  Name: connect the wallet, link the player with one signature, the name is then looked up by itself) and "I want
+  to get a name" (BNS One, then link, or send the name to the player's own address, then check again). Linking is
+  the page's existing link step; if it is not open for that wallet the screen says so and offers the other way.
+- **Sending a record on**: `listening.signSendRecord` in the wallet box. The listener confirms the inscription
+  number and the FULL address inside the box; the transaction is Deny mode with one post-condition (the sender sends
+  exactly that inscription), so it can move that one token and nothing else. From the card: "Send this record to
+  someone". An address only (no .btc names). The player goes back to plain once the server sees it has gone.
+- **The wall** (`public/players.html`): a claimed disc's sheet asks `/radio/awards/record`; once claimed it shows
+  the real inscription in place of the preview, with a link, and says "Music Hero". A failed read says nothing.
 
 ## Order of work
 

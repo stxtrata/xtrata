@@ -22,6 +22,7 @@ import { hiddenTrack, listedTracks } from '../lib/listening-wallet/gift-players'
 import { createShelf } from './shelf';
 import { createAlbumView, type AlbumInput } from './album';
 import { coverArt, onArt } from './art';
+import { createAwardWalk, type AwardScreen } from './award-view';
 import type { PlayerView } from '../lib/listening-wallet/gift-players';
 import { copyButton } from './feedback';
 import { browserName, inAppBrowser, openInBrowserHref } from './in-app';
@@ -212,6 +213,14 @@ function start(root: HTMLElement) {
     openPlayer: () => void ppp.openAlbum(0)
   };
   const albumView = albumMount ? createAlbumView(albumMount, albumDeps) : null;
+  // ---- the Music Hero award, one screen at a time (award-view.ts) ----
+  const awardWalk = albumMount ? createAwardWalk(albumMount) : null;
+  const AWARD_LATER = 'xtrata.radio.award.later.v1';
+  let awardStage: AwardScreen = 'ready';
+  /** The listener pressed Claim in this visit: the walk-through then carries on through "making" to "yours". */
+  let awardEngaged = false;
+  let awardLater = (() => { try { return Date.now() - Number(localStorage.getItem(AWARD_LATER) || 0) < 24 * 3600_000; } catch { return false; } })();
+  let awardLinkedSeen = false;
   // The player's class from the giveaway (tiers.ts): Diamond, Gold, Silver, Bronze, Neon or Classic, decided by the plays
   // a free starter player was given. Shown every time the player loads: a badge on the panel, the page's trim
   // (`html[data-tier]`, public/radio.html) and a coloured record on the welcome screens. Remembered on the device so a
@@ -1404,8 +1413,9 @@ function start(root: HTMLElement) {
       return row;
     }));
     albumView?.render(album ? albumInput(s, album, [...elsewhereLines, ...giftLines]) : null);
-    syncSkin(s, album);
     syncWelcome(s, !!album, giftScreen ? [...elsewhereLines, ...giftLines] : elsewhereLines, wMode);
+    syncAwardWalk(s, !!album || !!welcome?.showing());
+    syncSkin(s, album);
     if (restock.isOpen()) restock.refresh();
     syncFind();
     // A loaded album's songs stand in for "Your Station" too, counted against the player's own plays.
@@ -1427,6 +1437,48 @@ function start(root: HTMLElement) {
     const last = readLastAlbum();
     if (last && (s.step === 'locked' || (resumeAlbum && s.step === 'loading'))) return { mode: 'locked', player: last.player };
     return null;
+  }
+
+  const awardPreview = (tier: Tier, number: number, player: string, need: number, name: string | null) =>
+    `/awards/${tier.id}#${new URLSearchParams({ n: String(number), a: player, ...(name ? { b: name } : {}), p: String(need), s: awardSeed(AWARDS_DROP, number, player) })}`;
+  function awardScreenFor(s: Snapshot): AwardScreen | null {
+    const a = s.award;
+    if (!a || !['ready', 'fund', 'over', 'link'].includes(s.step)) return null;
+    if (a.claimTx) return awardEngaged ? 'making' : null;
+    if (a.state === 'claimed') return awardEngaged && a.inscription !== undefined ? 'yours' : null;
+    if (a.state !== 'ready' || awardLater) return null;
+    // Linking the player (the "have" screen) moves the panel to its link step: stay on the walk-through for that.
+    if (s.step === 'link' && awardStage !== 'have') return null;
+    return awardStage === 'making' || awardStage === 'yours' ? 'ready' : awardStage;
+  }
+  function syncAwardWalk(s: Snapshot, otherActive: boolean) {
+    if (!awardWalk) return;
+    const a = s.award;
+    const tier = a?.cls && isTierId(a.cls) ? tierById(a.cls) : null;
+    const player = s.slot === 0 ? s.listening : s.root;
+    const screen = otherActive || !a || !tier || !player || a.number === undefined ? null : awardScreenFor(s);
+    if (!screen || !a || !tier || !player) { awardWalk.render(null, otherActive); return; }
+    // Just linked from the "have" screen: look for the name once, without another press.
+    if (screen === 'have' && s.linked && !awardLinkedSeen) { awardLinkedSeen = true; void ppp.awardRefresh(); }
+    const named = typeof a.name === 'string' && a.name ? a.name : null;
+    const status: HTMLElement[] = [];
+    if (s.error) status.push(el('p', s.error, 'ppp-warn'));
+    const go = (next: AwardScreen) => { awardStage = next; if (next === 'name') awardEngaged = true; render(ppp.snapshot()); };
+    awardWalk.render({
+      screen, tier, number: a.number!, need: a.need ?? 0, player, name: a.name, inscription: a.inscription,
+      art: screen === 'yours' && a.inscription !== undefined ? `/i/${a.inscription}` : awardPreview(tier, a.number!, player, a.need ?? 0, named),
+      claimLink: a.claimTx ? explorer(a.claimTx) : undefined,
+      status, asking: !!s.busy || s.armed, busy: !!s.busy,
+      main: s.main ? who(s.main) : null, canLink: s.step === 'link', linked: !!s.linked,
+      copyAddress: () => copyButton('award-player-address', 'Copy my player’s address', () => player, 'tiny', () => render(ppp.snapshot())),
+      go,
+      claim: (name) => { awardEngaged = true; void ppp.claimAward(name); },
+      refresh: () => void ppp.awardRefresh(),
+      connect: () => (document.getElementById('radio-wallet-connect') as HTMLButtonElement | null)?.click(),
+      link: () => void ppp.link(),
+      later: () => { awardLater = true; try { localStorage.setItem(AWARD_LATER, String(Date.now())); } catch { /* this visit only */ } render(ppp.snapshot()); },
+      done: () => { awardEngaged = false; awardStage = 'ready'; render(ppp.snapshot()); }
+    }, otherActive);
   }
 
   /**
@@ -1457,6 +1509,18 @@ function start(root: HTMLElement) {
       kids.push(el('p', a.holds === false ? 'You sent this record to another wallet, so your player has gone back to plain. Whoever holds it keeps a record that still names you.'
         : a.holds === null || a.holds === undefined ? `Yours: Xtrata inscription #${a.inscription}.` : `Yours for good: Xtrata inscription #${a.inscription}. It gives your player its ${tier.name} colours.`, a.holds === false ? 'ppp-mute' : 'ppp-ok'));
       if (a.inscription !== undefined) { const p = el('p'); p.append(link('Open it full screen ↗', `/i/${a.inscription}`)); kids.push(p); }
+      if (a.sendTx) { const p = el('p', 'Your record is on its way to its new address. About a minute. ', 'ppp-cyan'); p.append(link('View', explorer(a.sendTx))); kids.push(p); }
+      else if (a.holds === true && a.inscription !== undefined) {
+        // Sending it on: found, not pushed. The full address is confirmed again inside the wallet box before anything is signed.
+        const send = el('details', '', 'ppp-award__send');
+        const to = document.createElement('input');
+        to.type = 'text'; to.placeholder = 'SP… address to send it to'; to.autocomplete = 'off'; to.spellcheck = false; to.setAttribute('aria-label', 'Address to send your record to');
+        const go = button('Send my record…', () => void ppp.sendAward(to.value), '');
+        go.disabled = !!s.busy;
+        send.append(el('summary', 'Send this record to someone'),
+          el('p', `It is yours to give or sell. Whoever holds it keeps a record that still names you, and your player goes back to plain without it. This cannot be undone.`, 'ppp-mute'), to, go);
+        kids.push(send);
+      }
     } else if (a.claimTx) {
       kids.push(head(`${tier.name} record · ${no}`));
       const p = el('p', 'Your record is being made: written to Xtrata with your plaque on it. About a minute. ', 'ppp-cyan'); p.append(link('View', explorer(a.claimTx)));
@@ -1470,10 +1534,10 @@ function start(root: HTMLElement) {
       const row = el('div', '', 'ppp-award__row');
       if (named) {
         kids.push(el('p', `Its plaque will carry ${named} beside your player’s address. What is on it cannot be changed afterwards.`, 'ppp-mute'));
-        row.append(button('Claim my record', () => void ppp.claimAward('auto'), 'primary'), button('Use my address only', () => void ppp.claimAward('none'), 'quiet'));
+        row.append(button('Claim my record', () => { awardEngaged = true; void ppp.claimAward('auto'); }, 'primary'), button('Use my address only', () => { awardEngaged = true; void ppp.claimAward('none'); }, 'quiet'));
       } else if (a.name === null) {
         kids.push(el('p', 'Its plaque will carry your player’s address. Want a .btc name on it? Link a wallet that has one (see “Make it yours” below), then check again. What is on it cannot be changed afterwards.', 'ppp-mute'));
-        row.append(button('Claim my record', () => void ppp.claimAward('none'), 'primary'), button('Check for a name again', () => void ppp.awardRefresh(), 'quiet'));
+        row.append(button('Claim my record', () => { awardEngaged = true; void ppp.claimAward('none'); }, 'primary'), button('Check for a name again', () => void ppp.awardRefresh(), 'quiet'));
       } else {
         kids.push(el('p', 'Could not check for a .btc name just now. Check again, or claim with your player’s address alone.', 'ppp-warn'));
         row.append(button('Check for a name again', () => void ppp.awardRefresh(), 'primary'), button('Claim with my address only', () => void ppp.claimAward('none'), 'quiet'));
@@ -1502,6 +1566,15 @@ function start(root: HTMLElement) {
   function syncSkin(s: Snapshot, a: AlbumState | null) {
     const skinEl = document.querySelector<HTMLElement>('.ppp-skin');
     if (!skinEl) return;
+    // The award walk-through has its own strip: the class mark, the record and whose it is.
+    if (!a && awardWalk?.showing() && s.award?.cls && isTierId(s.award.cls) && (!!s.busy || s.armed)) {
+      const t = tierById(s.award.cls);
+      const text = el('span', '', 'ppp-skin__t');
+      text.append(el('b', `${t.name} record · No. ${String(s.award.number ?? 0).padStart(4, '0')}`), el('span', 'Xtrata Music Hero'));
+      skinEl.hidden = false;
+      skinEl.replaceChildren(el('span', t.mark, 'ppp-skin__art ppp-skin__art--none'), text);
+      return;
+    }
     const on = !!a && (!!s.busy || s.armed);
     skinEl.hidden = !on;
     if (!on || !a) { skinEl.replaceChildren(); return; }

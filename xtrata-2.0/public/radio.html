@@ -544,6 +544,14 @@ history.replaceState(null,'',location.pathname+location.search);}catch(e){}})();
   .ppp-award__art{width:100%;max-width:300px;aspect-ratio:1;margin:2px auto;border-radius:14px;overflow:hidden;background:#040509;border:1px solid var(--line)}
   .ppp-award__art iframe{width:100%;height:100%;border:0;display:block}
   .ppp-award__row{display:flex;flex-wrap:wrap;gap:8px}
+  .ppp-award__send{border-top:1px solid var(--line);padding-top:8px}.ppp-award__send summary{cursor:pointer;color:var(--mut);font-size:13px}
+  .ppp-award__send input{width:100%;box-sizing:border-box;margin:8px 0;padding:10px 12px;border-radius:10px;border:1px solid var(--line);background:#0f1216;color:inherit;font:13px ui-monospace,monospace}
+  .aw-art{width:min(300px,78vw);aspect-ratio:1;margin:0 auto 18px;border-radius:18px;overflow:hidden;background:#040509;border:1px solid #2a313b;flex:none}
+  .aw-art iframe{width:100%;height:100%;border:0;display:block}
+  .aw-art--small{width:min(190px,50vw);margin-bottom:12px}
+  .aw-steps{text-align:left;margin:4px 0 14px;padding-left:22px;display:grid;gap:12px;color:#c9ced6;font-size:15px;line-height:1.45}
+  .aw-steps .ppp-addr-full{display:block;margin:8px 0;font:12.5px ui-monospace,monospace;word-break:break-all;color:#f2f0ea}
+  .aw-steps a{color:#7fe3f5}
   .ppp-featured{margin:10px 0 0;display:grid;gap:8px}
   .ppp-featured__h{margin:0;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--mut)}
   .ppp-featured__a{font:inherit;color:inherit;text-align:left;background:none;border:1px solid var(--line);border-radius:12px;padding:10px 12px;cursor:pointer;display:flex;flex-direction:column;gap:2px;min-height:48px}
@@ -1306,7 +1314,7 @@ function showUnavailable(){
 fetch('/radio/listening-wallet/config',{cache:'no-store',signal:AbortSignal.timeout(15000)})
   .then(function(r){return r.ok?r.json():{}})
   .then(function(c){
-    if(c?.enabled && (!paidHost || c.here)) return import('/radio/ppp.js?v=1115cdd30b11');
+    if(c?.enabled && (!paidHost || c.here)) return import('/radio/ppp.js?v=f9df4b24a772');
     showUnavailable();
   }).catch(showUnavailable);
 </script>
