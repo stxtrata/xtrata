@@ -23,6 +23,7 @@ import { createShelf } from './shelf';
 import { createAlbumView, type AlbumInput } from './album';
 import { coverArt, onArt } from './art';
 import { createAwardWalk, type AwardScreen } from './award-view';
+import { createReleases } from './releases';
 import type { PlayerView } from '../lib/listening-wallet/gift-players';
 import { copyButton } from './feedback';
 import { browserName, inAppBrowser, openInBrowserHref } from './in-app';
@@ -213,6 +214,24 @@ function start(root: HTMLElement) {
     openPlayer: () => void ppp.openAlbum(0)
   };
   const albumView = albumMount ? createAlbumView(albumMount, albumDeps) : null;
+  // Artists' releases, and the ones this player has added (releases.ts). Off unless the server says releases are open.
+  const releases = createReleases({
+    json,
+    main: () => { const s = sessionStore.load(); return s.isConnected && s.network === 'mainnet' ? s.address : undefined; },
+    sign: (main, data) => requestStructuredSignature({ ...data, network: 'mainnet', stxAddress: main }),
+    signShelf: (action, release) => ppp.signShelf(action, release),
+    player: () => { const s = ppp.snapshot(); const address = s.slot === 0 ? s.listening : s.root; return { address, unlocked: !!address && ['ready', 'fund', 'over', 'link'].includes(s.step) }; },
+    open: (album) => openFeatured(album, true),
+    who: (address) => who(address),
+    changed: () => render(ppp.snapshot()),
+    store: {
+      get: (k) => { try { return localStorage.getItem(k); } catch { return null; } },
+      set: (k, v) => { try { if (v === null) localStorage.removeItem(k); else localStorage.setItem(k, v); } catch { /* best effort */ } }
+    },
+    now: () => Date.now()
+  });
+  /** The albums a player shows: the ones every player comes loaded with, then the releases this player has added. */
+  const loadedAlbums = (): PlayerView[] => { const seen = new Set(featured.map((p) => p.id)); return [...featured, ...releases.albums().filter((p) => !seen.has(p.id))]; };
   // ---- the Music Hero award, one screen at a time (award-view.ts) ----
   const awardWalk = albumMount ? createAwardWalk(albumMount) : null;
   const AWARD_LATER = 'xtrata.radio.award.later.v1';
@@ -899,6 +918,7 @@ function start(root: HTMLElement) {
   }
 
   function render(raw: Snapshot) {
+    releases.sync();
     // "Continue listening" unlocked the same passkey: go back into the album it had open. Another passkey: stay put.
     if (resumeAlbum && ['ready', 'fund', 'over'].includes(raw.step) && !raw.busy) {
       const back = resumeAlbum;
@@ -1334,10 +1354,12 @@ function start(root: HTMLElement) {
     // The albums this player comes loaded with: one tap plays one, another tap goes back to the radio.
     const feat = document.querySelector('#ppp .ppp-featured') as HTMLElement | null;
     if (feat) {
-      const show = featured.length > 0 && s.slot === 0 && !s.gift?.player && s.step === 'ready';
+      const loaded = loadedAlbums();
+      const manage = releases.manage();
+      const show = (loaded.length > 0 || !!manage) && s.slot === 0 && !s.gift?.player && s.step === 'ready';
       feat.hidden = !show;
       if (show) {
-        feat.replaceChildren(el('p', 'Albums in your player', 'ppp-featured__h'), ...featured.map((p) => {
+        feat.replaceChildren(...(loaded.length ? [el('p', 'Albums in your player', 'ppp-featured__h')] : []), ...loaded.map((p) => {
           const on = featuredOpen?.id === p.id;
           const b = button('', () => openFeatured(on ? null : p, !on), 'ppp-featured__a' + (on ? ' is-on' : '')) as HTMLButtonElement;
           const n = listedTracks(p).length;
@@ -1345,9 +1367,14 @@ function start(root: HTMLElement) {
           b.setAttribute('aria-pressed', String(on));
           b.disabled = !!s.busy;
           return b;
-        }));
+        }), ...(manage ? [manage] : []));
       }
     }
+    // A release someone sent, and (for an artist) the section to release their own.
+    const relIn = document.querySelector('#ppp .ppp-release-in-slot') as HTMLElement | null;
+    if (relIn) { const lines = ['off', 'elsewhere', 'unsupported'].includes(s.step) ? [] : releases.banner(); relIn.hidden = !lines.length; relIn.replaceChildren(...lines); }
+    const relFold = document.querySelector('#ppp .ppp-release') as HTMLDetailsElement | null;
+    if (relFold) { const parts = ['off', 'elsewhere', 'unsupported'].includes(s.step) ? null : releases.fold(); relFold.hidden = !parts; if (parts) relFold.querySelector('.ppp-release-body')?.replaceChildren(...parts); }
     renderAward(s);
     // "Make it yours": found, not pushed. Each item is closed until the listener opens it. Only for a passkey-only
     // listener whose player is open; a player already linked to a Stacks wallet has done this.

@@ -18,9 +18,10 @@ import {
 } from '../../lib/listening-wallet/policy';
 import { AWARDS_DROP, awardClaimOptions, inscriptionSendOptions, likeCallOptions, moveTransferOptions, playCallOptions, returnTransferOptions } from '../../lib/listening-wallet/tx';
 import { AWARD_CLASS, AWARD_CLASS_NAME, parseRecord } from '../../lib/music-awards/record';
+import { signShelfRequest, validateShelfRequest, type ShelfAction } from '../../lib/music-releases/release';
 import type {
   BindSlotParams, BindSlotResult, LinkParams, LinkResult, MoveParams, MoveResult, OpenSlotResult, ReturnParams, ReturnResult, SessionSummary, SignedResult, SignLikeParams,
-  SendRecordParams, SendRecordResult, SignAwardParams, SignAwardResult, SignPlayParams, SlotAddressResult, SlotParams, StatusParams, StatusResult, TermsParams, UnlockParams, UnlockResult
+  SendRecordParams, SendRecordResult, SignShelfParams, SignShelfResult, SignAwardParams, SignAwardResult, SignPlayParams, SlotAddressResult, SlotParams, StatusParams, StatusResult, TermsParams, UnlockParams, UnlockResult
 } from '../../lib/listening-wallet/messages';
 import { LISTENING_FEATURES } from '../../lib/listening-wallet/messages';
 
@@ -880,6 +881,20 @@ export function createListeningEngine(deps: {
         return { raw: toHex(tx.serialize()), txid: '0x' + tx.txid(), from: from.address, recipient, inscription: p!.inscription, fee: fee.toString() };
       } finally { signing = false; }
     }),
+
+    /**
+     * Sign a request about the albums this player keeps: add one, hide or show it, remove it, or read the list. No
+     * panel, like binding an album wallet: the message is structured data under its own domain (not a transaction),
+     * it names this player and the time (both filled in here, never taken from the page), and it can move nothing.
+     * The worst a page could do with it is change which albums this player's own list shows.
+     */
+    'listening.signShelf': async (params: unknown): Promise<SignShelfResult> => {
+      const open = requireUnlocked();
+      const me = root ?? open;
+      const p = params as SignShelfParams | undefined;
+      const request = validateShelfRequest({ action: p?.action as ShelfAction, release: p?.action === 'list' ? '' : (p?.release as string), player: me.address, issued: now() }, now());
+      return { request, signature: signShelfRequest(request, me.privateKey) };
+    },
 
     // The page may withdraw a panel it asked for (e.g. to unlock a different wallet instead).
     'listening.cancel': async () => ({ cancelled: deps.ui.cancel() }),

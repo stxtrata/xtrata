@@ -1845,3 +1845,16 @@ describe('sending a claimed record on', () => {
     }
   });
 });
+
+describe('the albums a player keeps', () => {
+  it('signs a shelf request in the wallet box only while the player is open', async () => {
+    const s = setup({ passkeyOnly: true }); s.setMain(undefined);
+    await s.ppp.forceRefresh();
+    await expect(s.ppp.signShelf('list')).rejects.toThrow(/Unlock your player first/);
+    await s.ppp.create();
+    const r = await s.ppp.signShelf('add', '0123456789abcdef');
+    expect(r.request).toMatchObject({ action: 'add', release: '0123456789abcdef', player: LISTENING });
+    expect(r.signature).toMatch(/^[0-9a-f]{130}$/);
+    expect(s.chain.broadcasts).toHaveLength(0);   // nothing is ever sent to the chain for this
+  });
+});
