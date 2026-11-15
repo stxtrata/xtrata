@@ -77,6 +77,12 @@ export const HOMEPAGE_STRIP_SLIDES = Object.freeze([
     cta: 'Try it on your phone', href: 'https://radio.xtrata.xyz/radio', newTab: true
   }),
   Object.freeze({
+    id: 'nft-check', tag: 'Free tool', tone: 'teal',
+    title: 'Where does your NFT art actually live?',
+    line: 'Paste a wallet address and see which of your Stacks NFTs are safe and which are at risk.',
+    cta: 'Try NFT Check', href: '/nftcheck/'
+  }),
+  Object.freeze({
     id: 'chess', tag: 'Play', tone: 'amber',
     title: 'On-Chain Chess is live.',
     line: 'Every move is a Stacks transaction. Casual games are free.',
@@ -185,6 +191,13 @@ const WALL_CASINO = Object.freeze({
   image: '/home/wall/casino-floor.webp', position: 'center',
   href: '/casino/', newTab: true
 });
+const WALL_NFT_CHECK = Object.freeze({
+  // NFT Check (/nftcheck/): paste a wallet, see where the art of each NFT is stored. Artwork is a mosaic with a magnifier.
+  id: 'nft-check', kind: 'image', tone: 'teal',
+  eyebrow: 'Free tool', title: 'NFT Check', subtitle: 'Is your NFT art safe? Paste a wallet and find out.',
+  image: '/home/wall/nft-check.webp', position: 'center',
+  href: '/nftcheck/'
+});
 const WALL_FOREVER_TWINS = Object.freeze({
   // The Forever Twins campaign: one twin from each of the three newest collections.
   id: 'forever-twins', kind: 'twins', tone: 'orange',
@@ -240,6 +253,7 @@ export const HOMEPAGE_WALL_ROTATION = Object.freeze({
     Object.freeze({ tile: WALL_AUDIONAUTS, weights: Object.freeze({ big: 2, wide: 3 }) }),
     Object.freeze({ tile: WALL_CASINO, weights: Object.freeze({ big: 2, tall: 2, wide: 3 }) }),
     Object.freeze({ tile: WALL_RADIO, weights: Object.freeze({ big: 1, tall: 2, wide: 3 }) }),
+    Object.freeze({ tile: WALL_NFT_CHECK, weights: Object.freeze({ big: 3, tall: 2, wide: 3 }) }),
     Object.freeze({ tile: WALL_FOREVER_TWINS, weights: Object.freeze({ big: 3, tall: 3, wide: 2 }) })
   ]),
   // Milliseconds between swaps (random in this range) and how long a crossfade takes.
