@@ -16,7 +16,7 @@ import type { Outgoing } from '../../lib/listening-wallet/ledger';
 import type { GiftInfo } from '../controller';
 
 const PRF = Uint8Array.from({ length: 32 }, (_, i) => i);
-const LISTENING = 'SPHRV6ESV321YCV6W990X4FKXB4S9D7F665FSCTV';
+const LISTENING = 'SP1SY289GQAHCH7JZ1MSS5VMPNPH8GEK2DPRKKJ6N';
 const mainKey = privateKeyToString(makeRandomPrivKey()).slice(0, 64) + '01';
 const MAIN = getAddressFromPrivateKey(mainKey, TransactionVersion.Mainnet);
 // A second main wallet with its own key (for tests where a different wallet links).
@@ -45,14 +45,16 @@ function setup(over: Partial<GateConfig> = {}, opts: { tabLock?: boolean; hold?:
   let evaluations = 0;
   let created = 0;
   const prfs = new Map<string, Uint8Array>();
+  const handles = new Map<string, string>();
   const walletStore = new Map<string, string>();
   const held: { panel: Panel; tap: () => void; cancel: () => void }[] = [];
   const engine = createListeningEngine({
     // The first wallet is the fixed LISTENING address; each further one (another address's) is a different passkey and wallet.
     passkey: {
       available: () => true,
-      create: async () => { const id = created === 0 ? 'c1' : `c${created + 1}`; prfs.set(id, created === 0 ? PRF.slice() : PRF.map((b) => (b + created * 5) % 256)); created++; return { credentialId: id }; },
-      evaluate: async (id) => { evaluations++; const k = id ?? 'c1'; return { credentialId: k, prf: (prfs.get(k) ?? PRF).slice() }; }
+      // Like a real authenticator: each passkey keeps the public user id it was made with and hands it back on sign-in.
+      create: async (_exclude, _name, userId) => { const id = created === 0 ? 'c1' : `c${created + 1}`; prfs.set(id, created === 0 ? PRF.slice() : PRF.map((b) => (b + created * 5) % 256)); if (userId) handles.set(id, userId); created++; return { credentialId: id }; },
+      evaluate: async (id) => { evaluations++; const k = id ?? 'c1'; return { credentialId: k, prf: (prfs.get(k) ?? PRF).slice(), userHandle: handles.get(k) }; }
     },
     ui: {
       // Panels of the held kinds wait for the listener's tap, like the real frame; others confirm at once.
@@ -1676,5 +1678,45 @@ describe('a free starter player: one passkey check now, the second before anythi
     await b.ppp.create({ quick: true });
     expect(sentTo(b, 'listening.unlock').at(-1)![1]).not.toHaveProperty('quick');
     expect(b.ppp.snapshot().unproven).toBe(false);
+  });
+});
+
+describe('backup words', () => {
+  it('a new player can be backed up: the page asks the wallet box and learns only that it was done', async () => {
+    const s = setup({ passkeyOnly: true }); s.setMain(undefined);
+    await s.ppp.forceRefresh();
+    await s.ppp.create();
+    expect(s.ppp.snapshot()).toMatchObject({ phrase: true, backedUp: false });
+    const asked = () => s.requests.filter(([m]) => m === 'listening.backup');
+    await s.ppp.backup();
+    // This harness's box presses every button without choosing an answer, so the check is refused: nothing is recorded.
+    expect(asked()).toHaveLength(1);
+    expect(s.ppp.snapshot().backedUp).toBe(false);
+    expect(JSON.stringify(s.ppp.snapshot(), (_k, v) => (typeof v === 'bigint' ? v.toString() : v))).not.toMatch(/orchard|biology|sadness/);
+  });
+});
+
+describe('over 1 STX', () => {
+  it('stops a player that is not backed up, exactly as before', async () => {
+    const s = setup({ passkeyOnly: true }); s.setMain(undefined);
+    await s.ppp.forceRefresh(); await s.ppp.create();
+    s.chain.balance = TARGET + 500_000n;
+    await s.ppp.forceRefresh();
+    expect(s.ppp.snapshot()).toMatchObject({ step: 'over', balanceState: 'over', aboveTarget: false, phrase: true });
+  });
+
+  it('a backed-up player carries on, and the page is told so it can say it quietly', async () => {
+    const s = setup({ passkeyOnly: true }); s.setMain(undefined);
+    await s.ppp.forceRefresh(); await s.ppp.create();
+    // The wallet box records the backup (here: written straight into its store, as the box does after the word check).
+    const key = 'xtrata.listening-wallet.v1';
+    const stored = JSON.parse(s.walletStore.get(key)!);
+    stored.wallets[0].backedUp = 1;
+    s.walletStore.set(key, JSON.stringify(stored));
+    s.chain.balance = TARGET + 500_000n;
+    await s.ppp.forceRefresh();
+    expect(s.ppp.snapshot()).toMatchObject({ step: 'ready', balanceState: 'ok', aboveTarget: true, backedUp: true });
+    await s.ppp.onListened({ song: 7, id: rid(2), title: 'Night Drive' });
+    expect(s.chain.broadcasts).toHaveLength(1);
   });
 });

@@ -25,6 +25,10 @@ export interface StatusResult {
    * for `listening.prove` before the listener adds anything of their own; an ordinary unlock clears it too.
    */
   unproven?: true;
+  /** This player has backup words (a version 2 key): `listening.backup` lets the listener write them down in the box. */
+  phrase?: true;
+  /** The listener wrote the backup words down and checked them on this device. */
+  backedUp?: true;
   /**
    * Main wallets that OTHER listening wallets on this device are linked to (public addresses, other than the
    * one reported here), so the page can say "this device already has a listening wallet for ...". Absent when none.
@@ -49,9 +53,10 @@ export interface StatusResult {
  * `partial` (listening.prepareReturn accepts mode `amount` with an `amount`, to return part of the balance),
  * `slots` (listening.slotAddress, listening.openSlot and listening.bindSlot: one passkey, many derived wallets),
  * `rootLike` (listening.signLike always signs with the passkey's own wallet, whichever album wallet is open, and status reports it as `root`),
- * `move` (listening.signMove: move STX between two wallets of the same passkey, no panel).
+ * `move` (listening.signMove: move STX between two wallets of the same passkey, no panel),
+ * `phrase` (new players have a 24-word backup phrase that opens in other Stacks wallets; listening.backup shows it in the box).
  */
-export const LISTENING_FEATURES = ['cancel', 'like', 'standalone', 'multi', 'partial', 'slots', 'rootLike', 'move'] as const;
+export const LISTENING_FEATURES = ['cancel', 'like', 'standalone', 'multi', 'partial', 'slots', 'rootLike', 'move', 'phrase'] as const;
 
 /** `listening.status`: the connected main wallet, if any, so the box answers for that address's listening wallet. */
 export interface StatusParams {

@@ -3,7 +3,11 @@ import { getAddressFromPrivateKey, makeRandomPrivKey, privateKeyToString, Transa
 import { createListeningEngine, type Panel, type PasskeyPort } from '../engine';
 import { parseCreateRequest } from '../create-request';
 import { webkitOnly } from '../passkey';
-import { deriveListeningIdentity } from '../../../lib/listening-wallet/derive';
+import { deriveListeningIdentity as deriveOriginalIdentity } from '../../../lib/listening-wallet/derive';
+import { derivePhraseSlot, phraseBase } from '../../../lib/listening-wallet/phrase';
+/** The player a newly made passkey gives: one with a backup phrase (phrase.ts). */
+const deriveListeningIdentity = async (prf: Uint8Array) => derivePhraseSlot(await phraseBase(prf), 0);
+void deriveOriginalIdentity;
 
 const MAIN = getAddressFromPrivateKey(privateKeyToString(makeRandomPrivKey()).slice(0, 64) + '01', TransactionVersion.Mainnet);
 const prfOf = (seed: number) => Uint8Array.from({ length: 32 }, (_, i) => (i * 7 + seed) % 256);

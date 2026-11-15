@@ -86,6 +86,11 @@ behind a passkey that would not open, recoverable only from the 24 words.
 
 **Rule: never seal a seed against a credential whose PRF is unproven.**
 
+Create the passkey → run a live PRF round-trip → only then generate and seal the
+seed. If PRF fails, discard the credential and start over; nothing is lost,
+because no wallet exists yet. Enforce this in the WebAuthn wrapper (§7.2) — it
+is the ordering that makes the difference between a retry and a lost wallet.
+
 One narrow exception, for the listening wallet only (2026-11): a **free starter player** (`listening.unlock` with
 `quick`, no main wallet) starts after ONE use of the passkey instead of two. The PRF is still proven live; what is
 put off is the second, matching result. The wallet is marked `once` and status reports `unproven` until the next
@@ -93,10 +98,6 @@ ordinary unlock (which already compares addresses) or `listening.prove`, and the
 "Add plays" or any deposit. What rides on the single check is the gift only, never the listener's own STX. The
 reported PRF mismatches (Apple forum threads 774111, 822523) are between devices or transports for synced passkeys,
 not between two uses on one device minutes apart, so the second check there rescues very few devices, if any.
-Create the passkey → run a live PRF round-trip → only then generate and seal the
-seed. If PRF fails, discard the credential and start over; nothing is lost,
-because no wallet exists yet. Enforce this in the WebAuthn wrapper (§7.2) — it
-is the ordering that makes the difference between a retry and a lost wallet.
 
 Corollary: `NotAllowedError` is **not** a capability verdict. It covers a
 cancelled prompt, a timeout and Stolen Device Protection alike. Treat it as

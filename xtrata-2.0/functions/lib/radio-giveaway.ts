@@ -389,6 +389,24 @@ const wallRows = (env: GiveawayEnv, list: GiveawayList) => q<WallRow>(env,
   `SELECT l.pos, l.hold_until, l.hold_by, g.status, g.expires_at, g.amount, g.claimed_by, g.claimed_at
    FROM radio_giveaway_links l LEFT JOIN radio_gifts g ON g.code_hash=l.code_hash WHERE l.list=? AND l.archived=0 ORDER BY l.pos`, [list]);
 
+/**
+ * The numbered wall player an address became, if it is one (for the Music Hero awards): its number as the wall shows
+ * it, the plays it came with and so its class. Only a player whose plays have arrived counts. Null: not a wall player.
+ * The number is the disc's place among the wall's entries, so entries must not be archived one by one once awards open.
+ */
+export async function wallPlayerOf(env: GiveawayEnv, address: string, list: GiveawayList = 'players'): Promise<{ number: number; plays: number; tier: TierId } | null> {
+  await ensureGiveawayTables(env);
+  const r = await first<{ pos: number; amount: number }>(env,
+    `SELECT l.pos, g.amount FROM radio_giveaway_links l JOIN radio_gifts g ON g.code_hash=l.code_hash
+     WHERE l.list=? AND l.archived=0 AND g.claimed_by=? AND g.status='claimed' AND g.player_id IS NULL ORDER BY l.pos LIMIT 1`, [list, address]);
+  if (!r) return null;
+  const plays = Number.isSafeInteger(Number(r.amount)) && Number(r.amount) > 0 ? giftPlays(BigInt(r.amount)) : 0;
+  if (plays <= 0) return null;
+  const before = await first<{ n: number }>(env, 'SELECT COUNT(*) AS n FROM radio_giveaway_links WHERE list=? AND archived=0 AND pos<=?', [list, r.pos]);
+  const number = Number(before?.n);
+  return Number.isSafeInteger(number) && number >= 1 ? { number, plays, tier: tierOfPlays(plays).id } : null;
+}
+
 type SpotState = 'free' | 'held' | 'claimed' | 'gone';
 const spotState = (r: WallRow, now: number): SpotState => {
   if (r.status === 'claiming' || r.status === 'claimed') return 'claimed';

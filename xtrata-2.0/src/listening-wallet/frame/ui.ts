@@ -85,6 +85,26 @@ export function panelUi(cancelledMessage?: string): Pick<UiPort, 'act' | 'cancel
       $('p-more-warn').hidden = !folded || !panel.warnings?.length;
       ($('p-more') as HTMLDetailsElement).open = false;
       $('p-more').hidden = !folded;
+      // Backup words and the "which word?" answers: only frames that have these elements (the radio's box) show them.
+      const wordsEl = document.getElementById('p-words'), pickEl = document.getElementById('p-pick');
+      if ((panel.words && !wordsEl) || (panel.pick && !pickEl)) { open = false; return Promise.reject(new Error('This wallet box cannot show that.')); }
+      if (wordsEl) {
+        wordsEl.replaceChildren(...(panel.words ?? []).map((w) => Object.assign(document.createElement('li'), { textContent: w })));
+        wordsEl.hidden = !panel.words?.length;
+      }
+      const pick = panel.pick;
+      if (pickEl) {
+        pickEl.replaceChildren(...(pick?.options ?? []).map((w, i) => {
+          const b = Object.assign(document.createElement('button'), { type: 'button', textContent: w });
+          b.onclick = (event) => {
+            if (!event.isTrusted || !pick) return;
+            pick.chosen = i;
+            Array.from(pickEl.children).forEach((c, n) => c.classList.toggle('on', n === i));
+          };
+          return b;
+        }));
+        pickEl.hidden = !pick;
+      }
       ok.textContent = panel.confirmLabel;
       error.textContent = '';
       ok.disabled = cancel.disabled = false;
@@ -96,14 +116,14 @@ export function panelUi(cancelledMessage?: string): Pick<UiPort, 'act' | 'cancel
       const armedAt = performance.now() + ARM_DELAY_MS;
       ok.disabled = true; if (alt) alt.disabled = true;   // both arm together
       let running = false;
-      const ready = () => performance.now() >= armedAt && guard.steady(ARM_DELAY_MS);
+      const ready = () => performance.now() >= armedAt && guard.steady(ARM_DELAY_MS) && (!pick || pick.chosen !== null);
       const arming = setInterval(() => {
         if (!open) { clearInterval(arming); return; }
         if (!running) { ok.disabled = !ready(); if (alt) alt.disabled = ok.disabled; }
       }, 100);
 
       return new Promise<T>((resolve, reject) => {
-        const close = () => { open = false; withdraw = null; clearInterval(arming); $('panel').hidden = true; $('idle').hidden = false; ok.onclick = cancel.onclick = null; if (alt) { alt.onclick = null; alt.hidden = true; } };
+        const close = () => { open = false; withdraw = null; clearInterval(arming); $('panel').hidden = true; $('idle').hidden = false; wordsEl?.replaceChildren(); pickEl?.replaceChildren(); ok.onclick = cancel.onclick = null; if (alt) { alt.onclick = null; alt.hidden = true; } };
         withdraw = () => { if (running) return false; close(); reject(cancelled()); return true; };
         // The action starts synchronously inside the click so WebAuthn keeps the user activation.
         const runner = (run: () => Promise<T>) => (event: MouseEvent) => {

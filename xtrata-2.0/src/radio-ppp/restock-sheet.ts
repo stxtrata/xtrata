@@ -22,6 +22,8 @@ export interface RestockInput {
   done: { plays: number; artists: number; likes: number } | null;
   /** Plays are on their way right now: say so and offer nothing to pay. */
   arriving: boolean;
+  /** The player's backup words are written down: the "holds up to 1 STX" reminder is softened. */
+  backedUp?: boolean;
 }
 export interface RestockDeps {
   input(): RestockInput | null;
@@ -107,7 +109,7 @@ export function createRestockSheet(deps: RestockDeps) {
         const row = el('div', 'ppp-restock__row');
         row.append(deps.copyButton('restock-address', 'Copy address', () => i.address, 'primary'), deps.copyButton('restock-amount', 'Copy amount', () => stxText(chosen.stx), ''));
         box.append(row);
-        box.append(el('p', 'ppp-restock__note', 'From any Stacks wallet or an exchange, on the Stacks network. A different amount is fine: your player holds up to 1 STX. The plays appear here by themselves, usually within a few minutes, so you can close this.'));
+        box.append(el('p', 'ppp-restock__note', `From any Stacks wallet or an exchange, on the Stacks network. A different amount is fine: ${i.backedUp ? 'your player is backed up, though larger amounts are safer in your main wallet' : 'your player holds up to 1 STX'}. The plays appear here by themselves, usually within a few minutes, so you can close this.`));
         kids.push(box);
       }
       // A converted method (card, Bitcoin) is paid through a restock service that is not live yet: restock.ts has its
