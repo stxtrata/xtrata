@@ -1,4 +1,4 @@
-import { AwardError, awardAtNumber, awardNote, awardsConfig, awardStatus, hiroAwardChain, targetFor, type AwardsEnv } from '../../lib/radio-awards';
+import { AwardError, awardAtNumber, awardNamePreview, awardNote, awardsConfig, awardStatus, hiroAwardChain, targetFor, type AwardsEnv } from '../../lib/radio-awards';
 import { SUGGESTED_DROP } from '../../../src/lib/listening-wallet/tiers';
 
 /**
@@ -6,6 +6,7 @@ import { SUGGESTED_DROP } from '../../../src/lib/listening-wallet/tiers';
  * and the contract is set.
  *   GET  /radio/awards/config             on or off, the contract, the drop, what each class needs
  *   GET  /radio/awards/status?address=    where this player stands (never a zero for something that could not be read)
+ *   GET  /radio/awards/name?address=      the name a record would carry right now (for the preview before claiming)
  *   POST /radio/awards/note               {address, name: "auto" | "none"}: the record's bytes and their signed note
  *   GET  /radio/awards/record?number=     for the wall: whether disc N has claimed, and its inscription
  * Nothing here moves money or sends a transaction.
@@ -33,6 +34,10 @@ export async function onRequest({ request, env, params }: Ctx) {
     if (action === 'status') {
       if (request.method !== 'GET') return reply({ error: 'GET required' }, 405);
       return reply(await awardStatus(env, chain, url.searchParams.get('address'), Date.now()));
+    }
+    if (action === 'name') {
+      if (request.method !== 'GET') return reply({ error: 'GET required' }, 405);
+      return reply(await awardNamePreview(env, chain, url.searchParams.get('address')));
     }
     if (action === 'record') {
       if (request.method !== 'GET') return reply({ error: 'GET required' }, 405);

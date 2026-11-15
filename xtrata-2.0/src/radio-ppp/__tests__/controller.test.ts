@@ -1,3 +1,4 @@
+import { buildRecord } from '../../lib/music-awards/record';
 import { describe, expect, it } from 'vitest';
 import {
   addressToString, createStacksPrivateKey, cvToJSON, deserializeTransaction, encodeStructuredData, getAddressFromPrivateKey, makeRandomPrivKey,
@@ -36,6 +37,8 @@ function setup(over: Partial<GateConfig> = {}, opts: { tabLock?: boolean; hold?:
     limits: { playFee: '300', returnFee: '3000', maxSessionPlays: 3000, sessionHours: 168 }, ...over
   };
   const server = { mains: new Map<string, string>(), mainOfFails: false, mainOfCalls: 0 };
+  // Music Hero awards, as the server would answer: `view` null means the request fails.
+  const awards: { view: any; name: string | null | 'fail'; note: any; statusCalls: number; noteCalls: ['auto' | 'none', string][] } = { view: { state: 'off' }, name: null, note: null, statusCalls: 0, noteCalls: [] };
   const chain = { balanceOf: new Map<string, bigint>(), deposits: [] as [string, bigint][], balance: 0n, nonce: 0n, confirmed: 0n, rejectNext: false, mined: new Set<string>(), broadcasts: [] as string[], owner: HOLDER, accountFails: false, balanceFails: false, funder: { ok: true, funder: null, distinct: 0 } as FunderResult, funderCalls: 0 };
   const gift = { inboundBy: new Map<string, InboundTransfer[]>(), info: null as GiftInfo | null, fails: false, calls: 0, inbound: [] as InboundTransfer[], outgoing: [] as Outgoing[], historyFails: false };
   const savedLinks: any[] = [];
@@ -104,6 +107,9 @@ function setup(over: Partial<GateConfig> = {}, opts: { tabLock?: boolean; hold?:
     changed: () => {},
     likesChanged: () => { likesChanged++; },
     funder: async () => { chain.funderCalls++; return chain.funder; },
+    awardStatus: async () => { awards.statusCalls++; if (!awards.view) throw new Error('503'); return awards.view; },
+    awardName: async () => { if (awards.name === 'fail') throw new Error('503'); return awards.name; },
+    awardNote: async (player, name) => { awards.noteCalls.push([name, player]); if (!awards.note) throw new Error('Not yet: 3 of 50 plays.'); return typeof awards.note === 'function' ? awards.note(player, name) : awards.note; },
     mainOf: async (listening) => { server.mainOfCalls++; if (server.mainOfFails) throw new Error('503'); return server.mains.get(listening) ?? null; },
     likeState: async (_main, song) => { if (likeReadFails) throw new Error('503'); const by = likeBy.get(song) ?? []; return { liked: by.length > 0, by }; },
     likeSent: (song, liked) => { sent.push([song, liked]); },
@@ -119,7 +125,7 @@ function setup(over: Partial<GateConfig> = {}, opts: { tabLock?: boolean; hold?:
     chain.nonce = BigInt(chain.broadcasts.length);
   };
   const settle = () => new Promise((r) => setTimeout(r, 0));
-  return { ppp, chain, gate, savedLinks, store, walletStore, held, settle, likesChanged: () => likesChanged, likeBy, sent, failed, confirmed, setLikeReadFails: (v: boolean) => { likeReadFails = v; }, tap: () => held.shift()!.tap(), tick: (ms: number) => { time += ms; }, setMain: (m?: string) => { main = m; }, mineAll, evaluations: () => evaluations, requests, names, engine, server, gift };
+  return { awards, ppp, chain, gate, savedLinks, store, walletStore, held, settle, likesChanged: () => likesChanged, likeBy, sent, failed, confirmed, setLikeReadFails: (v: boolean) => { likeReadFails = v; }, tap: () => held.shift()!.tap(), tick: (ms: number) => { time += ms; }, setMain: (m?: string) => { main = m; }, mineAll, evaluations: () => evaluations, requests, names, engine, server, gift };
 }
 
 describe('radio pay-per-play walk-through (real wallet engine, mocked chain)', () => {
@@ -1718,5 +1724,81 @@ describe('over 1 STX', () => {
     expect(s.ppp.snapshot()).toMatchObject({ step: 'ready', balanceState: 'ok', aboveTarget: true, backedUp: true });
     await s.ppp.onListened({ song: 7, id: rid(2), title: 'Night Drive' });
     expect(s.chain.broadcasts).toHaveLength(1);
+  });
+});
+
+
+describe('the Music Hero award', () => {
+  const hexOf = (b: Uint8Array) => Array.from(b, (x) => x.toString(16).padStart(2, '0')).join('');
+  const ready = { state: 'ready', cls: 'gold', number: 412, need: 50, have: 50 };
+  const noteFor = (name: string | null) => (player: string) => ({ cls: 2, number: 412, plays: 50, signature: 'ab'.repeat(65), name, record: hexOf(buildRecord({ template: 9002, cls: 'gold', hero: player, number: 412, plays: 50, name, drop: 1 })) });
+  const player = async (view: any) => {
+    const s = setup({ passkeyOnly: true }); s.setMain(undefined);
+    s.awards.view = view;
+    await s.ppp.forceRefresh(); await s.ppp.create();
+    s.chain.balance = 100_000n;
+    await s.ppp.forceRefresh();
+    return s;
+  };
+
+  it('says nothing for a player that is not one of the numbered ones, or while awards are off', async () => {
+    for (const view of [{ state: 'off' }, { state: 'not-a-player' }]) expect((await player(view)).ppp.snapshot().award).toBeNull();
+  });
+
+  it('shows progress as the server reports it, and a failed check is "unavailable", never zero plays', async () => {
+    const s = await player({ state: 'earning', cls: 'gold', number: 412, need: 50, have: 12 });
+    expect(s.ppp.snapshot().award).toEqual({ state: 'earning', cls: 'gold', number: 412, need: 50, have: 12 });
+    s.awards.view = null;
+    s.tick(61_000); await s.ppp.forceRefresh();
+    expect(s.ppp.snapshot().award).toMatchObject({ state: 'unavailable', cls: 'gold', number: 412, need: 50 });
+  });
+
+  it('when ready it learns the name the record would carry, and claims with the listener’s choice', async () => {
+    const s = await player(ready);
+    s.awards.name = 'jim.btc';
+    await s.ppp.awardRefresh();
+    expect(s.ppp.snapshot().award).toMatchObject({ state: 'ready', name: 'jim.btc' });
+    s.awards.note = noteFor('jim.btc');
+    await s.ppp.claimAward('auto');
+    expect(s.ppp.snapshot().error).toBe('');
+    expect(s.awards.noteCalls).toEqual([['auto', LISTENING]]);
+    // One transaction went out: the claim, to the award contract, signed by the player.
+    expect(s.chain.broadcasts).toHaveLength(1);
+    const tx = deserializeTransaction(s.chain.broadcasts[0]) as any;
+    expect(tx.payload.functionName.content).toBe('claim');
+    expect(tx.payload.contractName.content).toBe('xtrata-music-awards-v1-0');
+    expect(addressToString({ type: 0, version: 22, hash160: tx.auth.spendingCondition.signer } as any)).toBe(LISTENING);
+    expect(s.ppp.snapshot().award).toMatchObject({ state: 'ready', claimTx: expect.stringMatching(/^0x[0-9a-f]{64}$/) });
+    // A second press while it is on its way sends nothing more.
+    await s.ppp.claimAward('auto');
+    expect(s.chain.broadcasts).toHaveLength(1);
+    // The chain confirms: the server now says claimed, and the page shows the record.
+    s.awards.view = { state: 'claimed', cls: 'gold', number: 412, inscription: 48213, holds: true };
+    s.tick(21_000); await s.ppp.forceRefresh();
+    expect(s.ppp.snapshot().award).toEqual({ state: 'claimed', cls: 'gold', number: 412, inscription: 48213, holds: true, name: 'jim.btc' });
+  });
+
+  it('a name that could not be checked is unknown, not "no name"; the address alone can still be claimed', async () => {
+    const s = await player(null);
+    s.awards.view = ready; s.awards.name = 'fail';
+    await s.ppp.awardRefresh();
+    const a = s.ppp.snapshot().award!;
+    expect(a.state).toBe('ready');
+    expect('name' in a && a.name === undefined).toBe(true);
+    s.awards.note = noteFor(null);
+    await s.ppp.claimAward('none');
+    expect(s.awards.noteCalls.at(-1)![0]).toBe('none');
+    expect(s.chain.broadcasts).toHaveLength(1);
+  });
+
+  it('sends nothing when the server will not sign, or signs a record for somebody else', async () => {
+    const s = await player(ready);
+    await s.ppp.claimAward('none');
+    expect(s.ppp.snapshot().error).toMatch(/Not yet/);
+    s.awards.note = () => noteFor(null)('SP16538G41XMAGHYB0JZAP29R7YBSKDR569QP1SMF');
+    await s.ppp.claimAward('none');
+    expect(s.ppp.snapshot().error).toMatch(/different player/);
+    expect(s.chain.broadcasts).toHaveLength(0);
+    expect(s.ppp.snapshot().award).not.toHaveProperty('claimTx');
   });
 });

@@ -65,3 +65,26 @@ export const recordHash = (record: Uint8Array): Uint8Array => {
   joined.set(record, 32);
   return sha256(joined);
 };
+
+export interface ParsedRecord { template: number; cls: AwardClassId; hero: string; number: number; plays: number; name: string | null }
+const SHAPE = /^<!doctype html><meta charset=utf-8><title>Xtrata Music Hero · (Diamond|Gold|Silver|Bronze|Classic) record No\. \d{4,7}(?: · [a-z0-9._-]+)?<\/title><style>[^<]*<\/style><iframe src="\/i\/(\d{1,12})#n=(\d{1,7})&a=(S[PMTN][0-9A-Z]{28,41})(?:&b=([a-z0-9._-]+))?&p=(\d{1,7})&s=[0-9a-f]{8}"><\/iframe>$/;
+/**
+ * Reads a record back into its parts, and accepts it only if building those parts again gives the very same bytes.
+ * So whatever passes is a genuine record of this drop, with nothing extra in it. Null for anything else.
+ * The wallet box uses this to show the listener what they are about to claim, from the bytes themselves.
+ */
+export function parseRecord(record: Uint8Array, drop: number): ParsedRecord | null {
+  if (record.length > MAX_RECORD_BYTES) return null;
+  let text: string;
+  try { text = new TextDecoder('utf-8', { fatal: true }).decode(record); } catch { return null; }
+  const m = SHAPE.exec(text);
+  if (!m) return null;
+  const cls = (Object.keys(AWARD_CLASS_NAME) as AwardClassId[]).find((k) => AWARD_CLASS_NAME[k] === m[1]);
+  if (!cls) return null;
+  const parsed: ParsedRecord = { template: Number(m[2]), cls, number: Number(m[3]), hero: m[4], name: m[5] ?? null, plays: Number(m[6]) };
+  try {
+    const again = buildRecord({ ...parsed, drop });
+    if (again.length !== record.length || !again.every((b, i) => b === record[i])) return null;
+  } catch { return null; }
+  return parsed;
+}

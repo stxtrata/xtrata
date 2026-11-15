@@ -54,9 +54,10 @@ export interface StatusResult {
  * `slots` (listening.slotAddress, listening.openSlot and listening.bindSlot: one passkey, many derived wallets),
  * `rootLike` (listening.signLike always signs with the passkey's own wallet, whichever album wallet is open, and status reports it as `root`),
  * `move` (listening.signMove: move STX between two wallets of the same passkey, no panel),
+ * `award` (listening.signAward: claim a Music Hero record from the one award contract the box knows),
  * `phrase` (new players have a 24-word backup phrase that opens in other Stacks wallets; listening.backup shows it in the box).
  */
-export const LISTENING_FEATURES = ['cancel', 'like', 'standalone', 'multi', 'partial', 'slots', 'rootLike', 'move', 'phrase'] as const;
+export const LISTENING_FEATURES = ['cancel', 'like', 'standalone', 'multi', 'partial', 'slots', 'rootLike', 'move', 'phrase', 'award'] as const;
 
 /** `listening.status`: the connected main wallet, if any, so the box answers for that address's listening wallet. */
 export interface StatusParams {
@@ -172,6 +173,31 @@ export interface MoveParams {
   nonce: string;
   balance: string;
 }
+/**
+ * `listening.signAward`: claim a Music Hero record. The page hands over what the awards server signed (the record's
+ * bytes and its note); the box reads the record itself, shows the listener what it says, and signs a claim to the one
+ * award contract it knows, as the passkey's own wallet. `balance` and `nonce` are that wallet's (slot 0).
+ */
+export interface SignAwardParams {
+  cls: number;
+  number: number;
+  plays: number;
+  /** Hex: the record's bytes (at most 1024) and the 65-byte signature. */
+  record: string;
+  signature: string;
+  fee: string;
+  nonce: string;
+  balance: string;
+}
+export interface SignAwardResult extends SignedResult {
+  /** The address that claims (the passkey's own wallet), and what the record says. */
+  hero: string;
+  number: number;
+  cls: number;
+  name: string | null;
+  fee: string;
+}
+
 export interface MoveResult extends SignedResult {
   from: string;
   to: string;

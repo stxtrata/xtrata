@@ -12,7 +12,8 @@ void deriveOriginalIdentity;
 import { linkHash, verifyLinkSignature } from '../../../lib/listening-wallet/link';
 import { verifySlotSignature } from '../../../lib/listening-wallet/slots';
 import { MIN_LIKE_INTERVAL_MS, MIN_PLAY_INTERVAL_MS, TARGET } from '../../../lib/listening-wallet/policy';
-import { LIKES_CONTRACT } from '../../../lib/listening-wallet/tx';
+import { AWARDS_CONTRACT, LIKES_CONTRACT } from '../../../lib/listening-wallet/tx';
+import { buildRecord } from '../../../lib/music-awards/record';
 import { assertNoSecrets } from '../../../lib/wallet/passkey/bridge/protocol';
 import { validateSaved } from '../../../radio-test-wallet/chain';
 
@@ -61,7 +62,7 @@ const play = (balance = '500000', nonce = '0') => ({ core: 3, song: 1234, receip
 describe('listening wallet engine (wallet origin)', () => {
   it('creates a wallet only after two matching PRF results and stores no secrets', async () => {
     const s = setup();
-    expect(await s.h['listening.status']()).toEqual({ state: 'none', session: null, features: ['cancel', 'like', 'standalone', 'multi', 'partial', 'slots', 'rootLike', 'move', 'phrase'] });
+    expect(await s.h['listening.status']()).toEqual({ state: 'none', session: null, features: ['cancel', 'like', 'standalone', 'multi', 'partial', 'slots', 'rootLike', 'move', 'phrase', 'award'] });
     const r = await s.h['listening.unlock']({ mode: 'create' });
     expect(r.address).toBe(ADDRESS);
     expect(s.panels.map((p) => p.kind)).toEqual(['create', 'confirm-passkey', 'verify-passkey']);
@@ -84,7 +85,7 @@ describe('listening wallet engine (wallet origin)', () => {
     const other = Uint8Array.from(PRF); other[5] ^= 0xff;
     const s = setup({ outputs: [PRF, other] });
     await expect(s.h['listening.unlock']({ mode: 'create' })).rejects.toThrow(/stable/);
-    expect(await s.h['listening.status']()).toEqual({ state: 'none', session: null, features: ['cancel', 'like', 'standalone', 'multi', 'partial', 'slots', 'rootLike', 'move', 'phrase'] });
+    expect(await s.h['listening.status']()).toEqual({ state: 'none', session: null, features: ['cancel', 'like', 'standalone', 'multi', 'partial', 'slots', 'rootLike', 'move', 'phrase', 'award'] });
     // No wallet, and no half-made passkey kept either: an unstable passkey is dropped, not picked up again.
     const kept = JSON.parse(s.map.get('xtrata.listening-wallet.v1') ?? '{"wallets":[]}');
     expect(kept.wallets).toEqual([]);
@@ -893,5 +894,81 @@ describe('the 1 STX rule, softened for a backed-up player', () => {
     // The backup changes how much it may HOLD, not how much one approval may SPEND.
     await expect(s.h['listening.signPlay'](play(OVER, '2'))).rejects.toThrow();
     await expect(s.h['listening.approveSession']({ fee: '300', maxPlays: 3000, budget: '2000000', expires: s.now() + 3600_000 })).rejects.toThrow(/at most 1 STX/);
+  });
+});
+
+describe('claiming a Music Hero record', () => {
+  const SIG = 'ab'.repeat(65);
+  const hexOf = (b: Uint8Array) => Array.from(b, (x) => x.toString(16).padStart(2, '0')).join('');
+  const recordFor = (over: Partial<Parameters<typeof buildRecord>[0]> = {}) => buildRecord({ template: 9002, cls: 'gold', hero: ADDRESS, number: 412, plays: 50, name: 'jim.btc', drop: 1, ...over });
+  const ask = (over: Record<string, unknown> = {}) => ({ cls: 2, number: 412, plays: 50, record: hexOf(recordFor()), signature: SIG, fee: '1500', nonce: '7', balance: '20000', ...over });
+  const opened = async (opts: Parameters<typeof setup>[0] = {}) => { const s = setup(opts); await s.h['listening.unlock']({ mode: 'create' }); return s; };
+
+  it('signs a claim to the one award contract, as the player itself, that can cost the player only its network fee', async () => {
+    const s = await opened();
+    const r = await s.h['listening.signAward'](ask());
+    expect(r).toMatchObject({ hero: ADDRESS, number: 412, cls: 2, name: 'jim.btc', fee: '1500' });
+    assertNoSecrets(r);
+    const tx = deserializeTransaction(r.raw) as any;
+    expect(`${addressToString(tx.payload.contractAddress)}.${tx.payload.contractName.content}`).toBe(AWARDS_CONTRACT);
+    expect(tx.payload.functionName.content).toBe('claim');
+    expect(tx.payload.functionArgs.map((a: any) => cvToJSON(a).value)).toEqual(['1', '2', '412', '50', '0x' + hexOf(recordFor()), '0x' + SIG]);
+    expect(addressToString({ type: 0, version: 22, hash160: tx.auth.spendingCondition.signer } as any)).toBe(ADDRESS);
+    expect(String(tx.auth.spendingCondition.fee)).toBe('1500');
+    expect(String(tx.auth.spendingCondition.nonce)).toBe('7');
+    // The claimer sends no STX at all: one post-condition, "equal to 0", on the player's own address.
+    expect(tx.postConditions.values).toHaveLength(1);
+    const pc = tx.postConditions.values[0];
+    expect(addressToString(pc.principal.address)).toBe(ADDRESS);
+    expect(String(pc.amount)).toBe('0');
+    // The listener was shown, inside the box, what the record itself says.
+    const panel = s.panels.at(-1)!;
+    expect(panel).toMatchObject({ kind: 'award', title: 'Claim your Gold record', confirmLabel: 'Claim my record' });
+    expect(panel.summary).toContain('No. 0412 · jim.btc');
+    expect(panel.lines.join(' ')).toContain(`jim.btc, ${ADDRESS}, 50 paid plays`);
+  });
+
+  it('the page cannot aim a claim anywhere else, and the claim is always the player’s own, whichever album is open', async () => {
+    const s = await opened();
+    await s.h['listening.openSlot']({ slot: 1 });
+    const r = await s.h['listening.signAward'](ask({ contract: 'SP000000000000000000002Q6VF78.evil', functionName: 'steal', drop: 99 }));
+    const tx = deserializeTransaction(r.raw) as any;
+    expect(`${addressToString(tx.payload.contractAddress)}.${tx.payload.contractName.content}`).toBe(AWARDS_CONTRACT);
+    expect(tx.payload.functionName.content).toBe('claim');
+    expect(cvToJSON(tx.payload.functionArgs[0]).value).toBe('1');
+    expect(addressToString({ type: 0, version: 22, hash160: tx.auth.spendingCondition.signer } as any)).toBe(ADDRESS);
+  });
+
+  it('signs only a genuine record for this very player, matching what is being claimed', async () => {
+    const s = await opened();
+    const other = 'SP16538G41XMAGHYB0JZAP29R7YBSKDR569QP1SMF';
+    const tampered = hexOf(new TextEncoder().encode(new TextDecoder().decode(recordFor()).replace('</iframe>', '</iframe><script>x</script>')));
+    const cases: [Record<string, unknown>, RegExp][] = [
+      [{ record: hexOf(recordFor({ hero: other })) }, /different player/],
+      [{ record: tampered }, /not a Music Hero record/],
+      [{ record: hexOf(new TextEncoder().encode('<h1>hello</h1>')) }, /not a Music Hero record/],
+      [{ record: hexOf(recordFor()).replace('3d3530', '3d3939') }, /not a Music Hero record|does not match/], // p=50 → p=99 inside the bytes
+      [{ cls: 1 }, /does not match/], [{ number: 413 }, /does not match/], [{ plays: 51 }, /does not match/],
+      [{ record: 'zz' }, /Invalid record/], [{ record: 'ab'.repeat(1025) }, /Invalid record/],
+      [{ signature: 'ab'.repeat(64) }, /not valid/], [{ signature: 5 }, /Invalid award note/],
+      [{ fee: '10001' }, /fee is not allowed/], [{ fee: '0' }, /fee is not allowed/],
+      [{ balance: '1000' }, /network fee/], [{ nonce: '-1' }, /Invalid nonce/]
+    ];
+    for (const [over, why] of cases) await expect(s.h['listening.signAward'](ask(over)), JSON.stringify(Object.keys(over))).rejects.toThrow(why);
+    expect(s.panels.some((p) => p.kind === 'award')).toBe(false); // none of those was even shown
+  });
+
+  it('needs an open player and the listener’s own confirm; closing the box signs nothing', async () => {
+    const locked = setup();
+    await expect(locked.h['listening.signAward'](ask())).rejects.toThrow(/Unlock/);
+    const s = await opened({ cancel: ['award'] });
+    await expect(s.h['listening.signAward'](ask())).rejects.toBeInstanceOf(CancelledError);
+  });
+
+  it('a record with no name is shown by its address alone', async () => {
+    const s = await opened();
+    const r = await s.h['listening.signAward'](ask({ record: hexOf(recordFor({ name: null })) }));
+    expect(r.name).toBeNull();
+    expect(s.panels.at(-1)!.summary).toContain('No. 0412 · SP1SY2…KJ6N · 50 paid plays');
   });
 });

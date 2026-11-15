@@ -32,6 +32,8 @@ import { createWelcomeView, type WelcomeMode } from './welcome';
 import { createRestockSheet, type RestockInput } from './restock-sheet';
 import { buildSongs, createFindBox } from './find';
 import { isTierId, tierById, tierOfAmount, type Tier } from '../lib/listening-wallet/tiers';
+import { AWARDS_DROP } from '../lib/listening-wallet/tx';
+import { awardSeed } from '../lib/music-awards/record';
 
 const root = document.getElementById('ppp');
 if (root) start(root);
@@ -77,7 +79,7 @@ function start(root: HTMLElement) {
       // Interactive requests wait for the listener (up to 30 minutes) so a late confirm in the frame
       // is never signed and then dropped here. Everything else must answer quickly.
       const client = new WalletBridgeClient({ walletOrigin: origin, frame, timeoutMs: 30 * 60_000 });
-      const INTERACTIVE = new Set(['listening.unlock', 'listening.link', 'listening.prove', 'listening.backup', 'listening.approveSession', 'listening.prepareReturn']);
+      const INTERACTIVE = new Set(['listening.unlock', 'listening.link', 'listening.prove', 'listening.backup', 'listening.signAward', 'listening.approveSession', 'listening.prepareReturn']);
       const request = <T,>(method: string, params?: unknown) => INTERACTIVE.has(method)
         ? client.request<T>(method as never, params)
         : Promise.race([
@@ -125,6 +127,22 @@ function start(root: HTMLElement) {
       if (!g) return null;
       if (typeof g.returnTo !== 'string' || typeof g.treasury !== 'string') throw new Error('Unreadable gift record.');
       return { returnTo: g.returnTo, from: typeof g.from === 'string' ? g.from : null, source: String(g.source ?? ''), amount: String(g.amount ?? '0'), treasury: g.treasury, state: g.state === 'sending' ? 'sending' : 'arrived', player: g.player ?? null };
+    },
+    // Music Hero awards: a failed request throws (shown as "can't check"), it is never read as "no award" or "no plays".
+    awardStatus: async (player) => {
+      const r = await json('/radio/awards/status?address=' + encodeURIComponent(player));
+      if (typeof r?.state !== 'string') throw new Error('Unreadable award status.');
+      return r;
+    },
+    awardName: async (player) => {
+      const r = await json('/radio/awards/name?address=' + encodeURIComponent(player));
+      if (r?.name !== null && typeof r?.name !== 'string') throw new Error('Unreadable name.');
+      return r.name;
+    },
+    awardNote: async (player, name) => {
+      const r = await json('/radio/awards/note', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ address: player, name }) });
+      if (typeof r?.record !== 'string' || typeof r?.signature !== 'string' || !Number.isSafeInteger(r?.cls) || !Number.isSafeInteger(r?.number) || !Number.isSafeInteger(r?.plays)) throw new Error('Unreadable award note.');
+      return { cls: r.cls, number: r.number, plays: r.plays, record: r.record, signature: r.signature, name: typeof r.name === 'string' ? r.name : null };
     },
     history: (listening, withOutgoing) => readHistory(listening, (path) => api(path), withOutgoing),
     likesChanged: () => { void (window as any).XtrataRadio?.refreshLikes?.(); },
@@ -214,6 +232,8 @@ function start(root: HTMLElement) {
     if (s.listening && s.slot === 0 && ['fund', 'ready', 'over'].includes(s.step) && !(s.gift && s.gift.drop === undefined)) {
       let next: Tier | null = null;
       try { next = s.gift && !s.gift.player && s.gift.drop === 'players' ? tierOfAmount(BigInt(s.gift.amount)) : null; } catch { next = null; }
+      // A player that claimed its record and then sent it to someone else goes back to plain: the colours go with the record.
+      if (s.award?.state === 'claimed' && s.award.holds === false) next = null;
       if ((next?.id ?? null) !== (tierNow?.id ?? null)) { tierNow = next; flagStore.set(TIER_KEY, next ? next.id : null); }
     }
     const root = document.documentElement;
@@ -1319,6 +1339,7 @@ function start(root: HTMLElement) {
         }));
       }
     }
+    renderAward(s);
     // "Make it yours": found, not pushed. Each item is closed until the listener opens it. Only for a passkey-only
     // listener whose player is open; a player already linked to a Stacks wallet has done this.
     const yours = document.querySelector('#ppp .ppp-yours') as HTMLDetailsElement | null;
@@ -1406,6 +1427,71 @@ function start(root: HTMLElement) {
     const last = readLastAlbum();
     if (last && (s.step === 'locked' || (resumeAlbum && s.step === 'loading'))) return { mode: 'locked', player: last.player };
     return null;
+  }
+
+  /**
+   * The player's Music Hero record, in the panel: how far along it is, the claim when it is ready (with a preview of
+   * exactly what will be made, and the name it would carry), and the record itself once it is theirs. Nothing here
+   * decides anything: the server says where the player stands and the wallet box checks the claim.
+   */
+  function renderAward(s: Snapshot) {
+    const box = document.querySelector('#ppp .ppp-award') as HTMLElement | null;
+    if (!box) return;
+    const a = s.award;
+    const player = s.slot === 0 ? s.listening : s.root;
+    const tier = a?.cls && isTierId(a.cls) ? tierById(a.cls) : null;
+    const show = !!a && !!tier && !!player && ['ready', 'fund', 'over'].includes(s.step) && !(a.state === 'unavailable' && a.number === undefined);
+    box.hidden = !show;
+    if (!show || !a || !tier || !player) { box.replaceChildren(); return; }
+    // Drawn again only when something it shows has changed, so the record's preview is not reloaded on every tick.
+    const sig = JSON.stringify([a, player, !!s.busy]);
+    if (box.getAttribute('data-sig') === sig) return;
+    box.setAttribute('data-sig', sig);
+    const head = (right: string) => { const h = el('p', '', 'ppp-award__h'); h.append(el('b', `${tier.mark} Music Hero award`), el('span', right)); return h; };
+    const no = `No. ${String(a.number ?? 0).padStart(4, '0')}`;
+    const art = (src: string) => { const w = el('div', '', 'ppp-award__art'); const f = document.createElement('iframe'); f.src = src; f.title = `${tier.name} record`; f.setAttribute('sandbox', 'allow-scripts'); f.setAttribute('loading', 'lazy'); w.append(f); return w; };
+    const kids: HTMLElement[] = [];
+    if (a.state === 'claimed') {
+      kids.push(head(`${tier.name} record · ${no}`));
+      if (a.inscription !== undefined) kids.push(art(`/i/${a.inscription}`));
+      kids.push(el('p', a.holds === false ? 'You sent this record to another wallet, so your player has gone back to plain. Whoever holds it keeps a record that still names you.'
+        : a.holds === null || a.holds === undefined ? `Yours: Xtrata inscription #${a.inscription}.` : `Yours for good: Xtrata inscription #${a.inscription}. It gives your player its ${tier.name} colours.`, a.holds === false ? 'ppp-mute' : 'ppp-ok'));
+      if (a.inscription !== undefined) { const p = el('p'); p.append(link('Open it full screen ↗', `/i/${a.inscription}`)); kids.push(p); }
+    } else if (a.claimTx) {
+      kids.push(head(`${tier.name} record · ${no}`));
+      const p = el('p', 'Your record is being made: written to Xtrata with your plaque on it. About a minute. ', 'ppp-cyan'); p.append(link('View', explorer(a.claimTx)));
+      kids.push(p);
+    } else if (a.state === 'ready') {
+      kids.push(head(`${tier.name} record · ${no}`));
+      const named = typeof a.name === 'string' && a.name ? a.name : null;
+      const q = new URLSearchParams({ n: String(a.number), a: player, ...(named ? { b: named } : {}), p: String(a.need), s: awardSeed(AWARDS_DROP, a.number!, player) });
+      kids.push(art(`/awards/${tier.id}#${q}`));
+      kids.push(el('p', `Your ${tier.name} record is ready. You have paid artists for ${a.need?.toLocaleString()} plays: that makes you an Xtrata Music Hero.`));
+      const row = el('div', '', 'ppp-award__row');
+      if (named) {
+        kids.push(el('p', `Its plaque will carry ${named} beside your player’s address. What is on it cannot be changed afterwards.`, 'ppp-mute'));
+        row.append(button('Claim my record', () => void ppp.claimAward('auto'), 'primary'), button('Use my address only', () => void ppp.claimAward('none'), 'quiet'));
+      } else if (a.name === null) {
+        kids.push(el('p', 'Its plaque will carry your player’s address. Want a .btc name on it? Link a wallet that has one (see “Make it yours” below), then check again. What is on it cannot be changed afterwards.', 'ppp-mute'));
+        row.append(button('Claim my record', () => void ppp.claimAward('none'), 'primary'), button('Check for a name again', () => void ppp.awardRefresh(), 'quiet'));
+      } else {
+        kids.push(el('p', 'Could not check for a .btc name just now. Check again, or claim with your player’s address alone.', 'ppp-warn'));
+        row.append(button('Check for a name again', () => void ppp.awardRefresh(), 'primary'), button('Claim with my address only', () => void ppp.claimAward('none'), 'quiet'));
+      }
+      row.querySelectorAll('button').forEach((b) => { (b as HTMLButtonElement).disabled = !!s.busy; });
+      kids.push(row, el('p', 'Free to claim: your player pays only a tiny network fee.', 'ppp-mute'));
+    } else if (a.state === 'earning' && a.have !== undefined && a.need) {
+      kids.push(head(`${a.have.toLocaleString()} of ${a.need.toLocaleString()} paid plays`));
+      const bar = el('div', '', 'ppp-award__bar'); const fill = document.createElement('i'); fill.style.width = `${Math.min(100, Math.round((a.have / a.need) * 100))}%`; bar.append(fill);
+      const left = a.need - a.have;
+      kids.push(bar, el('p', `${left.toLocaleString()} more ${left === 1 ? 'play' : 'plays'} and your ${tier.name} record is yours to claim.`, 'ppp-mute'));
+    } else {
+      kids.push(head(`${tier.name} record · ${no}`));
+      kids.push(el('p', a.state === 'paused' ? 'Claiming is paused for a moment. Your record is safe: try again later.'
+        : a.state === 'class-full' || a.state === 'not-open' ? 'Claiming is not open for this record right now.'
+          : 'Can’t check your award right now. Your plays still count: this updates by itself.', 'ppp-mute'));
+    }
+    box.replaceChildren(...kids);
   }
 
   /**

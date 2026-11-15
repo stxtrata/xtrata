@@ -536,6 +536,14 @@ history.replaceState(null,'',location.pathname+location.search);}catch(e){}})();
   html[data-view=album] #findBox{display:none!important}
   @media (max-width:900px){#findBox{order:4}}
   html[data-dock] #findBox{order:2}
+  .ppp-award{margin:10px 0 0;padding:12px 14px;border:1px solid #6b5720;border-radius:14px;background:linear-gradient(180deg,rgba(242,182,97,.10),rgba(242,182,97,.02));display:grid;gap:8px}
+  .ppp-award[hidden]{display:none}
+  .ppp-award__h{display:flex;justify-content:space-between;align-items:baseline;gap:8px;margin:0}.ppp-award__h b{color:#f2c661}.ppp-award__h span{font-size:12.5px;color:var(--mut)}
+  .ppp-award__bar{height:9px;border-radius:6px;background:#22262d;overflow:hidden}.ppp-award__bar i{display:block;height:100%;border-radius:6px;background:linear-gradient(90deg,#b8862b,#f6d77a)}
+  .ppp-award p{margin:0;font-size:13.5px}
+  .ppp-award__art{width:100%;max-width:300px;aspect-ratio:1;margin:2px auto;border-radius:14px;overflow:hidden;background:#040509;border:1px solid var(--line)}
+  .ppp-award__art iframe{width:100%;height:100%;border:0;display:block}
+  .ppp-award__row{display:flex;flex-wrap:wrap;gap:8px}
   .ppp-featured{margin:10px 0 0;display:grid;gap:8px}
   .ppp-featured__h{margin:0;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--mut)}
   .ppp-featured__a{font:inherit;color:inherit;text-align:left;background:none;border:1px solid var(--line);border-radius:12px;padding:10px 12px;cursor:pointer;display:flex;flex-direction:column;gap:2px;min-height:48px}
@@ -835,6 +843,8 @@ history.replaceState(null,'',location.pathname+location.search);}catch(e){}})();
       <!-- My albums, right under the switcher: opened by the "View all albums" button (its own summary is hidden). -->
       <details class="ppp-fold ppp-shelf" hidden><summary>♪ My albums</summary><div class="ppp-shelf-body"></div></details>
       <div class="ppp-key"></div>
+      <!-- The player's Music Hero record: progress, the claim, and the record once it is theirs (page.ts renderAward). -->
+      <div class="ppp-award" hidden></div>
       <div class="ppp-featured" hidden></div>
       <p class="ppp-frame-label" hidden><span>Listening wallet · approvals happen in this box</span></p>
       <!-- While the box asks for a tap on an album: its cover, name and giver, drawn by the page above the box. -->
@@ -1296,7 +1306,7 @@ function showUnavailable(){
 fetch('/radio/listening-wallet/config',{cache:'no-store',signal:AbortSignal.timeout(15000)})
   .then(function(r){return r.ok?r.json():{}})
   .then(function(c){
-    if(c?.enabled && (!paidHost || c.here)) return import('/radio/ppp.js?v=9d5698a22484');
+    if(c?.enabled && (!paidHost || c.here)) return import('/radio/ppp.js?v=1115cdd30b11');
     showUnavailable();
   }).catch(showUnavailable);
 </script>

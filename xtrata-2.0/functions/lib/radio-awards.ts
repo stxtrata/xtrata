@@ -221,6 +221,17 @@ export async function plaqueName(env: AwardsEnv, chain: AwardChain, address: str
   return cleanAwardName(await chain.primaryName(main));
 }
 
+/** The name a record would carry right now, for the preview before claiming. Wall players only. A failed lookup is a 503. */
+export async function awardNamePreview(env: AwardsEnv, chain: AwardChain, address: unknown): Promise<{ name: string | null }> {
+  if (!awardsConfig(env).enabled) throw new AwardError('Awards are not open.', 404);
+  if (typeof address !== 'string' || !isMainnetStandardAddress(address)) throw new AwardError('A mainnet player address is required.');
+  let player: Awaited<ReturnType<typeof wallPlayerOf>>;
+  try { player = await wallPlayerOf(env, address); } catch { throw new AwardError('Could not check right now. Try again shortly.', 503); }
+  if (!player) throw new AwardError('This is not one of the numbered players.', 404);
+  try { return { name: await plaqueName(env, chain, address) }; }
+  catch (e) { throw new AwardError(e instanceof AwardUnavailable ? e.message : 'Could not check for a name right now.', 503); }
+}
+
 // ---------------------------------------------------------------- the note
 export interface AwardNote {
   contract: string; drop: number; cls: number; className: AwardClassId; number: number; plays: number; hero: string;

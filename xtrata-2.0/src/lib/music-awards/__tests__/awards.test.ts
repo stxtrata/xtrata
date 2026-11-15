@@ -71,3 +71,18 @@ describe('the note the award contract checks', () => {
     }
   });
 });
+
+describe('reading a record back', () => {
+  it('reads the two testnet records, and only accepts bytes the builder itself would make', async () => {
+    const { parseRecord } = await import('../record');
+    const enc = (t: string) => new TextEncoder().encode(t);
+    expect(parseRecord(enc(GOLD), 1)).toEqual({ template: 0, cls: 'gold', hero: ACCEPTED.hero, number: 412, plays: 50, name: 'rehearsal.btc' });
+    expect(parseRecord(enc(DIAMOND), 1)).toMatchObject({ template: 1, cls: 'diamond', number: 7, plays: 100, name: null });
+    // A different figure is still a well-formed record: it reads as what it says (the box then checks it against the claim).
+    expect(parseRecord(enc(GOLD.replace('&p=50', '&p=5000')), 1)).toMatchObject({ plays: 5000 });
+    expect(parseRecord(enc(GOLD), 2)).toBeNull();                                    // another drop: the seed would differ
+    for (const bad of [GOLD + ' ', GOLD.replace('Gold', 'Diamond').replace('record No. 0412', 'record No. 0413'), GOLD.replace('rehearsal.btc', 'other.btc').replace('· rehearsal.btc', '· x.btc'),
+      GOLD.replace('<style>', '<script>alert(1)</script><style>'), GOLD.replace(/&s=[0-9a-f]{8}/, '&s=00000000'), '', 'hello'])
+      expect(parseRecord(enc(bad), 1), bad.slice(0, 60)).toBeNull();
+  });
+});
