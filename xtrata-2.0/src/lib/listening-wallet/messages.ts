@@ -56,9 +56,10 @@ export interface StatusResult {
  * `move` (listening.signMove: move STX between two wallets of the same passkey, no panel),
  * `award` (listening.signAward: claim a Music Hero record from the one award contract the box knows),
  * `sendRecord` (listening.signSendRecord: send an inscription the player holds to an address confirmed in the box),
+ * `shelf` (listening.signShelf: sign a request about the albums this player keeps; no panel, moves nothing),
  * `phrase` (new players have a 24-word backup phrase that opens in other Stacks wallets; listening.backup shows it in the box).
  */
-export const LISTENING_FEATURES = ['cancel', 'like', 'standalone', 'multi', 'partial', 'slots', 'rootLike', 'move', 'phrase', 'award', 'sendRecord'] as const;
+export const LISTENING_FEATURES = ['cancel', 'like', 'standalone', 'multi', 'partial', 'slots', 'rootLike', 'move', 'phrase', 'award', 'sendRecord', 'shelf'] as const;
 
 /** `listening.status`: the connected main wallet, if any, so the box answers for that address's listening wallet. */
 export interface StatusParams {
@@ -217,6 +218,14 @@ export interface SendRecordResult extends SignedResult {
   inscription: number;
   fee: string;
 }
+
+/**
+ * `listening.signShelf`: sign a request about the albums this player keeps (add, hide, show, remove, or read the
+ * list). Signed by the passkey's own wallet with no panel: it is a structured message under its own domain, not a
+ * transaction, and can move nothing. The box fills in the player and the time itself.
+ */
+export interface SignShelfParams { action: 'add' | 'hide' | 'show' | 'remove' | 'list'; release?: string }
+export interface SignShelfResult { request: { action: string; release: string; player: string; issued: number }; signature: string }
 
 export interface MoveResult extends SignedResult {
   from: string;

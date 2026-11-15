@@ -14,6 +14,7 @@ import { verifySlotSignature } from '../../../lib/listening-wallet/slots';
 import { MIN_LIKE_INTERVAL_MS, MIN_PLAY_INTERVAL_MS, TARGET } from '../../../lib/listening-wallet/policy';
 import { AWARDS_CONTRACT, LIKES_CONTRACT } from '../../../lib/listening-wallet/tx';
 import { buildRecord } from '../../../lib/music-awards/record';
+import { verifyShelfSignature } from '../../../lib/music-releases/release';
 import { assertNoSecrets } from '../../../lib/wallet/passkey/bridge/protocol';
 import { validateSaved } from '../../../radio-test-wallet/chain';
 
@@ -62,7 +63,7 @@ const play = (balance = '500000', nonce = '0') => ({ core: 3, song: 1234, receip
 describe('listening wallet engine (wallet origin)', () => {
   it('creates a wallet only after two matching PRF results and stores no secrets', async () => {
     const s = setup();
-    expect(await s.h['listening.status']()).toEqual({ state: 'none', session: null, features: ['cancel', 'like', 'standalone', 'multi', 'partial', 'slots', 'rootLike', 'move', 'phrase', 'award', 'sendRecord'] });
+    expect(await s.h['listening.status']()).toEqual({ state: 'none', session: null, features: ['cancel', 'like', 'standalone', 'multi', 'partial', 'slots', 'rootLike', 'move', 'phrase', 'award', 'sendRecord', 'shelf'] });
     const r = await s.h['listening.unlock']({ mode: 'create' });
     expect(r.address).toBe(ADDRESS);
     expect(s.panels.map((p) => p.kind)).toEqual(['create', 'confirm-passkey', 'verify-passkey']);
@@ -85,7 +86,7 @@ describe('listening wallet engine (wallet origin)', () => {
     const other = Uint8Array.from(PRF); other[5] ^= 0xff;
     const s = setup({ outputs: [PRF, other] });
     await expect(s.h['listening.unlock']({ mode: 'create' })).rejects.toThrow(/stable/);
-    expect(await s.h['listening.status']()).toEqual({ state: 'none', session: null, features: ['cancel', 'like', 'standalone', 'multi', 'partial', 'slots', 'rootLike', 'move', 'phrase', 'award', 'sendRecord'] });
+    expect(await s.h['listening.status']()).toEqual({ state: 'none', session: null, features: ['cancel', 'like', 'standalone', 'multi', 'partial', 'slots', 'rootLike', 'move', 'phrase', 'award', 'sendRecord', 'shelf'] });
     // No wallet, and no half-made passkey kept either: an unstable passkey is dropped, not picked up again.
     const kept = JSON.parse(s.map.get('xtrata.listening-wallet.v1') ?? '{"wallets":[]}');
     expect(kept.wallets).toEqual([]);
@@ -1013,5 +1014,27 @@ describe('sending a record on', () => {
     const closed = await opened({ cancel: ['send-record'] });
     await expect(closed.h['listening.signSendRecord'](ask())).rejects.toBeInstanceOf(CancelledError);
     await expect(setup().h['listening.signSendRecord'](ask())).rejects.toThrow(/Unlock/);
+  });
+});
+
+describe('the albums a player keeps (signShelf)', () => {
+  it('signs as the player itself, with no panel, naming the player and the time itself', async () => {
+    const s = setup();
+    await expect(s.h['listening.signShelf']({ action: 'add', release: '0123456789abcdef' })).rejects.toThrow(/Unlock/);
+    await s.h['listening.unlock']({ mode: 'create' });
+    await s.h['listening.openSlot']({ slot: 1 });
+    const panels = s.panels.length;
+    const r = await s.h['listening.signShelf']({ action: 'add', release: '0123456789abcdef', player: 'SP16538G41XMAGHYB0JZAP29R7YBSKDR569QP1SMF', issued: 1 } as never);
+    expect(r.request).toEqual({ action: 'add', release: '0123456789abcdef', player: ADDRESS, issued: s.now() });
+    expect(verifyShelfSignature(r.request as never, r.signature)).toBe(true);
+    expect(s.panels.length).toBe(panels);
+    assertNoSecrets(r);
+    const list = await s.h['listening.signShelf']({ action: 'list', release: 'ignored' });
+    expect(list.request).toMatchObject({ action: 'list', release: '', player: ADDRESS });
+  });
+  it('refuses anything that is not one of its five actions on a real album id', async () => {
+    const s = setup();
+    await s.h['listening.unlock']({ mode: 'create' });
+    for (const bad of [{ action: 'transfer', release: '0123456789abcdef' }, { action: 'add', release: 'x' }, { action: 'add' }, {}, undefined]) await expect(s.h['listening.signShelf'](bad as never)).rejects.toThrow();
   });
 });

@@ -600,7 +600,7 @@ export async function shelfFor(env: GiftEnv, root: string, after = 0, limit = 50
  * with a hidden track, an all-audio WebM). Titles and artists take the supplied credit corrections. A hidden track is
  * marked `hidden`. Anything else is simply absent.
  */
-async function catalogueSongs(env: GiftEnv, ids: number[]) {
+export async function catalogueSongs(env: GiftEnv, ids: number[]) {
   const out = new Map<number, { title: string; artist: string; hidden?: true }>();
   if (!ids.length) return out;
   const marks = ids.map(() => '?').join(',');
@@ -690,7 +690,18 @@ export async function createPlayer(env: GiftEnv, body: { definition: PlayerDefin
   let def: PlayerDefinition, req: PlayerRequest;
   try { def = validatePlayer(body?.definition); req = validatePlayerRequest(body?.request, def, deps.now); } catch (e) { throw new GiftError((e as Error).message, 400); }
   if (!isAdmin(env, req.admin) || !verifyPlayerSignature(req, body.signature, req.admin)) throw new GiftError('Only the gift admin can make gift players.', 403);
-  const admin = req.admin;
+  return storePlayer(env, def, req.admin, bytesToHex(sha256(encodeStructuredData(playerData(req)))), deps);
+}
+
+/**
+ * Stores an album definition for `owner`, who has already been shown (by a signature the caller checked) to be asking
+ * for exactly this definition. Every song must be a ready song in the catalogue and held by `owner` right now.
+ * `signed`: the digest of the signed request, so each signed request works once. Used for gift players (an admin) and
+ * for releases (any artist, functions/lib/radio-releases.ts).
+ */
+export async function storePlayer(env: GiftEnv, def: PlayerDefinition, owner: string, signed: string, deps: GiftDeps) {
+  const admin = owner;
+  const req = { admin: owner };
   await ensureGiftTables(env);
   // Only the songs must be ready songs. The cover is any inscription (an image, or a page with one): it need not be a song.
   const wanted = [...new Set(def.tracks)];
@@ -707,7 +718,6 @@ export async function createPlayer(env: GiftEnv, body: { definition: PlayerDefin
   const hash = playerHash(def);
   const existing = await one<{ id: string }>(env, 'SELECT id FROM radio_gift_players WHERE hash=?', [hash]);
   if (existing) return { id: existing.id, title: def.title, tracks: def.tracks.length, existing: true };
-  const signed = bytesToHex(sha256(encodeStructuredData(playerData(req))));
   try { await run(env, 'INSERT INTO radio_gift_campaigns(hash, admin, created_at) VALUES(?, ?, ?)', [signed, admin, deps.now]); }
   catch (e) { if (isConstraint(e)) throw new GiftError('That request was already used. Sign a new one.', 409); throw e; }
   const id = randomId().slice(0, 16);

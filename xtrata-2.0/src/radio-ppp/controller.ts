@@ -16,7 +16,7 @@ import {
   type BalanceState, type ReturnMode
 } from '../lib/listening-wallet/policy';
 import { AWARDS_CONTRACT, RADIO_CORE_INDEX } from '../lib/listening-wallet/tx';
-import type { SendRecordResult, SignAwardResult } from '../lib/listening-wallet/messages';
+import type { SendRecordResult, SignAwardResult, SignShelfResult } from '../lib/listening-wallet/messages';
 import type { BindSlotResult, MoveResult, OpenSlotResult, ReturnResult, SessionSummary, SignedResult, StatusResult, TermsParams } from '../lib/listening-wallet/messages';
 import type { Entry } from '../radio-test-wallet/model';
 
@@ -1319,6 +1319,17 @@ export function createPppController(deps: PppDeps) {
       status = await readStatus(b);
       say('Backed up ✓ Keep those 24 words somewhere safe and private.');
     }),
+
+    /**
+     * The open player signs a request about the albums it keeps (releases.ts). No panel: it is a structured message
+     * that can move nothing. Rejects when the player is locked or the wallet box is too old.
+     */
+    signShelf: async (action: 'add' | 'hide' | 'show' | 'remove' | 'list', release?: string): Promise<SignShelfResult> => {
+      if (status?.state !== 'unlocked') throw new Error('Unlock your player first.');
+      if (walletLacks('shelf')) throw new Error('The listening wallet box needs an update before it can keep albums. Try again shortly.');
+      const b = await ensureBridge();
+      return b.request<SignShelfResult>('listening.signShelf', { action, ...(release ? { release } : {}) });
+    },
 
     /** Ask again where the player's record stands, and what name it would carry (after linking a wallet, say). */
     awardRefresh: async () => { awardNameRes = null; await lookupAward(true); deps.changed(); },
