@@ -21,7 +21,8 @@ import { createGifts } from './gifts';
 import { hiddenTrack, listedTracks } from '../lib/listening-wallet/gift-players';
 import { createShelf } from './shelf';
 import { createAlbumView, type AlbumInput } from './album';
-import { coverArt, onArt } from './art';
+import { coverArt, onArt, peek, thumb } from './art';
+import { createAudition } from './audition';
 import { createAwardWalk, type AwardScreen } from './award-view';
 import { createReleases } from './releases';
 import type { PlayerView } from '../lib/listening-wallet/gift-players';
@@ -223,6 +224,11 @@ function start(root: HTMLElement) {
     player: () => { const s = ppp.snapshot(); const address = s.slot === 0 ? s.listening : s.root; return { address, unlocked: !!address && ['ready', 'fund', 'over', 'link'].includes(s.step) }; },
     open: (album) => openFeatured(album, true),
     who: (address) => who(address),
+    art: { song: (id, ask) => (ask ? thumb(String(id)) || peek(String(id)) : peek(String(id))), cover: (id) => coverArt(id) },
+    audition: createAudition({
+      changed: () => render(ppp.snapshot()),
+      quiet: () => { const radio = (window as any).XtrataRadio; try { if (radio?.getState?.().playing) radio.playPause(); } catch { /* the radio is not there */ } }
+    }),
     changed: () => render(ppp.snapshot()),
     store: {
       get: (k) => { try { return localStorage.getItem(k); } catch { return null; } },
@@ -337,7 +343,7 @@ function start(root: HTMLElement) {
   }
   if (welcome) setTimeout(() => { if (!welcomeKnown) render(ppp.snapshot()); }, 10_100);
   // A cover that was just found: the welcome screen's album rows and the strip above the wallet box draw again.
-  onArt(() => { if (welcome?.showing() || document.documentElement.dataset.asking) render(ppp.snapshot()); });
+  onArt(() => { if (welcome?.showing() || document.documentElement.dataset.asking || releases.wantsArt()) render(ppp.snapshot()); });
 
   // "Add plays" (restock-sheet.ts): where every "out of plays" and "running low" leads. It always restocks the
   // listener's own player (the first wallet), which is also what tops up albums and pays for likes.
@@ -1374,7 +1380,19 @@ function start(root: HTMLElement) {
     const relIn = document.querySelector('#ppp .ppp-release-in-slot') as HTMLElement | null;
     if (relIn) { const lines = ['off', 'elsewhere', 'unsupported'].includes(s.step) ? [] : releases.banner(); relIn.hidden = !lines.length; relIn.replaceChildren(...lines); }
     const relFold = document.querySelector('#ppp .ppp-release') as HTMLDetailsElement | null;
-    if (relFold) { const parts = ['off', 'elsewhere', 'unsupported'].includes(s.step) ? null : releases.fold(); relFold.hidden = !parts; if (parts) relFold.querySelector('.ppp-release-body')?.replaceChildren(...parts); }
+    if (relFold) {
+      const parts = ['off', 'elsewhere', 'unsupported'].includes(s.step) ? null : releases.fold();
+      relFold.hidden = !parts;
+      if (parts) {
+        // Redrawing must not throw away where the artist is: the field being typed in, and how far the song list is scrolled.
+        const typing = document.activeElement instanceof HTMLElement && relFold.contains(document.activeElement) ? document.activeElement : null;
+        const scrolled = relFold.querySelector('.ppp-release-songs')?.scrollTop ?? 0;
+        relFold.querySelector('.ppp-release-body')?.replaceChildren(...parts);
+        const list = relFold.querySelector('.ppp-release-songs');
+        if (list && scrolled) list.scrollTop = scrolled;
+        if (typing && typing.isConnected && document.activeElement !== typing) typing.focus({ preventScroll: true });
+      }
+    }
     renderAward(s);
     // "Make it yours": found, not pushed. Each item is closed until the listener opens it. Only for a passkey-only
     // listener whose player is open; a player already linked to a Stacks wallet has done this.
