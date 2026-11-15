@@ -75,6 +75,8 @@ export interface FindDeps {
   current(): number | null;
   /** Is this song marked explicit? Such a song is shown with an E and asks before it plays. */
   explicit?(id: number): boolean;
+  /** Has the listener liked this song? Such a song is shown with a small heart. Display only: it is not a button. */
+  liked?(id: number): boolean;
   /** An album that plays only its own songs is open: finding other music is off until the listener leaves it. */
   locked(): boolean;
 }
@@ -129,7 +131,8 @@ export function createFindBox(mount: HTMLElement, deps: FindDeps) {
       b.type = 'button'; b.title = `Play “${s.title}”${s.artist ? ` by ${s.artist}` : ''}`;
       b.onclick = () => deps.play(s.id);
       if (deps.explicit?.(s.id)) { const e = el('span', 'exp', 'E'); e.title = 'Explicit lyrics: only plays when you choose it'; b.append(' ', e); }
-      li.append(b, el('span', 'find-by', `${s.artist ? s.artist + ' · ' : ''}#${s.id}`));
+      if (deps.liked?.(s.id)) { const h = el('span', 'find-liked', '♥'); h.title = 'You like this song'; h.setAttribute('role', 'img'); h.setAttribute('aria-label', 'Liked'); li.append(b, h); } else li.append(b);
+      li.append(el('span', 'find-by', `${s.artist ? s.artist + ' · ' : ''}#${s.id}`));
       return li;
     }));
     status.textContent = !query.trim() && !artist ? `${songs.length.toLocaleString()} songs by ${artists.length.toLocaleString()} artists. Search, or pick an artist.`

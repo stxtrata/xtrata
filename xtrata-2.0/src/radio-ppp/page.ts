@@ -1646,13 +1646,19 @@ function start(root: HTMLElement) {
     play: (id) => { (window as any).XtrataRadio?.playToken?.(id); },
     current: () => { const n = Number((window as any).XtrataRadio?.getState?.()?.nowPlaying?.tokenId); return Number.isSafeInteger(n) ? n : null; },
     locked: () => !!ppp.snapshot().albumLock?.locked,
-    explicit: (id) => !!(window as any).XtrataRadio?.isExplicit?.(id)
+    explicit: (id) => !!(window as any).XtrataRadio?.isExplicit?.(id),
+    liked: (id) => likedNow().has(id)
   }) : null;
   findBox?.addEventListener('toggle', () => { if (findBox.open) find?.load(); });
   let findSeen = '';
+  /** The songs the listener likes, as the radio knows them (its own list, already kept up to date by the radio). */
+  const likedNow = (): Set<number> => {
+    const likes = (window as any).XtrataRadio?.getState?.()?.likes;
+    return new Set(Array.isArray(likes) ? likes.map((l: any) => Number(l?.tokenId)).filter(Number.isSafeInteger) : []);
+  };
   const syncFind = () => {
     if (!find || !findBox?.open) return;
-    const mark = `${!!ppp.snapshot().albumLock?.locked}|${(window as any).XtrataRadio?.getState?.()?.nowPlaying?.tokenId ?? ''}`;
+    const mark = `${!!ppp.snapshot().albumLock?.locked}|${(window as any).XtrataRadio?.getState?.()?.nowPlaying?.tokenId ?? ''}|${[...likedNow()].sort((a, b) => a - b).join(',')}`;
     if (mark !== findSeen) { findSeen = mark; find.refresh(); }
   };
 

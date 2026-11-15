@@ -188,6 +188,7 @@ history.replaceState(null,'',location.pathname+location.search);}catch(e){}})();
   .lrow{display:flex;align-items:center;gap:8px;padding:7px 2px;border-bottom:1px solid rgba(34,48,71,.6);font-size:13px}
   .lrow:last-child{border-bottom:0}
   .lrow.now .lt{color:var(--cyan)}
+  .find-liked{color:#ff6b8a;font-size:12px;line-height:1;flex:none}
   .lrow.drag-over{box-shadow:inset 0 2px 0 var(--cyan)}
   .lrow .grip{cursor:grab;color:#46597a;font-size:14px;line-height:1;padding:0 2px;user-select:none}
   .lrow .lt{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer;background:none;border:0;color:var(--ink);text-align:left;padding:0}
@@ -1316,7 +1317,7 @@ function showUnavailable(){
 fetch('/radio/listening-wallet/config',{cache:'no-store',signal:AbortSignal.timeout(15000)})
   .then(function(r){return r.ok?r.json():{}})
   .then(function(c){
-    if(c?.enabled && (!paidHost || c.here)) return import('/radio/ppp.js?v=adfc2a41a837');
+    if(c?.enabled && (!paidHost || c.here)) return import('/radio/ppp.js?v=eb8c154e55a4');
     showUnavailable();
   }).catch(showUnavailable);
 </script>
