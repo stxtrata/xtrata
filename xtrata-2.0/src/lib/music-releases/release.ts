@@ -87,3 +87,40 @@ export const verifyShelfSignature = (req: ShelfRequest, signature: unknown): boo
 /** Used only inside the wallet origin, where the key lives. */
 export const signShelfRequest = (req: ShelfRequest, privateKey: string): string =>
   signMessageHashRsv({ messageHash: shelfDigest(req), privateKey: createStacksPrivateKey(privateKey) }).data;
+
+// ---------------------------------------------------------------- selling a release (stage 3)
+/**
+ * An artist may put a price on a release. A listener then adds it by paying that price STRAIGHT to the artist's
+ * wallet: one STX transfer whose memo names the order. Xtrata never holds the money, takes no part of it and cannot
+ * refund it. The price is what the artist signs here (not a transaction: it only says what the price is).
+ */
+export const PRICE_PURPOSE = 'Set the price of my release on Xtrata Music; no spending permission';
+/** A price is 0 (free) or between these (microSTX): 0.1 STX to 1,000 STX. */
+export const PRICE_MIN = 100_000n;
+export const PRICE_MAX = 1_000_000_000n;
+export const validPrice = (price: bigint) => price === 0n || (price >= PRICE_MIN && price <= PRICE_MAX);
+export interface PriceRequest { artist: string; release: string; /** microSTX, decimal string; "0" makes it free */ price: string; issued: number }
+
+export function validatePriceRequest(req: PriceRequest, now = Date.now()): PriceRequest {
+  if (!req || !isMainnetStandardAddress(req.artist)) throw new Error('A price needs the artist’s wallet address.');
+  if (!isPlayerId(req.release)) throw new Error('That is not a release.');
+  if (typeof req.price !== 'string' || !/^(0|[1-9]\d{0,11})$/.test(req.price) || !validPrice(BigInt(req.price))) throw new Error('A price is free, or 0.1 to 1,000 STX.');
+  if (!fresh(req.issued, now, RELEASE_MAX_AGE_MS)) throw new Error('Request expired. Sign again.');
+  return { artist: req.artist, release: req.release, price: req.price, issued: req.issued };
+}
+export const priceData = (req: PriceRequest) => ({
+  domain: tupleCV({ name: stringAsciiCV(RELEASE_DOMAIN), version: stringAsciiCV('1'), 'chain-id': uintCV(1) }),
+  message: tupleCV({ purpose: stringAsciiCV(PRICE_PURPOSE), artist: stringAsciiCV(req.artist), release: stringAsciiCV(req.release), price: uintCV(BigInt(req.price)), issued: uintCV(req.issued) })
+});
+export const priceDigest = (req: PriceRequest) => bytesToHex(sha256(encodeStructuredData(priceData(req))));
+export const verifyPriceSignature = (req: PriceRequest, signature: unknown): boolean => verify(priceDigest(req), signature, req.artist);
+
+/** An order: one listener's purchase of one release. Its id travels in the payment's memo. */
+export const isOrderId = (id: unknown): id is string => typeof id === 'string' && /^[0-9a-f]{16}$/.test(id);
+export const orderMemo = (id: string) => `buy ${id}`;
+/** What a buyer needs to pay an order (public: an address, an amount and a memo). */
+export interface OrderView { order: string; release: string; to: string; amount: string; memo: string; status: 'pending' | 'confirming' | 'paid' }
+/** "2", "0.5", "12.25": a price for people. */
+export const stxText = (micro: bigint | string) => { const m = BigInt(micro); const whole = m / 1_000_000n, frac = (m % 1_000_000n).toString().padStart(6, '0').replace(/0+$/, ''); return frac ? `${whole}.${frac}` : `${whole}`; };
+/** What someone typed as a price, in microSTX; null when it is not an amount. */
+export const parseStx = (text: string): bigint | null => { const m = /^\s*(\d{1,6})(?:\.(\d{1,6}))?\s*$/.exec(text); return m ? BigInt(m[1]) * 1_000_000n + BigInt((m[2] ?? '').padEnd(6, '0') || '0') : null; };

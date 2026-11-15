@@ -67,8 +67,15 @@ export type GiftEnv = PppEnv & {
   RADIO_GIFT_TURNSTILE_SITE_KEY?: string;
   RADIO_GIFT_TURNSTILE_SECRET?: string;
   TELEMETRY_SALT?: string;
+  /** Artists' releases (radio-releases.ts). With COPIES on, an artist may fund copies of their OWN release (not only gift admins). */
+  RADIO_RELEASES_ENABLED?: string;
+  RADIO_RELEASE_COPIES_ENABLED?: string;
+  /** Most of one artist's money held in unclaimed copies at once, microSTX (default 25 STX). Gift admins are not capped. */
+  RADIO_RELEASE_COPIES_CAP?: string;
 };
 
+/** The most of one artist's money held at once in copies nobody has claimed yet (a batch waiting for its payment counts too). */
+export const DEFAULT_ARTIST_COPIES_CAP = 25_000_000n;
 /** The most money held for creators and friends at once (a batch still waiting for its payment counts too). */
 export const DEFAULT_ESCROW_CAP = 50_000_000n;
 /** Unpaid batches one creator may have waiting at once (each is dropped after PENDING_DEPOSIT_MS). */
@@ -806,19 +813,44 @@ async function batchView(env: GiftEnv, b: BatchRow): Promise<BatchView> {
 }
 
 /**
+ * An artist who is not a gift admin may fund copies of a release they made themselves, and only so many at a time:
+ * the treasury holds their money until each copy is claimed or refunded, so what it holds for one stranger is capped.
+ */
+async function requireArtistBatch(env: GiftEnv, req: BatchRequest, now: number) {
+  const refuse = () => new GiftError('Only a gift admin can fund a batch.', 403);
+  if (!req.player) throw refuse();
+  let release: { artist: string } | null = null;
+  try { release = await one<{ artist: string }>(env, 'SELECT artist FROM radio_releases WHERE id=?', [req.player]); } catch { /* no release has ever been made here */ }
+  if (!release || release.artist !== req.creator) throw refuse();
+  const cap = micro(env.RADIO_RELEASE_COPIES_CAP, DEFAULT_ARTIST_COPIES_CAP);
+  const held = await one<{ a: number; n: number }>(env, `SELECT COALESCE(SUM(amount), 0) AS a, COUNT(*) AS n FROM radio_gifts
+    WHERE gifter=? AND batch_id IS NOT NULL AND (status IN ('live','claiming','refunding') OR (status='pending-deposit' AND created_at>?))`, [req.creator, now - PENDING_DEPOSIT_MS]);
+  const already = BigInt(held?.a ?? 0) + BigInt(held?.n ?? 0) * GIFT_FEE;
+  const wanted = batchDeposit(req.count, BigInt(req.amount));
+  if (already + wanted > cap) {
+    const stx = (v: bigint) => (Number(v) / 1e6).toLocaleString('en-GB', { maximumFractionDigits: 2 });
+    throw new GiftError(`You can have up to ${stx(cap)} STX in unclaimed copies at a time. You have ${stx(already)} STX out now and this batch is ${stx(wanted)} STX. Make fewer copies, or wait for some to be claimed.`, 409);
+  }
+}
+
+/**
  * A gift admin funds a batch: N dormant gift links, paid for by ONE deposit from the creator to the treasury (memo
  * `batch <id>`). Nothing can be claimed until that payment confirms, and then every copy goes live together. The
  * creator is the gift's payer, so a copy nobody claims is refunded to them, and so are a listener's leftover plays.
- * The codes exist in clear only in this reply. Gift admins only for now; later the same check can be the album's owner.
+ * The codes exist in clear only in this reply. Gift admins, and (when RADIO_RELEASE_COPIES_ENABLED=1) an artist for
+ * their own release, within a cap (requireArtistBatch).
  */
 export async function createBatch(env: GiftEnv, body: { request: BatchRequest; signature: string }, deps: GiftDeps, request?: Request) {
   const { treasury } = requireEnabled(env, request);
-  if (!adminAddresses(env).length) throw new GiftError('No gift admin is set for this deployment.', 403);
+  const artistsMay = env.RADIO_RELEASES_ENABLED === '1' && env.RADIO_RELEASE_COPIES_ENABLED === '1';
+  if (!adminAddresses(env).length && !artistsMay) throw new GiftError('No gift admin is set for this deployment.', 403);
   let req: BatchRequest;
   try { req = validateBatch(body?.request, deps.now); } catch (e) { throw new GiftError((e as Error).message, 400); }
   if (req.creator === treasury) throw new GiftError('The gift treasury cannot fund its own batch.', 400);
-  if (!isAdmin(env, req.creator) || !verifyBatchSignature(req, body.signature, req.creator)) throw new GiftError('Only a gift admin can fund a batch.', 403);
+  const admin = isAdmin(env, req.creator);
+  if (!(admin || artistsMay) || !verifyBatchSignature(req, body.signature, req.creator)) throw new GiftError('Only a gift admin can fund a batch.', 403);
   await ensureGiftTables(env);
+  if (!admin) await requireArtistBatch(env, req, deps.now);
   // An album's copies can only be funded by the wallet that made the album (and so held all its songs).
   if (req.player) {
     const p = await one<{ id: string; owner: string }>(env, "SELECT id, owner FROM radio_gift_players WHERE id=? AND status='active'", [req.player]);
@@ -828,7 +860,7 @@ export async function createBatch(env: GiftEnv, body: { request: BatchRequest; s
   const total = batchDeposit(req.count, BigInt(req.amount));
   const waiting = await one<{ n: number }>(env, "SELECT COUNT(*) AS n FROM radio_gift_batches WHERE creator=? AND status='pending-deposit' AND created_at>?", [req.creator, deps.now - PENDING_DEPOSIT_MS]);
   if ((waiting?.n ?? 0) >= MAX_PENDING_BATCHES) throw new GiftError('Several batches are still waiting for their payment. Pay or wait for them first.', 429);
-  // No size cap: only a gift admin can get here, every copy is paid for up front by the creator's own deposit (nothing is
+  // No size cap for a gift admin (an artist's is checked above): every copy is paid for up front by the creator's own deposit (nothing is
   // made live until it confirms), and unclaimed copies go back to them. The escrow cap guards friend gifts only.
   const id = randomId().slice(0, 16), db = d1(env), now = deps.now, amount = Number(req.amount);
   const codes = Array.from({ length: req.count }, () => newGiftCode());

@@ -38,7 +38,7 @@ async function open(over: object = {}) {
   document.body.innerHTML = `<section id="ppp" hidden><div class="ppp-head"><h3><span class="ppp-badge"></span></h3><span class="ppp-state"></span></div><ol class="ppp-steps"></ol><p class="ppp-stage"></p>
     <div class="ppp-switch" hidden></div><div class="ppp-key"></div><p class="ppp-frame-label"></p><div class="ppp-frame"></div><div class="ppp-actions"></div><p class="ppp-msg"></p><p class="ppp-err"></p>
     <details class="ppp-recent"><ol class="ppp-recent-list"></ol><details class="ppp-history"></details></details><details class="ppp-wallets"><dl class="ppp-facts"></dl><div class="ppp-actions ppp-actions2"></div></details>
-    <details class="ppp-more"><div class="ppp-body"></div></details><details class="ppp-shelf" hidden><summary></summary><div class="ppp-shelf-body"></div></details><details class="ppp-gifts"><div class="ppp-gift-body"></div></details></section>`;
+    <details class="ppp-more"><div class="ppp-body"></div></details><details class="ppp-shelf" hidden><summary></summary><div class="ppp-shelf-body"></div></details><details class="ppp-gifts"><div class="ppp-gift-body"></div></details><details class="ppp-fold ppp-release" hidden><summary></summary><div class="ppp-release-body"></div></details></section>`;
   // The radio's own hooks (public/radio.html): the ON AIR lamp and the note under the receiver.
   document.body.insertAdjacentHTML('beforeend', '<div id="onair" hidden><b>ON AIR</b><span class="onair-sub"></span></div><div class="nudge" id="pppNudge" hidden><span class="nudge-txt"><b class="nudge-t"></b><span class="nudge-s"></span></span><button type="button">Start</button></div>');
   h.radio = { setGiftPlayer: vi.fn(), setGiftStop: vi.fn(), setGiftWait: vi.fn(), subscribe: vi.fn(), refreshLikes: vi.fn() };
@@ -455,6 +455,34 @@ describe('prefunded batches (admin): the creator pays for every copy up front', 
   };
   const payWith = async (impl: (o: any) => void) => { const m = await import('../../lib/wallet/connect'); (m.showStxTransfer as any).mockReset(); (m.showStxTransfer as any).mockImplementation(impl); return m.showStxTransfer as any; };
   beforeEach(() => { localStorage.clear(); h.session = { isConnected: true, network: 'mainnet', address: ADMIN }; });
+
+  it('an artist who is not an admin funds copies of their own release from "Release music": one signature, one payment, always that album', async () => {
+    const REL = 'fedcba9876543210';
+    const rel = { id: REL, title: 'Reload', subtitle: 'melophonic', tracks: [{ id: 315, title: 'Entertainment', artist: 'melophonic' }], cover: null, paidOnly: true, artist: ADMIN, added: 3, price: '0', sold: 0, createdAt: 1 };
+    served({
+      '/radio/release/config': () => new Response(JSON.stringify({ enabled: true, copies: true, sales: true })),
+      '/radio/release/by': () => new Response(JSON.stringify({ releases: [rel] }))
+    });
+    const pay = await payWith((o) => o.onFinish({ txId: '0x' + 'd'.repeat(64) }));
+    const root = await open({ gift: null, giftStop: null, giftPlays: 0, main: ADMIN });
+    const fold = root.querySelector('.ppp-release') as HTMLElement;
+    const press = (label: RegExp) => [...fold.querySelectorAll('button')].find((b) => label.test(b.textContent ?? ''))!.click();
+    await vi.waitFor(() => expect(text(fold)).toContain('Send copies'));
+    expect(text(root.querySelector('.ppp-gift-body')!)).not.toMatch(/Prefunded batch/);   // still not an admin
+    press(/Send copies/);
+    await vi.waitFor(() => expect(text(fold)).toMatch(/Each copy: 50 paid plays .* 10 copies = [\d.]+ STX, paid now in one payment/));
+    expect(text(fold)).toContain('come back to you');
+    expect(h.signed).toHaveLength(0);
+    const count = fold.querySelector('input[aria-label="How many copies"]') as HTMLInputElement;
+    count.value = '2'; count.dispatchEvent(new Event('input'));
+    press(/Sign, pay and make links/);
+    await vi.waitFor(() => expect(calls.some((c) => c.url.endsWith('/radio/gift/batch/confirm'))).toBe(true));
+    expect(h.signed).toHaveLength(1);
+    const made = calls.find((c) => c.url.endsWith('/radio/gift/batch') && c.body)!;
+    expect(made.body.request).toMatchObject({ creator: ADMIN, count: 2, player: REL, label: 'Reload' });
+    expect(pay).toHaveBeenCalledTimes(1);
+    expect(pay.mock.calls[0][0]).toMatchObject({ recipient: TREASURY, amount: '222000', memo: 'batch ' + ID, stxAddress: ADMIN });
+  });
 
   it('only a gift admin sees it', async () => {
     h.session = { isConnected: true, network: 'mainnet', address: ADMIN };

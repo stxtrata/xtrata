@@ -512,17 +512,16 @@ export function createGifts(deps: GiftDeps) {
   }
 
   /** What the batch form would cost for the current choices (also used to explain it). */
-  function batchPlan() {
-    const album = !!batchPlayer.value;
-    const plays = batchPreset.value === 'max' ? maxCopyPlays(album) : Number(batchPreset.value);
+  const batchPlan = () => planFor(!!batchPlayer.value, batchPreset.value, batchCount.value);
+  function planFor(album: boolean, preset: string, copies: string) {
+    const plays = preset === 'max' ? maxCopyPlays(album) : Number(preset);
     const amount = copyAmountForPlays(plays, album);
-    const count = Number(batchCount.value);
+    const count = Number(copies);
     if (!Number.isInteger(count) || count < 1 || count > BATCH_MAX_COPIES) return { ok: false as const, reason: `Make 1 to ${BATCH_MAX_COPIES} copies at a time.`, album, plays, amount, count };
     if (!validBatchAmount(amount)) return { ok: false as const, reason: 'Each copy must be 0.01 to 1 STX.', album, plays, amount, count };
     return { ok: true as const, reason: '', album, plays, amount, count, bill: batchBreakdown(count, amount, album) };
   }
-  const billText = () => {
-    const p = batchPlan();
+  const billText = (p = batchPlan()) => {
     if (!p.ok) return p.reason;
     const b = p.bill;
     return `Each copy: ${p.plays.toLocaleString()} paid plays (${stxNice(b.holders)} to song holders, ${stxNice(b.fees)} network fees)`
@@ -562,6 +561,56 @@ export function createGifts(deps: GiftDeps) {
   for (const x of [batchPlayer, batchPreset, batchCount]) { x.oninput = syncBill; x.onchange = syncBill; }
   syncBill();
 
+  /** One batch in a list: what it is, where it stands, and its links once they work. */
+  function batchLine(main: string, b: MyBatch, radioUrl: string | null) {
+    const v = b.view, c = v?.copies;
+    const status = b.error ? b.error : !v || v.status === 'pending-deposit' ? (b.txid ? 'payment confirming…' : 'waiting for your payment')
+      : `${c!.claimed} of ${v.count} claimed${c!.refunding + c!.refunded ? ` · ${c!.refunded} refunded${c!.refunding ? `, ${c!.refunding} on their way` : ''}` : ''}`;
+    const li = el('li');
+    li.append(el('span', `${b.label || 'Batch'} · ${b.count} × ${stxNice(BigInt(b.amount))} STX`, 't'), el('span', status, 'ppp-mute'));
+    if (!b.txid && b.depositTo && (!v || v.status === 'pending-deposit')) li.append(button('Pay now', () => void payBatch(main, b.id), 'tiny'));
+    if (b.codes.length && v?.status === 'live') {
+      const links = batchLinks(radioUrl, b);
+      li.append(
+        copyButton('batch-copy:' + b.id, 'Copy all links', () => links.join('\n'), 'tiny', deps.changed),
+        copyButton('batch-csv:' + b.id, 'Copy as CSV', () => ['copy,link', ...links.map((u, n) => `${n + 1},${u}`)].join('\n'), 'tiny', deps.changed));
+    } else if (!b.codes.length) li.append(el('span', 'links were made on another device', 'ppp-mute'));
+    return li;
+  }
+
+  // ---------------------------------------------------------------- copies of one release, for its artist (releases.ts)
+  // The same prefunded batches, always carrying that release: the artist pays for every copy up front in one payment,
+  // each copy is a link that makes the album with its own plays, and copies nobody claims come back after 30 days.
+  const relPreset = el('select') as HTMLSelectElement; relPreset.setAttribute('aria-label', 'Plays in each copy');
+  for (const n of [...new Set([50, 100, 250, ...PLAY_PRESETS])].sort((a, b) => a - b)) relPreset.append(opt(`${n.toLocaleString()} plays`, String(n)));
+  relPreset.value = '50';
+  const relCount = el('input') as HTMLInputElement; relCount.type = 'number'; relCount.min = '1'; relCount.max = String(BATCH_MAX_COPIES); relCount.value = '10'; relCount.setAttribute('aria-label', 'How many copies');
+  const relLabel = el('input') as HTMLInputElement; relLabel.maxLength = 40; relLabel.placeholder = 'A note recipients see, e.g. Launch week (optional)'; relLabel.setAttribute('aria-label', 'Note for recipients');
+  const relBill = el('p', '', 'ppp-mute');
+  function copies(main: string, release: { id: string; title: string }, radioUrl: string | null): HTMLElement[] {
+    const plan = () => planFor(true, relPreset.value, relCount.value);
+    const sync = () => { relBill.textContent = billText(plan()); };
+    for (const x of [relPreset, relCount]) { x.oninput = sync; x.onchange = sync; }
+    sync();
+    const label = () => (relLabel.value.trim() || release.title).replace(/[^ -~]/g, '').slice(0, 40);
+    const go = button('Sign, pay and make links', () => { void makeBatch(main, plan(), label(), release.id); }, 'primary');
+    go.disabled = !!working;
+    const labelled = (text: string, input: HTMLElement) => { const l = el('label', text); l.append(input); return l; };
+    const parts: HTMLElement[] = [
+      el('p', 'Each copy is a link. Whoever opens it gets this album with its own plays, paid for by you. You pay for every copy now, in one payment; copies nobody claims within 30 days come back to you.', 'ppp-mute'),
+      labelled('Plays in each ', relPreset), labelled('Copies ', relCount), relLabel, relBill, go];
+    if (deps.now() - checkedBatches > 30_000) { checkedBatches = deps.now(); void refreshBatches(main); }
+    const mine = loadBatches(main).filter((b) => b.player === release.id);
+    if (mine.length) {
+      const list = el('ul', '', 'ppp-gift-list');
+      for (const b of mine.slice(0, 10)) list.append(batchLine(main, b, radioUrl));
+      parts.push(list);
+    }
+    if (working) parts.push(el('p', working, 'ppp-cyan'));
+    if (note) parts.push(el('p', note, /✓/.test(note) ? 'ppp-ok' : 'ppp-warn'));
+    return parts;
+  }
+
   function renderFold(s: Snapshot): HTMLElement | null {
     const g = s.gate?.gifts;
     // Albums only: the "send music to a friend" gift is retired from the page. The section is for gift admins, who make
@@ -596,21 +645,7 @@ export function createGifts(deps: GiftDeps) {
         const myBatches = loadBatches(main);
         if (myBatches.length) {
           const blist = el('ul', '', 'ppp-gift-list');
-          for (const b of myBatches.slice(0, 10)) {
-            const v = b.view, c = v?.copies;
-            const status = b.error ? b.error : !v || v.status === 'pending-deposit' ? (b.txid ? 'payment confirming…' : 'waiting for your payment')
-              : `${c!.claimed} of ${v.count} claimed${c!.refunding + c!.refunded ? ` · ${c!.refunded} refunded${c!.refunding ? `, ${c!.refunding} on their way` : ''}` : ''}`;
-            const li = el('li');
-            li.append(el('span', `${b.label || 'Batch'} · ${b.count} × ${stxNice(BigInt(b.amount))} STX`, 't'), el('span', status, 'ppp-mute'));
-            if (!b.txid && b.depositTo && (!v || v.status === 'pending-deposit')) li.append(button('Pay now', () => void payBatch(main, b.id), 'tiny'));
-            if (b.codes.length && v?.status === 'live') {
-              const links = batchLinks(s.gate?.radioUrl ?? null, b);
-              li.append(
-                copyButton('batch-copy:' + b.id, 'Copy all links', () => links.join('\n'), 'tiny', deps.changed),
-                copyButton('batch-csv:' + b.id, 'Copy as CSV', () => ['copy,link', ...links.map((u, n) => `${n + 1},${u}`)].join('\n'), 'tiny', deps.changed));
-            } else if (!b.codes.length) li.append(el('span', 'links were made on another device', 'ppp-mute'));
-            blist.append(li);
-          }
+          for (const b of myBatches.slice(0, 10)) blist.append(batchLine(main, b, s.gate?.radioUrl ?? null));
           box.append(blist);
         }
         parts.push(box);
@@ -624,5 +659,5 @@ export function createGifts(deps: GiftDeps) {
 
   /** The gift code still waiting on this device (to carry it to another browser), or null. */
   const pendingCode = () => (incoming && !incoming.done && (!incoming.view || incoming.view.status === 'live') ? incoming.code : null);
-  return { banner, funder, renderFold, liveGift, incomingAlbum, incomingStarter, setAside, pendingCode, inProgress };
+  return { banner, funder, renderFold, copies, liveGift, incomingAlbum, incomingStarter, setAside, pendingCode, inProgress };
 }

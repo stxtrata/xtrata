@@ -13,17 +13,23 @@
  */
 import { copyButton } from './feedback';
 import { isPlayerId, listedTracks, playerHash, validatePlayer, type PlayerView } from '../lib/listening-wallet/gift-players';
-import { releaseData, type ShelfAction } from '../lib/music-releases/release';
+import { parseStx, priceData, releaseData, stxText, validPrice, type OrderView, type PriceRequest, type ShelfAction } from '../lib/music-releases/release';
 import type { Audition } from './audition';
 
-export interface ReleaseView extends PlayerView { artist: string; added: number }
+export interface ReleaseView extends PlayerView { artist: string; added: number; /** microSTX; "0" or absent is free */ price?: string; sold?: number }
+/** An order being paid, as kept on this device until the album arrives. */
+type MyOrder = OrderView & { txid?: string };
 export interface ShelfItem extends ReleaseView { hidden: boolean }
 export interface ReleasesDeps {
   json(url: string, init?: RequestInit): Promise<any>;
   /** The connected Stacks wallet, if any. */
   main(): string | undefined;
   /** SIP-018 signature from the connected wallet (one popup). */
-  sign(main: string, data: ReturnType<typeof releaseData>): Promise<string>;
+  sign(main: string, data: ReturnType<typeof releaseData> | ReturnType<typeof priceData>): Promise<string>;
+  /** STX transfer from the connected wallet (one popup); resolves with the txid. Used to pay an artist for an album. */
+  pay(main: string, recipient: string, amount: bigint, memo: string): Promise<string>;
+  /** The form for funding copies of a release with plays included (gifts.ts), when that is open. */
+  copies?(main: string, release: { id: string; title: string }): HTMLElement[];
   /** The open player signs a shelf request in the wallet box (no panel). Rejects when the player is locked. */
   signShelf(action: ShelfAction, release?: string): Promise<{ request: unknown; signature: string }>;
   /** The player itself (the passkey's own wallet), and whether it is unlocked now. */
@@ -59,6 +65,7 @@ const isView = (v: any): v is ReleaseView => !!v && isPlayerId(v.id) && typeof v
 
 export function createReleases(deps: ReleasesDeps) {
   let enabled: boolean | null = null; // null: not known yet
+  let ways = { copies: false, sales: false }; // which ways of distributing a release are open
   let asked = false;
   let working = '';
   let note = '';
@@ -89,6 +96,8 @@ export function createReleases(deps: ReleasesDeps) {
       const signed = await deps.signShelf(action, release);
       const r = await deps.json('/radio/release/shelf', post(signed));
       keep(p.address, r?.albums, true);
+      if (isOrder(r?.pay)) setOrder(p.address, r.pay); // a priced album: not added, an order to pay its artist instead
+      else if (action === 'add') setOrder(p.address, null, release);
       return true;
     } catch (e) {
       if (action !== 'list') note = (e as Error).message || 'That did not work. Try again.';
@@ -96,11 +105,71 @@ export function createReleases(deps: ReleasesDeps) {
     } finally { shelfBusy = false; deps.changed(); }
   }
 
+  // ---------------------------------------------------------------- buying a priced release
+  // The listener pays the ARTIST directly (one transfer whose memo names the order); the server only reads the chain
+  // and, once the payment has confirmed, puts the album in the player. Orders are kept on this device until then.
+  const ordersKey = (player: string) => 'xtrata.radio.releases.orders.v1:' + player;
+  const isOrder = (o: any): o is OrderView => !!o && /^[0-9a-f]{16}$/.test(o.order) && isPlayerId(o.release) && typeof o.to === 'string' && /^\d{1,12}$/.test(o.amount) && typeof o.memo === 'string';
+  const orders = (player?: string): Record<string, MyOrder> => {
+    if (!player) return {};
+    try { const v = JSON.parse(deps.store.get(ordersKey(player)) || '{}'); return v && typeof v === 'object' ? Object.fromEntries(Object.entries(v).filter(([, o]) => isOrder(o))) as Record<string, MyOrder> : {}; } catch { return {}; }
+  };
+  function setOrder(player: string, o: MyOrder | null, release = o?.release ?? '') {
+    const all = orders(player);
+    if (o) all[o.release] = { ...all[o.release]?.order === o.order ? all[o.release] : {}, ...o };
+    else delete all[release];
+    deps.store.set(ordersKey(player), Object.keys(all).length ? JSON.stringify(all) : null);
+  }
+  const checking = new Set<string>();
+  const checkedAt = new Map<string, number>();
+  /** Looks for an order's payment. Paid: the album is in the player, so the shelf is read again. */
+  async function check(player: string, o: MyOrder, asked = false) {
+    if (checking.has(o.order)) return;
+    checking.add(o.order); checkedAt.set(o.order, deps.now());
+    if (asked) { note = ''; deps.changed(); }
+    try {
+      const r = await deps.json('/radio/release/paid', post({ order: o.order, ...(o.txid ? { txid: o.txid } : {}) }));
+      if (r?.status === 'paid') {
+        setOrder(player, null, o.release);
+        if (incoming?.view?.id === o.release) incoming.view = { ...incoming.view, added: incoming.view.added + 1 };
+        note = '';
+        checking.delete(o.order);
+        if (shelf?.for === player) shelf.fresh = false;
+        if (deps.player().unlocked) await act('list'); // locked: read on the next unlock
+      } else {
+        if (isOrder(r)) setOrder(player, { ...o, ...r });
+        if (asked && r?.status === 'pending') note = 'No payment found yet. If you have just paid, give it a minute and check again.';
+      }
+    } catch (e) {
+      // A payment that failed or does not match is forgotten here so it can be made again; anything else is tried again.
+      if (/did not go through|does not pay this order/.test((e as Error).message || '')) setOrder(player, { ...o, txid: undefined, status: 'pending' });
+      if (asked || o.txid) note = (e as Error).message || 'The payment could not be checked right now. Nothing is lost.';
+    } finally { checking.delete(o.order); deps.changed(); }
+  }
+  async function payOrder(main: string, player: string, o: MyOrder) {
+    if (working) return;
+    working = 'Approve the payment in your wallet…'; note = ''; deps.changed();
+    try {
+      const txid = await deps.pay(main, o.to, BigInt(o.amount), o.memo);
+      const sent: MyOrder = { ...o, txid: txid || undefined, status: 'confirming' };
+      setOrder(player, sent);
+      working = '';
+      void check(player, sent);
+    } catch (e) { note = /cancel/i.test((e as Error).message || '') ? 'Payment cancelled. Nothing was sent.' : ((e as Error).message || 'Not paid. Nothing was sent.'); }
+    finally { working = ''; deps.changed(); }
+  }
+  async function buy(v: ReleaseView) {
+    const p = deps.player();
+    if (!(await act('add', v.id)) || !p.address) return;
+    const o = orders(p.address)[v.id], main = deps.main();
+    if (o && main) await payOrder(main, p.address, o);
+  }
+
   /** Called on every render: learns whether releases are open, reads the release in the link, and the player's shelf. */
   function sync() {
     if (!asked) {
       asked = true;
-      deps.json('/radio/release/config').then((r) => { enabled = r?.enabled === true; }, () => { enabled = false; asked = false; }).finally(deps.changed);
+      deps.json('/radio/release/config').then((r) => { enabled = r?.enabled === true; ways = { copies: enabled && r?.copies === true, sales: enabled && r?.sales === true }; }, () => { enabled = false; asked = false; }).finally(deps.changed);
     }
     if (!enabled) return;
     if (incoming && !incoming.view && !incoming.error) {
@@ -114,6 +183,13 @@ export function createReleases(deps: ReleasesDeps) {
     if (shelf?.for !== p.address) kept(p.address);
     // The server's copy, once per unlock (and again a minute after a failed try). Signed in the box, no panel.
     if (p.unlocked && !shelf?.fresh && !shelfBusy && deps.now() - shelfTriedAt > 60_000) { shelfTriedAt = deps.now(); void act('list'); }
+    // A payment on its way is looked for again every 20 seconds until it confirms.
+    for (const o of Object.values(orders(p.address))) {
+      if ((o.txid || o.status === 'confirming') && !checking.has(o.order) && deps.now() - (checkedAt.get(o.order) ?? -Infinity) > 20_000) {
+        const player = p.address;
+        void check(player, o).then(() => { setTimeout(() => deps.changed(), 20_500); });
+      }
+    }
   }
 
   /** The albums this player has added and not hidden, to show with the albums a player comes loaded with. */
@@ -137,7 +213,8 @@ export function createReleases(deps: ReleasesDeps) {
     const v = incoming.view;
     const box = el('div', '', 'ppp-release-in');
     const head = el('p', '', 'ppp-release-in__h');
-    head.append(el('b', v.title), el('span', `${v.subtitle || deps.who(v.artist)} · ${songsLine(v)}`));
+    const price = BigInt(/^\d{1,12}$/.test(v.price ?? '') ? v.price! : '0');
+    head.append(el('b', v.title), el('span', `${v.subtitle || deps.who(v.artist)} · ${songsLine(v)}${price > 0n ? ` · ${stxText(price)} STX` : ''}`));
     const tracks = listedTracks(v);
     const cover = deps.art.cover(v.cover) || (v.cover ? '' : tracks[0] ? deps.art.song(tracks[0].id, true) || '' : '');
     const top = el('div', '', 'ppp-rel-top');
@@ -152,7 +229,29 @@ export function createReleases(deps: ReleasesDeps) {
       row.append(button('Play it', () => deps.open(v), 'primary'));
     } else if (!p.address) box.append(el('p', 'Make your player first (above), then add this album to it. It plays with your own plays, and every play pays the artist.', 'ppp-mute'));
     else if (!p.unlocked) box.append(el('p', 'Unlock your player to add this album to it.', 'ppp-mute'));
-    else {
+    else if (price > 0n) {
+      const o = orders(p.address)[v.id], main = deps.main();
+      const cost = `${stxText(o?.amount ?? price)} STX`;
+      if (o?.txid || o?.status === 'confirming') {
+        box.append(el('p', `Payment sent ✓ Waiting for it to confirm (a few minutes). The album appears in your player by itself.`, 'ppp-ok'));
+        const again = button('Check now', () => void check(p.address!, o, true)); again.disabled = checking.has(o.order);
+        row.append(again);
+      } else {
+        box.append(el('p', `This album costs ${cost}. You pay ${deps.who(v.artist)} directly: Xtrata takes nothing, never holds the money and cannot refund it. Once paid it is in your player for good, and it plays with your own plays.`, 'ppp-mute'));
+        if (!ways.sales && !o) box.append(el('p', 'Buying is paused right now.', 'ppp-warn'));
+        else if (!o) { const b = button(`Buy · ${cost}`, () => void buy(v), 'primary'); b.disabled = shelfBusy || !!working; row.append(b); }
+        else {
+          if (main) { const b = button(`Pay ${cost} from my wallet`, () => void payOrder(main, p.address!, o), 'primary'); b.disabled = !!working; row.append(b); }
+          else box.append(el('p', 'Connect a Stacks wallet (top right) to pay here. Or pay from any wallet, exactly like this:', 'ppp-mute'));
+          const how = el('div', '', 'ppp-rel-pay');
+          const line = (label: string, value: string, key: string) => { const l = el('p'); l.append(el('span', label), el('code', value), copyButton(`order-${key}:${o.order}`, 'Copy', () => value, 'tiny', deps.changed)); return l; };
+          how.append(line('Send', stxText(o.amount) + ' STX', 'amount'), line('To', o.to, 'to'), line('Memo', o.memo, 'memo'));
+          box.append(how, el('p', 'The memo is what ties the payment to your player. Without it the album cannot be added.', 'ppp-mute'));
+          const paid = button('I have paid: check', () => void check(p.address!, o, true)); paid.disabled = checking.has(o.order);
+          row.append(paid);
+        }
+      }
+    } else {
       box.append(el('p', 'Add it and it stays in your player. It plays with your own plays, and every play pays the artist.', 'ppp-mute'));
       const add = button('Add to my player', () => { void act('add', v.id).then((ok) => { if (ok && incoming?.view) incoming.view = { ...incoming.view, added: incoming.view.added + 1 }; }); }, 'primary');
       add.disabled = shelfBusy;
@@ -160,6 +259,7 @@ export function createReleases(deps: ReleasesDeps) {
     }
     row.append(button('Not now', () => { if (incoming) incoming.dismissed = true; deps.changed(); }, 'quiet'));
     box.append(row);
+    if (working) box.append(el('p', working, 'ppp-cyan'));
     if (note) box.append(el('p', note, 'ppp-warn'));
     return [box];
   }
@@ -199,6 +299,26 @@ export function createReleases(deps: ReleasesDeps) {
   const titleIn = el('input') as HTMLInputElement; titleIn.maxLength = 60; titleIn.placeholder = 'Title of the single, EP or album'; titleIn.setAttribute('aria-label', 'Release title');
   const byIn = el('input') as HTMLInputElement; byIn.maxLength = 80; byIn.placeholder = 'Artist name shown under the title'; byIn.setAttribute('aria-label', 'Artist name');
   const coverIn = el('input') as HTMLInputElement; coverIn.inputMode = 'numeric'; coverIn.placeholder = 'Cover: an inscription number (optional; the first song’s artwork if left empty)'; coverIn.setAttribute('aria-label', 'Cover inscription number');
+  const priceIn = el('input') as HTMLInputElement; priceIn.inputMode = 'decimal'; priceIn.placeholder = 'Price in STX, e.g. 2 (0 makes it free)'; priceIn.setAttribute('aria-label', 'Price in STX');
+  /** The release whose price or copies form is open in "Your releases". */
+  let opened: { id: string; what: 'price' | 'copies' } | null = null;
+  const toggle = (id: string, what: 'price' | 'copies', price = '') => { opened = opened?.id === id && opened.what === what ? null : { id, what }; if (opened?.what === 'price') priceIn.value = price; note = ''; deps.changed(); };
+  async function setPrice(main: string, r: ReleaseView) {
+    if (working) return;
+    const price = parseStx(priceIn.value);
+    if (price === null || !validPrice(price)) { note = 'A price is 0 (free), or 0.1 to 1,000 STX.'; deps.changed(); return; }
+    working = 'Sign in your wallet (nothing is spent)…'; note = ''; deps.changed();
+    try {
+      const request: PriceRequest = { artist: main, release: r.id, price: price.toString(), issued: deps.now() };
+      const signature = await deps.sign(main, priceData(request));
+      working = 'Saving the price…'; deps.changed();
+      await deps.json('/radio/release/price', post({ request, signature }));
+      note = price > 0n ? `Price set ✓ “${r.title}” now costs ${stxText(price)} STX, paid straight to this wallet.` : `“${r.title}” is free again ✓`;
+      opened = null;
+      loadMade(main, true);
+    } catch (e) { note = (e as Error).message || 'The price was not changed.'; }
+    finally { working = ''; deps.changed(); }
+  }
   const linkOf = (id: string) => `${location.origin}${location.pathname}?release=${id}`;
 
   function loadSongs(main: string) {
@@ -309,9 +429,22 @@ export function createReleases(deps: ReleasesDeps) {
       for (const r of made.list) {
         const row = el('div', '', 'ppp-release-row');
         const t = el('span', '', 'ppp-release-row__t');
-        t.append(el('b', r.title), el('span', `${songsLine(r)} · added by ${r.added.toLocaleString()} ${r.added === 1 ? 'player' : 'players'}`));
+        const price = BigInt(/^\d{1,12}$/.test(r.price ?? '') ? r.price! : '0');
+        const money = price > 0n ? ` · ${stxText(price)} STX · ${(r.sold ?? 0).toLocaleString()} sold` : ways.sales ? ' · free' : '';
+        t.append(el('b', r.title), el('span', `${songsLine(r)} · added by ${r.added.toLocaleString()} ${r.added === 1 ? 'player' : 'players'}${money}`));
         row.append(t, copyButton('release-link:' + r.id, 'Copy link', () => linkOf(r.id), 'tiny', deps.changed));
+        if (ways.sales) { const b = button('Price', () => toggle(r.id, 'price', price > 0n ? stxText(price) : ''), 'tiny'); b.setAttribute('aria-expanded', String(opened?.id === r.id && opened.what === 'price')); row.append(b); }
+        if (ways.copies && deps.copies) { const b = button('Send copies', () => toggle(r.id, 'copies'), 'tiny'); b.setAttribute('aria-expanded', String(opened?.id === r.id && opened.what === 'copies')); row.append(b); }
         parts.push(row);
+        if (opened?.id !== r.id) continue;
+        const box = el('div', '', 'ppp-release-way');
+        if (opened.what === 'price' && ways.sales) {
+          const go = button('Sign this price', () => void setPrice(main, r), 'primary'); go.disabled = !!working;
+          box.append(
+            el('p', 'Put a price on this release. Each listener then pays you that price once to add it, straight to this wallet. Xtrata takes nothing, never holds the money and cannot refund a sale: a refund is between you and the buyer. Players that already have it keep it.', 'ppp-mute'),
+            priceIn, go);
+        } else if (opened.what === 'copies' && ways.copies && deps.copies) box.append(...deps.copies(main, { id: r.id, title: r.title }));
+        if (box.childNodes.length) parts.push(box);
       }
     }
     return parts;

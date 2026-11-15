@@ -161,14 +161,16 @@ function start(root: HTMLElement) {
     likeFailed: (song) => window.dispatchEvent(new CustomEvent('xtrata:radio-like-failed', { detail: { song } }))
   });
 
+  /** One STX transfer from the connected Stacks wallet (its own popup shows the amount, the recipient and the memo). */
+  const payStx = (app: string, cancelled: string, main: string, recipient: string, amount: bigint, memo: string) => new Promise<string>((resolve, reject) => showStxTransfer({
+    recipient, amount: amount.toString(), memo, stxAddress: main, network: new StacksMainnet(),
+    appDetails: { name: app, icon: '/favicon.svg' },
+    onFinish: (r) => resolve(r.txId || ''), onCancel: () => reject(new Error(cancelled)), onError: reject
+  }));
   const gifts = createGifts({
     json,
     main: () => { const s = sessionStore.load(); return s.isConnected && s.network === 'mainnet' ? s.address : undefined; },
-    pay: (main, recipient, amount, memo) => new Promise((resolve, reject) => showStxTransfer({
-      recipient, amount: amount.toString(), memo, stxAddress: main, network: new StacksMainnet(),
-      appDetails: { name: 'Xtrata Radio · gift', icon: '/favicon.svg' },
-      onFinish: (r) => resolve(r.txId || ''), onCancel: () => reject(new Error('Gift cancelled. Nothing was sent.')), onError: reject
-    })),
+    pay: (main, recipient, amount, memo) => payStx('Xtrata Radio · gift', 'Gift cancelled. Nothing was sent.', main, recipient, amount, memo),
     sign: (main, data) => requestStructuredSignature({ ...data, network: 'mainnet', stxAddress: main }),
     giftSent: (txid, amount) => ppp.giftSent(txid, amount),
     claiming: (on) => ppp.giftClaiming(on),
@@ -221,6 +223,8 @@ function start(root: HTMLElement) {
     main: () => { const s = sessionStore.load(); return s.isConnected && s.network === 'mainnet' ? s.address : undefined; },
     sign: (main, data) => requestStructuredSignature({ ...data, network: 'mainnet', stxAddress: main }),
     signShelf: (action, release) => ppp.signShelf(action, release),
+    pay: (main, recipient, amount, memo) => payStx('Xtrata Music · album', 'Payment cancelled. Nothing was sent.', main, recipient, amount, memo),
+    copies: (main, release) => gifts.copies(main, release, ppp.snapshot().gate?.radioUrl ?? null),
     player: () => { const s = ppp.snapshot(); const address = s.slot === 0 ? s.listening : s.root; return { address, unlocked: !!address && ['ready', 'fund', 'over', 'link'].includes(s.step) }; },
     open: (album) => openFeatured(album, true),
     who: (address) => who(address),
