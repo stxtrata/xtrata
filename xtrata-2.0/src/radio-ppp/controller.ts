@@ -15,7 +15,8 @@ import {
   balanceState, costPerPlay, DEFAULT_PLAY_FEE, DEFAULT_RETURN_FEE, fundingAllowance, LIKE_FEE, LIKES_FLOAT, playsCovered, RESERVE, TARGET,
   type BalanceState, type ReturnMode
 } from '../lib/listening-wallet/policy';
-import { RADIO_CORE_INDEX } from '../lib/listening-wallet/tx';
+import { AWARDS_CONTRACT, RADIO_CORE_INDEX } from '../lib/listening-wallet/tx';
+import type { SendRecordResult, SignAwardResult } from '../lib/listening-wallet/messages';
 import type { BindSlotResult, MoveResult, OpenSlotResult, ReturnResult, SessionSummary, SignedResult, StatusResult, TermsParams } from '../lib/listening-wallet/messages';
 import type { Entry } from '../radio-test-wallet/model';
 
@@ -50,6 +51,13 @@ export interface GiftInfo {
   /** 'players': one of the numbered free players on the giveaway wall, so it has a class. null: it is not. Absent: not known. */
   drop?: 'players' | null;
 }
+/** Where a player stands with its Music Hero record, as the server says (see AwardStatus there). */
+export interface AwardView {
+  state: 'off' | 'not-a-player' | 'unavailable' | 'earning' | 'ready' | 'paused' | 'class-full' | 'not-open' | 'claimed';
+  cls?: string; number?: number; need?: number; have?: number; inscription?: number; holds?: boolean | null; reason?: string;
+}
+/** Network fee offered for a claim (microSTX): about twice its size in bytes. The box refuses more than its own cap. */
+export const AWARD_FEE = 1_500n;
 export interface StoredLink { listening: string; issued: number; mainSignature: string }
 
 export interface Bridge { request<T = unknown>(method: string, params?: unknown): Promise<T> }
@@ -106,6 +114,14 @@ export interface PppDeps {
    * Was this listening wallet gifted? `null` means it was not; a rejection means the server could not be asked (never read as "not a gift").
    */
   giftInfo?(listening: string): Promise<GiftInfo | null>;
+  /**
+   * Music Hero awards (functions/lib/radio-awards.ts). `awardStatus`: where a player stands; a rejection means it
+   * could not be asked (never read as "nothing"). `awardName`: the name its record would carry now. `awardNote`: the
+   * record's bytes and their signed note, for a player whose record is ready.
+   */
+  awardStatus?(player: string): Promise<AwardView>;
+  awardName?(player: string): Promise<string | null>;
+  awardNote?(player: string, name: 'auto' | 'none'): Promise<{ cls: number; number: number; plays: number; record: string; signature: string; name: string | null }>;
   /** Every inbound (and outgoing) STX transfer of the listening wallet, or `{ok:false}` when the list is not complete. */
   history?(listening: string, withOutgoing: boolean): Promise<History>;
 }
@@ -142,6 +158,11 @@ export interface Snapshot {
   phrase: boolean;
   /** The listener wrote the backup words down and checked them on this device. */
   backedUp: boolean;
+  /**
+   * The player's Music Hero record: where it stands, the name it would carry (`undefined` while that is not known),
+   * and a claim on its way (`claimTx`). Null when awards are off, this is not a numbered player, or nothing is known yet.
+   */
+  award: (AwardView & { name?: string | null; claimTx?: string; /** the record is on its way to another address */ sendTx?: string }) | null;
   /** A backed-up player holding more than 1 STX: allowed, and it keeps paying. The page says so quietly; nothing is blocked. */
   aboveTarget: boolean;
   balance?: bigint;
@@ -435,6 +456,56 @@ export function createPppController(deps: PppDeps) {
    * Asks the server whether this wallet was gifted. A failed answer keeps what was known and is tried again a
    * minute later; it never turns a gifted wallet into an ordinary one (and so never lets a gift player play free).
    */
+  // ---------------------------------------------------------------- Music Hero award
+  /** The player itself (the passkey's own wallet): awards belong to it, whichever album is open. */
+  const playerAddr = () => (status?.state === 'unlocked' ? status.root ?? status.address : (status?.slot ?? 0) === 0 ? status?.address : undefined);
+  let awardRes: { for: string; view: AwardView; at: number } | null = null;
+  let awardNameRes: { for: string; name: string | null | undefined; at: number } | null = null;
+  let awardLooking = false;
+  const claimKey = (player: string) => key('award-claim', player);
+  const sendKey = (player: string) => key('award-send', player);
+  const sendNow = (player: string): { txid: string; at: number } | null => {
+    try { const v = JSON.parse(deps.store.get(sendKey(player)) || 'null'); return v && typeof v.txid === 'string' && deps.now() - v.at < 2 * 3600_000 ? v : null; } catch { return null; }
+  };
+  const claimNow = (player: string): { txid: string; at: number } | null => {
+    try { const v = JSON.parse(deps.store.get(claimKey(player)) || 'null'); return v && typeof v.txid === 'string' && deps.now() - v.at < 2 * 3600_000 ? v : null; } catch { return null; }
+  };
+  /**
+   * Asks the server where this player stands. Quiet and best effort: a failed answer keeps what was known (it is
+   * shown as "can't check", never as zero plays). Off or not a numbered player: asked rarely.
+   */
+  async function lookupAward(force = false) {
+    const player = playerAddr();
+    if (!player || !deps.awardStatus || awardLooking) return;
+    const known = awardRes?.for === player ? awardRes : null;
+    const s = known?.view.state;
+    const wait = !known ? 0 : s === 'off' || s === 'not-a-player' ? 30 * 60_000 : claimNow(player) || sendNow(player) ? 20_000 : s === 'claimed' ? 10 * 60_000 : 60_000;
+    if (known && !force && deps.now() - known.at < wait) return;
+    awardLooking = true;
+    try {
+      const view = await deps.awardStatus(player);
+      awardRes = { for: player, view, at: deps.now() };
+      if (view.state === 'claimed') deps.store.set(claimKey(player), '');
+      if (view.state === 'claimed' && view.holds === false) deps.store.set(sendKey(player), '');
+      // The name its record would carry, once there is a record to claim (asked once; "Check again" asks afresh).
+      if (view.state === 'ready' && deps.awardName && awardNameRes?.for !== player) {
+        try { awardNameRes = { for: player, name: await deps.awardName(player), at: deps.now() }; }
+        catch { awardNameRes = { for: player, name: undefined, at: deps.now() }; }
+      }
+    } catch {
+      awardRes = { for: player, view: known && known.view.state !== 'off' && known.view.state !== 'not-a-player' ? { ...known.view, state: 'unavailable' } : { state: 'unavailable' }, at: deps.now() };
+    } finally { awardLooking = false; }
+  }
+  function awardNow(): Snapshot['award'] {
+    const player = playerAddr();
+    if (!player || awardRes?.for !== player) return null;
+    const v = awardRes.view;
+    if (v.state === 'off' || v.state === 'not-a-player') return null;
+    const claim = v.state === 'claimed' ? null : claimNow(player);
+    const send = v.state === 'claimed' && v.holds !== false ? sendNow(player) : null;
+    return { ...v, ...(awardNameRes?.for === player ? { name: awardNameRes.name } : {}), ...(claim ? { claimTx: claim.txid } : {}), ...(send ? { sendTx: send.txid } : {}) };
+  }
+
   async function lookupGift() {
     const listening = status?.address;
     if (!listening || !deps.giftInfo || !gate?.gifts?.enabled || giftLooking) return;
@@ -538,7 +609,7 @@ export function createPppController(deps: PppDeps) {
 
   const snapshot = (): Snapshot => ({
     step: step(), busy, message, error, notice: noticeText(), gate, main: creditMain(), mainConnected: !!deps.main(), standIn: standIn(),
-    listening: status?.address, linked: status?.linked, unproven: !!status?.unproven, phrase: !!status?.phrase, backedUp: !!status?.backedUp, balance,
+    listening: status?.address, linked: status?.linked, award: awardNow(), unproven: !!status?.unproven, phrase: !!status?.phrase, backedUp: !!status?.backedUp, balance,
     balanceState: balance === undefined ? undefined : ((b: BalanceState): BalanceState => (b === 'over' && status?.backedUp ? 'ok' : b))(balanceState(balance, fee())), // backed up: over 1 STX reads as a healthy balance
     aboveTarget: balance !== undefined && balance > TARGET && !!status?.backedUp,
     playsLeft: balance === undefined ? 0 : playsCovered(balance, fee()),
@@ -779,6 +850,7 @@ export function createPppController(deps: PppDeps) {
       await lookupCredited();
       await lookupUnused();
       await lookupGift();
+      await lookupAward();
       // A payment that has just landed has changed the balance: read it again now, so plays-left is exact.
       if (await reconcile()) await refreshBalance(true);
       await refreshRootBalance(); // a confirmed top-up clears the cached one: read it again now
@@ -1246,6 +1318,71 @@ export function createPppController(deps: PppDeps) {
       await b.request('listening.backup');
       status = await readStatus(b);
       say('Backed up ✓ Keep those 24 words somewhere safe and private.');
+    }),
+
+    /** Ask again where the player's record stands, and what name it would carry (after linking a wallet, say). */
+    awardRefresh: async () => { awardNameRes = null; await lookupAward(true); deps.changed(); },
+
+    /**
+     * Claim the player's Music Hero record. The server signs the record (with the name, or the address alone); the
+     * wallet box reads it, shows it and signs the claim; this page sends it. The player pays the network fee only.
+     */
+    claimAward: (name: 'auto' | 'none') => task('Confirm in the listening wallet…', async () => {
+      const player = playerAddr();
+      if (status?.state !== 'unlocked' || !player) throw new Error('Unlock your player first.');
+      if (!deps.awardNote) throw new Error('Awards are not available here.');
+      if (walletLacks('award')) throw new Error('The listening wallet box needs an update before it can claim a record. Try again shortly.');
+      if (claimNow(player)) throw new Error('Your claim is already on its way. It usually confirms in a minute or two.');
+      if (paying || liking || checkingLike || unresolvedAll().length) throw new Error('A payment is still confirming. Claim as soon as it has.');
+      await holdTab();
+      const note = await deps.awardNote(player, name);
+      const { balance: bal, nonce } = await deps.chain.account(player);
+      if (bal < AWARD_FEE) throw new Error('Your player needs a little STX for the network fee to claim. Add plays first.');
+      const b = await ensureBridge();
+      const r = await b.request<SignAwardResult>('listening.signAward', {
+        cls: note.cls, number: note.number, plays: note.plays, record: note.record, signature: note.signature,
+        fee: AWARD_FEE.toString(), nonce: nonce.toString(), balance: bal.toString()
+      });
+      const tx = deserializeTransaction(r.raw) as any;
+      if (r.hero !== player || r.number !== note.number || tx.payload?.functionName?.content !== 'claim' || tx.payload?.contractName?.content !== AWARDS_CONTRACT.split('.')[1])
+        throw new Error('The signed claim does not match what was asked. Nothing was sent.');
+      await deps.chain.broadcast(r.raw, r.txid);
+      deps.store.set(claimKey(player), JSON.stringify({ txid: r.txid, at: deps.now() }));
+      balanceAt = -Infinity;
+      if (awardRes) awardRes = { ...awardRes, at: -Infinity };
+      say('Record claimed ✓ It is being made now: about a minute.');
+    }),
+
+    /**
+     * Send the player's claimed record to another address. The wallet box shows the inscription and the full address
+     * and the listener confirms there; the transaction can move that one inscription and nothing else.
+     */
+    sendAward: (to: string) => task('Confirm in the listening wallet…', async () => {
+      const player = playerAddr();
+      const a = awardNow();
+      if (status?.state !== 'unlocked' || !player) throw new Error('Unlock your player first.');
+      if (a?.state !== 'claimed' || a.inscription === undefined) throw new Error('There is no record to send yet.');
+      if (a.holds === false) throw new Error('This record has already been sent.');
+      if (a.holds !== true) throw new Error('Could not check that your player still holds the record. Try again shortly.');
+      if (sendNow(player)) throw new Error('Your record is already on its way.');
+      const recipient = to.trim();
+      if (!isMainnetStandardAddress(recipient)) throw new Error('Enter a Stacks address starting SP. A .btc name will not work here.');
+      if (recipient === player) throw new Error('That is your player itself. Enter the address to send it to.');
+      if (walletLacks('sendRecord')) throw new Error('The listening wallet box needs an update before it can send a record. Try again shortly.');
+      if (paying || liking || checkingLike || unresolvedAll().length) throw new Error('A payment is still confirming. Send as soon as it has.');
+      await holdTab();
+      const { balance: bal, nonce } = await deps.chain.account(player);
+      if (bal < AWARD_FEE) throw new Error('Your player needs a little STX for the network fee. Add plays first.');
+      const b = await ensureBridge();
+      const r = await b.request<SendRecordResult>('listening.signSendRecord', { inscription: a.inscription, recipient, fee: AWARD_FEE.toString(), nonce: nonce.toString(), balance: bal.toString() });
+      const tx = deserializeTransaction(r.raw) as any;
+      if (r.from !== player || r.recipient !== recipient || r.inscription !== a.inscription || tx.payload?.functionName?.content !== 'transfer' || cvToJSON(tx.payload.functionArgs?.[2]).value !== recipient)
+        throw new Error('The signed send does not match what was asked. Nothing was sent.');
+      await deps.chain.broadcast(r.raw, r.txid);
+      deps.store.set(sendKey(player), JSON.stringify({ txid: r.txid, at: deps.now() }));
+      balanceAt = -Infinity;
+      if (awardRes) awardRes = { ...awardRes, at: -Infinity };
+      say('Record sent ✓ It arrives in a minute or two.');
     }),
 
     lock: () => task('Locking…', async () => {

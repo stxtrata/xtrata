@@ -44,7 +44,7 @@ async function open(over: object = {}, flag: string | null = '1') {
   document.body.innerHTML = `<header class="topbar"></header><p id="paidRadioStatus"></p><main><section class="album" id="album" hidden></section><section class="albumlist" id="albumList" hidden></section><section class="rx"></section>
     <aside class="side"><div class="sheet-bar"><b id="sheetTitle"></b><button id="sheetClose">×</button></div><div class="sheet-extra" id="sheetExtra"></div>
     <section id="ppp" hidden><div class="ppp-head"><h3><span class="ppp-badge"></span></h3><span class="ppp-state"></span></div><ol class="ppp-steps"></ol><p class="ppp-stage"></p>
-    <div class="ppp-switch" hidden></div><div class="ppp-key"></div><div class="ppp-featured" hidden></div><p class="ppp-frame-label"></p><div class="ppp-frame"></div><div class="ppp-actions"></div><p class="ppp-msg"></p><p class="ppp-err"></p>
+    <div class="ppp-switch" hidden></div><div class="ppp-key"></div><div class="ppp-award" hidden></div><div class="ppp-featured" hidden></div><p class="ppp-frame-label"></p><div class="ppp-frame"></div><div class="ppp-actions"></div><p class="ppp-msg"></p><p class="ppp-err"></p>
     <details class="ppp-recent"><ol class="ppp-recent-list"></ol><details class="ppp-history"></details></details><details class="ppp-wallets"><dl class="ppp-facts"></dl><div class="ppp-actions ppp-actions2"></div></details>
     <details class="ppp-more"><div class="ppp-body"></div></details><details class="ppp-yours" hidden><summary></summary><div class="ppp-yours-body"></div></details><details class="ppp-shelf" hidden><summary></summary><div class="ppp-shelf-body"></div></details><details class="ppp-gifts"><div class="ppp-gift-body"></div></details></section></aside></main>
     <div id="onair" hidden><b>ON AIR</b><span class="onair-sub"></span></div><div class="nudge" id="pppNudge" hidden><span class="nudge-txt"><b class="nudge-t"></b><span class="nudge-s"></span></span><button type="button">Start</button></div>`;
@@ -484,5 +484,141 @@ describe('albums every player comes loaded with', () => {
     expect((album.querySelector('.ppp-featured') as HTMLElement).hidden).toBe(true);
     const empty = await open({ step: 'fund', balance: 3_100n, playsLeft: 0, session: null, entries: PLAYED, createdHere: false });
     expect((empty.querySelector('.ppp-featured') as HTMLElement).hidden).toBe(true);
+  });
+});
+
+describe('the Music Hero award in the panel', () => {
+  const award = () => document.querySelector('#ppp .ppp-award') as HTMLElement;
+  const gold = { cls: 'gold', number: 412, need: 50 };
+
+  it('is not there for a player without one', async () => {
+    await open({ entries: PLAYED });
+    expect(award().hidden).toBe(true);
+  });
+
+  it('shows how far along the player is', async () => {
+    await open({ entries: PLAYED, award: { state: 'earning', ...gold, have: 12 } });
+    expect(award().hidden).toBe(false);
+    expect(text(award())).toContain('12 of 50 paid plays');
+    expect(text(award())).toContain('38 more plays and your Gold record is yours to claim.');
+    expect((award().querySelector('.ppp-award__bar i') as HTMLElement).style.width).toBe('24%');
+    expect(award().querySelector('button')).toBeNull();
+  });
+
+  it('when ready: a preview of exactly what will be made, the name it would carry, and the claim', async () => {
+    await open({ entries: PLAYED, award: { state: 'ready', ...gold, have: 50, name: 'jim.btc' } });
+    const src = award().querySelector('iframe')!.getAttribute('src')!;
+    expect(src.startsWith('/awards/gold#')).toBe(true);
+    const q = new URLSearchParams(src.split('#')[1]);
+    expect(Object.fromEntries(q)).toMatchObject({ n: '412', a: ME, b: 'jim.btc', p: '50' });
+    expect(q.get('s')).toMatch(/^[0-9a-f]{8}$/);
+    expect(award().querySelector('iframe')!.getAttribute('sandbox')).toBe('allow-scripts');
+    expect(text(award())).toContain('Its plaque will carry jim.btc beside your player’s address.');
+    expect([...award().querySelectorAll('button')].map((b) => b.textContent)).toEqual(['Claim my record', 'Use my address only']);
+  });
+
+  it('with no name it offers the address, and with a name that could not be checked it says so', async () => {
+    await open({ entries: PLAYED, award: { state: 'ready', ...gold, have: 50, name: null } });
+    expect(new URLSearchParams(award().querySelector('iframe')!.getAttribute('src')!.split('#')[1]).has('b')).toBe(false);
+    expect([...award().querySelectorAll('button')].map((b) => b.textContent)).toEqual(['Claim my record', 'Check for a name again']);
+    await open({ entries: PLAYED, award: { state: 'ready', ...gold, have: 50 } });
+    expect(text(award())).toContain('Could not check for a .btc name just now.');
+    expect([...award().querySelectorAll('button')].map((b) => b.textContent)).toEqual(['Check for a name again', 'Claim with my address only']);
+  });
+
+  it('while the claim is on its way there is nothing to press; once claimed the record itself is shown', async () => {
+    await open({ entries: PLAYED, award: { state: 'ready', ...gold, have: 50, name: null, claimTx: '0x' + 'a'.repeat(64) } });
+    expect(text(award())).toContain('Your record is being made');
+    expect(award().querySelector('button')).toBeNull();
+    await open({ entries: PLAYED, award: { state: 'claimed', cls: 'gold', number: 412, inscription: 48213, holds: true } });
+    expect(award().querySelector('iframe')!.getAttribute('src')).toBe('/i/48213');
+    expect(text(award())).toContain('Xtrata inscription #48213');
+  });
+
+  it('a player that sent its record away goes back to plain; a check that failed is never shown as zero', async () => {
+    const gifted = { player: null, from: null, source: 'batch', amount: '178000', drop: 'players' };
+    await open({ entries: PLAYED, gift: gifted, giftPlays: 400, award: { state: 'claimed', cls: 'gold', number: 412, inscription: 48213, holds: true } });
+    expect(document.documentElement.dataset.tier).toBe('gold');
+    await open({ entries: PLAYED, gift: gifted, giftPlays: 400, award: { state: 'claimed', cls: 'gold', number: 412, inscription: 48213, holds: false } });
+    expect(document.documentElement.dataset.tier).toBeUndefined();
+    expect(text(award())).toContain('gone back to plain');
+    await open({ entries: PLAYED, award: { state: 'unavailable', ...gold } });
+    expect(text(award())).toContain('Can’t check your award right now.');
+    expect(text(award())).not.toMatch(/\b0 of/);
+  });
+});
+
+describe('the Music Hero award walk-through', () => {
+  const page = () => document.getElementById('album')!;
+  const tap = (label: RegExp) => { const b = [...page().querySelectorAll('button')].find((x) => label.test(x.textContent || '')) as HTMLButtonElement | undefined; if (!b) throw new Error('no button ' + label); b.click(); };
+  const ready = (name: string | null | undefined = null) => ({ state: 'ready', cls: 'gold', number: 412, need: 50, have: 50, ...(name === undefined ? {} : { name }) });
+  const named = (n: string) => h.calls.filter(([c]) => c === n).map(([, a]) => a);
+
+  it('opens by itself when the record is earned, goes to the name question, and claims with the listener’s choice', async () => {
+    await open({ entries: PLAYED, award: ready('jim.btc') });
+    expect(page().hidden).toBe(false);
+    expect(text(page())).toContain('Your Gold record is ready');
+    expect(new URLSearchParams(page().querySelector('.aw-art iframe')!.getAttribute('src')!.split('#')[1]).get('b')).toBe('jim.btc');
+    tap(/Claim my Gold record/);
+    expect(text(page())).toContain('Put your name on it?');
+    tap(/Claim with jim\.btc/);
+    expect(named('claimAward')).toEqual([['auto']]);
+    // The claim is on its way, then confirmed: the same walk-through carries on to the end.
+    h.snap = { ...h.snap, award: { ...ready('jim.btc'), claimTx: '0x' + 'a'.repeat(64) } }; h.changed();
+    expect(text(page())).toContain('Making your record');
+    h.snap = { ...h.snap, award: { state: 'claimed', cls: 'gold', number: 412, inscription: 48213, holds: true } }; h.changed();
+    expect(text(page())).toContain('It’s yours');
+    expect(page().querySelector('.aw-art iframe')!.getAttribute('src')).toBe('/i/48213');
+    tap(/See it in my player/);
+    expect(page().hidden).toBe(true);
+  });
+
+  it('"Later" puts it away for a day; the card in the player is still there', async () => {
+    await open({ entries: PLAYED, award: ready() });
+    tap(/Later/);
+    expect(page().hidden).toBe(true);
+    expect(Number(localStorage.getItem('xtrata.radio.award.later.v1'))).toBeGreaterThan(0);
+    expect((document.querySelector('#ppp .ppp-award') as HTMLElement).hidden).toBe(false);
+  });
+
+  it('without a name it walks through getting one on: the wallet route asks to connect, the other shows where to send a name', async () => {
+    await open({ entries: PLAYED, award: ready(null) });
+    tap(/Claim my Gold record/);
+    tap(/I have a name in Leather or Xverse/);
+    expect(text(page())).toContain('Connect the Leather or Xverse wallet that holds your .btc name.');
+    const connect = Object.assign(document.createElement('button'), { id: 'radio-wallet-connect' });
+    const clicked = vi.fn(); connect.addEventListener('click', clicked); document.body.append(connect);
+    tap(/Connect my wallet/);
+    expect(clicked).toHaveBeenCalledTimes(1);
+    tap(/Back/);
+    tap(/I want to get a name/);
+    expect(text(page())).toContain('Get a name at BNS One.');
+    expect(text(page())).toContain(ME);
+    tap(/I have my name: check again/);
+    expect(named('awardRefresh')).toHaveLength(1);
+    expect(text(page())).toContain('Put your name on it?');
+    tap(/Claim with my address/);
+    expect(named('claimAward')).toEqual([['none']]);
+  });
+
+  it('does not open for a record that was claimed before this visit, or while it is only being earned', async () => {
+    await open({ entries: PLAYED, award: { state: 'claimed', cls: 'gold', number: 412, inscription: 48213, holds: true } });
+    expect(page().hidden).toBe(true);
+    await open({ entries: PLAYED, award: { state: 'earning', cls: 'gold', number: 412, need: 50, have: 3 } });
+    expect(page().hidden).toBe(true);
+  });
+
+  it('a claimed record can be sent on from the card, to the address typed', async () => {
+    await open({ entries: PLAYED, award: { state: 'claimed', cls: 'gold', number: 412, inscription: 48213, holds: true } });
+    const card = document.querySelector('#ppp .ppp-award') as HTMLElement;
+    const to = card.querySelector('.ppp-award__send input') as HTMLInputElement;
+    to.value = 'SP16538G41XMAGHYB0JZAP29R7YBSKDR569QP1SMF';
+    (card.querySelector('.ppp-award__send button') as HTMLButtonElement).click();
+    expect(named('sendAward')).toEqual([['SP16538G41XMAGHYB0JZAP29R7YBSKDR569QP1SMF']]);
+    await open({ entries: PLAYED, award: { state: 'claimed', cls: 'gold', number: 412, inscription: 48213, holds: true, sendTx: '0x' + 'b'.repeat(64) } });
+    expect(text(document.querySelector('#ppp .ppp-award')!)).toContain('on its way to its new address');
+    expect(document.querySelector('#ppp .ppp-award__send')).toBeNull();
+    await open({ entries: PLAYED, award: { state: 'claimed', cls: 'gold', number: 412, inscription: 48213, holds: false } });
+    expect(document.querySelector('#ppp .ppp-award__send')).toBeNull();
   });
 });

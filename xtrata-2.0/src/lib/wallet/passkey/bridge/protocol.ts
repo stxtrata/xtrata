@@ -45,6 +45,10 @@ export type WalletMethod =
   | 'listening.unlock'
   /** Verify the main wallet's link signature and countersign with the listening key. */
   | 'listening.link'
+  /** Claim a Music Hero record: shown and confirmed inside the frame, signed for the one award contract it knows. */
+  | 'listening.signAward'
+  /** Send an inscription the player holds to an address the listener confirms inside the frame. */
+  | 'listening.signSendRecord'
   /** Show the listener their backup words inside the frame; the page learns only that it was done. */
   | 'listening.backup'
   /** The second passkey check a `quick` starter player skipped; nothing is signed. */
@@ -98,6 +102,8 @@ export const WALLET_METHODS: readonly WalletMethod[] = [
   'listening.link',
   'listening.prove',
   'listening.backup',
+  'listening.signAward',
+  'listening.signSendRecord',
   'listening.approveSession',
   'listening.signPlay',
   'listening.signLike',

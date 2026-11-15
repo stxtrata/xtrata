@@ -140,6 +140,42 @@ Not exercised against a live award contract on mainnet (there is none yet): the 
 Wall numbers: a player's number is its disc's place among the wall's entries. Do not archive single entries once
 awards are open, or later numbers shift (the contract would still refuse a number twice).
 
+## The client side, built 15 Nov 2026
+
+- **Wallet box: `listening.signAward`.** The page hands over the server's record and note; nothing in them is
+  trusted. The box reads the record's bytes itself (`parseRecord`: accepted only if rebuilding them gives the same
+  bytes), requires them to be for the player's OWN address and to match the class, number and plays being claimed,
+  shows the listener what the plaque will say, and signs a claim to the one contract it knows
+  (`AWARDS_CONTRACT` in `src/lib/listening-wallet/tx.ts`): the page cannot name a contract or a function. Signed as
+  the passkey's own wallet whichever album is open. One post-condition: the claimer sends no STX (the mode is Allow
+  because the contract moves its own STX and an inscription whose number is not known beforehand, so Deny cannot be
+  used; what keeps this safe is that the contract is fixed in the box). Fee capped at 0.01 STX.
+- **`AWARDS_CONTRACT` assumes the award contract is deployed by the Xtrata wallet** (`SP3JNSEX…`), as
+  `xtrata-music-awards-v1-0`. If it is deployed from another wallet, change that one constant and rebuild the box
+  BEFORE deploying it: a wrong value means no claim can be signed, never a claim to the wrong place.
+- **Page.** A "Music Hero award" card in the panel: progress (as the server reports it), the claim when ready with a
+  live preview of exactly what will be made and the name it would carry ("Claim my record", "Use my address only",
+  "Check for a name again"), "being made" while the claim confirms, then the record itself. A player that sent its
+  record away loses its class colours. `GET /radio/awards/name` gives the preview its name.
+- Claims pay `AWARD_FEE` (1,500 microSTX) from the player; a claim waits while a play or like is still confirming.
+
+Added 15 Nov 2026 (second pass):
+
+- **The walk-through** (`src/radio-ppp/award-view.ts`): full-screen, three lights (Earned, Claim, Yours). It opens
+  by itself when a record is earned ("Later" puts it away for a day; the card in the panel stays), asks "Put your
+  name on it?", carries on through "Making your record" to "It's yours". The wallet box sheet shows a strip naming
+  the record while it asks.
+- **Getting a name on it**, inside the walk-through: "I have a name in Leather or Xverse" (lights Connect, Link,
+  Name: connect the wallet, link the player with one signature, the name is then looked up by itself) and "I want
+  to get a name" (BNS One, then link, or send the name to the player's own address, then check again). Linking is
+  the page's existing link step; if it is not open for that wallet the screen says so and offers the other way.
+- **Sending a record on**: `listening.signSendRecord` in the wallet box. The listener confirms the inscription
+  number and the FULL address inside the box; the transaction is Deny mode with one post-condition (the sender sends
+  exactly that inscription), so it can move that one token and nothing else. From the card: "Send this record to
+  someone". An address only (no .btc names). The player goes back to plain once the server sees it has gone.
+- **The wall** (`public/players.html`): a claimed disc's sheet asks `/radio/awards/record`; once claimed it shows
+  the real inscription in place of the preview, with a link, and says "Music Hero". A failed read says nothing.
+
 ## Order of work
 
 1. Shared record builder, and switch the rehearsal script to it (no behaviour change; proves the bytes).

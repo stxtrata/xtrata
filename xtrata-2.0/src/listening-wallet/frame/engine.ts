@@ -16,10 +16,11 @@ import { isMainnetStandardAddress, signLink, verifyLinkSignature } from '../../l
 import {
   costPerPlay, LIKE_FEE, MOVE_FEE_CAP, MOVE_MIN, RESERVE, returnPlan, SessionLedger, stx, TARGET, validateSessionTerms, type SessionTerms
 } from '../../lib/listening-wallet/policy';
-import { likeCallOptions, moveTransferOptions, playCallOptions, returnTransferOptions } from '../../lib/listening-wallet/tx';
+import { AWARDS_DROP, awardClaimOptions, inscriptionSendOptions, likeCallOptions, moveTransferOptions, playCallOptions, returnTransferOptions } from '../../lib/listening-wallet/tx';
+import { AWARD_CLASS, AWARD_CLASS_NAME, parseRecord } from '../../lib/music-awards/record';
 import type {
   BindSlotParams, BindSlotResult, LinkParams, LinkResult, MoveParams, MoveResult, OpenSlotResult, ReturnParams, ReturnResult, SessionSummary, SignedResult, SignLikeParams,
-  SignPlayParams, SlotAddressResult, SlotParams, StatusParams, StatusResult, TermsParams, UnlockParams, UnlockResult
+  SendRecordParams, SendRecordResult, SignAwardParams, SignAwardResult, SignPlayParams, SlotAddressResult, SlotParams, StatusParams, StatusResult, TermsParams, UnlockParams, UnlockResult
 } from '../../lib/listening-wallet/messages';
 import { LISTENING_FEATURES } from '../../lib/listening-wallet/messages';
 
@@ -52,7 +53,7 @@ export interface PasskeyPort {
 }
 
 export interface Panel {
-  kind: 'create' | 'confirm-passkey' | 'verify-passkey' | 'unlock' | 'session' | 'return' | 'link' | 'backup' | 'phrase' | 'phrase-check';
+  kind: 'create' | 'confirm-passkey' | 'verify-passkey' | 'unlock' | 'session' | 'return' | 'link' | 'backup' | 'phrase' | 'phrase-check' | 'award' | 'send-record';
   title: string;
   /**
    * One or two plain lines shown above the button. When set, `lines` and `warnings` fold into a
@@ -799,6 +800,85 @@ export function createListeningEngine(deps: {
       if (identity !== id) throw new Error('Wallet locked before the return was signed.');
       const tx = await makeSTXTokenTransfer({ ...returnTransferOptions(main, plan.amount, plan.fee, nonce), senderKey: id.privateKey });
       return { raw: toHex(tx.serialize()), txid: '0x' + tx.txid(), amount: plan.amount.toString(), fee: plan.fee.toString(), recipient: main, mode: plan.mode };
+    }),
+
+    /**
+     * Claim a Music Hero record. What the page hands over is not trusted: the box reads the record's bytes itself and
+     * accepts them only if they are a genuine record (byte-for-byte what the builder makes) for THIS player's own
+     * address and for the class, number and plays being claimed. It shows the listener what the record says, and
+     * signs a claim to the one award contract it knows, with a post-condition that the player sends no STX.
+     * Signed as the passkey's own wallet (slot 0), whichever album is open. Changes nothing about paid listening.
+     */
+    'listening.signAward': (params: unknown): Promise<SignAwardResult> => interact(async () => {
+      const open = requireUnlocked();
+      const hero = root ?? open;
+      const p = params as SignAwardParams | undefined;
+      const hex = (v: unknown, what: string, max: number) => {
+        if (typeof v !== 'string' || v.length % 2 || v.length > max * 2 || !/^[0-9a-f]*$/.test(v)) throw new Error(`Invalid ${what}.`);
+        return Uint8Array.from(v.match(/../g) ?? [], (b) => parseInt(b, 16));
+      };
+      const record = hex(p?.record, 'record', 1024), signature = hex(p?.signature, 'award note', 65);
+      const fee = bigintParam(p?.fee, 'fee'), nonce = bigintParam(p?.nonce, 'nonce'), balance = bigintParam(p?.balance, 'balance');
+      const says = parseRecord(record, AWARDS_DROP);
+      if (!says) throw new Error('That is not a Music Hero record. Nothing was signed.');
+      if (says.hero !== hero.address) throw new Error('That record is for a different player. Nothing was signed.');
+      if (AWARD_CLASS[says.cls] !== p?.cls || says.number !== p?.number || says.plays !== p?.plays) throw new Error('That record does not match the award being claimed. Nothing was signed.');
+      const options = awardClaimOptions(hero.address, hero.publicKey, { cls: p.cls, number: p.number, plays: p.plays, record, signature, fee, nonce });
+      if (balance < fee) throw new Error('Your player needs a little STX for the network fee to claim. Add plays first.');
+      const className = AWARD_CLASS_NAME[says.cls], no = String(says.number).padStart(4, '0');
+      await deps.ui.act({
+        kind: 'award',
+        title: `Claim your ${className} record`,
+        summary: `No. ${no} · ${says.name ? `${says.name} · ` : ''}${short(hero.address)} · ${says.plays.toLocaleString('en')} paid plays. Yours to keep or send on.`,
+        lines: [
+          `A Music Hero ${className} record, No. ${no}, is made for this player and written to Xtrata for good.`,
+          `Its plaque will read: ${says.name ? `${says.name}, ` : ''}${hero.address}, ${says.plays.toLocaleString('en')} paid plays. This cannot be changed afterwards.`,
+          `Network fee ${stx(fee)} STX from this player. Nothing else is spent: the claim is refused by the network if it would move any more of your STX.`
+        ],
+        confirmLabel: 'Claim my record'
+      }, async () => undefined);
+      if (identity !== open || (root ?? open) !== hero) throw new Error('Wallet locked before the claim was signed.');
+      if (signing) throw new Error('Still signing. Try again in a moment.');
+      signing = true;
+      try {
+        const tx = await makeContractCall({ ...options, senderKey: hero.privateKey });
+        return { raw: toHex(tx.serialize()), txid: '0x' + tx.txid(), hero: hero.address, number: says.number, cls: p.cls, name: says.name, fee: fee.toString() };
+      } finally { signing = false; }
+    }),
+
+    /**
+     * Send an inscription the player holds (its Music Hero record) to another address. The box cannot read the chain,
+     * so it cannot know what the inscription is: it shows its number and the FULL destination, the listener confirms
+     * both here, and the transaction is built so that it can move that one inscription and nothing else (Deny mode).
+     * If the player does not hold it, the network refuses and nothing moves. Signed as the passkey's own wallet.
+     */
+    'listening.signSendRecord': (params: unknown): Promise<SendRecordResult> => interact(async () => {
+      const open = requireUnlocked();
+      const from = root ?? open;
+      const p = params as SendRecordParams | undefined;
+      const recipient = typeof p?.recipient === 'string' ? p.recipient.trim() : '';
+      if (!isMainnetStandardAddress(recipient)) throw new Error('Choose a standard mainnet address (starting SP) to send to.');
+      if (recipient === from.address) throw new Error('That is this player itself. Choose a different address.');
+      const fee = bigintParam(p?.fee, 'fee'), nonce = bigintParam(p?.nonce, 'nonce'), balance = bigintParam(p?.balance, 'balance');
+      const options = inscriptionSendOptions(from.address, from.publicKey, { inscription: p?.inscription as number, recipient, fee, nonce });
+      if (balance < fee) throw new Error('Your player needs a little STX for the network fee. Add plays first.');
+      await deps.ui.act({
+        kind: 'send-record',
+        title: 'Send your record',
+        lines: [
+          `Send Xtrata inscription #${p!.inscription} to this address: ${recipient}`,
+          'Check every character. Once sent it belongs to that address and cannot be taken back. Your player goes back to plain.',
+          `Network fee ${stx(fee)} STX from this player. Nothing else can move: only this one inscription.`
+        ],
+        confirmLabel: 'Send it'
+      }, async () => undefined);
+      if (identity !== open || (root ?? open) !== from) throw new Error('Wallet locked before the send was signed.');
+      if (signing) throw new Error('Still signing. Try again in a moment.');
+      signing = true;
+      try {
+        const tx = await makeContractCall({ ...options, senderKey: from.privateKey });
+        return { raw: toHex(tx.serialize()), txid: '0x' + tx.txid(), from: from.address, recipient, inscription: p!.inscription, fee: fee.toString() };
+      } finally { signing = false; }
     }),
 
     // The page may withdraw a panel it asked for (e.g. to unlock a different wallet instead).

@@ -22,6 +22,7 @@ import { hiddenTrack, listedTracks } from '../lib/listening-wallet/gift-players'
 import { createShelf } from './shelf';
 import { createAlbumView, type AlbumInput } from './album';
 import { coverArt, onArt } from './art';
+import { createAwardWalk, type AwardScreen } from './award-view';
 import type { PlayerView } from '../lib/listening-wallet/gift-players';
 import { copyButton } from './feedback';
 import { browserName, inAppBrowser, openInBrowserHref } from './in-app';
@@ -32,6 +33,8 @@ import { createWelcomeView, type WelcomeMode } from './welcome';
 import { createRestockSheet, type RestockInput } from './restock-sheet';
 import { buildSongs, createFindBox } from './find';
 import { isTierId, tierById, tierOfAmount, type Tier } from '../lib/listening-wallet/tiers';
+import { AWARDS_DROP } from '../lib/listening-wallet/tx';
+import { awardSeed } from '../lib/music-awards/record';
 
 const root = document.getElementById('ppp');
 if (root) start(root);
@@ -77,7 +80,7 @@ function start(root: HTMLElement) {
       // Interactive requests wait for the listener (up to 30 minutes) so a late confirm in the frame
       // is never signed and then dropped here. Everything else must answer quickly.
       const client = new WalletBridgeClient({ walletOrigin: origin, frame, timeoutMs: 30 * 60_000 });
-      const INTERACTIVE = new Set(['listening.unlock', 'listening.link', 'listening.prove', 'listening.backup', 'listening.approveSession', 'listening.prepareReturn']);
+      const INTERACTIVE = new Set(['listening.unlock', 'listening.link', 'listening.prove', 'listening.backup', 'listening.signAward', 'listening.approveSession', 'listening.prepareReturn']);
       const request = <T,>(method: string, params?: unknown) => INTERACTIVE.has(method)
         ? client.request<T>(method as never, params)
         : Promise.race([
@@ -125,6 +128,22 @@ function start(root: HTMLElement) {
       if (!g) return null;
       if (typeof g.returnTo !== 'string' || typeof g.treasury !== 'string') throw new Error('Unreadable gift record.');
       return { returnTo: g.returnTo, from: typeof g.from === 'string' ? g.from : null, source: String(g.source ?? ''), amount: String(g.amount ?? '0'), treasury: g.treasury, state: g.state === 'sending' ? 'sending' : 'arrived', player: g.player ?? null };
+    },
+    // Music Hero awards: a failed request throws (shown as "can't check"), it is never read as "no award" or "no plays".
+    awardStatus: async (player) => {
+      const r = await json('/radio/awards/status?address=' + encodeURIComponent(player));
+      if (typeof r?.state !== 'string') throw new Error('Unreadable award status.');
+      return r;
+    },
+    awardName: async (player) => {
+      const r = await json('/radio/awards/name?address=' + encodeURIComponent(player));
+      if (r?.name !== null && typeof r?.name !== 'string') throw new Error('Unreadable name.');
+      return r.name;
+    },
+    awardNote: async (player, name) => {
+      const r = await json('/radio/awards/note', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ address: player, name }) });
+      if (typeof r?.record !== 'string' || typeof r?.signature !== 'string' || !Number.isSafeInteger(r?.cls) || !Number.isSafeInteger(r?.number) || !Number.isSafeInteger(r?.plays)) throw new Error('Unreadable award note.');
+      return { cls: r.cls, number: r.number, plays: r.plays, record: r.record, signature: r.signature, name: typeof r.name === 'string' ? r.name : null };
     },
     history: (listening, withOutgoing) => readHistory(listening, (path) => api(path), withOutgoing),
     likesChanged: () => { void (window as any).XtrataRadio?.refreshLikes?.(); },
@@ -194,6 +213,14 @@ function start(root: HTMLElement) {
     openPlayer: () => void ppp.openAlbum(0)
   };
   const albumView = albumMount ? createAlbumView(albumMount, albumDeps) : null;
+  // ---- the Music Hero award, one screen at a time (award-view.ts) ----
+  const awardWalk = albumMount ? createAwardWalk(albumMount) : null;
+  const AWARD_LATER = 'xtrata.radio.award.later.v1';
+  let awardStage: AwardScreen = 'ready';
+  /** The listener pressed Claim in this visit: the walk-through then carries on through "making" to "yours". */
+  let awardEngaged = false;
+  let awardLater = (() => { try { return Date.now() - Number(localStorage.getItem(AWARD_LATER) || 0) < 24 * 3600_000; } catch { return false; } })();
+  let awardLinkedSeen = false;
   // The player's class from the giveaway (tiers.ts): Diamond, Gold, Silver, Bronze, Neon or Classic, decided by the plays
   // a free starter player was given. Shown every time the player loads: a badge on the panel, the page's trim
   // (`html[data-tier]`, public/radio.html) and a coloured record on the welcome screens. Remembered on the device so a
@@ -214,6 +241,8 @@ function start(root: HTMLElement) {
     if (s.listening && s.slot === 0 && ['fund', 'ready', 'over'].includes(s.step) && !(s.gift && s.gift.drop === undefined)) {
       let next: Tier | null = null;
       try { next = s.gift && !s.gift.player && s.gift.drop === 'players' ? tierOfAmount(BigInt(s.gift.amount)) : null; } catch { next = null; }
+      // A player that claimed its record and then sent it to someone else goes back to plain: the colours go with the record.
+      if (s.award?.state === 'claimed' && s.award.holds === false) next = null;
       if ((next?.id ?? null) !== (tierNow?.id ?? null)) { tierNow = next; flagStore.set(TIER_KEY, next ? next.id : null); }
     }
     const root = document.documentElement;
@@ -1319,6 +1348,7 @@ function start(root: HTMLElement) {
         }));
       }
     }
+    renderAward(s);
     // "Make it yours": found, not pushed. Each item is closed until the listener opens it. Only for a passkey-only
     // listener whose player is open; a player already linked to a Stacks wallet has done this.
     const yours = document.querySelector('#ppp .ppp-yours') as HTMLDetailsElement | null;
@@ -1383,8 +1413,9 @@ function start(root: HTMLElement) {
       return row;
     }));
     albumView?.render(album ? albumInput(s, album, [...elsewhereLines, ...giftLines]) : null);
-    syncSkin(s, album);
     syncWelcome(s, !!album, giftScreen ? [...elsewhereLines, ...giftLines] : elsewhereLines, wMode);
+    syncAwardWalk(s, !!album || !!welcome?.showing());
+    syncSkin(s, album);
     if (restock.isOpen()) restock.refresh();
     syncFind();
     // A loaded album's songs stand in for "Your Station" too, counted against the player's own plays.
@@ -1408,6 +1439,125 @@ function start(root: HTMLElement) {
     return null;
   }
 
+  const awardPreview = (tier: Tier, number: number, player: string, need: number, name: string | null) =>
+    `/awards/${tier.id}#${new URLSearchParams({ n: String(number), a: player, ...(name ? { b: name } : {}), p: String(need), s: awardSeed(AWARDS_DROP, number, player) })}`;
+  function awardScreenFor(s: Snapshot): AwardScreen | null {
+    const a = s.award;
+    if (!a || !['ready', 'fund', 'over', 'link'].includes(s.step)) return null;
+    if (a.claimTx) return awardEngaged ? 'making' : null;
+    if (a.state === 'claimed') return awardEngaged && a.inscription !== undefined ? 'yours' : null;
+    if (a.state !== 'ready' || awardLater) return null;
+    // Linking the player (the "have" screen) moves the panel to its link step: stay on the walk-through for that.
+    if (s.step === 'link' && awardStage !== 'have') return null;
+    return awardStage === 'making' || awardStage === 'yours' ? 'ready' : awardStage;
+  }
+  function syncAwardWalk(s: Snapshot, otherActive: boolean) {
+    if (!awardWalk) return;
+    const a = s.award;
+    const tier = a?.cls && isTierId(a.cls) ? tierById(a.cls) : null;
+    const player = s.slot === 0 ? s.listening : s.root;
+    const screen = otherActive || !a || !tier || !player || a.number === undefined ? null : awardScreenFor(s);
+    if (!screen || !a || !tier || !player) { awardWalk.render(null, otherActive); return; }
+    // Just linked from the "have" screen: look for the name once, without another press.
+    if (screen === 'have' && s.linked && !awardLinkedSeen) { awardLinkedSeen = true; void ppp.awardRefresh(); }
+    const named = typeof a.name === 'string' && a.name ? a.name : null;
+    const status: HTMLElement[] = [];
+    if (s.error) status.push(el('p', s.error, 'ppp-warn'));
+    const go = (next: AwardScreen) => { awardStage = next; if (next === 'name') awardEngaged = true; render(ppp.snapshot()); };
+    awardWalk.render({
+      screen, tier, number: a.number!, need: a.need ?? 0, player, name: a.name, inscription: a.inscription,
+      art: screen === 'yours' && a.inscription !== undefined ? `/i/${a.inscription}` : awardPreview(tier, a.number!, player, a.need ?? 0, named),
+      claimLink: a.claimTx ? explorer(a.claimTx) : undefined,
+      status, asking: !!s.busy || s.armed, busy: !!s.busy,
+      main: s.main ? who(s.main) : null, canLink: s.step === 'link', linked: !!s.linked,
+      copyAddress: () => copyButton('award-player-address', 'Copy my player’s address', () => player, 'tiny', () => render(ppp.snapshot())),
+      go,
+      claim: (name) => { awardEngaged = true; void ppp.claimAward(name); },
+      refresh: () => void ppp.awardRefresh(),
+      connect: () => (document.getElementById('radio-wallet-connect') as HTMLButtonElement | null)?.click(),
+      link: () => void ppp.link(),
+      later: () => { awardLater = true; try { localStorage.setItem(AWARD_LATER, String(Date.now())); } catch { /* this visit only */ } render(ppp.snapshot()); },
+      done: () => { awardEngaged = false; awardStage = 'ready'; render(ppp.snapshot()); }
+    }, otherActive);
+  }
+
+  /**
+   * The player's Music Hero record, in the panel: how far along it is, the claim when it is ready (with a preview of
+   * exactly what will be made, and the name it would carry), and the record itself once it is theirs. Nothing here
+   * decides anything: the server says where the player stands and the wallet box checks the claim.
+   */
+  function renderAward(s: Snapshot) {
+    const box = document.querySelector('#ppp .ppp-award') as HTMLElement | null;
+    if (!box) return;
+    const a = s.award;
+    const player = s.slot === 0 ? s.listening : s.root;
+    const tier = a?.cls && isTierId(a.cls) ? tierById(a.cls) : null;
+    const show = !!a && !!tier && !!player && ['ready', 'fund', 'over'].includes(s.step) && !(a.state === 'unavailable' && a.number === undefined);
+    box.hidden = !show;
+    if (!show || !a || !tier || !player) { box.replaceChildren(); return; }
+    // Drawn again only when something it shows has changed, so the record's preview is not reloaded on every tick.
+    const sig = JSON.stringify([a, player, !!s.busy]);
+    if (box.getAttribute('data-sig') === sig) return;
+    box.setAttribute('data-sig', sig);
+    const head = (right: string) => { const h = el('p', '', 'ppp-award__h'); h.append(el('b', `${tier.mark} Music Hero award`), el('span', right)); return h; };
+    const no = `No. ${String(a.number ?? 0).padStart(4, '0')}`;
+    const art = (src: string) => { const w = el('div', '', 'ppp-award__art'); const f = document.createElement('iframe'); f.src = src; f.title = `${tier.name} record`; f.setAttribute('sandbox', 'allow-scripts'); f.setAttribute('loading', 'lazy'); w.append(f); return w; };
+    const kids: HTMLElement[] = [];
+    if (a.state === 'claimed') {
+      kids.push(head(`${tier.name} record · ${no}`));
+      if (a.inscription !== undefined) kids.push(art(`/i/${a.inscription}`));
+      kids.push(el('p', a.holds === false ? 'You sent this record to another wallet, so your player has gone back to plain. Whoever holds it keeps a record that still names you.'
+        : a.holds === null || a.holds === undefined ? `Yours: Xtrata inscription #${a.inscription}.` : `Yours for good: Xtrata inscription #${a.inscription}. It gives your player its ${tier.name} colours.`, a.holds === false ? 'ppp-mute' : 'ppp-ok'));
+      if (a.inscription !== undefined) { const p = el('p'); p.append(link('Open it full screen ↗', `/i/${a.inscription}`)); kids.push(p); }
+      if (a.sendTx) { const p = el('p', 'Your record is on its way to its new address. About a minute. ', 'ppp-cyan'); p.append(link('View', explorer(a.sendTx))); kids.push(p); }
+      else if (a.holds === true && a.inscription !== undefined) {
+        // Sending it on: found, not pushed. The full address is confirmed again inside the wallet box before anything is signed.
+        const send = el('details', '', 'ppp-award__send');
+        const to = document.createElement('input');
+        to.type = 'text'; to.placeholder = 'SP… address to send it to'; to.autocomplete = 'off'; to.spellcheck = false; to.setAttribute('aria-label', 'Address to send your record to');
+        const go = button('Send my record…', () => void ppp.sendAward(to.value), '');
+        go.disabled = !!s.busy;
+        send.append(el('summary', 'Send this record to someone'),
+          el('p', `It is yours to give or sell. Whoever holds it keeps a record that still names you, and your player goes back to plain without it. This cannot be undone.`, 'ppp-mute'), to, go);
+        kids.push(send);
+      }
+    } else if (a.claimTx) {
+      kids.push(head(`${tier.name} record · ${no}`));
+      const p = el('p', 'Your record is being made: written to Xtrata with your plaque on it. About a minute. ', 'ppp-cyan'); p.append(link('View', explorer(a.claimTx)));
+      kids.push(p);
+    } else if (a.state === 'ready') {
+      kids.push(head(`${tier.name} record · ${no}`));
+      const named = typeof a.name === 'string' && a.name ? a.name : null;
+      const q = new URLSearchParams({ n: String(a.number), a: player, ...(named ? { b: named } : {}), p: String(a.need), s: awardSeed(AWARDS_DROP, a.number!, player) });
+      kids.push(art(`/awards/${tier.id}#${q}`));
+      kids.push(el('p', `Your ${tier.name} record is ready. You have paid artists for ${a.need?.toLocaleString()} plays: that makes you an Xtrata Music Hero.`));
+      const row = el('div', '', 'ppp-award__row');
+      if (named) {
+        kids.push(el('p', `Its plaque will carry ${named} beside your player’s address. What is on it cannot be changed afterwards.`, 'ppp-mute'));
+        row.append(button('Claim my record', () => { awardEngaged = true; void ppp.claimAward('auto'); }, 'primary'), button('Use my address only', () => { awardEngaged = true; void ppp.claimAward('none'); }, 'quiet'));
+      } else if (a.name === null) {
+        kids.push(el('p', 'Its plaque will carry your player’s address. Want a .btc name on it? Link a wallet that has one (see “Make it yours” below), then check again. What is on it cannot be changed afterwards.', 'ppp-mute'));
+        row.append(button('Claim my record', () => { awardEngaged = true; void ppp.claimAward('none'); }, 'primary'), button('Check for a name again', () => void ppp.awardRefresh(), 'quiet'));
+      } else {
+        kids.push(el('p', 'Could not check for a .btc name just now. Check again, or claim with your player’s address alone.', 'ppp-warn'));
+        row.append(button('Check for a name again', () => void ppp.awardRefresh(), 'primary'), button('Claim with my address only', () => void ppp.claimAward('none'), 'quiet'));
+      }
+      row.querySelectorAll('button').forEach((b) => { (b as HTMLButtonElement).disabled = !!s.busy; });
+      kids.push(row, el('p', 'Free to claim: your player pays only a tiny network fee.', 'ppp-mute'));
+    } else if (a.state === 'earning' && a.have !== undefined && a.need) {
+      kids.push(head(`${a.have.toLocaleString()} of ${a.need.toLocaleString()} paid plays`));
+      const bar = el('div', '', 'ppp-award__bar'); const fill = document.createElement('i'); fill.style.width = `${Math.min(100, Math.round((a.have / a.need) * 100))}%`; bar.append(fill);
+      const left = a.need - a.have;
+      kids.push(bar, el('p', `${left.toLocaleString()} more ${left === 1 ? 'play' : 'plays'} and your ${tier.name} record is yours to claim.`, 'ppp-mute'));
+    } else {
+      kids.push(head(`${tier.name} record · ${no}`));
+      kids.push(el('p', a.state === 'paused' ? 'Claiming is paused for a moment. Your record is safe: try again later.'
+        : a.state === 'class-full' || a.state === 'not-open' ? 'Claiming is not open for this record right now.'
+          : 'Can’t check your award right now. Your plays still count: this updates by itself.', 'ppp-mute'));
+    }
+    box.replaceChildren(...kids);
+  }
+
   /**
    * The album's cover, name and giver in a strip right above the wallet box while the box asks for a tap, so the
    * passkey step still looks like the album being opened. The box itself loads nothing from outside (by design): this
@@ -1416,6 +1566,15 @@ function start(root: HTMLElement) {
   function syncSkin(s: Snapshot, a: AlbumState | null) {
     const skinEl = document.querySelector<HTMLElement>('.ppp-skin');
     if (!skinEl) return;
+    // The award walk-through has its own strip: the class mark, the record and whose it is.
+    if (!a && awardWalk?.showing() && s.award?.cls && isTierId(s.award.cls) && (!!s.busy || s.armed)) {
+      const t = tierById(s.award.cls);
+      const text = el('span', '', 'ppp-skin__t');
+      text.append(el('b', `${t.name} record · No. ${String(s.award.number ?? 0).padStart(4, '0')}`), el('span', 'Xtrata Music Hero'));
+      skinEl.hidden = false;
+      skinEl.replaceChildren(el('span', t.mark, 'ppp-skin__art ppp-skin__art--none'), text);
+      return;
+    }
     const on = !!a && (!!s.busy || s.armed);
     skinEl.hidden = !on;
     if (!on || !a) { skinEl.replaceChildren(); return; }
