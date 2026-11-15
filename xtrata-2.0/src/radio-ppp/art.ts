@@ -136,6 +136,15 @@ export function thumb(id: string, known?: string): string {
   return '';
 }
 
+/** What is already known of a song's artwork, without asking for it: the image, '' (none of its own) or null (not looked at yet). */
+export function peek(id: string): string | null {
+  if (thumbs.has(id)) return thumbs.get(id)!;
+  const kept = store(id);
+  if (kept === null || kept === undefined) return null;
+  const url = kept === NONE ? '' : kept;
+  thumbs.set(id, url);
+  return url;
+}
 
 // An album's cover inscription: an image is used as it is; a page gives its first embedded image. Asked for once and
 // shared by every screen that shows the album (its own page, the welcome screens, the strip above the wallet box).

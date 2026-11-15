@@ -14,6 +14,7 @@
 import { copyButton } from './feedback';
 import { isPlayerId, listedTracks, playerHash, validatePlayer, type PlayerView } from '../lib/listening-wallet/gift-players';
 import { releaseData, type ShelfAction } from '../lib/music-releases/release';
+import type { Audition } from './audition';
 
 export interface ReleaseView extends PlayerView { artist: string; added: number }
 export interface ShelfItem extends ReleaseView { hidden: boolean }
@@ -30,6 +31,13 @@ export interface ReleasesDeps {
   /** Start playing this album in the player (with the player's own plays). */
   open(album: PlayerView): void;
   who(address?: string): string;
+  /**
+   * Small artwork. `song`: a song's own image, '' when it has none, null when not looked at yet (`ask` starts
+   * looking, one song at a time in the background). `cover`: an album cover inscription's image, '' until known.
+   */
+  art: { song(id: number, ask: boolean): string | null; cover(id: number | null | undefined): string };
+  /** Hear one of your own songs before releasing it. Nothing is paid or counted. */
+  audition: Audition;
   changed(): void;
   store: { get(key: string): string | null; set(key: string, value: string | null): void };
   now(): number;
@@ -39,6 +47,14 @@ const el = (tag: string, text = '', cls = '') => { const n = document.createElem
 const button = (label: string, run: () => void, cls = '') => { const b = el('button', label, cls) as HTMLButtonElement; b.type = 'button'; b.onclick = run; return b; };
 const post = (body: unknown): RequestInit => ({ method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
 const songsLine = (p: PlayerView) => { const n = listedTracks(p).length; return `${n} ${n === 1 ? 'song' : 'songs'}`; };
+/** A small square: the image, or what stands in for it (a number, a disc) over the album's cover when there is one. */
+function square(url: string, blank: string, under = '', cls = '') {
+  const s = el('span', '', 'ppp-rel-art' + (url ? '' : ' is-blank') + (cls ? ' ' + cls : ''));
+  const src = url || under;
+  if (src) { const img = document.createElement('img'); img.src = src; img.alt = ''; img.decoding = 'async'; s.append(img); }
+  if (!url) s.append(el('span', blank));
+  return s;
+}
 const isView = (v: any): v is ReleaseView => !!v && isPlayerId(v.id) && typeof v.title === 'string' && Array.isArray(v.tracks) && v.tracks.length > 0 && typeof v.artist === 'string';
 
 export function createReleases(deps: ReleasesDeps) {
@@ -103,6 +119,17 @@ export function createReleases(deps: ReleasesDeps) {
   /** The albums this player has added and not hidden, to show with the albums a player comes loaded with. */
   const albums = (): PlayerView[] => (enabled ? shelfNow().filter((a) => !a.hidden) : []);
 
+  /** The songs in play order, each with its own artwork, or its number over the album's cover when it has none. */
+  function songList(songs: { id: number; title: string }[], cover: string) {
+    const ol = el('ol', '', 'ppp-rel-songs');
+    songs.forEach((t, n) => {
+      const li = el('li');
+      li.append(square(deps.art.song(t.id, true) || '', String(n + 1), cover), el('span', t.title));
+      ol.append(li);
+    });
+    return ol;
+  }
+
   /** The release a link points at: what it is, and one button. Empty when there is none, or it was put away. */
   function banner(): HTMLElement[] {
     if (!enabled || !incoming || incoming.dismissed) return [];
@@ -111,7 +138,11 @@ export function createReleases(deps: ReleasesDeps) {
     const box = el('div', '', 'ppp-release-in');
     const head = el('p', '', 'ppp-release-in__h');
     head.append(el('b', v.title), el('span', `${v.subtitle || deps.who(v.artist)} · ${songsLine(v)}`));
-    box.append(head);
+    const tracks = listedTracks(v);
+    const cover = deps.art.cover(v.cover) || (v.cover ? '' : tracks[0] ? deps.art.song(tracks[0].id, true) || '' : '');
+    const top = el('div', '', 'ppp-rel-top');
+    top.append(square(cover, '💿', '', 'is-cover'), head);
+    box.append(top, songList(tracks.map((t) => ({ id: t.id, title: t.title || `#${t.id}` })), deps.art.cover(v.cover)));
     box.append(el('p', `Released by ${deps.who(v.artist)}. ${v.added === 1 ? '1 player has' : `${v.added.toLocaleString()} players have`} added it.`, 'ppp-mute'));
     const p = deps.player();
     const have = shelfNow().find((a) => a.id === v.id);
@@ -193,18 +224,50 @@ export function createReleases(deps: ReleasesDeps) {
       working = 'Releasing…'; deps.changed();
       const r = await deps.json('/radio/release/create', post({ definition, request, signature }));
       note = `${r.existing ? 'Already released' : 'Released'} ✓ “${r.title}”. Its link is below.`;
-      picked = []; titleIn.value = ''; coverIn.value = '';
+      picked = []; titleIn.value = ''; coverIn.value = ''; deps.audition.stop();
       loadMade(main, true);
     } catch (e) { note = (e as Error).message || 'Not released.'; }
     finally { working = ''; deps.changed(); }
   }
 
+  /** Stop a song that is being listened to, after the current drawing is done (stopping redraws). */
+  const later = () => { queueMicrotask(() => deps.audition.stop()); };
+  /** The release as listeners will see it: cover, title, and each song with its artwork or its placeholder. */
+  const heard = new Set<number>();
+  function preview(songs: Song[]) {
+    const chosen = picked.map((id) => songs.find((s) => s.id === id)).filter((s): s is Song => !!s);
+    const raw = coverIn.value.trim().replace(/^#/, '');
+    const coverId = /^\d{1,9}$/.test(raw) ? Number(raw) : null;
+    const coverUrl = deps.art.cover(coverId);
+    const first = chosen[0] ? deps.art.song(chosen[0].id, true) : null;
+    const box = el('div', '', 'ppp-release-preview');
+    box.append(el('p', 'How it will look', 'ppp-featured__h'));
+    const head = el('p', '', 'ppp-release-in__h');
+    const t = el('b', titleIn.value.trim() || 'Untitled');
+    const by = el('span', `${byIn.value.trim() || deps.who(deps.main())} · ${chosen.length} ${chosen.length === 1 ? 'song' : 'songs'}`);
+    head.append(t, by);
+    const top = el('div', '', 'ppp-rel-top');
+    top.append(square(coverId ? coverUrl : first || '', '💿', '', 'is-cover'), head);
+    box.append(top, songList(chosen.map((s) => ({ id: s.id, title: s.title })), coverUrl));
+    const missing = chosen.filter((s) => deps.art.song(s.id, true) === null).length;
+    const lines: string[] = [];
+    if (coverId && !coverUrl) lines.push(`Looking for an image in #${coverId}… If none appears, that inscription is not a picture.`);
+    if (missing) lines.push(`Finding artwork for ${missing} ${missing === 1 ? 'song' : 'songs'}…`);
+    if (!missing && chosen.some((s) => deps.art.song(s.id, false) === '')) lines.push(`A numbered square is a song with no artwork of its own${coverUrl ? ': it shows the cover, dimmed' : ''}.`);
+    for (const l of lines) box.append(el('p', l, 'ppp-mute'));
+    // Typing redraws these two lines only (the whole section is not rebuilt on every key).
+    titleIn.oninput = () => { t.textContent = titleIn.value.trim() || 'Untitled'; };
+    byIn.oninput = () => { by.textContent = `${byIn.value.trim() || deps.who(deps.main())} · ${chosen.length} ${chosen.length === 1 ? 'song' : 'songs'}`; };
+    coverIn.onchange = () => deps.changed();
+    return box;
+  }
+
   /** The "Release music" section. Null unless releases are open and a Stacks wallet is connected. */
   function fold(): HTMLElement[] | null {
     const main = deps.main();
-    if (!enabled || !main) return null;
+    if (!enabled || !main) { if (mine) { mine = null; picked = []; later(); } return null; }
     const parts: HTMLElement[] = [el('p', 'Put your own songs out as a single, an EP or an album. Listeners add it to their player, and every play pays you. Nothing to pay, and no money passes through Xtrata.', 'ppp-mute')];
-    if (mine?.for !== main) { mine = null; picked = []; }
+    if (mine && mine.for !== main) { mine = null; picked = []; heard.clear(); later(); }
     if (!mine) parts.push(button('Show the songs in my wallet', () => loadSongs(main), 'primary'));
     else if (mine.loading) parts.push(el('p', 'Reading your wallet…', 'ppp-cyan'));
     else if (mine.error) parts.push(el('p', mine.error, 'ppp-warn'), button('Try again', () => loadSongs(main)));
@@ -214,10 +277,19 @@ export function createReleases(deps: ReleasesDeps) {
       const list = el('div', '', 'ppp-release-songs');
       for (const s of mine.songs!) {
         const at = picked.indexOf(s.id);
-        const b = button('', () => { picked = at >= 0 ? picked.filter((x) => x !== s.id) : [...picked, s.id]; deps.changed(); }, 'ppp-release-song' + (at >= 0 ? ' is-on' : ''));
-        b.setAttribute('aria-pressed', String(at >= 0));
-        b.append(el('i', at >= 0 ? String(at + 1) : '+'), el('b', s.title), el('span', `${s.artist ? s.artist + ' · ' : ''}#${s.id}`));
-        list.append(b);
+        const row = el('div', '', 'ppp-release-song' + (at >= 0 ? ' is-on' : ''));
+        const hear = deps.audition.state(s.id);
+        if (hear !== 'idle') heard.add(s.id);
+        const play = button(hear === 'playing' ? '❚❚' : hear === 'loading' ? '…' : '▶', () => deps.audition.toggle(s.id), 'ppp-release-hear' + (hear === 'playing' ? ' is-on' : ''));
+        play.setAttribute('aria-label', hear === 'playing' ? `Stop ${s.title}` : `Listen to ${s.title}`);
+        play.title = hear === 'error' ? 'This song could not be played just now' : hear === 'playing' ? 'Stop' : 'Listen (free: it is your own song)';
+        // Artwork is looked up for the songs you pick or listen to (a song is a big file); others show it if already known.
+        const art = deps.art.song(s.id, at >= 0 || heard.has(s.id));
+        const pick = button('', () => { picked = at >= 0 ? picked.filter((x) => x !== s.id) : [...picked, s.id]; deps.changed(); }, 'ppp-release-pick');
+        pick.setAttribute('aria-pressed', String(at >= 0));
+        pick.append(el('i', at >= 0 ? String(at + 1) : '+'), el('b', s.title), el('span', hear === 'error' ? 'could not play' : `${s.artist ? s.artist + ' · ' : ''}#${s.id}`, hear === 'error' ? 'ppp-warn' : ''));
+        row.append(play, square(art || '', art === '' ? '♪' : '', ''), pick);
+        list.append(row);
       }
       parts.push(list);
       if (mine.more) parts.push(el('p', 'This wallet holds a lot: only the first few hundred inscriptions were looked through.', 'ppp-mute'));
@@ -225,7 +297,9 @@ export function createReleases(deps: ReleasesDeps) {
       const kind = picked.length === 0 ? 'release' : picked.length === 1 ? 'single' : picked.length <= 6 ? 'EP' : 'album';
       const go = button(picked.length ? `Sign and release this ${kind} · ${picked.length} ${picked.length === 1 ? 'song' : 'songs'}` : 'Pick at least one song', () => void release(main), 'primary');
       go.disabled = !picked.length || !!working;
-      parts.push(titleIn, byIn, coverIn, go);
+      parts.push(titleIn, byIn, coverIn);
+      if (picked.length) parts.push(preview(mine.songs!));
+      parts.push(go);
     }
     if (working) parts.push(el('p', working, 'ppp-cyan'));
     if (note && !incoming) parts.push(el('p', note, /✓/.test(note) ? 'ppp-ok' : 'ppp-warn'));
@@ -243,5 +317,7 @@ export function createReleases(deps: ReleasesDeps) {
     return parts;
   }
 
-  return { sync, albums, banner, manage, fold, enabled: () => enabled === true };
+  /** True while a release card, or the artist's picker, is on screen: found artwork should be drawn. */
+  const wantsArt = () => enabled === true && ((!!incoming?.view && !incoming.dismissed) || (!!mine?.songs && !!deps.main()));
+  return { sync, albums, banner, manage, fold, wantsArt, enabled: () => enabled === true };
 }

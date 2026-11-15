@@ -11,7 +11,7 @@ const flush = async () => { for (let i = 0; i < 6; i++) await Promise.resolve();
 function setup(opts: { enabled?: boolean; url?: string; main?: string; player?: { address?: string; unlocked: boolean }; shelf?: any[]; songs?: any } = {}) {
   window.history.replaceState(null, '', opts.url ?? '/radio');
   const store = new Map<string, string>();
-  const world = { shelf: opts.shelf ?? [] as any[], player: opts.player ?? { address: ME, unlocked: true }, main: opts.main, posts: [] as [string, any][], signed: [] as [string, string | undefined][], opened: [] as string[], changes: 0, failShelf: false };
+  const world = { shelf: opts.shelf ?? [] as any[], player: opts.player ?? { address: ME, unlocked: true }, main: opts.main, posts: [] as [string, any][], signed: [] as [string, string | undefined][], opened: [] as string[], changes: 0, failShelf: false, art: new Map<number, string>(), artAsked: new Set<number>(), artSettled: false, covers: new Map<number, string>(), hearing: null as null | { id: number; state: 'loading' | 'playing' | 'error' }, toggled: [] as number[], stops: 0 };
   const deps: ReleasesDeps = {
     json: vi.fn(async (url: string, init?: RequestInit) => {
       const body = init?.body ? JSON.parse(String(init.body)) : undefined;
@@ -37,6 +37,8 @@ function setup(opts: { enabled?: boolean; url?: string; main?: string; player?: 
     player: () => world.player,
     open: (a) => { world.opened.push(a.id); },
     who: (a) => (a === ARTIST ? 'jim.btc' : String(a).slice(0, 6)),
+    art: { song: (id, ask) => { if (ask) world.artAsked.add(id); return world.art.has(id) ? world.art.get(id)! : world.artAsked.has(id) && world.artSettled ? '' : null; }, cover: (id) => (id ? world.covers.get(id) ?? '' : '') },
+    audition: { state: (id) => (world.hearing?.id === id ? world.hearing.state : 'idle'), toggle: (id) => { world.hearing = world.hearing?.id === id ? null : { id, state: 'playing' }; world.toggled.push(id); deps.changed(); }, stop: () => { world.stops++; world.hearing = null; } },
     changed: () => { world.changes++; },
     store: { get: (k) => store.get(k) ?? null, set: (k, v) => { if (v === null) store.delete(k); else store.set(k, v); } },
     now: () => Date.now()
@@ -158,5 +160,86 @@ describe('releases on the radio page', () => {
     s.press(s.r.fold(), /Show the songs/); await flush();
     expect(s.text(s.r.fold())).toContain('Could not read what this wallet holds right now.');
     expect(s.text(s.r.fold())).not.toContain('No songs found');
+  });
+});
+
+describe('hearing and seeing a release before it is made', () => {
+  const rows = (parts: HTMLElement[] | null) => [...(parts ?? []).flatMap((p) => [...p.querySelectorAll('.ppp-release-song')])] as HTMLElement[];
+  const open = async () => { const s = setup({ main: ARTIST }); await s.ready(); s.press(s.r.fold(), /Show the songs/); await flush(); return s; };
+
+  it('every song has a listen button that never picks the song, and a pick button that never plays it', async () => {
+    const s = await open();
+    let r = rows(s.r.fold());
+    expect(r).toHaveLength(2);
+    (r[0].querySelector('.ppp-release-hear') as HTMLButtonElement).click();
+    expect(s.world.toggled).toEqual([315]);
+    r = rows(s.r.fold());
+    expect(r[0].classList.contains('is-on')).toBe(false);                       // listening is not choosing
+    expect(r[0].querySelector('.ppp-release-hear')!.getAttribute('aria-label')).toBe('Stop Entertainment');
+    expect(r[1].querySelector('.ppp-release-hear')!.getAttribute('aria-label')).toBe('Listen to Russian Rampage');
+    (r[1].querySelector('.ppp-release-pick') as HTMLButtonElement).click();
+    expect(s.world.toggled).toEqual([315]);                                     // choosing is not listening
+    expect(rows(s.r.fold())[1].classList.contains('is-on')).toBe(true);
+    expect(s.world.posts.filter(([u]) => u !== '/radio/release/shelf')).toHaveLength(0); // nothing released, nothing paid
+  });
+
+  it('says so on the row when a song cannot be played', async () => {
+    const s = await open();
+    s.world.hearing = { id: 319, state: 'error' };
+    expect(rows(s.r.fold())[1].textContent).toContain('could not play');
+  });
+
+  it('only looks up artwork for songs that are picked or listened to', async () => {
+    const s = await open();
+    s.r.fold();
+    expect([...s.world.artAsked]).toEqual([]);
+    (rows(s.r.fold())[1].querySelector('.ppp-release-pick') as HTMLButtonElement).click();
+    s.r.fold();
+    expect([...s.world.artAsked]).toEqual([319]);
+  });
+
+  it('previews the release as listeners will see it: cover, title, and each song with its artwork or its number', async () => {
+    const s = await open();
+    s.world.art.set(315, 'data:image/jpeg;base64,AAAA');
+    for (const r of rows(s.r.fold())) { (r.querySelector('.ppp-release-pick') as HTMLButtonElement).click(); s.r.fold(); }
+    let parts = s.r.fold()!;
+    let pre = parts.find((p) => p.classList.contains('ppp-release-preview'))!;
+    expect(pre.textContent).toContain('Untitled');
+    expect(pre.textContent).toContain('Finding artwork for 1 song');
+    // no cover given: the first song's artwork is the cover
+    expect(pre.querySelector('.is-cover img')!.getAttribute('src')).toBe('data:image/jpeg;base64,AAAA');
+    s.world.artSettled = true;                                                 // 319 turns out to have no artwork
+    (parts.find((p) => p.matches('input[aria-label="Cover inscription number"]')) as HTMLInputElement).value = '77';
+    s.world.covers.set(77, '/inscription/77');
+    parts = s.r.fold()!;
+    pre = parts.find((p) => p.classList.contains('ppp-release-preview'))!;
+    expect(pre.querySelector('.is-cover img')!.getAttribute('src')).toBe('/inscription/77');
+    const songs = [...pre.querySelectorAll('.ppp-rel-songs li')];
+    expect(songs.map((li) => li.textContent)).toEqual(['Entertainment', '2Russian Rampage']);
+    expect(songs[0].querySelector('.ppp-rel-art')!.classList.contains('is-blank')).toBe(false);
+    expect(songs[1].querySelector('.ppp-rel-art')!.classList.contains('is-blank')).toBe(true);
+    expect(songs[1].querySelector('img')!.getAttribute('src')).toBe('/inscription/77'); // the cover, dimmed, behind its number
+    expect(pre.textContent).toContain('no artwork of its own');
+    // typing the title updates the preview without rebuilding the section
+    const title = parts.find((p) => p.matches('input[aria-label="Release title"]')) as HTMLInputElement;
+    const before = s.world.changes;
+    title.value = 'Reload'; title.dispatchEvent(new Event('input'));
+    expect(pre.textContent).toContain('Reload');
+    expect(s.world.changes).toBe(before);
+  });
+
+  it('there is no preview before a song is picked', async () => {
+    const s = await open();
+    expect(s.r.fold()!.some((p) => p.classList.contains('ppp-release-preview'))).toBe(false);
+  });
+
+  it('a release link shows its cover and its songs with their artwork', async () => {
+    const s = setup({ url: '/radio?release=' + REL });
+    s.world.art.set(315, 'data:image/jpeg;base64,BBBB');
+    await s.ready();
+    const card = s.r.banner()[0];
+    expect(card.querySelector('.is-cover img')!.getAttribute('src')).toBe('data:image/jpeg;base64,BBBB');
+    expect([...card.querySelectorAll('.ppp-rel-songs li')].map((li) => li.textContent)).toEqual(['Entertainment', '2Russian Rampage']);
+    expect(card.querySelector('.ppp-release-hear')).toBeNull();                  // listeners hear songs by playing them
   });
 });
