@@ -181,6 +181,121 @@
   footer.foot{margin-top:40px;border-top:1px solid var(--line);padding-top:16px;max-width:760px}
   footer.foot ul{padding-left:20px;margin:8px 0}
   footer.foot li{margin:4px 0}
+
+  /* ===== Xtrata skin (2026-11): colourful, frozen centred header ===== */
+  :root{--bg:#070912;--panel:#10142a;--panel2:#171d38;--line:#2b3358;--ink:#f4f6ff;--mut:#aab3d0;
+    --acc:#b9a2ff;--cyan:#7ee2c7;--good:#5ef0c0;--warn:#f6cf68;--orange:#ffa24d;--bad:#ff7a8c;--forev:#7ee2ff;
+    --violet:#c8b6ff;--teal:#7ee2c7;--amber:#f0a35b;--pink:#ffb3df;--lime:#b9ef77}
+  html{scroll-padding-top:150px}
+  body{background:
+    radial-gradient(900px 520px at 6% -8%,rgba(200,182,255,.24),transparent 62%),
+    radial-gradient(820px 500px at 98% 0%,rgba(126,226,199,.17),transparent 62%),
+    radial-gradient(1000px 620px at 50% 112%,rgba(240,163,91,.14),transparent 62%),
+    var(--bg);background-attachment:fixed}
+  a{color:var(--teal)}
+
+  /* frozen header: Xtrata left, centred lockup + headline, address right */
+  header.top{position:sticky;top:0;z-index:50;display:grid;grid-template-columns:minmax(120px,1fr) minmax(0,auto) minmax(120px,1fr);align-items:center;gap:16px;
+    padding:12px 22px 14px;border-bottom:1px solid rgba(200,182,255,.28);background:rgba(8,10,24,.86);
+    -webkit-backdrop-filter:blur(14px) saturate(1.3);backdrop-filter:blur(14px) saturate(1.3);box-shadow:0 10px 30px -18px rgba(0,0,0,.9)}
+  header.top::after{content:"";position:absolute;left:0;right:0;bottom:-1px;height:2px;background:linear-gradient(90deg,var(--violet),var(--teal),var(--lime),var(--amber),var(--pink))}
+  header.top .logo{justify-self:start;font-size:20px}
+  .brand{text-align:center;min-width:0}
+  .brand__eyebrow{display:flex;align-items:center;justify-content:center;gap:9px;margin:0;font:800 12px/1.2 var(--mono);letter-spacing:.16em;text-transform:uppercase;
+    background:linear-gradient(90deg,var(--violet),var(--teal) 55%,var(--lime));-webkit-background-clip:text;background-clip:text;color:transparent}
+  .brand__eyebrow img{display:block;border-radius:6px;box-shadow:0 0 0 1px rgba(255,255,255,.12),0 0 18px rgba(200,182,255,.45)}
+  .brand__eyebrow span{-webkit-text-fill-color:transparent}
+  .brand__head{margin:6px 0 0;font-size:clamp(17px,2.3vw,25px);line-height:1.15;font-weight:800;letter-spacing:-.01em;color:var(--ink)}
+  .urlpill{justify-self:end;font:700 12px var(--mono);color:var(--mut);border:1px solid var(--line);border-radius:999px;padding:5px 12px;white-space:nowrap;background:rgba(255,255,255,.03)}
+  @media (max-width:760px){
+    header.top{grid-template-columns:1fr;padding:9px 14px 11px;gap:0}
+    header.top .logo,.urlpill{display:none}
+    .brand__eyebrow{font-size:10.5px;letter-spacing:.12em}
+    .brand__head{font-size:17px;margin-top:4px}
+    html{scroll-padding-top:100px}
+  }
+  .results{scroll-margin-top:150px}
+  @media (max-width:760px){.results{scroll-margin-top:100px}}
+
+  main{padding-top:30px}
+  .lead{max-width:760px;margin:0 auto 4px;text-align:center}
+  .lead p{margin:0;font-size:17px;color:var(--mut)}
+  .lead p strong{color:var(--ink)}
+
+  /* the finder card */
+  .finder{max-width:800px;margin:20px auto 0;padding:18px 18px 12px;border-radius:20px;border:1px solid transparent;
+    background:linear-gradient(var(--panel),var(--panel)) padding-box,linear-gradient(120deg,var(--violet),var(--teal) 50%,var(--amber)) border-box;
+    box-shadow:0 24px 60px -30px rgba(200,182,255,.5)}
+  .finder .modes{margin:0 0 12px;justify-content:center}
+  .finder form.find{margin:0;max-width:none}
+  .finder .hint{max-width:none;margin:10px 2px 4px;font-size:13px}
+  button.mode{border-color:var(--line);background:var(--panel2);color:var(--ink)}
+  button.mode[aria-pressed=true]{border-color:var(--violet);background:linear-gradient(120deg,rgba(200,182,255,.28),rgba(126,226,199,.2));color:#fff}
+  form.find input[type=text]{background:#0a0d20;border-color:#39426b;border-radius:12px}
+  form.find input[type=text]:focus{border-color:var(--teal);box-shadow:0 0 0 3px rgba(126,226,199,.22);outline:none}
+  button{border:0;background:linear-gradient(120deg,var(--violet),var(--teal));color:#07101a;font-weight:800;border-radius:12px}
+  #go{box-shadow:0 8px 22px -10px rgba(126,226,199,.7)}
+  button:hover:not(:disabled){filter:brightness(1.08)}
+  button.quiet{background:transparent;color:var(--ink);border:1px solid var(--line);box-shadow:none}
+  button.done{border:1px solid var(--good);color:var(--good)}
+
+  /* three steps */
+  .steps{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;max-width:800px;margin:16px auto 0;padding:0;list-style:none}
+  @media (max-width:640px){.steps{grid-template-columns:1fr}}
+  .steps li{display:flex;gap:11px;align-items:flex-start;padding:11px 13px;border-radius:14px;background:rgba(255,255,255,.035);border:1px solid var(--line);font-size:14px;line-height:1.4;color:var(--mut)}
+  .steps b{display:block;color:var(--ink);font-size:15px;margin-bottom:1px}
+  .steps .n{flex:none;width:28px;height:28px;border-radius:50%;display:grid;place-items:center;font:800 14px var(--mono);color:#07101a}
+  .steps li:nth-child(1) .n{background:var(--violet)}.steps li:nth-child(2) .n{background:var(--teal)}.steps li:nth-child(3) .n{background:var(--amber)}
+
+  .box{border-radius:14px;background:var(--panel);max-width:800px;margin-left:auto;margin-right:auto}
+  .box.info{border-color:#4a4f8f}
+  .box.warn{border-color:#8a6e22;background:#1a1608}
+  .box.error{border-color:#8a3040;background:#1d0b12}
+  .results{max-width:none}
+
+  /* totals */
+  .tile{border-radius:14px;border-top:3px solid var(--violet);background:linear-gradient(180deg,rgba(200,182,255,.1),var(--panel) 60%)}
+  .tile .n{font-size:30px}
+  .tile.t-rep{border-top-color:var(--teal);background:linear-gradient(180deg,rgba(126,226,199,.1),var(--panel) 60%)}.tile.t-rep .n{color:var(--teal)}
+  .tile.t-none{border-top-color:#7b84a8;background:linear-gradient(180deg,rgba(255,255,255,.05),var(--panel) 60%)}
+  .tile.t-attn{border-color:#8a3040;border-top-color:var(--bad);background:linear-gradient(180deg,rgba(255,122,140,.14),var(--panel) 60%)}
+  .bar{height:12px}
+  .bar .b-rep{background:linear-gradient(90deg,var(--violet),var(--teal))}
+  .legend{font-size:13px}
+
+  /* filters */
+  .chip-btn,.controls select,.controls input[type=search]{background:var(--panel2);border-color:var(--line)}
+  .chip-btn[aria-pressed=true]{border-color:var(--violet);background:linear-gradient(120deg,rgba(200,182,255,.26),rgba(126,226,199,.16))}
+  .chip-btn.twin[aria-pressed=true]{border-color:var(--forev)}
+
+  /* rows: a tinted left edge and chip per status */
+  .row{background:var(--panel);border-radius:12px;border-left-width:6px}
+  .rowsum:hover{background:#171d3a}
+  .row.s-on_chain,.row.s-solid{background:linear-gradient(90deg,rgba(94,240,192,.1),var(--panel) 40%)}
+  .row.s-twinned{background:linear-gradient(90deg,rgba(126,226,255,.12),var(--panel) 40%)}
+  .row.s-one_host{background:linear-gradient(90deg,rgba(246,207,104,.1),var(--panel) 40%)}
+  .row.s-marketplace_broken{background:linear-gradient(90deg,rgba(255,162,77,.12),var(--panel) 40%)}
+  .row.s-marketplace_only,.row.s-not_found{background:linear-gradient(90deg,rgba(255,122,140,.13),var(--panel) 40%)}
+  .row.s-on_chain .chip,.row.s-solid .chip{border-color:rgba(94,240,192,.5);background:rgba(94,240,192,.12)}
+  .row.s-twinned .chip{border-color:rgba(126,226,255,.5);background:rgba(126,226,255,.12)}
+  .row.s-one_host .chip{border-color:rgba(246,207,104,.5);background:rgba(246,207,104,.12)}
+  .row.s-marketplace_broken .chip{border-color:rgba(255,162,77,.55);background:rgba(255,162,77,.13)}
+  .row.s-marketplace_only .chip,.row.s-not_found .chip{border-color:rgba(255,122,140,.55);background:rgba(255,122,140,.13)}
+  .rowbody{border-top-color:var(--line)}
+  .cols section{background:rgba(255,255,255,.045);border:1px solid var(--line)}
+  .headline{font-size:17px}
+  .tag.live{color:var(--teal);border-color:rgba(126,226,199,.45)}
+  .twinnote{border-color:rgba(126,226,255,.5);background:rgba(126,226,255,.08)}
+  .helperbox{border-color:rgba(200,182,255,.4);background:rgba(200,182,255,.08)}
+  .hbtn{border:1px solid var(--violet);background:transparent;color:var(--violet);box-shadow:none}
+  .hbtn:hover{background:rgba(200,182,255,.14)}
+  .hbtn.big{background:linear-gradient(120deg,var(--violet),var(--teal));color:#07101a;border:0}
+  .hbtn.done,.hbtn.big.done{background:transparent;border:1px solid var(--good);color:var(--good)}
+  .hbtn.open,.hbtn.big.open{background:transparent;border:1px solid var(--teal);color:var(--teal)}
+
+  @media (max-width:520px){.finder form.find button{flex:1 1 100%}}
+  footer.foot{max-width:800px;margin:40px auto 0;border-top:1px solid var(--line)}
+  .ask input[type=text],.ask select,.ask textarea{background:#0a0d20}
 </style>
 <link rel="canonical" href="https://xtrata.xyz/nftcheck/">
 <meta property="og:type" content="website">
@@ -199,13 +314,19 @@
 <meta name="twitter:image:alt" content="NFT Check: where does your NFT’s art actually live?">
 </head>
 <body>
-<header class="top"><a class="logo" href="/" aria-label="Xtrata"><img src="/nftcheck/xtrata-x.webp" alt="" width="28" height="28" /><span aria-hidden="true">trata</span></a><span class="sub">NFT preservation checker</span></header>
+<header class="top">
+  <a class="logo" href="/" aria-label="Xtrata home"><img src="/nftcheck/xtrata-x.webp" alt="" width="28" height="28" /><span aria-hidden="true">trata</span></a>
+  <div class="brand">
+    <p class="brand__eyebrow"><img src="/nftcheck/xtrata-x.webp" alt="" width="26" height="26" /><span>Xtrata NFT Preservation Checker</span></p>
+    <h1 class="brand__head">Where does your NFT's art actually live?</h1>
+  </div>
+  <span class="urlpill">xtrata.xyz/nftcheck</span>
+</header>
 <main>
   <div class="lead">
-    <h1>Where does your NFT's art actually live?</h1>
-    <p class="mut"><strong>Paste your wallet address</strong> and we'll go through every NFT collection you hold: where the art is stored, what looks good and what worries us. Or check a single collection with a link or contract address, or search by name.</p>
+    <p><strong>Paste your wallet address</strong> and we'll go through every NFT collection you hold: where the art is stored, what looks good and what worries us. Or check a single collection with a link or contract address, or search by name.</p>
   </div>
-
+  <div class="finder">
   <div class="modes" role="group" aria-label="What to look up">
     <button type="button" class="mode" id="mode-find" aria-pressed="true">Wallet, link or contract</button>
     <button type="button" class="mode" id="mode-search" aria-pressed="false">Search by name</button>
@@ -216,6 +337,12 @@
     <button type="submit" id="go">Check</button>
   </form>
   <p class="hint mut small">A wallet address is public, so there is nothing to connect or sign. We don't keep your address or what you paste; we only keep anonymous daily counts of which collections get looked up. Names ending in <code>.btc</code> aren't supported yet; use the address that starts with <code>SP</code>.</p>
+  </div>
+  <ol class="steps" aria-label="How it works">
+    <li><span class="n" aria-hidden="true">1</span><span><b>Paste an address</b>Your public wallet address, or a collection link.</span></li>
+    <li><span class="n" aria-hidden="true">2</span><span><b>We look up the art</b>Where each collection keeps its images and details.</span></li>
+    <li><span class="n" aria-hidden="true">3</span><span><b>See what to protect</b>Colour coded, worst first.</span></li>
+  </ol>
 
   <noscript><div class="box error"><p>This page needs JavaScript to look things up.</p></div></noscript>
   <div id="out" class="results" aria-live="polite" tabindex="-1"></div>
