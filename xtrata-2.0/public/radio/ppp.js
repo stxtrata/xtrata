@@ -15748,10 +15748,10 @@ function WI(t) {
       y.replaceChildren();
       return;
     }
-    const f = Id(m.player.cover), S = f ? k("img", "ppp-skin__art") : k("span", "ppp-skin__art ppp-skin__art--none", "♪");
+    const f = Id(m.player.cover), S = f ? k("img", "", "ppp-skin__art") : k("span", "♪", "ppp-skin__art ppp-skin__art--none");
     f && (S.src = f, S.alt = "");
-    const C = k("span", "ppp-skin__t");
-    C.append(k("b", "", m.player.title), k("span", "", m.mode === "arrive" && m.from ? `A gift from ${m.from}` : m.player.subtitle || "Your album")), y.replaceChildren(S, C);
+    const C = k("span", "", "ppp-skin__t");
+    C.append(k("b", m.player.title), k("span", m.mode === "arrive" && m.from ? `A gift from ${m.from}` : m.player.subtitle || "Your album")), y.replaceChildren(S, C);
   }
   function Pr(l, m, y) {
     var J, D, Q, q, X;

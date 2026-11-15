@@ -41,7 +41,7 @@ async function open(over: object = {}, { page = true }: { page?: boolean } = {})
   document.body.innerHTML = `<header class="topbar"></header><main><section class="album" id="album" hidden></section><section class="albumlist" id="albumList" hidden></section><section class="rx"></section>
     <aside class="side"><div class="sheet-bar"><b id="sheetTitle"></b><button id="sheetClose">×</button></div><div class="sheet-extra" id="sheetExtra"></div>
     <section id="ppp" hidden><div class="ppp-head"><h3><span class="ppp-badge"></span></h3><span class="ppp-state"></span></div><ol class="ppp-steps"></ol><p class="ppp-stage"></p>
-    <div class="ppp-switch" hidden></div><div class="ppp-key"></div><p class="ppp-frame-label"></p><div class="ppp-frame"></div><div class="ppp-actions"></div><p class="ppp-msg"></p><p class="ppp-err"></p>
+    <div class="ppp-switch" hidden></div><div class="ppp-key"></div><p class="ppp-frame-label"></p><div class="ppp-skin" hidden></div><div class="ppp-frame"></div><div class="ppp-actions"></div><p class="ppp-msg"></p><p class="ppp-err"></p>
     <details class="ppp-recent"><ol class="ppp-recent-list"></ol><details class="ppp-history"></details></details><details class="ppp-wallets"><dl class="ppp-facts"></dl><div class="ppp-actions ppp-actions2"></div></details>
     <details class="ppp-more"><div class="ppp-body"></div></details><details class="ppp-shelf" hidden><summary></summary><div class="ppp-shelf-body"></div></details><details class="ppp-gifts"><div class="ppp-gift-body"></div></details></section></aside></main>`;
   h.radio = { setGiftPlayer: vi.fn(), setGiftStop: vi.fn(), setGiftLock: vi.fn(), subscribe: vi.fn(), refreshLikes: vi.fn(), forgetWallets: vi.fn(), getState: () => h.idle ? ({ playing: false, nowPlaying: null, heart: { liked: false } }) : ({ playing: true, nowPlaying: { tokenId: 319, title: 'Russian Rampage', artist: 'melophonic' }, heart: { liked: false } }),
@@ -288,6 +288,18 @@ describe('an album arriving by link', () => {
     await vi.waitFor(() => expect(text(album)).toContain('Continue in the box below.'));
     expect(document.documentElement.dataset.asking).toBe('1');
     expect(buttonNamed(album, /Open album/)).toBeUndefined();
+    // The strip above the box names the album. Its picture carries the thumbnail class (without it the cover draws at
+    // its full size over the sheet), and the album's name is text, never a class name.
+    const strip = document.querySelector('#ppp .ppp-skin') as HTMLElement;
+    expect(strip.hidden).toBe(false);
+    const art = strip.firstElementChild as HTMLElement;
+    expect(art.classList.contains('ppp-skin__art')).toBe(true);
+    expect(art.tagName === 'IMG' ? art.textContent : art.textContent).not.toContain('ppp-skin');
+    const words = strip.querySelector('.ppp-skin__t') as HTMLElement;
+    expect(words).not.toBeNull();
+    expect(words.querySelector('b')!.textContent).toBeTruthy();
+    expect(words.querySelector('b')!.className).toBe('');
+    expect(text(strip)).not.toContain('ppp-skin');
   });
 
   it('a used link is not an album to open: the ordinary panel says so', async () => {

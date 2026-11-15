@@ -1579,10 +1579,12 @@ function start(root: HTMLElement) {
     skinEl.hidden = !on;
     if (!on || !a) { skinEl.replaceChildren(); return; }
     const url = coverArt(a.player.cover);
-    const art = url ? el('img', 'ppp-skin__art') as HTMLImageElement : el('span', 'ppp-skin__art ppp-skin__art--none', '♪');
+    // This file's `el` takes (tag, text, class): the class is the THIRD argument. (Getting that wrong once left the
+    // cover with no class, so it drew at its full size over the sheet; the test in album.test.ts holds it now.)
+    const art = url ? el('img', '', 'ppp-skin__art') as HTMLImageElement : el('span', '♪', 'ppp-skin__art ppp-skin__art--none');
     if (url) { (art as HTMLImageElement).src = url; (art as HTMLImageElement).alt = ''; }
-    const text = el('span', 'ppp-skin__t');
-    text.append(el('b', '', a.player.title), el('span', '', a.mode === 'arrive' && a.from ? `A gift from ${a.from}` : a.player.subtitle || 'Your album'));
+    const text = el('span', '', 'ppp-skin__t');
+    text.append(el('b', a.player.title), el('span', a.mode === 'arrive' && a.from ? `A gift from ${a.from}` : a.player.subtitle || 'Your album'));
     skinEl.replaceChildren(art, text);
   }
 
