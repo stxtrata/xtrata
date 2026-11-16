@@ -163,3 +163,14 @@ describe('what is next, read from the chain', () => {
     await expect(inspect(x.reader, input())).rejects.toThrow(/chain down/);
   });
 });
+
+describe('pasting the signer hash', () => {
+  it('accepts it as the key script prints it, with 0x on the front', async () => {
+    const { cleanSignerHash, isSignerHash } = await import('../awards-launch');
+    const printed = '  0x77335A9EBDF3322F2461B00346268B6451A7D40D ';
+    expect(isSignerHash(printed)).toBe(false);
+    expect(cleanSignerHash(printed)).toBe('77335a9ebdf3322f2461b00346268b6451a7d40d');
+    expect(isSignerHash(cleanSignerHash(printed))).toBe(true);
+    expect(isSignerHash(cleanSignerHash('0x1234'))).toBe(false);
+  });
+});

@@ -12,7 +12,7 @@ import { toStacksNetwork } from './lib/network/stacks';
 import type { WalletSession } from './lib/wallet/types';
 import { extractWalletTxId } from './lib/deploy/drops-v1-1';
 import {
-  AWARDS_ID, AWARDS_NAME, CLASSES, classArgs, CORE, DROP, FUND_MINIMUM, hiroReader, inspect, isSignerHash, OWNER, signerArgs, steps, stx, templateArgs, TOTAL_AWARDS,
+  AWARDS_ID, AWARDS_NAME, CLASSES, classArgs, cleanSignerHash, CORE, DROP, FUND_MINIMUM, hiroReader, inspect, isSignerHash, OWNER, signerArgs, steps, stx, templateArgs, TOTAL_AWARDS,
   type ClassKey, type LaunchState, type StepId
 } from './lib/deploy/awards-launch';
 import source from '../contracts/live/xtrata-music-awards-v1.0.clar?raw';
@@ -36,7 +36,7 @@ let readError = '';
 let reading = false;
 let busy = '';
 let pending: { step: StepId; txid: string; at: number } | null = (() => { try { const p = JSON.parse(store.get('pending') || 'null'); return p && /^0x[0-9a-f]{64}$/.test(p.txid) ? p : null; } catch { return null; } })();
-let signerInput = store.get('signer') || '';
+let signerInput = cleanSignerHash(store.get('signer') || '');
 let fundInput = store.get('fund') || '';
 const log: { at: number; level: 'info' | 'ok' | 'error'; text: string; txid?: string }[] = [];
 const say = (level: 'info' | 'ok' | 'error', text: string, txid?: string) => { log.unshift({ at: Date.now(), level, text, txid }); render(); };
@@ -163,8 +163,8 @@ function render() {
       li.append(h('p', 'wallet-line', wallet));
       if (s.id.startsWith('template:') && state) { const t = state.templates.find((x) => `template:${x.plan.key}` === s.id)!; li.append(h('p', 'mute', `File sha256 ${t.plan.sha256.slice(0, 16)}… · Xtrata hash ${t.plan.hash.slice(0, 16)}… · fee ${stx(t.fee)} STX`)); }
       if (s.id === 'signer') {
-        const input = h('input') as HTMLInputElement; input.id = 'signer-hash'; input.value = signerInput; input.placeholder = 'Signer hash: 40 hex characters'; input.spellcheck = false;
-        input.oninput = () => { signerInput = input.value.trim().toLowerCase(); store.set('signer', signerInput); };
+        const input = h('input') as HTMLInputElement; input.id = 'signer-hash'; input.value = signerInput; input.placeholder = 'Signer hash: 40 hex characters (0x in front is fine)'; input.spellcheck = false;
+        input.oninput = () => { signerInput = cleanSignerHash(input.value); store.set('signer', signerInput); };
         li.append(h('p', 'mute', 'Run `node scripts/awards-signer-key.mjs` (it prints only this hash), put the key into Cloudflare as RADIO_AWARDS_SIGNER_KEY, then paste the hash here.'), input);
       }
       if (s.id === 'fund' && state) {
