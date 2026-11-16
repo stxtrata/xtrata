@@ -82,6 +82,8 @@ export const templateArgs = (p: TemplatePlan): ClarityValue[] =>
   [bufferCV(hexToBytes(p.hash)), stringAsciiCV(TEMPLATE_MIME), uintCV(p.size), listCV(p.chunks.map((c) => bufferCV(c))), stringAsciiCV(p.tokenUri)];
 export const classArgs = (classId: number, template: number, cap: number): ClarityValue[] => [uintCV(DROP), uintCV(classId), uintCV(template), uintCV(cap)];
 export const signerArgs = (hash: string | null): ClarityValue[] => [hash ? someCV(bufferCV(hexToBytes(hash))) : noneCV()];
+/** What someone pasted, tidied: the key script prints the hash with 0x on the front. */
+export const cleanSignerHash = (v: string): string => v.trim().toLowerCase().replace(/^0x/, '');
 export const isSignerHash = (v: unknown): v is string => typeof v === 'string' && /^[0-9a-f]{40}$/.test(v);
 
 // ---------------------------------------------------------------- the whole state, read from the chain
