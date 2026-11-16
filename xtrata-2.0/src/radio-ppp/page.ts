@@ -25,6 +25,7 @@ import { coverArt, onArt, peek, thumb } from './art';
 import { createAudition } from './audition';
 import { createAwardWalk, type AwardScreen } from './award-view';
 import { createReleases } from './releases';
+import { createReplace } from './replace';
 import type { PlayerView } from '../lib/listening-wallet/gift-players';
 import { copyButton } from './feedback';
 import { browserName, inAppBrowser, openInBrowserHref } from './in-app';
@@ -177,6 +178,25 @@ function start(root: HTMLElement) {
     (gifts.incomingStarter() && s.canAnother && s.hadGift === false && !s.main && !!s.listening && !s.createdHere && !s.brandNew
       && ['locked', 'ready', 'fund', 'over', 'link'].includes(s.step) && !s.busy
       ? () => void ppp.create({ quick: true, another: true }) : null);
+  /** Replace the old player instead of keeping both: on offer to the same people, with a wallet box that can remove a player. */
+  const replaceFor = (s: Snapshot): (() => void) | null => (claimNewFor(s) && s.canForget ? () => { replace.start(s); render(ppp.snapshot()); } : null);
+  const replace = createReplace({
+    json,
+    unlock: () => void ppp.unlock(),
+    returnAll: () => void ppp.returnFunds('all'),
+    forget: () => ppp.forget(),
+    backup: () => void ppp.backup(),
+    keepBoth: (s) => claimNewFor(s),
+    who: (address) => who(address),
+    changed: () => render(ppp.snapshot()),
+    store: {
+      get: (k) => { try { return localStorage.getItem(k); } catch { return null; } },
+      set: (k, v) => { try { if (v === null) localStorage.removeItem(k); else localStorage.setItem(k, v); } catch { /* best effort */ } }
+    },
+    dust: (s) => BigInt(s.gate?.limits.returnFee ?? '3000')
+  });
+  /** How a player is made from the claim screens: quick for a free player, and with a named passkey when it replaces an old one. */
+  const createOpts = () => ({ quick: !!gifts.incomingStarter(), ...(replace.claiming() ? { another: true } : {}) });
   const gifts = createGifts({
     json,
     main: () => { const s = sessionStore.load(); return s.isConnected && s.network === 'mainnet' ? s.address : undefined; },
@@ -185,6 +205,7 @@ function start(root: HTMLElement) {
     giftSent: (txid, amount) => ppp.giftSent(txid, amount),
     claiming: (on) => ppp.giftClaiming(on),
     claimNew: (s) => claimNewFor(s),
+    replaceOld: (s) => replaceFor(s),
     album: { bind: (slot) => ppp.bindAlbum(slot), arrived: async (slot, address, txid, amount) => { shelf.invalidate(); await ppp.albumArriving(slot, address, txid, amount); } },
     who: (address) => who(address),
     changed: () => render(ppp.snapshot()),
@@ -312,6 +333,8 @@ function start(root: HTMLElement) {
     // Not known yet: hold, but never for long (a page that cannot reach the server must still show the radio).
     if (!welcomeKnown) return Date.now() - welcomeSince < 10_000 ? 'checking' : null;
     if (!plainFor(s)) return null;
+    // Replacing an old player: its steps are in the player panel, so the welcome screens step aside until the claim itself.
+    if (replace.active() && s.step !== 'intro') return null;
     if (s.step === 'intro' || s.step === 'unsupported') return gifts.incomingStarter() ? 'gift' : 'new';
     if (s.step === 'locked') return 'back';
     // The listener's own player (not an album), never played from on this device.
@@ -339,15 +362,15 @@ function start(root: HTMLElement) {
     // untouched: making the passkey still takes the visitor's tap inside the box.
     if (starter && !autoClaimTried && s.step === 'intro' && !s.busy && !s.armed && !s.error && !inApp) {
       autoClaimTried = true;
-      void ppp.create({ quick: true });
+      void ppp.create({ quick: true, ...(replace.claiming() ? { another: true } : {}) });
     }
     welcome.render({
       mode, status, asking: !!s.busy || s.armed, busy: !!s.busy, canStart: (s.step === 'intro' || s.step === 'locked') && !inApp,
       plays: starter ? starter.plays : mode === 'landed' ? s.playsLeft : null, from: starter?.from ?? null,
       tier: tierNow, mystery,
       albums: mode === 'landed' ? featured.map((p) => ({ title: p.title, by: p.subtitle, cover: coverArt(p.cover), run: () => { showFull(); openFeatured(p, true); } })) : [],
-      claimNew: mode === 'back' ? claimNewFor(s) : null,
-      start: () => void ppp.create({ quick: !!gifts.incomingStarter() }), unlock: () => void ppp.unlock(), returning: () => void ppp.unlock(true), restock: () => openRestock(),
+      claimNew: mode === 'back' ? claimNewFor(s) : null, replaceOld: mode === 'back' ? replaceFor(s) : null,
+      start: () => void ppp.create(createOpts()), unlock: () => void ppp.unlock(), returning: () => void ppp.unlock(true), restock: () => openRestock(),
       full: () => {
         // "Start listening" starts the music: it is the listener's own tap, and nothing is playing yet.
         const radio = (window as any).XtrataRadio;
@@ -1119,7 +1142,7 @@ function start(root: HTMLElement) {
         // A live gift link is for a brand-new wallet, so claiming it leads. Someone who already has a listening
         // wallet (e.g. synced from another device) can still unlock it, or put the gift aside for now.
         const gift = gifts.liveGift();
-        actions.push(button(gift ? 'Claim my gift · no wallet needed' : s.solo ? 'Start listening · no wallet needed' : s.others.length && s.main ? `Set up for ${who(s.main)}` : 'Start listening', () => void ppp.create(), 'primary'));
+        actions.push(button(gift ? 'Claim my gift · no wallet needed' : s.solo ? 'Start listening · no wallet needed' : s.others.length && s.main ? `Set up for ${who(s.main)}` : 'Start listening', () => void ppp.create(replace.claiming() ? { another: true } : undefined), 'primary'));
         if (!gift && !s.solo && s.main && s.others.length) actions.push(button('Switch wallet', connectStacks));
         if (!gift && s.solo) actions.push(button('I have a Stacks wallet', connectStacks));
         actions.push(button('I already have a listening wallet', () => void ppp.unlock(true)));
@@ -1308,7 +1331,9 @@ function start(root: HTMLElement) {
     // gift's progress (the human check, "sending…", real errors) is wanted, as on the album view.
     const wMode = welcomeMode(s, !!album);
     const giftScreen = wMode === 'gift' || wMode === 'arriving' || wMode === 'new';
-    const giftLines = gifts.banner(raw, { bare: !!album || wMode === 'gift' || wMode === 'arriving' });
+    // While an old player is being replaced its steps stand where the gift line would: one thing to do at a time.
+    const replaceLines = !album ? replace.lines(raw) : null;
+    const giftLines = replaceLines && !replace.claiming() ? replaceLines : [...(replaceLines ?? []), ...gifts.banner(raw, { bare: !!album || wMode === 'gift' || wMode === 'arriving' })];
     const elsewhereLines = inApp && (gifts.pendingCode() || ['intro', 'locked', 'unsupported'].includes(s.step)) ? openElsewhere(inApp, gifts.pendingCode()) : [];
     if (!album) {
       key.unshift(...giftLines);

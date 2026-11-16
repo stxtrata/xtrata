@@ -25,6 +25,8 @@ export interface StatusResult {
    * for `listening.prove` before the listener adds anything of their own; an ordinary unlock clears it too.
    */
   unproven?: true;
+  /** The name the box gave this player's passkey when it made it (e.g. "Xtrata player · A1B2"), when it gave one: so the listener can tell passkeys apart in their device's list. */
+  passkeyName?: string;
   /** This player has backup words (a version 2 key): `listening.backup` lets the listener write them down in the box. */
   phrase?: true;
   /** The listener wrote the backup words down and checked them on this device. */
@@ -59,7 +61,7 @@ export interface StatusResult {
  * `shelf` (listening.signShelf: sign a request about the albums this player keeps; no panel, moves nothing),
  * `phrase` (new players have a 24-word backup phrase that opens in other Stacks wallets; listening.backup shows it in the box).
  */
-export const LISTENING_FEATURES = ['cancel', 'like', 'standalone', 'multi', 'partial', 'slots', 'rootLike', 'move', 'phrase', 'award', 'sendRecord', 'shelf', 'another'] as const;
+export const LISTENING_FEATURES = ['cancel', 'like', 'standalone', 'multi', 'partial', 'slots', 'rootLike', 'move', 'phrase', 'award', 'sendRecord', 'shelf', 'another', 'forget'] as const;
 
 /** `listening.status`: the connected main wallet, if any, so the box answers for that address's listening wallet. */
 export interface StatusParams {

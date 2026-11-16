@@ -189,6 +189,10 @@ export interface Snapshot {
   walletOutdated: boolean;
   /** The wallet box can make a second, separate player on a device that already has one (for a free-player claim). */
   canAnother: boolean;
+  /** The wallet box can remove a player from this device (replacing an old player). */
+  canForget: boolean;
+  /** The name the wallet box gave this player's passkey, when it gave one. */
+  passkeyName?: string;
   /** Whether the player this device shows was itself a gift: true, false, or null when that has not been read yet. */
   hadGift: boolean | null;
   /** Listening wallets linked to the connected main wallet (dual-signed, public), newest first. */
@@ -624,6 +628,8 @@ export function createPppController(deps: PppDeps) {
     arrival: arrivalExpected() ? { since: pendingDeposit()?.at ?? arrival?.since ?? deps.now(), graceMs: ARRIVAL_GRACE_MS } : null,
     walletOutdated: walletLacks('like'),
     canAnother: !!status && !walletLacks('another'),
+    canForget: !!status && !walletLacks('forget'),
+    passkeyName: status?.passkeyName,
     hadGift: status?.address && giftRes?.for === status.address && giftRes.ok ? !!giftRes.info : null,
     linkedListening: mainLinksFor && mainLinksFor === creditMain() ? mainLinks.map((l) => l.listening) : [],
     serverLinked: !!serverLink && serverLinkFor === `${creditMain()}:${status?.address}`,
@@ -1141,6 +1147,25 @@ export function createPppController(deps: PppDeps) {
       balance = undefined; balanceAt = -Infinity; rootBalance = null;
       await refresh(true);
     },
+
+    /**
+     * Remove the open player from this device (the wallet box asks in its own panel; the passkey is not touched). Only
+     * the listener's own player, only when it is empty and nothing is on its way: checked here as well as on the page.
+     */
+    forget: () => task('Check the listening wallet…', async () => {
+      const b = await ensureBridge();
+      if (walletLacks('forget')) throw new Error('The listening wallet box needs an update before it can do this. Try again shortly.');
+      if (status?.state !== 'unlocked' || (status.slot ?? 0) !== 0) throw new Error('Unlock your own player first.');
+      if (balance === undefined) throw new Error('Could not read what this player holds. Nothing was removed.');
+      if (balance > BigInt(gate?.limits.returnFee ?? '3000')) throw new Error('Empty this player first. Nothing was removed.');
+      if (unresolved().length) throw new Error('Wait for the pending payment to confirm. Nothing was removed.');
+      forgetQueue();
+      await b.request('listening.forget');
+      balance = undefined;
+      status = await readStatus(b);
+      setPayingOn(false);
+      say('Removed from this device ✓');
+    }),
 
     /** `quick`: a free starter player is being claimed, so the wallet box may put off its second passkey check. */
     create: (opts?: { quick?: boolean; another?: boolean }) => task('Waiting for your passkey…', async () => {
