@@ -490,7 +490,16 @@ export function createGifts(deps: GiftDeps) {
         list.push({ id: v.id, codes: [], count: v.count, amount: v.amount, label: v.label, player: v.player, depositTo: '', deposit: v.deposit, memo: v.memo, at: 0, view: v });
       }
     } catch { /* the local list is still right; the server list is a bonus */ }
-    saveBatches(main, list);
+    // This took a while, and a batch may have been made or paid meanwhile. What is stored now wins for everything that
+    // exists only on this device (the links, the payment's txid); this pass adds only what it learned from the server.
+    const merged = new Map<string, MyBatch>();
+    for (const b of loadBatches(main)) if (!merged.has(b.id) || b.codes.length > merged.get(b.id)!.codes.length) merged.set(b.id, b);
+    for (const b of list) {
+      const kept = merged.get(b.id);
+      if (!kept) merged.set(b.id, b);
+      else merged.set(b.id, { ...kept, view: b.view ?? kept.view, error: b.error, txid: kept.txid ?? b.txid, codes: kept.codes.length >= b.codes.length ? kept.codes : b.codes, depositTo: kept.depositTo || b.depositTo });
+    }
+    saveBatches(main, [...merged.values()]);
     deps.changed();
   }
 

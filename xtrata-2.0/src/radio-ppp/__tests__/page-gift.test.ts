@@ -532,6 +532,34 @@ describe('prefunded batches (admin): the creator pays for every copy up front', 
     expect(JSON.parse(localStorage.getItem('xtrata.radio.gift.batches.v1:' + ADMIN)!).filter((b: any) => b.codes.length)).toHaveLength(13); // none pushed out
   });
 
+  it('a background check that started before a batch was made never loses that batch\'s links, and never lists it twice', async () => {
+    const OLD = 'aaaaaaaaaaaaaaaa';
+    const old = { id: OLD, codes: ['C'.repeat(22)], count: 1, amount: '108000', label: 'Old', player: null, depositTo: TREASURY, deposit: '111000', memo: 'batch ' + OLD, at: 1, txid: '0x1', view: { ...live, id: OLD, count: 1, copies: { ...live.copies, waiting: 1 } } };
+    localStorage.setItem('xtrata.radio.gift.batches.v1:' + ADMIN, JSON.stringify([old]));
+    let release!: () => void;
+    const held = new Promise<void>((r) => { release = r; });
+    served();
+    const plain = h.route!;
+    // The slow check: its list of the creator's batches arrives late, and by then names the batch made meanwhile.
+    h.route = (url, init) => (url.includes('/radio/gift/batches') ? held.then(() => new Response(JSON.stringify({ batches: [old.view, live] }))) : plain(url, init)) as any;
+    let finish!: () => void;
+    const pay = await payWith((o) => { finish = () => o.onFinish({ txId: '0x' + 'f'.repeat(64) }); }); // the wallet popup stays open
+    const root = await admin();
+    field(root, 'input[aria-label="Copies"]').value = '2';
+    field(root, 'select[aria-label="Plays per copy"]').value = '300';
+    click(root, /Sign, pay and make links/);
+    await vi.waitFor(() => expect(pay).toHaveBeenCalledTimes(1));
+    release();   // the old check finishes while the popup is open, and saves
+    await vi.waitFor(() => expect(JSON.parse(localStorage.getItem('xtrata.radio.gift.batches.v1:' + ADMIN)!).find((b: any) => b.id === OLD).view).toBeTruthy());
+    await new Promise((r) => setTimeout(r, 20));
+    expect(JSON.parse(localStorage.getItem('xtrata.radio.gift.batches.v1:' + ADMIN)!).find((b: any) => b.id === ID).codes).toEqual(CODES);
+    finish();
+    await vi.waitFor(() => { const kept = JSON.parse(localStorage.getItem('xtrata.radio.gift.batches.v1:' + ADMIN)!); expect(kept.filter((b: any) => b.id === ID)).toHaveLength(1); expect(kept.find((b: any) => b.id === ID).view?.status).toBe('live'); });
+    const kept = JSON.parse(localStorage.getItem('xtrata.radio.gift.batches.v1:' + ADMIN)!);
+    expect(kept.find((b: any) => b.id === ID)).toMatchObject({ codes: CODES, txid: '0x' + 'f'.repeat(64) });
+    expect(kept.find((b: any) => b.id === OLD).codes).toEqual(['C'.repeat(22)]);
+  });
+
   it('a live batch shows how long it has left, and one signature extends one batch or all of them', async () => {
     const DAY = 86_400_000;
     const view = (id: string, days: number, waiting = 2) => ({ ...live, id, expires: Date.now() + days * DAY, copies: { ...live.copies, waiting } });
