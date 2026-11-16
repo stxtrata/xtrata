@@ -326,6 +326,48 @@ describe('a free starter player: claimed, arriving, landed', () => {
     expect(html().dataset.view).toBeUndefined(); // the radio itself
   });
 
+  describe('a free player arrives on a device whose player was made before the giveaway', () => {
+    const OLD = { entries: PLAYED, createdHere: false, canAnother: true, hadGift: false };
+    const keyOf = (root: Element) => root.querySelector('.ppp-key');
+
+    it('offers to claim it as a new, separate player, says the old one is untouched, and asks the box for exactly that', async () => {
+      starter();
+      const root = await open(OLD);
+      await vi.waitFor(() => expect(text(keyOf(root))).toContain('claim this free one as a new, separate player'));
+      expect(text(keyOf(root))).toContain('Your existing player, and anything in it, stays exactly as it is');
+      expect(text(keyOf(root))).not.toContain('Pass it on');
+      [...keyOf(root)!.querySelectorAll('button')].find((b) => /Claim it as a new player/.test(b.textContent || ''))!.click();
+      expect(h.calls.filter(([n]) => n === 'create')).toEqual([['create', [{ quick: true, another: true }]]]);
+    });
+
+    it('not for a player that was itself a gift, not when that is unknown, not with an older wallet box, not with a Stacks wallet connected', async () => {
+      for (const over of [{ hadGift: true }, { hadGift: null }, { canAnother: false }, { main: 'SP1FVCANW8KX51C70JJAFTES86SR48CPP6F2ANQKP' }]) {
+        localStorage.clear(); starter();
+        const root = await open({ ...OLD, ...over });
+        await vi.waitFor(() => expect(text(keyOf(root))).toContain('Pass it on and bring them in'));
+        expect(buttons(keyOf(root))).not.toContain('Claim it as a new player');
+      }
+    });
+
+    it('on the welcome-back screen the claim leads, and opening the existing player is still one tap', async () => {
+      starter();
+      await open({ ...OLD, step: 'locked', balance: undefined, session: null });
+      await vi.waitFor(() => expect(text(page())).toContain('Claim it as a new player'));
+      expect(text(page())).toContain('Your existing player, and anything in it, stays exactly as it is');
+      named(/Open my existing player instead/)!.click();
+      expect(h.calls.filter(([n]) => n === 'unlock')).toHaveLength(1);
+      named(/Claim it as a new player/)!.click();
+      expect(h.calls.filter(([n]) => n === 'create')).toEqual([['create', [{ quick: true, another: true }]]]);
+    });
+
+    it('without a free player waiting, a returning listener sees the ordinary welcome back and no way to add a player', async () => {
+      await open({ ...OLD, step: 'locked', balance: undefined, session: null });
+      await vi.waitFor(() => expect(text(page())).toContain('Unlock my player'));
+      expect(text(page())).not.toContain('new player');
+      expect(text(document.getElementById('ppp')!)).not.toContain('Claim it as a new player');
+    });
+  });
+
   it('someone who already has a player is asked, kindly, to pass it on', async () => {
     starter();
     const root = await open({ entries: PLAYED, createdHere: false });

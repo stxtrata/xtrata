@@ -1858,3 +1858,49 @@ describe('the albums a player keeps', () => {
     expect(s.chain.broadcasts).toHaveLength(0);   // nothing is ever sent to the chain for this
   });
 });
+
+describe('claiming a free player as a new, separate player (for someone who made theirs before the giveaway)', () => {
+  it('knows whether this device’s player was itself a gift, and whether the wallet box can make a second one', async () => {
+    const s = setup({ passkeyOnly: true, gifts: { enabled: true, admin: false, treasury: null, turnstileSiteKey: null, fee: '3000' } } as any); s.setMain(undefined);
+    await s.ppp.forceRefresh();
+    expect(s.ppp.snapshot()).toMatchObject({ canAnother: true, hadGift: null });   // no player yet: nothing to say
+    await s.ppp.create();
+    await s.ppp.forceRefresh();
+    expect(s.ppp.snapshot()).toMatchObject({ listening: LISTENING, canAnother: true, hadGift: false });
+    // a player that WAS a gift: it has had its free one
+    s.gift.info = { returnTo: 'SP000000000000000000002Q6VF78', treasury: 'SP000000000000000000002Q6VF78', from: null, source: 'campaign', amount: '20500', player: null } as any;
+    s.tick(31 * 60_000);
+    await s.ppp.forceRefresh();
+    expect(s.ppp.snapshot().hadGift).toBe(true);
+    // and when the server cannot be read, nothing is assumed
+    const t = setup({ passkeyOnly: true, gifts: { enabled: true, admin: false, treasury: null, turnstileSiteKey: null, fee: '3000' } } as any); t.setMain(undefined);
+    t.gift.fails = true;
+    await t.ppp.forceRefresh(); await t.ppp.create(); await t.ppp.forceRefresh();
+    expect(t.ppp.snapshot().hadGift).toBeNull();
+  });
+
+  it('makes the new player beside the old one: the open one is locked first, and the new one becomes this device’s player', async () => {
+    const s = setup({ passkeyOnly: true }); s.setMain(undefined);
+    await s.ppp.forceRefresh();
+    await s.ppp.create();
+    s.requests.length = 0;
+    await s.ppp.create({ quick: true, another: true });
+    const asked = s.requests.filter(([m]) => m === 'listening.lock' || m === 'listening.unlock');
+    expect(asked.map(([m]) => m)).toEqual(['listening.lock', 'listening.unlock']);
+    expect(asked[1][1]).toMatchObject({ mode: 'create', another: true, quick: true });
+    expect(asked[1][1].main).toBeUndefined();
+    const now = s.ppp.snapshot().listening;
+    expect(now).toBeTruthy();
+    expect(now).not.toBe(LISTENING);
+    expect(s.chain.broadcasts).toHaveLength(0);
+  });
+
+  it('never asks for it while a Stacks wallet is connected: that wallet’s own player is the one in play', async () => {
+    const s = setup();
+    await s.ppp.forceRefresh();
+    await s.ppp.create({ another: true });
+    const made = s.requests.find(([m, p]) => m === 'listening.unlock' && p?.mode === 'create')!;
+    expect(made[1].another).toBeUndefined();
+    expect(made[1].main).toBe(MAIN);
+  });
+});

@@ -59,7 +59,7 @@ export interface StatusResult {
  * `shelf` (listening.signShelf: sign a request about the albums this player keeps; no panel, moves nothing),
  * `phrase` (new players have a 24-word backup phrase that opens in other Stacks wallets; listening.backup shows it in the box).
  */
-export const LISTENING_FEATURES = ['cancel', 'like', 'standalone', 'multi', 'partial', 'slots', 'rootLike', 'move', 'phrase', 'award', 'sendRecord', 'shelf'] as const;
+export const LISTENING_FEATURES = ['cancel', 'like', 'standalone', 'multi', 'partial', 'slots', 'rootLike', 'move', 'phrase', 'award', 'sendRecord', 'shelf', 'another'] as const;
 
 /** `listening.status`: the connected main wallet, if any, so the box answers for that address's listening wallet. */
 export interface StatusParams {
@@ -80,6 +80,12 @@ export interface UnlockParams {
    * claim); create makes a new one for it. Only chooses among this device's wallets: it grants nothing.
    */
   main?: string;
+  /**
+   * Create, passkey-only (no `main`): make a NEW, separate player on a device that already has one, with its own new
+   * passkey. The existing player is untouched and still opens with its own passkey. Only for claiming a free player
+   * by someone who made theirs before the giveaway; the box says plainly that it is a second player.
+   */
+  another?: boolean;
   /** Unlock: let the listener pick any listening-wallet passkey instead of this device's last one. */
   anyPasskey?: boolean;
   /**

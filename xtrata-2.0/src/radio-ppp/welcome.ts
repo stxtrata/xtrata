@@ -35,6 +35,11 @@ export interface WelcomeInput {
   albums?: { title: string; by: string; cover?: string; run(): void }[];
   /** gift: do not say how many plays it holds yet (a lottery drop): that is the reveal when it lands. */
   mystery?: boolean;
+  /**
+   * back, arriving with a free player to claim on a device whose player was made before the giveaway: claim it as a new,
+   * separate player (its own passkey). Null for everyone else.
+   */
+  claimNew?: (() => void) | null;
   start(): void;
   returning(): void;
   unlock(): void;
@@ -90,6 +95,8 @@ export const WELCOME_TEXT = {
   new: { title: 'Music that pays the artist', body: 'Every play counts for whoever owns the song. Make your player once and you’re in.', primary: 'Make my player',
     hint: 'One tap with Face ID or your fingerprint. No app, no account, no password.', returning: 'I’ve listened here before', full: 'Look around first' },
   back: { title: 'Welcome back', body: 'Unlock your player and carry on listening.', primary: 'Unlock my player', hint: 'One tap with Face ID or your fingerprint.', returning: 'Use a different passkey', full: 'Look around first' },
+  backClaim: { title: 'A free player is waiting', body: 'This device already has a player you made before. You can claim the free one as a new, separate player with its own passkey. Your existing player, and anything in it, stays exactly as it is.',
+    primary: 'Claim it as a new player', hint: 'One tap with Face ID or your fingerprint. You can switch between your players at any time.', unlock: 'Open my existing player instead' },
   arriving: { title: 'Your player is made', body: 'Your plays are on their way to it. This usually takes about a minute: keep this page open and it carries on by itself.' },
   landed: { title: 'You’re in', primary: 'Start listening' },
   empty: { title: 'Your player is ready', body: 'It has no plays yet. Add some and every song you hear pays its artist.', primary: 'Add plays', full: 'Look around the radio' },
@@ -159,7 +166,12 @@ export function createWelcomeView(mount: HTMLElement) {
         if (m === 'landed' || m === 'gift') box.append(promises());
         if (input.status.length) { const s = el('div', 'al-status'); s.setAttribute('role', 'status'); s.append(...input.status); box.append(s); }
         if (input.asking) box.append(el('p', 'al-hint al-hint--ask', WELCOME_TEXT.asking));
-        else if (m === 'gift' || m === 'new' || m === 'back') {
+        else if (m === 'back' && input.claimNew) {
+          const w = WELCOME_TEXT.backClaim;
+          box.append(el('p', 'al-hint', w.body));
+          if (input.canStart) box.append(button('al-primary', w.primary, input.claimNew, input.busy), el('p', 'al-hint', w.hint), button('al-link', w.unlock, input.unlock, input.busy));
+          box.append(button('al-link', WELCOME_TEXT.back.full, input.full));
+        } else if (m === 'gift' || m === 'new' || m === 'back') {
           const w = WELCOME_TEXT[m];
           if (input.canStart) box.append(button('al-primary', w.primary, m === 'back' ? input.unlock : input.start, input.busy), el('p', 'al-hint', w.hint));
           if (input.canStart) box.append(button('al-link', w.returning, input.returning, input.busy));

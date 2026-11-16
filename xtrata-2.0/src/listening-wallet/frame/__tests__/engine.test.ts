@@ -63,7 +63,7 @@ const play = (balance = '500000', nonce = '0') => ({ core: 3, song: 1234, receip
 describe('listening wallet engine (wallet origin)', () => {
   it('creates a wallet only after two matching PRF results and stores no secrets', async () => {
     const s = setup();
-    expect(await s.h['listening.status']()).toEqual({ state: 'none', session: null, features: ['cancel', 'like', 'standalone', 'multi', 'partial', 'slots', 'rootLike', 'move', 'phrase', 'award', 'sendRecord', 'shelf'] });
+    expect(await s.h['listening.status']()).toEqual({ state: 'none', session: null, features: ['cancel', 'like', 'standalone', 'multi', 'partial', 'slots', 'rootLike', 'move', 'phrase', 'award', 'sendRecord', 'shelf', 'another'] });
     const r = await s.h['listening.unlock']({ mode: 'create' });
     expect(r.address).toBe(ADDRESS);
     expect(s.panels.map((p) => p.kind)).toEqual(['create', 'confirm-passkey', 'verify-passkey']);
@@ -86,7 +86,7 @@ describe('listening wallet engine (wallet origin)', () => {
     const other = Uint8Array.from(PRF); other[5] ^= 0xff;
     const s = setup({ outputs: [PRF, other] });
     await expect(s.h['listening.unlock']({ mode: 'create' })).rejects.toThrow(/stable/);
-    expect(await s.h['listening.status']()).toEqual({ state: 'none', session: null, features: ['cancel', 'like', 'standalone', 'multi', 'partial', 'slots', 'rootLike', 'move', 'phrase', 'award', 'sendRecord', 'shelf'] });
+    expect(await s.h['listening.status']()).toEqual({ state: 'none', session: null, features: ['cancel', 'like', 'standalone', 'multi', 'partial', 'slots', 'rootLike', 'move', 'phrase', 'award', 'sendRecord', 'shelf', 'another'] });
     // No wallet, and no half-made passkey kept either: an unstable passkey is dropped, not picked up again.
     const kept = JSON.parse(s.map.get('xtrata.listening-wallet.v1') ?? '{"wallets":[]}');
     expect(kept.wallets).toEqual([]);
@@ -460,6 +460,52 @@ describe('one listening wallet per main-wallet address', () => {
     await b.h['listening.unlock']({ mode: 'unlock', main: MAIN });
     expect(b.evaluated).toEqual(['cred-1']);
     expect(b.panels.at(-1)!.title).toContain(shortOf(MAIN));
+  });
+
+  describe('a deliberate second player (someone who made theirs before the giveaway claims a free one)', () => {
+    it('makes a NEW passkey beside the old one: nothing excluded, a name with a tag, and the box says it is a second player', async () => {
+      const b = box();
+      const first = (await b.h['listening.unlock']({ mode: 'create' })).address;
+      await b.h['listening.lock']();
+      const second = (await b.h['listening.unlock']({ mode: 'create', another: true, quick: true })).address;
+      expect(second).not.toBe(first);
+      expect(b.creates.at(-1)!.exclude).toEqual([]);
+      expect(b.creates.at(-1)!.name).toMatch(/^Xtrata player · [0-9A-F]{4}$/);
+      const panel = b.panels.find((p) => p.title === 'Make a new player')!;
+      expect(panel.summary).toMatch(/A new, separate player with its own passkey \(“Xtrata player · [0-9A-F]{4}”\)\. Your other player and everything in it stay exactly as they are\./);
+      expect(panel.warnings!.join(' ')).toContain('This device already has a listening wallet');
+      // both are remembered; the new one is the one this device opens next
+      await b.h['listening.lock']();
+      expect(await b.h['listening.status']()).toMatchObject({ state: 'known', address: second, phrase: true });
+      // the old player is untouched and still opens with its own passkey
+      b.evaluated.length = 0;
+      expect((await b.h['listening.unlock']({ mode: 'unlock', anyPasskey: true })).address).toBe(first);
+      expect(b.evaluated[0]).toBeUndefined(); // the browser offered every passkey, not just the last one
+    });
+
+    it('is only for a passkey-only player on a device that already has one: otherwise it changes nothing', async () => {
+      const fresh = box();
+      await fresh.h['listening.unlock']({ mode: 'create', another: true });
+      expect(fresh.creates.at(-1)).toMatchObject({ exclude: [], name: undefined });       // a first player is a first player
+      expect(fresh.panels.some((p) => p.title === 'Make a new player')).toBe(false);
+      const b = box();
+      await b.makeFor(MAIN, mainKey);
+      await b.h['listening.unlock']({ mode: 'create', main: MAIN_B, another: true });
+      expect(b.creates.at(-1)!.name).toBe(`Xtrata listening wallet · ${shortOf(MAIN_B)}`);  // an address's wallet stays an address's wallet
+      expect(b.panels.some((p) => p.title === 'Make a new player')).toBe(false);
+    });
+
+    it('without asking for it, a second passkey-only player is still refused the old way (the existing passkeys are excluded)', async () => {
+      const b = box();
+      await b.h['listening.unlock']({ mode: 'create' });
+      await b.h['listening.lock']();
+      await b.h['listening.unlock']({ mode: 'create' }).catch(() => undefined);
+      expect(b.creates.at(-1)!.exclude).toEqual(['cred-1']);
+    });
+
+    it('the box says it can do this, so a page only offers it to a box that can', async () => {
+      expect((await box().h['listening.status']()).features).toContain('another');
+    });
   });
 
   it('with no address given, a second passkey still excludes the existing ones so it is not quietly duplicated', async () => {
