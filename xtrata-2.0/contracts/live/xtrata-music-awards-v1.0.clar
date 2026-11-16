@@ -16,7 +16,9 @@
 ;; Limits that hold even if that key leaked: one award per wall number and one per address in a drop, and no more
 ;; awards of a class than the owner allowed. The most that can ever be spent is fee x the sum of the class caps.
 ;;
-;; Deploy as Clarity 3 (it uses `as-contract`).
+;; CLARITY 4. Wallets publish at Clarity 4 whatever version is asked for, so this is written for it: everything the
+;; contract does as itself runs inside `as-contract?` with an exact allowance (the core's own quoted fee in STX for
+;; the inscription; the one new inscription for the hand-over), and it names itself with `current-contract`.
 
 (define-constant ERR-NOT-OWNER        (err u200))
 (define-constant ERR-PAUSED           (err u201))
@@ -37,6 +39,8 @@
 (define-constant MIME "text/html")
 ;; Xtrata hashes a file as a chain over its chunks, starting from 32 zero bytes. A record is always one chunk.
 (define-constant ZERO-HASH 0x0000000000000000000000000000000000000000000000000000000000000000)
+;; The core's NFT, as an allowance names it.
+(define-constant CORE-ASSET "xtrata-inscription")
 
 (define-data-var contract-owner principal tx-sender)
 ;; hash160 of the public key whose notes are accepted. None: nobody can claim.
@@ -57,7 +61,7 @@
 (define-read-only (get-signer-hash) (ok (var-get signer-hash)))
 (define-read-only (is-paused) (ok (var-get paused)))
 (define-read-only (get-token-uri) (ok (var-get token-uri)))
-(define-read-only (get-balance) (ok (stx-get-balance (as-contract tx-sender))))
+(define-read-only (get-balance) (ok (stx-get-balance current-contract)))
 (define-read-only (get-class (drop uint) (class uint)) (map-get? Classes { drop: drop, class: class }))
 (define-read-only (get-award (id uint)) (map-get? Awards id))
 (define-read-only (get-award-by-number (drop uint) (number uint)) (map-get? ByNumber { drop: drop, number: number }))
@@ -66,7 +70,7 @@
 ;; What a note is bound to besides its own fields: this chain and this very contract. A note signed for one
 ;; deployment is worthless on another.
 (define-read-only (get-domain)
-  { chain: chain-id, contract: (as-contract tx-sender), domain: DOMAIN })
+  { chain: chain-id, contract: current-contract, domain: DOMAIN })
 
 ;; The hash Xtrata will compute for a one-chunk record.
 (define-read-only (get-record-hash (record (buff 1024)))
@@ -78,7 +82,7 @@
   (sha256 (unwrap-panic (to-consensus-buff? {
     chain: chain-id,
     class: class,
-    contract: (as-contract tx-sender),
+    contract: current-contract,
     domain: DOMAIN,
     drop: drop,
     hero: hero,
@@ -108,18 +112,25 @@
     (asserts! (is-none (map-get? ByHero { drop: drop, hero: hero })) ERR-ALREADY-AWARDED)
     (asserts! (< (get minted cfg) (get cap cfg)) ERR-CLASS-FULL)
     (let (
+        ;; What Xtrata charges for this one-chunk record right now: the most this contract may spend on it.
+        (fee (get total-fee (try! (contract-call? 'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-v3-2-3
+          quote-single-tx-fee size u1))))
         ;; As this contract: inscribe the record (the core checks the bytes against the hash and takes its fee
         ;; from this contract's balance), with the class's template declared as what it is built from.
-        (minted (try! (as-contract (contract-call? 'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-v3-2-3
-          mint-single-tx-recursive record-hash MIME size (list record) (var-get token-uri)
-          (list (get template cfg))))))
+        (minted (unwrap! (as-contract? ((with-stx fee))
+          (try! (contract-call? 'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-v3-2-3
+            mint-single-tx-recursive record-hash MIME size (list record) (var-get token-uri)
+            (list (get template cfg)))))
+          ERR-UNEXPECTED))
         (id (get token-id minted))
         (edition (+ (get minted cfg) u1))
       )
       (asserts! (not (get existed minted)) ERR-UNEXPECTED)
       ;; ...and hand it to the hero. Everything above and below happens in this one transaction or not at all.
-      (try! (as-contract (contract-call? 'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-v3-2-3
-        transfer id tx-sender hero)))
+      (unwrap! (as-contract? ((with-nft 'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-v3-2-3 CORE-ASSET (list id)))
+        (try! (contract-call? 'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-v3-2-3
+          transfer id tx-sender hero)))
+        ERR-UNEXPECTED)
       (map-set Classes { drop: drop, class: class } (merge cfg { minted: edition }))
       (map-set Awards id { drop: drop, class: class, edition: edition, number: number, plays: plays, hero: hero })
       (map-set ByNumber { drop: drop, number: number } id)
@@ -167,14 +178,18 @@
   (begin
     (try! (assert-owner))
     (asserts! (> amount u0) ERR-BAD-ARGS)
-    (as-contract (stx-transfer? amount tx-sender recipient))))
+    (unwrap! (as-contract? ((with-stx amount)) (try! (stx-transfer? amount tx-sender recipient))) ERR-UNEXPECTED)
+    (ok true)))
 
 ;; An inscription sent to this contract by mistake can be sent on. Claims never leave one here.
 (define-public (recover (id uint) (recipient principal))
   (begin
     (try! (assert-owner))
-    (as-contract (contract-call? 'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-v3-2-3
-      transfer id tx-sender recipient))))
+    (unwrap! (as-contract? ((with-nft 'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-v3-2-3 CORE-ASSET (list id)))
+      (try! (contract-call? 'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-v3-2-3
+        transfer id tx-sender recipient)))
+      ERR-UNEXPECTED)
+    (ok true)))
 
 (define-public (transfer-contract-ownership (new-owner principal))
   (begin
