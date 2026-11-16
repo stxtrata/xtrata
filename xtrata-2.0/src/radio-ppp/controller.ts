@@ -32,7 +32,7 @@ export interface GateConfig {
   passkeyOnly?: boolean;
   limits: { playFee: string; returnFee: string; maxSessionPlays: number; sessionHours: number };
   /** Gift wallets (functions/lib/radio-gifts.ts): off unless the deployment has a gift treasury. */
-  gifts?: { enabled: boolean; treasury: string | null; turnstileSiteKey: string | null; admin: boolean; fee: string };
+  gifts?: { enabled: boolean; treasury: string | null; turnstileSiteKey: string | null; admin: boolean; fee: string; /** days a prefunded batch's copies stay claimable */ batchDays?: number };
   /** Ways to add plays beyond sending STX (src/lib/listening-wallet/restock.ts). Absent: STX only. */
   restock?: { sbtc?: boolean; card?: boolean };
 }

@@ -436,6 +436,8 @@ history.replaceState(null,'',location.pathname+location.search);}catch(e){}})();
   .ppp-gift-list{list-style:none;margin:8px 0;padding:0}
   .ppp-gift-list li{display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid rgba(34,48,71,.5);font-size:12px}
   .ppp-gift-list .t{flex:1;color:var(--ink)}
+  .ppp-gift-list li{flex-wrap:wrap}
+  .ppp-batch-extend{display:flex;flex-wrap:wrap;align-items:center;gap:8px;font-size:12.5px;margin:6px 0 0}
   .ppp-gift-admin{margin-top:10px;padding:10px;border:1px dashed var(--line);border-radius:10px;display:flex;flex-wrap:wrap;gap:6px;align-items:center}
   .ppp-gift-admin p{flex-basis:100%;margin:2px 0!important}
   .ppp-gift-admin input{font:inherit;font-size:12px;color:var(--ink);background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:6px 8px;width:80px}
@@ -1348,7 +1350,7 @@ function showUnavailable(){
 fetch('/radio/listening-wallet/config',{cache:'no-store',signal:AbortSignal.timeout(15000)})
   .then(function(r){return r.ok?r.json():{}})
   .then(function(c){
-    if(c?.enabled && (!paidHost || c.here)) return import('/radio/ppp.js?v=92499498282f');
+    if(c?.enabled && (!paidHost || c.here)) return import('/radio/ppp.js?v=3babaebf8fd0');
     showUnavailable();
   }).catch(showUnavailable);
 </script>

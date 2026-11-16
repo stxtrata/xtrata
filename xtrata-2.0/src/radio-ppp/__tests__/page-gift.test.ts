@@ -484,6 +484,39 @@ describe('prefunded batches (admin): the creator pays for every copy up front', 
     expect(pay.mock.calls[0][0]).toMatchObject({ recipient: TREASURY, amount: '222000', memo: 'batch ' + ID, stxAddress: ADMIN });
   });
 
+  it('a live batch shows how long it has left, and one signature extends one batch or all of them', async () => {
+    const DAY = 86_400_000;
+    const view = (id: string, days: number, waiting = 2) => ({ ...live, id, expires: Date.now() + days * DAY, copies: { ...live.copies, waiting } });
+    const mine = [{ id: ID, codes: CODES, count: 2, amount: '108000', label: 'Launch', player: null, depositTo: TREASURY, deposit: '222000', memo: 'batch ' + ID, at: 1, txid: '0x1', view: view(ID, 12) },
+      { id: 'aaaaaaaaaaaaaaaa', codes: [], count: 5, amount: '20500', label: 'Classic 1', player: null, depositTo: TREASURY, deposit: '1', memo: 'm', at: 2, txid: '0x2', view: view('aaaaaaaaaaaaaaaa', 40) }];
+    localStorage.setItem('xtrata.radio.gift.batches.v1:' + ADMIN, JSON.stringify(mine));
+    let added = 0; // the server remembers an extension, as the real one does
+    served({
+      '/radio/gift/batch': () => new Response(JSON.stringify(view(ID, 12 + added))),
+      '/radio/gift/batch/confirm': () => new Response(JSON.stringify(view(ID, 12 + added))),
+      '/radio/gift/batches': () => new Response(JSON.stringify({ batches: [view(ID, 12 + added), view('aaaaaaaaaaaaaaaa', 40 + added)] })),
+      '/radio/gift/batch/extend': () => { added = 90; return new Response(JSON.stringify({ extended: 2, days: 90, batches: [view(ID, 102), view('aaaaaaaaaaaaaaaa', 130)] })); }
+    });
+    const pay = await payWith(() => { throw new Error('no payment is ever asked for an extension'); });
+    const root = await admin();
+    const body = () => root.querySelector('.ppp-gift-body')!;
+    await vi.waitFor(() => expect(text(body())).toContain('12 days left'));
+    expect(text(body())).toContain('40 days left');
+    expect(text(body())).toMatch(/2 live batches · the first runs out in 12 days\. Extend them all:/);
+    [...body().querySelectorAll('.ppp-batch-extend button')].find((b) => /\+90 days/.test(b.textContent ?? ''))!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    await vi.waitFor(() => expect(calls.some((c) => c.url.endsWith('/radio/gift/batch/extend'))).toBe(true));
+    expect(h.signed).toHaveLength(1);
+    expect(h.signed[0].message.data.purpose.data).toMatch(/Extend my prefunded/);
+    expect(calls.find((c) => c.url.endsWith('/radio/gift/batch/extend'))!.body.request).toMatchObject({ creator: ADMIN, batch: 'all', days: 90 });
+    await vi.waitFor(() => expect(text(body())).toContain('Extended ✓ 2 batches have 90 more days.'));
+    expect(text(body())).toContain('102 days left');
+    expect(pay).not.toHaveBeenCalled();
+    // one batch on its own
+    [...body().querySelectorAll('.ppp-gift-list button')].find((b) => b.getAttribute('aria-label') === 'Extend Classic 1 by 30 days')!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    await vi.waitFor(() => expect(calls.filter((c) => c.url.endsWith('/radio/gift/batch/extend'))).toHaveLength(2));
+    expect(calls.filter((c) => c.url.endsWith('/radio/gift/batch/extend'))[1].body.request).toMatchObject({ batch: 'aaaaaaaaaaaaaaaa', days: 30 });
+  });
+
   it('only a gift admin sees it', async () => {
     h.session = { isConnected: true, network: 'mainnet', address: ADMIN };
     const root = await open({ gift: null, giftStop: null, giftPlays: 0, main: ADMIN });

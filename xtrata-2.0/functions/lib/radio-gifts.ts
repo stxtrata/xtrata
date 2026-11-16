@@ -45,7 +45,8 @@ import {
   isPlayerId, playerData, playerHash, validatePlayer, validatePlayerRequest, verifyPlayerSignature, type PlayerDefinition, type PlayerRequest, type PlayerView
 } from '../../src/lib/listening-wallet/gift-players';
 import {
-  batchDeposit, batchDepositMemo, batchRequestHash, BATCH_MEMO, isBatchId, validateBatch, verifyBatchSignature, type BatchRequest, type BatchView
+  BATCH_DAYS_DEFAULT, batchDeposit, batchDepositMemo, batchRequestHash, BATCH_MEMO, DAY_MS, EXTEND_HORIZON_DAYS, extendRequestHash, isBatchId, validateBatch, validateExtend,
+  verifyBatchSignature, verifyExtendSignature, type BatchRequest, type BatchView, type ExtendRequest
 } from '../../src/lib/listening-wallet/batches';
 import {
   GIFT_EXPIRY_MS, GIFT_FEE, GIFT_FEE_CAP, GIFT_MEMO, giftCodeHash, giftDepositMemo, isGiftCode, newGiftCode,
@@ -72,6 +73,8 @@ export type GiftEnv = PppEnv & {
   RADIO_RELEASE_COPIES_ENABLED?: string;
   /** Most of one artist's money held in unclaimed copies at once, microSTX (default 25 STX). Gift admins are not capped. */
   RADIO_RELEASE_COPIES_CAP?: string;
+  /** Days a prefunded batch's copies stay claimable once its payment confirms (1 to 365; default 90). The creator can extend. */
+  RADIO_GIFT_BATCH_DAYS?: string;
 };
 
 /** The most of one artist's money held at once in copies nobody has claimed yet (a batch waiting for its payment counts too). */
@@ -268,13 +271,17 @@ export const adminAddresses = (env: GiftEnv): string[] =>
 const isAdmin = (env: GiftEnv, address: unknown) => typeof address === 'string' && adminAddresses(env).includes(address);
 const micro = (value: string | undefined, fallback: bigint) => (typeof value === 'string' && /^\d{1,12}$/.test(value.trim()) ? BigInt(value.trim()) : fallback);
 
+/** How long a prefunded batch's copies stay claimable from the moment its payment confirms. */
+export const batchDays = (env: GiftEnv): number => { const n = Number((env.RADIO_GIFT_BATCH_DAYS ?? '').trim()); return Number.isSafeInteger(n) && n >= 1 && n <= 365 ? n : BATCH_DAYS_DEFAULT; };
+const batchMs = (env: GiftEnv) => batchDays(env) * DAY_MS;
+
 /** What the radio page needs to know (public). Gifts are off unless every piece is in place. */
 export function giftsConfig(env: GiftEnv, main: string | null, request?: Request) {
   const g = gate(env, null, request);
   const treasury = treasuryAddress(env);
   const enabled = g.enabled && g.here && env.RADIO_GIFT_ENABLED === '1' && !!treasury;
   const turnstile = enabled && env.RADIO_GIFT_TURNSTILE_SITE_KEY && env.RADIO_GIFT_TURNSTILE_SECRET ? env.RADIO_GIFT_TURNSTILE_SITE_KEY : null;
-  return { enabled, treasury: enabled ? treasury : null, turnstileSiteKey: turnstile, admin: enabled && !!main && isAdmin(env, main), fee: GIFT_FEE.toString() };
+  return { enabled, treasury: enabled ? treasury : null, turnstileSiteKey: turnstile, admin: enabled && !!main && isAdmin(env, main), fee: GIFT_FEE.toString(), batchDays: batchDays(env) };
 }
 
 const requireEnabled = (env: GiftEnv, request?: Request) => {
@@ -866,16 +873,16 @@ export async function createBatch(env: GiftEnv, body: { request: BatchRequest; s
   const codes = Array.from({ length: req.count }, () => newGiftCode());
   // One transaction: the batch and every copy, or nothing. Copies go in a few rows per statement (D1 allows 100 bound values).
   const writes: any[] = [db.prepare(`INSERT INTO radio_gift_batches(id, request_hash, creator, player_id, count, amount, label, status, created_at, expires_at, updated_at)
-    VALUES(?, ?, ?, ?, ?, ?, ?, 'pending-deposit', ?, ?, ?)`).bind(id, batchRequestHash(req), req.creator, req.player ?? null, req.count, amount, req.label, now, now + GIFT_EXPIRY_MS, now)];
+    VALUES(?, ?, ?, ?, ?, ?, ?, 'pending-deposit', ?, ?, ?)`).bind(id, batchRequestHash(req), req.creator, req.player ?? null, req.count, amount, req.label, now, now + batchMs(env), now)];
   for (let i = 0; i < codes.length; i += 9) {
     const part = codes.slice(i, i + 9);
     writes.push(db.prepare(`INSERT INTO radio_gifts(id, code_hash, amount, source, gifter, label, status, created_at, expires_at, updated_at, player_id, batch_id)
       VALUES ${part.map(() => "(?, ?, ?, 'friend', ?, ?, 'pending-deposit', ?, ?, ?, ?, ?)").join(', ')}`)
-      .bind(...part.flatMap((code) => [randomId(), giftCodeHash(code), amount, req.creator, req.label, now, now + GIFT_EXPIRY_MS, now, req.player ?? null, id])));
+      .bind(...part.flatMap((code) => [randomId(), giftCodeHash(code), amount, req.creator, req.label, now, now + batchMs(env), now, req.player ?? null, id])));
   }
   try { await db.batch(writes); }
   catch (e) { if (isConstraint(e)) throw new GiftError('That request was already used. Sign a new one.', 409); throw e; }
-  return { id, codes, count: req.count, amount: req.amount, depositTo: treasury, deposit: total.toString(), memo: batchDepositMemo(id), links: GIFT_EXPIRY_MS };
+  return { id, codes, count: req.count, amount: req.amount, depositTo: treasury, deposit: total.toString(), memo: batchDepositMemo(id), links: batchMs(env) };
 }
 
 /** The creator's deposit. With a txid it checks that transaction; without one it looks for the memo among the treasury's recent deposits. */
@@ -891,6 +898,40 @@ export async function confirmBatch(env: GiftEnv, body: { id: string; txid?: stri
   const b = await batchRow(env, body.id);
   if (!b) throw new GiftError('Unknown batch.', 404);
   return checkBatchDeposit(env, b, txid, treasury, deps);
+}
+
+/**
+ * The creator gives their copies longer: one batch, or every live batch they have, by 30 or 90 days, with one signature
+ * (no payment: the money is already here). Only copies still waiting to be claimed move: each one's deadline becomes
+ * its current one (or now, if that has just passed and it has not been refunded yet) plus the days, never more than a
+ * year ahead. Claimed, refunding and refunded copies are untouched, and a signed request works once.
+ */
+export async function extendBatches(env: GiftEnv, body: { request?: ExtendRequest; signature?: unknown }, deps: GiftDeps, request?: Request) {
+  requireEnabled(env, request);
+  let req: ExtendRequest;
+  try { req = validateExtend(body?.request as ExtendRequest, deps.now); } catch (e) { throw new GiftError((e as Error).message, 400); }
+  if (!verifyExtendSignature(req, body.signature)) throw new GiftError('That extension was not signed by this wallet.', 403);
+  await ensureGiftTables(env);
+  await run(env, 'CREATE TABLE IF NOT EXISTS radio_gift_batch_extends(hash TEXT PRIMARY KEY, creator TEXT NOT NULL, batch TEXT NOT NULL, days INTEGER NOT NULL, at INTEGER NOT NULL)');
+  const list = req.batch === 'all'
+    ? await all<BatchRow>(env, "SELECT * FROM radio_gift_batches WHERE creator=? AND status='live' ORDER BY created_at DESC LIMIT 200", [req.creator])
+    : await all<BatchRow>(env, 'SELECT * FROM radio_gift_batches WHERE id=?', [req.batch]);
+  if (req.batch !== 'all') {
+    if (!list.length) throw new GiftError('Unknown batch.', 404);
+    if (list[0].creator !== req.creator) throw new GiftError('Only the wallet that paid for a batch can extend it.', 403);
+    if (list[0].status !== 'live') throw new GiftError('That batch is not paid for yet, so there is nothing to extend.', 409);
+  }
+  const db = d1(env), add = req.days * DAY_MS, horizon = deps.now + EXTEND_HORIZON_DAYS * DAY_MS;
+  const writes: any[] = [db.prepare('INSERT INTO radio_gift_batch_extends(hash, creator, batch, days, at) VALUES(?, ?, ?, ?, ?)').bind(extendRequestHash(req), req.creator, req.batch, req.days, deps.now)];
+  for (const b of list) {
+    // MAX(expires_at, now): a copy whose time has just run out but which has not been refunded yet starts again from now.
+    writes.push(db.prepare("UPDATE radio_gifts SET expires_at=MIN(MAX(expires_at, ?) + ?, ?), updated_at=? WHERE batch_id=? AND status='live'").bind(deps.now, add, horizon, deps.now, b.id));
+    writes.push(db.prepare("UPDATE radio_gift_batches SET expires_at=MIN(MAX(expires_at, ?) + ?, ?), updated_at=? WHERE id=? AND status='live'").bind(deps.now, add, horizon, deps.now, b.id));
+  }
+  try { await db.batch(writes); }
+  catch (e) { if (isConstraint(e)) throw new GiftError('That request was already used. Sign a new one.', 409); throw e; }
+  const after = await Promise.all(list.map(async (b) => batchView(env, (await batchRow(env, b.id))!)));
+  return { extended: after.length, days: req.days, batches: after };
 }
 
 /** A batch by its id (the creator who paid for it). */
@@ -932,7 +973,7 @@ async function checkBatchDeposit(env: GiftEnv, b: BatchRow, txid: string | null,
   await run(env, "UPDATE radio_gift_orphans SET status='resolved', reason=reason || ' (paid for its batch)', updated_at=? WHERE txid=? AND status='needs-refund'", [deps.now, t.txid]);
   if (t.status === 'pending') return batchView(env, (await batchRow(env, b.id))!);
   // Confirmed (even long after it was set aside): the batch and every copy go live in ONE transaction, for 30 days.
-  const db = d1(env), expires = deps.now + GIFT_EXPIRY_MS;
+  const db = d1(env), expires = deps.now + batchMs(env);
   await db.batch([
     db.prepare("UPDATE radio_gift_batches SET status='live', expires_at=?, updated_at=? WHERE id=? AND status IN ('pending-deposit','abandoned')").bind(expires, deps.now, b.id),
     db.prepare("UPDATE radio_gifts SET status='live', expires_at=?, updated_at=? WHERE batch_id=? AND status IN ('pending-deposit','abandoned')").bind(expires, deps.now, b.id)

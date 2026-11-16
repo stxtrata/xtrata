@@ -7,13 +7,13 @@
  *  - Friend gift: anyone with a Stacks wallet picks 0.01 to 1 STX, pays it (+ the network fee) into the
  *    gift treasury, and gets a link to share once that payment confirms.
  *  - Admin: prefunded batches. The creator signs one request, pays for every copy in ONE transfer to the treasury, and the
- *    links go live when it confirms. Unclaimed copies go back to the creator after 30 days. The treasury pays nothing itself.
+ *    links go live when it confirms. Unclaimed copies go back to the creator when their time runs out (90 days, which the creator can extend). The treasury pays nothing itself.
  * Where returns go for a gifted wallet comes from the gift record (`funder`), not the chain's first
  * sender, so a friend's gift goes back to the friend.
  */
 import { GIFT_FEE, GIFT_MAX, GIFT_MIN, giftLink, giftPlays, isGiftCode, type GiftView } from '../lib/listening-wallet/gifts';
 import {
-  BATCH_MAX_COPIES, batchBreakdown, batchData, copyAmountForPlays, maxCopyPlays, validBatchAmount, type BatchRequest, type BatchView
+  BATCH_DAYS_DEFAULT, BATCH_MAX_COPIES, batchBreakdown, batchData, copyAmountForPlays, EXTEND_DAYS, extendData, maxCopyPlays, validBatchAmount, type BatchRequest, type BatchView, type ExtendRequest
 } from '../lib/listening-wallet/batches';
 import { listedTracks, PLAY_PRESETS, playerData, playerHash, validatePlayer } from '../lib/listening-wallet/gift-players';
 import type { FunderResult } from '../lib/listening-wallet/funder';
@@ -28,7 +28,9 @@ export interface GiftDeps {
   /** STX transfer from the connected wallet (one popup); resolves with the txid. */
   pay(main: string, recipient: string, amount: bigint, memo: string): Promise<string>;
   /** SIP-018 signature from the connected wallet (one popup). */
-  sign(main: string, data: ReturnType<typeof playerData> | ReturnType<typeof batchData>): Promise<string>;
+  sign(main: string, data: ReturnType<typeof playerData> | ReturnType<typeof batchData> | ReturnType<typeof extendData>): Promise<string>;
+  /** Days a batch's copies stay claimable (from the server's settings), when known. */
+  batchDays?(): number | undefined;
   giftSent(txid: string, amount: bigint): void;
   /** A claim started (true) or ended without a gift (false): the wallet should read as "plays on their way", never empty. */
   claiming?(on: boolean): void;
@@ -527,6 +529,34 @@ export function createGifts(deps: GiftDeps) {
     await payBatch(main, made!.id);
   }
 
+  /** Give copies longer: one batch, or every live one (`all`), with one signature and no payment. */
+  async function extend(main: string, batch: string, days: number) {
+    if (working) return;
+    working = 'Sign in your wallet (nothing is spent)…'; note = ''; deps.changed();
+    try {
+      const request: ExtendRequest = { creator: main, batch, days, issued: deps.now() };
+      const signature = await deps.sign(main, extendData(request));
+      working = 'Extending…'; deps.changed();
+      const r = await postJson('/radio/gift/batch/extend', { request, signature });
+      const list = loadBatches(main);
+      for (const v of (r?.batches ?? []) as BatchView[]) { const b = list.find((x) => x.id === v.id); if (b) { b.view = v; b.error = undefined; } }
+      saveBatches(main, list);
+      note = r?.extended ? `Extended ✓ ${r.extended === 1 ? 'That batch has' : `${r.extended} batches have`} ${days} more days.` : 'There was nothing live to extend.';
+    } catch (e) { note = /cancel/i.test((e as Error).message || '') ? 'Cancelled. Nothing changed.' : ((e as Error).message || 'Not extended.'); }
+    finally { working = ''; deps.changed(); }
+  }
+  const daysLeft = (expires: number) => Math.max(0, Math.ceil((expires - deps.now()) / 86_400_000));
+  /** One row to extend every live batch at once, when there is one with copies still waiting. */
+  function extendAllRow(main: string, list: MyBatch[]): HTMLElement | null {
+    const live = list.filter((b) => b.view?.status === 'live' && b.view.copies.waiting > 0);
+    if (!live.length) return null;
+    const soonest = Math.min(...live.map((b) => b.view!.expires));
+    const row = el('p', '', 'ppp-batch-extend');
+    row.append(el('span', `${live.length} live ${live.length === 1 ? 'batch' : 'batches'} · the first runs out in ${daysLeft(soonest)} days. Extend ${live.length === 1 ? 'it' : 'them all'}: `));
+    for (const d of EXTEND_DAYS) { const b = button(`+${d} days`, () => void extend(main, 'all', d), 'tiny'); b.disabled = !!working; row.append(b); }
+    return row;
+  }
+
   /** What the batch form would cost for the current choices (also used to explain it). */
   const batchPlan = () => planFor(!!batchPlayer.value, batchPreset.value, batchCount.value);
   function planFor(album: boolean, preset: string, copies: string) {
@@ -537,13 +567,14 @@ export function createGifts(deps: GiftDeps) {
     if (!validBatchAmount(amount)) return { ok: false as const, reason: 'Each copy must be 0.01 to 1 STX.', album, plays, amount, count };
     return { ok: true as const, reason: '', album, plays, amount, count, bill: batchBreakdown(count, amount, album) };
   }
+  const daysNow = () => deps.batchDays?.() ?? BATCH_DAYS_DEFAULT;
   const billText = (p = batchPlan()) => {
     if (!p.ok) return p.reason;
     const b = p.bill;
     return `Each copy: ${p.plays.toLocaleString()} paid plays (${stxNice(b.holders)} to song holders, ${stxNice(b.fees)} network fees)`
       + `${p.album ? `, ${stxNice(b.float)} for the album’s likes` : ''}, ${stxNice(b.reserve)} kept so a listener can return what is left, `
       + `+ ${stxNice(b.sendFee)} to send it = ${stxNice(b.perCopy)} STX. ${p.count} copies = ${stxNice(b.total)} STX, paid now in one payment. `
-      + 'Copies nobody claims within 30 days come back to you.';
+      + `Copies nobody claims within ${daysNow()} days come back to you, and you can extend that at any time.`;
   };
 
   const batchLinks = (radioUrl: string | null, b: MyBatch) => b.codes.map((c) => linkFor(radioUrl, c));
@@ -585,6 +616,10 @@ export function createGifts(deps: GiftDeps) {
     const li = el('li');
     li.append(el('span', `${b.label || 'Batch'} · ${b.count} × ${stxNice(BigInt(b.amount))} STX`, 't'), el('span', status, 'ppp-mute'));
     if (!b.txid && b.depositTo && (!v || v.status === 'pending-deposit')) li.append(button('Pay now', () => void payBatch(main, b.id), 'tiny'));
+    if (v?.status === 'live' && c!.waiting > 0) {
+      li.append(el('span', `${daysLeft(v.expires)} days left`, 'ppp-mute'));
+      for (const d of EXTEND_DAYS) { const x = button(`+${d}`, () => void extend(main, b.id, d), 'tiny'); x.title = `Extend this batch by ${d} days (a signature, no payment)`; x.setAttribute('aria-label', `Extend ${b.label || 'this batch'} by ${d} days`); x.disabled = !!working; li.append(x); }
+    }
     if (b.codes.length && v?.status === 'live') {
       const links = batchLinks(radioUrl, b);
       li.append(
@@ -596,7 +631,7 @@ export function createGifts(deps: GiftDeps) {
 
   // ---------------------------------------------------------------- copies of one release, for its artist (releases.ts)
   // The same prefunded batches, always carrying that release: the artist pays for every copy up front in one payment,
-  // each copy is a link that makes the album with its own plays, and copies nobody claims come back after 30 days.
+  // each copy is a link that makes the album with its own plays, and copies nobody claims come back when their time runs out (the creator can extend it).
   const relPreset = el('select') as HTMLSelectElement; relPreset.setAttribute('aria-label', 'Plays in each copy');
   for (const n of [...new Set([50, 100, 250, ...PLAY_PRESETS])].sort((a, b) => a - b)) relPreset.append(opt(`${n.toLocaleString()} plays`, String(n)));
   relPreset.value = '50';
@@ -613,7 +648,7 @@ export function createGifts(deps: GiftDeps) {
     go.disabled = !!working;
     const labelled = (text: string, input: HTMLElement) => { const l = el('label', text); l.append(input); return l; };
     const parts: HTMLElement[] = [
-      el('p', 'Each copy is a link. Whoever opens it gets this album with its own plays, paid for by you. You pay for every copy now, in one payment; copies nobody claims within 30 days come back to you.', 'ppp-mute'),
+      el('p', 'Each copy is a link. Whoever opens it gets this album with its own plays, paid for by you. You pay for every copy now, in one payment; copies nobody claims come back to you when their time runs out, and you can extend that.', 'ppp-mute'),
       labelled('Plays in each ', relPreset), labelled('Copies ', relCount), relLabel, relBill, go];
     if (deps.now() - checkedBatches > 30_000) { checkedBatches = deps.now(); void refreshBatches(main); }
     const mine = loadBatches(main).filter((b) => b.player === release.id);
@@ -622,6 +657,8 @@ export function createGifts(deps: GiftDeps) {
       for (const b of mine.slice(0, 10)) list.append(batchLine(main, b, radioUrl));
       parts.push(list);
     }
+    const all = extendAllRow(main, loadBatches(main));
+    if (all) parts.push(all);
     if (working) parts.push(el('p', working, 'ppp-cyan'));
     if (note) parts.push(el('p', note, /✓/.test(note) ? 'ppp-ok' : 'ppp-warn'));
     return parts;
@@ -655,14 +692,16 @@ export function createGifts(deps: GiftDeps) {
         if (made.some((x) => x.id === keepB)) batchPlayer.value = keepB;
         syncBill();
         box.append(
-          el('p', 'Prefunded batch (admin) · you pay up front, unclaimed copies come back to you after 30 days', 'ppp-cyan'),
+          el('p', `Prefunded batch (admin) · you pay up front, unclaimed copies come back to you after ${daysNow()} days unless you extend`, 'ppp-cyan'),
           labelled('Album ', batchPlayer), labelled('Plays each ', batchPreset), labelled('Copies ', batchCount), batchLabel, batchBill, gobtn);
         if (deps.now() - checkedBatches > 30_000) { checkedBatches = deps.now(); void refreshBatches(main); }
         const myBatches = loadBatches(main);
         if (myBatches.length) {
           const blist = el('ul', '', 'ppp-gift-list');
-          for (const b of myBatches.slice(0, 10)) blist.append(batchLine(main, b, s.gate?.radioUrl ?? null));
+          for (const b of myBatches.slice(0, 20)) blist.append(batchLine(main, b, s.gate?.radioUrl ?? null));
           box.append(blist);
+          const all = extendAllRow(main, myBatches);
+          if (all) box.append(all);
         }
         parts.push(box);
       }

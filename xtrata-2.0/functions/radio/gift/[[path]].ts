@@ -1,5 +1,5 @@
 import {
-  batchesFor, batchStatus, claimGift, confirmBatch, confirmFriendGift, createBatch, createFriendGift, createPlayer, GiftError,
+  batchesFor, batchStatus, claimGift, confirmBatch, confirmFriendGift, createBatch, extendBatches, createFriendGift, createPlayer, GiftError,
   explicitSongs, featuredPlayers, giftForWallet, giftStatus, hiroGiftChain, nextSlot, runSweep, shelfFor, sweepAuthorised, sweepGifts, turnstilePasses, type GiftDeps, type GiftEnv
 } from '../../lib/radio-gifts';
 import { checkSongsNow } from '../../lib/radio-metadata';
@@ -75,6 +75,7 @@ export async function onRequest(context: Ctx) {
     else if (action === 'confirm') out = await confirmFriendGift(env, body, deps(), request);
     else if (action === 'batch') out = await createBatch(env, body, deps(), request);
     else if (action === 'batch/confirm') out = await confirmBatch(env, body, deps(), request);
+    else if (action === 'batch/extend') out = await extendBatches(env, body, deps(), request);
     else if (action === 'player') out = await createPlayer(env, body, deps(), request);
     else return reply({ error: 'Not found' }, 404);
     later();

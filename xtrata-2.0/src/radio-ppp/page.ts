@@ -204,6 +204,7 @@ function start(root: HTMLElement) {
     sign: (main, data) => requestStructuredSignature({ ...data, network: 'mainnet', stxAddress: main }),
     giftSent: (txid, amount) => ppp.giftSent(txid, amount),
     claiming: (on) => ppp.giftClaiming(on),
+    batchDays: () => ppp.snapshot().gate?.gifts?.batchDays,
     claimNew: (s) => claimNewFor(s),
     replaceOld: (s) => replaceFor(s),
     album: { bind: (slot) => ppp.bindAlbum(slot), arrived: async (slot, address, txid, amount) => { shelf.invalidate(); await ppp.albumArriving(slot, address, txid, amount); } },

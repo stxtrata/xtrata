@@ -11,9 +11,9 @@ import { bytesToHex } from '@noble/hashes/utils';
 import {
   BUMP_AFTER_MS, claimGift, hiroGiftChain, RETRY_FAILED_MS, CLAIMS_PER_IP, confirmFriendGift, createFriendGift, createPlayer, ensureGiftTables, GiftError, giftForWallet, giftsConfig,
   adminAddresses, explicitSongs, featuredPlayers, giftStatus, playerView, nextSlot, NONCE_SETTLE_MS, principalIn, REBROADCAST_MS, shelfFor, sweepGifts, type ChainTransfer, type GiftChain, type GiftEnv,
-  batchesFor, batchStatus, confirmBatch, createBatch, MAX_PENDING_BATCHES, REFUND_GROUP_MAX, runSweep, sweepAuthorised, SCAN_EVERY_MS, SCAN_WHILE_EXPECTING_MS
+  batchesFor, batchStatus, confirmBatch, createBatch, extendBatches, MAX_PENDING_BATCHES, REFUND_GROUP_MAX, runSweep, sweepAuthorised, SCAN_EVERY_MS, SCAN_WHILE_EXPECTING_MS
 } from '../radio-gifts';
-import { batchDeposit, batchRequestHash, type BatchRequest } from '../../../src/lib/listening-wallet/batches';
+import { batchDeposit, batchRequestHash, extendRequestHash, type BatchRequest, type ExtendRequest } from '../../../src/lib/listening-wallet/batches';
 import { deriveSlotIdentity, listeningBase } from '../../../src/lib/listening-wallet/derive';
 import { signSlotBinding } from '../../../src/lib/listening-wallet/slots';
 import { playerData, playerHash, type PlayerDefinition, type PlayerRequest } from '../../../src/lib/listening-wallet/gift-players';
@@ -775,6 +775,7 @@ describe('radio gift players', () => {
     });
 
   describe('prefunded batches (the creator pays for every copy up front)', () => {
+    const BATCH_MS = 90 * 86_400_000; // how long a batch's copies last by default
     const PRF = Uint8Array.from({ length: 32 }, (_, i) => i + 11);
     type S = ReturnType<typeof setup>;
     const req = (s: S, over: Partial<BatchRequest> = {}): BatchRequest => ({ creator: s.admin, count: 3, amount: '123000', label: 'Opera launch', issued: s.now(), ...over });
@@ -794,6 +795,97 @@ describe('radio gift players', () => {
     };
     const rowsOf = (s: S, id: string) => s.db.sql.prepare('SELECT status, gifter, amount, expires_at AS expires FROM radio_gifts WHERE batch_id=?').all(id) as { status: string; gifter: string; amount: number; expires: number }[];
 
+    describe('how long copies last, and extending them', () => {
+      const DAY = 86_400_000;
+      const ext = (s: S, batch: string, days: number, k = s.adminKey, creator = addr(k)) => {
+        s.tick(1000);
+        const request: ExtendRequest = { creator, batch, days, issued: s.now() };
+        return extendBatches(s.env, { request, signature: signMessageHashRsv({ messageHash: extendRequestHash(request), privateKey: createStacksPrivateKey(k) }).data }, s.deps(), s.request);
+      };
+      const expiries = (s: S, id: string) => (s.db.sql.prepare('SELECT status, expires_at AS e FROM radio_gifts WHERE batch_id=? ORDER BY id').all(id) as { status: string; e: number }[]);
+
+      it('copies last 90 days from the moment the payment confirms; the length is a setting', async () => {
+        const s = setup();
+        const made = await live(s);
+        expect(giftsConfig(s.env, null, s.request).batchDays).toBe(90);
+        expect(rowsOf(s, made.id).every((g) => g.expires === s.now() + 90 * DAY)).toBe(true);
+        expect((await batchStatus(s.env, made.id)).expires).toBe(s.now() + 90 * DAY);
+        const t = setup({ RADIO_GIFT_BATCH_DAYS: '45' });
+        const other = await live(t);
+        expect(rowsOf(t, other.id).every((g) => g.expires === t.now() + 45 * DAY)).toBe(true);
+        expect(giftsConfig(setup({ RADIO_GIFT_BATCH_DAYS: 'forever' }).env, null, s.request).batchDays).toBe(90);
+      });
+
+      it('the creator adds 30 or 90 days with one signature; only copies still waiting move', async () => {
+        const s = setup();
+        const made = await live(s);
+        const start = rowsOf(s, made.id)[0].expires;
+        s.db.sql.prepare("UPDATE radio_gifts SET status='claimed' WHERE id=(SELECT id FROM radio_gifts WHERE batch_id=? LIMIT 1)").run(made.id);
+        const out = await ext(s, made.id, 30);
+        expect(out).toMatchObject({ extended: 1, days: 30 });
+        expect(out.batches[0].expires).toBe(start + 30 * DAY);
+        const rows = expiries(s, made.id);
+        expect(rows.filter((r) => r.status === 'live').every((r) => r.e === start + 30 * DAY)).toBe(true);
+        expect(rows.filter((r) => r.status === 'claimed').every((r) => r.e === start)).toBe(true);
+        await ext(s, made.id, 90);
+        expect(expiries(s, made.id).filter((r) => r.status === 'live').every((r) => r.e === start + 120 * DAY)).toBe(true);
+      });
+
+      it('"all" extends every live batch the creator has, and nobody else’s', async () => {
+        const s = setup();
+        const a = await live(s), b = await live(s, { count: 2 });
+        const pending = await fund(s, { count: 1 });
+        const before = [a, b].map((m) => rowsOf(s, m.id)[0].expires);
+        const out = await ext(s, 'all', 90);
+        expect(out.extended).toBe(2);
+        expect(rowsOf(s, a.id)[0].expires).toBe(before[0] + 90 * DAY);
+        expect(rowsOf(s, b.id)[0].expires).toBe(before[1] + 90 * DAY);
+        expect(rowsOf(s, pending.id)[0].status).toBe('pending-deposit'); // not paid for: nothing to extend
+      });
+
+      it('a copy whose time has just run out, but which has not been refunded yet, starts again from now', async () => {
+        const s = setup();
+        const made = await live(s);
+        s.tick(91 * DAY);
+        await ext(s, made.id, 30);
+        expect(expiries(s, made.id).every((r) => r.e === s.now() + 30 * DAY)).toBe(true);
+        // and it can be claimed again
+        await expect(s.claim(made.codes[0])).resolves.toMatchObject({ already: false });
+      });
+
+      it('never more than a year ahead, however often it is signed', async () => {
+        const s = setup();
+        const made = await live(s);
+        for (let i = 0; i < 6; i++) await ext(s, made.id, 90);
+        expect(expiries(s, made.id).every((r) => r.e <= s.now() + 365 * DAY)).toBe(true);
+        expect(expiries(s, made.id).every((r) => r.e > s.now() + 360 * DAY)).toBe(true);
+      });
+
+      it('only the wallet that paid can extend, only by 30 or 90 days, a signed request works once, and refunded copies stay refunded', async () => {
+        const s = setup();
+        const made = await live(s);
+        const stranger = key();
+        const before = expiries(s, made.id).map((r) => r.e);
+        await expect(ext(s, made.id, 30, stranger)).rejects.toMatchObject({ status: 403 });            // their own signature, not their batch
+        await expect(ext(s, made.id, 30, stranger, s.admin)).rejects.toMatchObject({ status: 403 });   // claims to be the creator
+        await expect(ext(s, made.id, 7)).rejects.toThrow(/30 or 90 days/);
+        await expect(ext(s, 'ffffffffffffffff', 30)).rejects.toMatchObject({ status: 404 });
+        expect((await ext(s, 'all', 30, stranger)).extended).toBe(0);                                  // "all" of a stranger's batches is none
+        expect(expiries(s, made.id).map((r) => r.e)).toEqual(before);
+        s.tick(1000);
+        const request: ExtendRequest = { creator: s.admin, batch: made.id, days: 30, issued: s.now() };
+        const body = { request, signature: signMessageHashRsv({ messageHash: extendRequestHash(request), privateKey: createStacksPrivateKey(s.adminKey) }).data };
+        await extendBatches(s.env, body, s.deps(), s.request);
+        await expect(extendBatches(s.env, body, s.deps(), s.request)).rejects.toMatchObject({ status: 409 });
+        s.db.sql.prepare("UPDATE radio_gifts SET status='refunded' WHERE batch_id=?").run(made.id);
+        const frozen = expiries(s, made.id).map((r) => r.e);
+        await ext(s, made.id, 90);
+        expect(expiries(s, made.id).map((r) => r.e)).toEqual(frozen);
+        s.tick(16 * 60_000);
+        await expect(extendBatches(s.env, { ...body, request: { ...request } }, s.deps(), s.request)).rejects.toThrow(/expired|already used/);
+      });
+    });
+
     it('a batch is dormant until its ONE deposit confirms, then every copy goes live together', async () => {
       const s = setup();
       const made = await fund(s);
@@ -805,8 +897,8 @@ describe('radio gift players', () => {
       expect(await batchStatus(s.env, made.id)).toMatchObject({ status: 'pending-deposit', copies: { waiting: 0, claimed: 0 } });
       s.tick(5_000);
       const view = await confirmBatch(s.env, { id: made.id, txid: pay(s, made) }, s.deps(), s.request);
-      expect(view).toMatchObject({ status: 'live', copies: { waiting: 3, claiming: 0, claimed: 0 }, expires: s.now() + GIFT_EXPIRY_MS });
-      expect(rowsOf(s, made.id)).toEqual(Array(3).fill({ status: 'live', gifter: s.admin, amount: 123000, expires: s.now() + GIFT_EXPIRY_MS }));
+      expect(view).toMatchObject({ status: 'live', copies: { waiting: 3, claiming: 0, claimed: 0 }, expires: s.now() + BATCH_MS });
+      expect(rowsOf(s, made.id)).toEqual(Array(3).fill({ status: 'live', gifter: s.admin, amount: 123000, expires: s.now() + BATCH_MS }));
       // the recipient sees who paid
       expect(await giftStatus(s.env, { code: made.codes[1] })).toMatchObject({ status: 'live', from: s.admin, source: 'friend', amount: '123000', label: 'Opera launch' });
     });
@@ -952,11 +1044,11 @@ describe('radio gift players', () => {
       await s.claim(made.codes[0]); // the creator's copy is claimable
     });
 
-    it('unclaimed copies go back to the creator after 30 days in ONE refund; claimed copies are never refunded', async () => {
+    it('unclaimed copies go back to the creator when their 90 days run out in ONE refund; claimed copies are never refunded', async () => {
       const s = setup();
       const made = await live(s, { count: 3 });
       await s.claim(made.codes[0]); await s.land();
-      s.tick(GIFT_EXPIRY_MS + 1);
+      s.tick(BATCH_MS + 1);
       await expect(s.claim(made.codes[1])).rejects.toMatchObject({ status: 410, message: expect.stringMatching(/expired/) });
       expect((await sweepGifts(s.env, s.deps())).did).toBe('deposits-scanned');
       const sent = await sweepGifts(s.env, s.deps());
@@ -977,7 +1069,7 @@ describe('radio gift players', () => {
       const s = setup();
       const made = await live(s, { count: 4 });
       const deposit = batchDeposit(4, 123000n);
-      s.tick(GIFT_EXPIRY_MS + 1);
+      s.tick(BATCH_MS + 1);
       await sweepGifts(s.env, s.deps()); // scan
       await sweepGifts(s.env, s.deps()); // refund
       const out = decode(s.chain.sent.at(-1)!.raw);
@@ -994,7 +1086,7 @@ describe('radio gift players', () => {
       const b = await createBatch(s.env, { request: r2, signature: sig(r2, second) }, s.deps(), s.request);
       s.chain.txs.set('0x' + 'b'.repeat(64), { status: 'success', sender: addr(second), recipient: s.treasury, amount: BigInt(b.deposit), memo: b.memo });
       await confirmBatch(s.env, { id: b.id, txid: '0x' + 'b'.repeat(64) }, s.deps(), s.request);
-      s.tick(GIFT_EXPIRY_MS + 1);
+      s.tick(BATCH_MS + 1);
       await sweepGifts(s.env, s.deps()); // scan
       const seen: { to: string; amount: bigint }[] = [];
       for (let i = 0; i < 6; i++) {
@@ -1012,7 +1104,7 @@ describe('radio gift players', () => {
     it('a stuck refund is re-signed with the same nonce and higher fee for EVERY copy it returns, and whichever lands settles all of them', async () => {
       const s = setup();
       const made = await live(s, { count: 3 });
-      s.tick(GIFT_EXPIRY_MS + 1);
+      s.tick(BATCH_MS + 1);
       await sweepGifts(s.env, s.deps());
       await sweepGifts(s.env, s.deps());
       const first = s.chain.sent.at(-1)!;
@@ -1031,7 +1123,7 @@ describe('radio gift players', () => {
     it('a refund whose nonce is used without a payment puts EVERY copy back, and it is tried again', async () => {
       const s = setup();
       const made = await live(s, { count: 3 });
-      s.tick(GIFT_EXPIRY_MS + 1);
+      s.tick(BATCH_MS + 1);
       await sweepGifts(s.env, s.deps());
       await sweepGifts(s.env, s.deps());
       const lost = s.chain.sent.at(-1)!;
@@ -1050,7 +1142,7 @@ describe('radio gift players', () => {
     it('a refund is never recorded half-way: if one copy stopped being live, no copy is touched and no send exists', async () => {
       const s = setup();
       const made = await live(s, { count: 3 });
-      s.tick(GIFT_EXPIRY_MS + 1);
+      s.tick(BATCH_MS + 1);
       await sweepGifts(s.env, s.deps());
       // The sweep reads the expired copies, then one of them is claimed by a racing request before the refund is written.
       let raced = false;
@@ -1153,7 +1245,7 @@ describe('radio gift players', () => {
       // 4. a claimed copy cannot be claimed again, and a wallet that already had a gift cannot take another
       await expect(s.claim(made.codes[0])).rejects.toMatchObject({ status: 410 });
       // 5. thirty days pass; the sweep alone returns the three unclaimed copies in ONE transfer to the creator
-      s.tick(GIFT_EXPIRY_MS + 1);
+      s.tick(BATCH_MS + 1);
       const steps = (await runSweep(s.env, s.deps())).steps;
       expect(steps).toContain('refund-sent');
       const refund = decode(s.chain.sent.at(-1)!.raw);
@@ -1179,7 +1271,7 @@ describe('radio gift players', () => {
       it('refunds an expired batch with nobody visiting any page, then idles', async () => {
         const s = setup();
         const made = await live(s, { count: 3 });
-        s.tick(GIFT_EXPIRY_MS + 1);
+        s.tick(BATCH_MS + 1);
         const first = await runSweep(s.env, s.deps());
         expect(first.steps).toEqual(['deposits-scanned', 'refund-sent', 'pending']); // scan, one refund for all three, then wait for the chain
         await s.land();

@@ -3,7 +3,7 @@
  *
  * A batch is N gift links made by a creator who pays for every one of them up front, in ONE transfer to the gift
  * treasury (memo `batch <id>`). The links stay dormant until that payment confirms; then all of them go live together.
- * Each copy that is claimed is paid out of the creator's own money; each copy still unclaimed after 30 days goes back to
+ * Each copy that is claimed is paid out of the creator's own money; each copy still unclaimed when its time runs out (90 days unless the creator extends it) goes back to
  * the creator. The treasury never pays for a copy out of its own pocket, and a listener's leftover plays go back to the
  * creator because the creator is recorded as the gift's payer (the same rule friend gifts already follow).
  *
@@ -135,4 +135,37 @@ export interface BatchView {
   expires: number;
   /** Copies by state: waiting to be claimed, being sent, claimed, expired and waiting for a refund, refunded. */
   copies: { waiting: number; claiming: number; claimed: number; refunding: number; refunded: number };
+}
+
+// ---- how long copies stay claimable, and making that longer ----
+/** A batch's copies stay claimable this long from the moment its payment confirms, unless the deployment says otherwise. */
+export const BATCH_DAYS_DEFAULT = 90;
+export const DAY_MS = 24 * 60 * 60 * 1000;
+/** Lengths a creator may add with one signature. */
+export const EXTEND_DAYS = [30, 90] as const;
+/** However often it is extended, a copy's deadline is never more than this far ahead. */
+export const EXTEND_HORIZON_DAYS = 365;
+export const EXTEND_PURPOSE = 'Extend my prefunded Xtrata radio gift batches; no spending permission';
+/** Extend one batch (its id), or every live batch this creator has (`all`). */
+export interface ExtendRequest { creator: string; batch: string; days: number; issued: number }
+
+export function validateExtend(req: ExtendRequest, now = Date.now()): ExtendRequest {
+  if (!req || typeof req.creator !== 'string' || !isMainnetStandardAddress(req.creator)) throw new Error('An extension needs the creator’s Stacks address.');
+  if (req.batch !== 'all' && !isBatchId(req.batch)) throw new Error('That is not a batch.');
+  if (!(EXTEND_DAYS as readonly number[]).includes(req.days)) throw new Error(`Extend by ${EXTEND_DAYS.join(' or ')} days.`);
+  if (!Number.isSafeInteger(req.issued) || req.issued > now + 60_000 || now - req.issued > CAMPAIGN_MAX_AGE_MS) throw new Error('Request expired. Sign again.');
+  return { creator: req.creator, batch: req.batch, days: req.days, issued: req.issued };
+}
+export const extendData = (req: ExtendRequest) => ({
+  domain: tupleCV({ name: stringAsciiCV(CAMPAIGN_DOMAIN), version: stringAsciiCV('1'), 'chain-id': uintCV(1) }),
+  message: tupleCV({ purpose: stringAsciiCV(EXTEND_PURPOSE), creator: stringAsciiCV(req.creator), batch: stringAsciiCV(req.batch), days: uintCV(req.days), issued: uintCV(req.issued) })
+});
+export const extendRequestHash = (req: ExtendRequest) => bytesToHex(sha256(encodeStructuredData(extendData(req))));
+export function verifyExtendSignature(req: ExtendRequest, signature: unknown): boolean {
+  try {
+    if (typeof signature !== 'string') return false;
+    const hex = signature.replace(/^0x/, '');
+    if (!/^[a-fA-F0-9]{130}$/.test(hex)) return false;
+    return getAddressFromPublicKey(publicKeyFromSignatureRsv(extendRequestHash(req), createMessageSignature(hex)), TransactionVersion.Mainnet) === req.creator;
+  } catch { return false; }
 }
