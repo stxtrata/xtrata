@@ -40,6 +40,8 @@ export interface WelcomeInput {
    * separate player (its own passkey). Null for everyone else.
    */
   claimNew?: (() => void) | null;
+  /** With `claimNew`: replace the old player instead (empty it, remove it, then claim). Leads when on offer. */
+  replaceOld?: (() => void) | null;
   start(): void;
   returning(): void;
   unlock(): void;
@@ -96,7 +98,8 @@ export const WELCOME_TEXT = {
     hint: 'One tap with Face ID or your fingerprint. No app, no account, no password.', returning: 'I’ve listened here before', full: 'Look around first' },
   back: { title: 'Welcome back', body: 'Unlock your player and carry on listening.', primary: 'Unlock my player', hint: 'One tap with Face ID or your fingerprint.', returning: 'Use a different passkey', full: 'Look around first' },
   backClaim: { title: 'A free player is waiting', body: 'This device already has a player you made before. You can claim the free one as a new, separate player with its own passkey. Your existing player, and anything in it, stays exactly as it is.',
-    primary: 'Claim it as a new player', hint: 'One tap with Face ID or your fingerprint. You can switch between your players at any time.', unlock: 'Open my existing player instead' },
+    primary: 'Claim it as a new player', hint: 'One tap with Face ID or your fingerprint. You can switch between your players at any time.', unlock: 'Open my existing player instead',
+    replace: 'Replace my old player', replaceHint: 'Its balance is sent back first, then it is removed from this device. You end up with one player that has 24 backup words.', both: 'Keep both players' },
   arriving: { title: 'Your player is made', body: 'Your plays are on their way to it. This usually takes about a minute: keep this page open and it carries on by itself.' },
   landed: { title: 'You’re in', primary: 'Start listening' },
   empty: { title: 'Your player is ready', body: 'It has no plays yet. Add some and every song you hear pays its artist.', primary: 'Add plays', full: 'Look around the radio' },
@@ -169,7 +172,8 @@ export function createWelcomeView(mount: HTMLElement) {
         else if (m === 'back' && input.claimNew) {
           const w = WELCOME_TEXT.backClaim;
           box.append(el('p', 'al-hint', w.body));
-          if (input.canStart) box.append(button('al-primary', w.primary, input.claimNew, input.busy), el('p', 'al-hint', w.hint), button('al-link', w.unlock, input.unlock, input.busy));
+          if (input.canStart && input.replaceOld) box.append(button('al-primary', w.replace, input.replaceOld, input.busy), el('p', 'al-hint', w.replaceHint), button('al-link', w.both, input.claimNew, input.busy), button('al-link', w.unlock, input.unlock, input.busy));
+          else if (input.canStart) box.append(button('al-primary', w.primary, input.claimNew, input.busy), el('p', 'al-hint', w.hint), button('al-link', w.unlock, input.unlock, input.busy));
           box.append(button('al-link', WELCOME_TEXT.back.full, input.full));
         } else if (m === 'gift' || m === 'new' || m === 'back') {
           const w = WELCOME_TEXT[m];

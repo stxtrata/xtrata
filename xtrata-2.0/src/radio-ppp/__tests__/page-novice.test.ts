@@ -340,13 +340,11 @@ describe('a free starter player: claimed, arriving, landed', () => {
       expect(h.calls.filter(([n]) => n === 'create')).toEqual([['create', [{ quick: true, another: true }]]]);
     });
 
-    it('not for a player that was itself a gift, not when that is unknown, not with an older wallet box, not with a Stacks wallet connected', async () => {
-      for (const over of [{ hadGift: true }, { hadGift: null }, { canAnother: false }, { main: 'SP1FVCANW8KX51C70JJAFTES86SR48CPP6F2ANQKP' }]) {
-        localStorage.clear(); starter();
-        const root = await open({ ...OLD, ...over });
-        await vi.waitFor(() => expect(text(keyOf(root))).toContain('Pass it on and bring them in'));
-        expect(buttons(keyOf(root))).not.toContain('Claim it as a new player');
-      }
+    it.each([['a player that was itself a gift', { hadGift: true }], ['when that is unknown', { hadGift: null }], ['an older wallet box', { canAnother: false }], ['a Stacks wallet connected', { main: 'SP1FVCANW8KX51C70JJAFTES86SR48CPP6F2ANQKP' }]])('not for %s', async (_what, over) => {
+      starter();
+      const root = await open({ ...OLD, ...over });
+      await vi.waitFor(() => expect(text(keyOf(root))).toContain('Pass it on and bring them in'));
+      expect(buttons(keyOf(root))).not.toContain('Claim it as a new player');
     });
 
     it('on the welcome-back screen the claim leads, and opening the existing player is still one tap', async () => {
@@ -358,6 +356,66 @@ describe('a free starter player: claimed, arriving, landed', () => {
       expect(h.calls.filter(([n]) => n === 'unlock')).toHaveLength(1);
       named(/Claim it as a new player/)!.click();
       expect(h.calls.filter(([n]) => n === 'create')).toEqual([['create', [{ quick: true, another: true }]]]);
+    });
+
+    describe('and the wallet box can remove a player: replacing the old one leads', () => {
+      const CAN = { ...OLD, canForget: true, balance: 0n, returnTo: FUNDER };
+      const withShelf = (total: number) => { const gift = h.route!; h.route = (url, init) => (url.includes('/radio/gift/shelf') ? new Response(JSON.stringify({ total, albums: [] })) : gift(url, init)); };
+      const press = (root: Element | null, re: RegExp) => [...root!.querySelectorAll('button')].find((b) => re.test(b.textContent || ''))!.click();
+
+      it('offers Replace first and Keep both second; Replace starts the steps and makes nothing', async () => {
+        starter(); withShelf(0);
+        const root = await open(CAN);
+        await vi.waitFor(() => expect(buttons(keyOf(root))).toEqual(expect.arrayContaining(['Replace my old player', 'Keep both players'])));
+        expect(buttons(keyOf(root)).indexOf('Replace my old player')).toBeLessThan(buttons(keyOf(root)).indexOf('Keep both players'));
+        press(keyOf(root), /Replace my old player/);
+        await vi.waitFor(() => expect(text(keyOf(root))).toContain('step 2 of 3'));
+        expect(text(keyOf(root))).toContain('What stays behind with the old player');
+        expect(buttons(keyOf(root))).not.toContain('Keep both players');            // one thing to do at a time
+        expect(h.calls.filter(([n]) => n === 'create' || n === 'forget')).toEqual([]);
+        press(keyOf(root), /Remove my old player/);
+        // As the real controller does: by the time the wallet box has removed it, the device shows no player.
+        h.snap = { ...h.snap, step: 'intro', listening: undefined, root: undefined, balance: undefined, session: null, entries: [], hadGift: null };
+        await vi.waitFor(() => expect(h.calls.filter(([n]) => n === 'forget')).toHaveLength(1));
+        // the old player is gone from the device: the ordinary claim follows, with a named passkey
+        h.changed();
+        await vi.waitFor(() => expect(html().dataset.welcome).toBe('gift'));
+        named(/Claim my free player/)?.click();
+        expect(h.calls.filter(([n]) => n === 'create').at(-1)).toEqual(['create', [{ quick: true, another: true }]]);
+        localStorage.removeItem('xtrata.radio.replace.v1');
+      });
+
+      it('Keep both still makes a second player straight away', async () => {
+        starter(); withShelf(0);
+        const root = await open(CAN);
+        await vi.waitFor(() => expect(buttons(keyOf(root))).toContain('Keep both players'));
+        press(keyOf(root), /Keep both players/);
+        expect(h.calls.filter(([n]) => n === 'create')).toEqual([['create', [{ quick: true, another: true }]]]);
+        expect(h.calls.filter(([n]) => n === 'forget')).toEqual([]);
+      });
+
+      it('a player with money in it is asked to send it back, and cannot be removed', async () => {
+        starter(); withShelf(0);
+        const root = await open({ ...CAN, balance: 400_000n });
+        await vi.waitFor(() => expect(buttons(keyOf(root))).toContain('Replace my old player'));
+        press(keyOf(root), /Replace my old player/);
+        await vi.waitFor(() => expect(text(keyOf(root))).toContain('It holds 0.4 STX'));
+        expect(buttons(keyOf(root))).not.toContain('Remove my old player');
+        press(keyOf(root), /Send everything back/);
+        expect(h.calls.filter(([n]) => n === 'returnFunds')).toEqual([['returnFunds', ['all']]]);
+        press(keyOf(root), /Stop · keep my old player/);
+      });
+
+      it('from the welcome-back screen: Replace leads, and the steps then take the screen’s place', async () => {
+        starter(); withShelf(0);
+        const root = await open({ ...CAN, step: 'locked', balance: undefined, session: null });
+        await vi.waitFor(() => expect(text(page())).toContain('Replace my old player'));
+        expect(text(page())).toContain('You end up with one player that has 24 backup words');
+        named(/Replace my old player/)!.click();
+        await vi.waitFor(() => expect(text(keyOf(root))).toContain('Unlock your old player so it can be emptied'));
+        expect(html().dataset.welcome).toBeUndefined();
+        press(keyOf(root), /Stop · keep my old player/);
+      });
     });
 
     it('without a free player waiting, a returning listener sees the ordinary welcome back and no way to add a player', async () => {

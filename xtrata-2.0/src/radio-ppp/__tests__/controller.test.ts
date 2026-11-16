@@ -1904,3 +1904,36 @@ describe('claiming a free player as a new, separate player (for someone who made
     expect(made[1].main).toBe(MAIN);
   });
 });
+
+describe('removing an old player from this device', () => {
+  const GIFTS = { passkeyOnly: true, gifts: { enabled: true, admin: false, treasury: null, turnstileSiteKey: null, fee: '3000' } } as any;
+  it('refuses while the player holds anything, while its balance is unknown, or while a payment is on its way', async () => {
+    const s = setup(GIFTS); s.setMain(undefined);
+    await s.ppp.forceRefresh(); await s.ppp.create();
+    s.chain.balance = 500_000n; s.chain.balanceOf.set(LISTENING, 500_000n);
+    await s.ppp.forceRefresh();
+    s.requests.length = 0;
+    await s.ppp.forget();
+    expect(s.ppp.snapshot().error).toMatch(/Empty this player first/);
+    expect(s.requests.some(([m]) => m === 'listening.forget')).toBe(false);
+    expect(s.ppp.snapshot().listening).toBe(LISTENING);
+  });
+
+  it('an empty one is removed by the wallet box, and the device then has no player', async () => {
+    const s = setup(GIFTS); s.setMain(undefined);
+    await s.ppp.forceRefresh(); await s.ppp.create();
+    s.chain.balance = 0n; s.chain.balanceOf.set(LISTENING, 0n);
+    await s.ppp.forceRefresh();
+    expect(s.ppp.snapshot()).toMatchObject({ canForget: true, listening: LISTENING });
+    await s.ppp.forget();
+    expect(s.requests.some(([m]) => m === 'listening.forget')).toBe(true);
+    const after = s.ppp.snapshot();
+    expect(after.listening).toBeUndefined();
+    expect(after.step).toBe('intro');
+    expect(s.chain.broadcasts).toHaveLength(0); // removing a player sends nothing anywhere
+    // and the next one made is a new address with a named passkey
+    await s.ppp.create({ quick: true, another: true });
+    expect(s.ppp.snapshot().listening).not.toBe(LISTENING);
+    expect(s.ppp.snapshot().passkeyName).toMatch(/^Xtrata player · [0-9A-F]{4}$/);
+  });
+});

@@ -75,6 +75,7 @@ export type WalletMethod =
   | 'listening.stop'
   /** Drop the key from memory. */
   | 'listening.lock'
+  | 'listening.forget'
   /*
    * ParallaX Casino testnet wallet (casino-wallet.xtrata.xyz, a SEPARATE wallet origin from the radio's).
    * See src/lib/casino-wallet/ and docs/plans/CASINO-PASSKEY-WALLET-PLAN.md. A radio box does not implement these,
@@ -117,6 +118,7 @@ export const WALLET_METHODS: readonly WalletMethod[] = [
   'listening.cancel',
   'listening.stop',
   'listening.lock',
+  'listening.forget',
   'casino.status',
   'casino.open',
   'casino.signBuy',

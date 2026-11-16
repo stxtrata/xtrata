@@ -36,3 +36,29 @@ go into numbered album wallets under the same passkey and never needed a new pla
 
 This is a guide rail, not an anti-farming measure: someone who clears their browser's data looks like a new device, as
 they always did. Per-connection pick limits and the brand-new-wallet rule are what bound that.
+
+## Replace my old player (built 16 Nov 2026)
+
+The same people are offered **Replace my old player** first and **Keep both players** second, when the wallet box
+supports removing a player (feature `forget`). Replace leaves them with one player that has backup words. The steps
+(`src/radio-ppp/replace.ts`) are all the listener's own taps on things that already exist:
+
+1. **Empty it.** Unlock the old player; "Send everything back" is the ordinary return (the wallet box shows where it
+   goes and asks). There is no way on to step 2 while the balance is above the network fee to move it, while anything
+   is on its way in or out, or while the balance cannot be read.
+2. **Remove it from this device.** The wallet box's own panel (`listening.forget`): only an open player, and it says
+   to empty it first. The controller refuses as well if the player is not empty. Only this device's note of the player
+   goes. **The passkey is never deleted by us** (a page cannot, and the box never asks the phone to), so the old player
+   can always be opened again with "I already have a listening wallet": nothing is lost if someone stops halfway.
+3. **Claim the new one.** The ordinary free-player claim. Its passkey gets a tagged name ("Xtrata player · A1B2"), so
+   it cannot be mistaken for the older "Xtrata listening wallet" passkey still on the phone.
+
+Afterwards: write down the new player's 24 words first; then, if they want, delete the old passkey themselves, told
+by name which one to keep. Leaving it does no harm.
+
+It refuses, and points to "Keep both players", when the old player has albums of its own (they hang off that passkey
+and would be left behind), holds a Music Hero record, or the album check cannot be read. What stays with the old
+player is said before step 2: its likes, play history and any progress toward an award.
+
+Not done on purpose: the browser's "this passkey is no longer used" signal. It can make a phone delete the passkey,
+and the wallet box cannot see balances, so a wrong call could destroy an old player that still held money.

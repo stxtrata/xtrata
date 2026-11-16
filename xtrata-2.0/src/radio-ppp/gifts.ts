@@ -42,6 +42,8 @@ export interface GiftDeps {
    * NEW, separate player. Returns the action when that applies to this snapshot, else null.
    */
   claimNew?(s: Snapshot): (() => void) | null;
+  /** The same person may instead replace the old player: empty it, remove it, then claim (replace.ts). Null when not on offer. */
+  replaceOld?(s: Snapshot): (() => void) | null;
   /** "jim.btc · SP12…AB" style label. */
   who(address?: string): string;
   changed(): void;
@@ -335,6 +337,10 @@ export function createGifts(deps: GiftDeps) {
     const notNew = !!s.listening && (!(s.createdHere || s.brandNew) || !!s.linked || !!s.creditedTo || (s.balance ?? 0n) > 0n || s.entries.length > 0);
     // Someone who made their player before the giveaway (it was never a gift) may claim this one as a new, separate player.
     const asNew = notNew ? deps.claimNew?.(s) ?? null : null;
+    const swap = asNew ? deps.replaceOld?.(s) ?? null : null;
+    if (asNew && swap)
+      return [el('p', '🎁 A free player is waiting, and this device already has a player you made before. Replace the old one to end up with a single player that has 24 backup words: its balance is sent back first, then it is removed from this device. Or keep both as two separate players.', 'ppp-mute'),
+        button('Replace my old player', swap, 'primary'), button('Keep both players', asNew, 'quiet'), button('Not now', setAside, 'quiet')];
     if (asNew)
       return [el('p', '🎁 This device already has a player you made before. You can claim this free one as a new, separate player with its own passkey. Your existing player, and anything in it, stays exactly as it is; you can switch between them with “Use a different listening wallet”.', 'ppp-mute'),
         button('Claim it as a new player', asNew, 'primary'), button('Not now', setAside, 'quiet')];

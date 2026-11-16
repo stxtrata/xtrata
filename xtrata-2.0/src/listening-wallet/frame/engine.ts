@@ -54,7 +54,7 @@ export interface PasskeyPort {
 }
 
 export interface Panel {
-  kind: 'create' | 'confirm-passkey' | 'verify-passkey' | 'unlock' | 'session' | 'return' | 'link' | 'backup' | 'phrase' | 'phrase-check' | 'award' | 'send-record';
+  kind: 'forget' | 'create' | 'confirm-passkey' | 'verify-passkey' | 'unlock' | 'session' | 'return' | 'link' | 'backup' | 'phrase' | 'phrase-check' | 'award' | 'send-record';
   title: string;
   /**
    * One or two plain lines shown above the button. When set, `lines` and `warnings` fold into a
@@ -131,6 +131,8 @@ interface WalletRecord {
    * The radio asks for that check before the listener adds anything of their own.
    */
   once?: true;
+  /** The name this box gave the passkey when it made it, when it gave one. Shown so passkeys can be told apart. */
+  name?: string;
   /**
    * 2: a player with a backup phrase (phrase.ts). Absent: version 1, the passkey's secret itself (derive.ts). Fixed
    * when the passkey was made; a version 1 player never becomes version 2 (its address would change).
@@ -271,8 +273,8 @@ export function createListeningEngine(deps: {
     return others.length ? { others } : {};
   };
   /** Version 2 players can write down backup words; whether that was done on this device. */
-  const backupOf = (w: WalletRecord | undefined): { phrase?: true; backedUp?: true } =>
-    (w?.v === 2 ? { phrase: true as const, ...(w.backedUp ? { backedUp: true as const } : {}) } : {});
+  const backupOf = (w: WalletRecord | undefined): { phrase?: true; backedUp?: true; passkeyName?: string } =>
+    ({ ...(w?.v === 2 ? { phrase: true as const, ...(w.backedUp ? { backedUp: true as const } : {}) } : {}), ...(w?.name ? { passkeyName: w.name } : {}) });
   /**
    * The open player's backup words were written down and checked on this device. Only then may it hold more than
    * 1 STX and keep paying: losing the passkey no longer loses the money. What one approval may spend is unchanged.
@@ -309,9 +311,12 @@ export function createListeningEngine(deps: {
     // `another`: a deliberate second player on a device that already has one. Like a wallet for a specific address, it
     // must be a NEW passkey beside the others, so nothing is excluded (an authenticator refuses to make a passkey while
     // an excluded one is on it). It gets a name with a tag, so the two can be told apart in the device's passkey list.
-    another = another && !main && existing.length > 0;
+    // Asked for at all (even on a device with no player left, after an old one was removed): the passkey still gets its
+    // tagged name, so it can never be mistaken for an older "Xtrata listening wallet" passkey still on the phone.
+    const tagged = another && !main;
+    another = tagged && existing.length > 0;
     const exclude = main || another ? [] : existing.map((w) => w.credentialId);
-    const anotherId = another ? crypto.getRandomValues(new Uint8Array(16)) : null;
+    const anotherId = tagged ? crypto.getRandomValues(new Uint8Array(16)) : null;
     const tagOf = (b: Uint8Array) => Array.from(b.slice(0, 2), (x) => x.toString(16).padStart(2, '0')).join('').toUpperCase();
     const name = main ? `Xtrata listening wallet · ${short(main)}` : anotherId ? `Xtrata player · ${tagOf(anotherId)}` : undefined;
     const createPanel: Panel = {
@@ -428,7 +433,7 @@ export function createListeningEngine(deps: {
       const key = await baseFor(version, outputs[0]);
       const id = await slotOf(key, 0);
       credentialId = created.credentialId;
-      remember({ credentialId: created.credentialId, address: id.address, ...(once ? { once: true as const } : {}), ...(version === 2 ? { v: 2 as const } : {}) });
+      remember({ credentialId: created.credentialId, address: id.address, ...(once ? { once: true as const } : {}), ...(version === 2 ? { v: 2 as const } : {}), ...(anotherId && name ? { name } : {}) });
       return { id, base: key };
     } catch (e) {
       afterFailure(resume, e);
@@ -903,6 +908,37 @@ export function createListeningEngine(deps: {
       const request = validateShelfRequest({ action: p?.action as ShelfAction, release: p?.action === 'list' ? '' : (p?.release as string), player: me.address, issued: now() }, now());
       return { request, signature: signShelfRequest(request, me.privateKey) };
     },
+
+    /**
+     * Remove the OPEN player from this device's list (for someone replacing an old player with a new one). It must be
+     * unlocked, so only someone holding its passkey can do this, and the box asks in its own panel. Only this device's
+     * note of the player goes: the passkey is not touched (a page cannot delete one, and this box never asks the phone
+     * to), so the player can always be opened again with "I already have a listening wallet". The box cannot see
+     * balances, so the panel says plainly to empty it first; nothing here can move or lose money.
+     */
+    'listening.forget': (): Promise<{ forgotten: string; left: number }> => interact(async () => {
+      const id = requireUnlocked();
+      const me = root ?? id;
+      const gone = credentialId;
+      if (!gone || !record(gone)) throw new Error('This player is not on this device’s list.');
+      await deps.ui.act({
+        kind: 'forget',
+        title: 'Remove this player from this device?',
+        summary: `Player ${short(me.address)}. Only do this once it is empty.`,
+        lines: [
+          'This device will stop showing this player. Its passkey stays on your phone until you delete it yourself, and with that passkey the player can be opened again at any time.',
+          'Anything still in it stays in it: nothing is sent anywhere by this.'
+        ],
+        warnings: ['Empty it first. If you later delete its passkey from your phone, anything left in this player is lost for good.'],
+        confirmLabel: 'Remove from this device'
+      }, async () => true);
+      const s = load();
+      s.wallets = s.wallets.filter((w) => w.credentialId !== gone);
+      if (s.last === gone) s.last = s.wallets[0]?.credentialId;
+      save(s);
+      lockNow();
+      return { forgotten: me.address, left: s.wallets.length };
+    }),
 
     // The page may withdraw a panel it asked for (e.g. to unlock a different wallet instead).
     'listening.cancel': async () => ({ cancelled: deps.ui.cancel() }),

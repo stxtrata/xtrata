@@ -63,7 +63,7 @@ const play = (balance = '500000', nonce = '0') => ({ core: 3, song: 1234, receip
 describe('listening wallet engine (wallet origin)', () => {
   it('creates a wallet only after two matching PRF results and stores no secrets', async () => {
     const s = setup();
-    expect(await s.h['listening.status']()).toEqual({ state: 'none', session: null, features: ['cancel', 'like', 'standalone', 'multi', 'partial', 'slots', 'rootLike', 'move', 'phrase', 'award', 'sendRecord', 'shelf', 'another'] });
+    expect(await s.h['listening.status']()).toEqual({ state: 'none', session: null, features: ['cancel', 'like', 'standalone', 'multi', 'partial', 'slots', 'rootLike', 'move', 'phrase', 'award', 'sendRecord', 'shelf', 'another', 'forget'] });
     const r = await s.h['listening.unlock']({ mode: 'create' });
     expect(r.address).toBe(ADDRESS);
     expect(s.panels.map((p) => p.kind)).toEqual(['create', 'confirm-passkey', 'verify-passkey']);
@@ -86,7 +86,7 @@ describe('listening wallet engine (wallet origin)', () => {
     const other = Uint8Array.from(PRF); other[5] ^= 0xff;
     const s = setup({ outputs: [PRF, other] });
     await expect(s.h['listening.unlock']({ mode: 'create' })).rejects.toThrow(/stable/);
-    expect(await s.h['listening.status']()).toEqual({ state: 'none', session: null, features: ['cancel', 'like', 'standalone', 'multi', 'partial', 'slots', 'rootLike', 'move', 'phrase', 'award', 'sendRecord', 'shelf', 'another'] });
+    expect(await s.h['listening.status']()).toEqual({ state: 'none', session: null, features: ['cancel', 'like', 'standalone', 'multi', 'partial', 'slots', 'rootLike', 'move', 'phrase', 'award', 'sendRecord', 'shelf', 'another', 'forget'] });
     // No wallet, and no half-made passkey kept either: an unstable passkey is dropped, not picked up again.
     const kept = JSON.parse(s.map.get('xtrata.listening-wallet.v1') ?? '{"wallets":[]}');
     expect(kept.wallets).toEqual([]);
@@ -486,8 +486,10 @@ describe('one listening wallet per main-wallet address', () => {
     it('is only for a passkey-only player on a device that already has one: otherwise it changes nothing', async () => {
       const fresh = box();
       await fresh.h['listening.unlock']({ mode: 'create', another: true });
-      expect(fresh.creates.at(-1)).toMatchObject({ exclude: [], name: undefined });       // a first player is a first player
+      expect(fresh.creates.at(-1)!.exclude).toEqual([]);                                   // a first player is a first player:
+      expect(fresh.creates.at(-1)!.name).toMatch(/^Xtrata player · [0-9A-F]{4}$/);         // only its passkey's name is tagged
       expect(fresh.panels.some((p) => p.title === 'Make a new player')).toBe(false);
+      expect((await fresh.h['listening.status']()).passkeyName).toMatch(/^Xtrata player · [0-9A-F]{4}$/);
       const b = box();
       await b.makeFor(MAIN, mainKey);
       await b.h['listening.unlock']({ mode: 'create', main: MAIN_B, another: true });
@@ -504,7 +506,92 @@ describe('one listening wallet per main-wallet address', () => {
     });
 
     it('the box says it can do this, so a page only offers it to a box that can', async () => {
-      expect((await box().h['listening.status']()).features).toContain('another');
+      expect((await box().h['listening.status']()).features).toEqual(expect.arrayContaining(['another', 'forget']));
+    });
+  });
+
+  describe('removing an old player from this device (replacing it with a new one)', () => {
+    /** A device like a real one: each passkey hands back the public user id it was made with. */
+    function device() {
+      let n = 0;
+      const map = new Map<string, string>(), prfs = new Map<string, Uint8Array>(), handles = new Map<string, string | undefined>();
+      const panels: Panel[] = [], creates: { exclude?: string[]; name?: string }[] = [];
+      let offered = 'cred-1'; // which passkey the listener picks when the browser offers them all
+      const engine = createListeningEngine({
+        passkey: {
+          available: () => true,
+          create: async (exclude, name, userId) => { const id = `cred-${++n}`; prfs.set(id, Uint8Array.from({ length: 32 }, (_, i) => (i * 7 + n * 13) % 256)); handles.set(id, userId); creates.push({ exclude, name }); return { credentialId: id }; },
+          evaluate: async (id) => { const k = id ?? offered; return { credentialId: k, prf: prfs.get(k)!.slice(), userHandle: handles.get(k) }; }
+        },
+        store: { get: (k) => map.get(k) ?? null, set: (k, v) => void map.set(k, v) },
+        now: () => 1_760_000_000_000,
+        ui: { act: async (panel, action) => { panels.push(panel); return action(); }, cancel: () => false, idle: () => {} }
+      });
+      /** An old-style player (made before backup words): its passkey has no version-2 user id. */
+      const makeOld = async () => { n = 1; prfs.set('cred-1', Uint8Array.from({ length: 32 }, (_, i) => (i * 5 + 3) % 256)); handles.set('cred-1', undefined); creates.push({ exclude: [], name: undefined }); return (await engine.handlers['listening.unlock']({ mode: 'unlock', anyPasskey: true })).address as string; };
+      return { h: engine.handlers, panels, creates, pick: (id: string) => { offered = id; }, makeOld };
+    }
+
+    it('only an open player can be removed, the box asks first, and it says to empty it', async () => {
+      const d = device();
+      await d.h['listening.unlock']({ mode: 'create' });
+      await d.h['listening.lock']();
+      await expect(d.h['listening.forget']()).rejects.toThrow(/Unlock the listening wallet first/);
+      await d.h['listening.unlock']({ mode: 'unlock' });
+      const out = await d.h['listening.forget']();
+      const panel = d.panels.at(-1)!;
+      expect(panel).toMatchObject({ kind: 'forget', title: 'Remove this player from this device?', confirmLabel: 'Remove from this device' });
+      expect(panel.summary).toContain('Only do this once it is empty');
+      expect(panel.warnings!.join(' ')).toContain('Empty it first');
+      expect(panel.lines.join(' ')).toContain('Its passkey stays on your phone until you delete it yourself');
+      expect(out.left).toBe(0);
+      expect(await d.h['listening.status']()).toMatchObject({ state: 'none' }); // locked, and no longer on this device
+    });
+
+    it('a refused panel removes nothing', async () => {
+      const map = new Map<string, string>();
+      const prf = Uint8Array.from({ length: 32 }, (_, i) => i);
+      let refuse = false;
+      const engine = createListeningEngine({
+        passkey: { available: () => true, create: async () => ({ credentialId: 'c' }), evaluate: async () => ({ credentialId: 'c', prf: prf.slice() }) },
+        store: { get: (k) => map.get(k) ?? null, set: (k, v) => void map.set(k, v) }, now: () => 1,
+        ui: { act: async (panel, action) => { if (refuse && panel.kind === 'forget') throw new CancelledError(); return action(); }, cancel: () => false, idle: () => {} }
+      });
+      const made = await engine.handlers['listening.unlock']({ mode: 'create' });
+      refuse = true;
+      await expect(engine.handlers['listening.forget']()).rejects.toBeInstanceOf(CancelledError);
+      expect(await engine.handlers['listening.status']()).toMatchObject({ state: 'unlocked', address: made.address });
+    });
+
+    it('the removed player is not gone: its passkey opens the very same address again (an old-style one included)', async () => {
+      const d = device();
+      const old = await d.makeOld();
+      expect((await d.h['listening.status']()).phrase).toBeUndefined();        // an old-style player: no backup words
+      await d.h['listening.forget']();
+      expect((await d.h['listening.unlock']({ mode: 'unlock', anyPasskey: true })).address).toBe(old);
+    });
+
+    it('after it is removed, the next player is made the ordinary way with a name that cannot be confused with the old passkey', async () => {
+      const d = device();
+      const old = await d.makeOld();
+      await d.h['listening.forget']();
+      const fresh = (await d.h['listening.unlock']({ mode: 'create', another: true, quick: true })).address;
+      expect(fresh).not.toBe(old);
+      expect(d.creates.at(-1)!.exclude).toEqual([]);                           // the old passkey is still on the phone: it must not block the new one
+      expect(d.creates.at(-1)!.name).toMatch(/^Xtrata player · [0-9A-F]{4}$/);
+      expect(d.creates[0].name).toBeUndefined();                                // the old one has the plain default name
+      const st = await d.h['listening.status']();
+      expect(st).toMatchObject({ address: fresh, phrase: true });              // and the new one has backup words
+      expect(st.passkeyName).toBe(d.creates.at(-1)!.name);
+    });
+
+    it('with two players on the device, removing one leaves the other as the device’s player', async () => {
+      const d = device();
+      const a = (await d.h['listening.unlock']({ mode: 'create' })).address;
+      await d.h['listening.lock']();
+      const b = (await d.h['listening.unlock']({ mode: 'create', another: true })).address;
+      expect((await d.h['listening.forget']()).forgotten).toBe(b);
+      expect(await d.h['listening.status']()).toMatchObject({ state: 'known', address: a });
     });
   });
 
