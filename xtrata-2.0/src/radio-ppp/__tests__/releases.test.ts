@@ -6,24 +6,35 @@ const ARTIST = 'SP10W2EEM757922QTVDZZ5CSEW55JEFNN30J69TM7';
 const ME = 'SP1SY289GQAHCH7JZ1MSS5VMPNPH8GEK2DPRKKJ6N';
 const REL = '0123456789abcdef';
 const view = (over: object = {}) => ({ id: REL, title: 'Reload', subtitle: 'melophonic', tracks: [{ id: 315, title: 'Entertainment', artist: 'melophonic' }, { id: 319, title: 'Russian Rampage', artist: 'melophonic' }], cover: null, paidOnly: true, artist: ARTIST, added: 3, createdAt: 1, ...over });
+let priceAtStart = '0';
+const ORDER = { order: 'aaaaaaaaaaaaaaaa', release: REL, to: ARTIST, amount: '2000000', memo: 'buy aaaaaaaaaaaaaaaa', status: 'pending' };
 const flush = async () => { for (let i = 0; i < 6; i++) await Promise.resolve(); };
 
-function setup(opts: { enabled?: boolean; url?: string; main?: string; player?: { address?: string; unlocked: boolean }; shelf?: any[]; songs?: any } = {}) {
+function setup(opts: { made?: boolean; enabled?: boolean; sales?: boolean; copies?: boolean; price?: string; url?: string; main?: string; player?: { address?: string; unlocked: boolean }; shelf?: any[]; songs?: any } = {}) {
   window.history.replaceState(null, '', opts.url ?? '/radio');
   const store = new Map<string, string>();
-  const world = { shelf: opts.shelf ?? [] as any[], player: opts.player ?? { address: ME, unlocked: true }, main: opts.main, posts: [] as [string, any][], signed: [] as [string, string | undefined][], opened: [] as string[], changes: 0, failShelf: false, art: new Map<number, string>(), artAsked: new Set<number>(), artSettled: false, covers: new Map<number, string>(), hearing: null as null | { id: number; state: 'loading' | 'playing' | 'error' }, toggled: [] as number[], stops: 0 };
+  if (opts.price) priceAtStart = opts.price;
+  const world = { shelf: opts.shelf ?? [] as any[], player: opts.player ?? { address: ME, unlocked: true }, main: opts.main, posts: [] as [string, any][], signed: [] as [string, string | undefined][], opened: [] as string[], changes: 0, failShelf: false, art: new Map<number, string>(), artAsked: new Set<number>(), artSettled: false, covers: new Map<number, string>(), hearing: null as null | { id: number; state: 'loading' | 'playing' | 'error' }, toggled: [] as number[], stops: 0, price: priceAtStart, sold: 0, order: null as null | { status: string; txid?: string }, paid: [] as [string, bigint, string][], payFails: '', chain: 'none' as 'none' | 'pending' | 'success' | 'bad' };
   const deps: ReleasesDeps = {
     json: vi.fn(async (url: string, init?: RequestInit) => {
       const body = init?.body ? JSON.parse(String(init.body)) : undefined;
       if (init?.method === 'POST') world.posts.push([url, body]);
-      if (url === '/radio/release/config') return { enabled: opts.enabled ?? true };
-      if (url.startsWith('/radio/release/view')) return view();
+      if (url === '/radio/release/config') return { enabled: opts.enabled ?? true, sales: opts.sales ?? false, copies: opts.copies ?? false };
+      if (url.startsWith('/radio/release/view')) return view({ price: world.price, sold: world.sold });
+      if (url === '/radio/release/price') { world.price = body.request.price; return view({ price: world.price }); }
+      if (url === '/radio/release/paid') {
+        if (world.chain === 'bad') throw new Error('That payment did not go through. Nothing was taken; try again.');
+        if (world.chain === 'success') { world.order = { status: 'paid' }; world.shelf.unshift({ ...view({ price: world.price }), hidden: false }); world.sold++; }
+        else if (world.chain === 'pending' && body.txid) world.order = { status: 'confirming' };
+        return { ...ORDER, status: world.order?.status ?? 'pending' };
+      }
       if (url.startsWith('/radio/release/songs')) { if (opts.songs instanceof Error) throw opts.songs; return opts.songs ?? { songs: [{ id: 315, title: 'Entertainment', artist: 'melophonic' }, { id: 319, title: 'Russian Rampage', artist: 'melophonic' }], more: false }; }
-      if (url.startsWith('/radio/release/by')) return { releases: world.posts.some(([u]) => u === '/radio/release/create') ? [view({ added: 0 })] : [] };
+      if (url.startsWith('/radio/release/by')) return { releases: opts.made || world.posts.some(([u]) => u === '/radio/release/create') ? [view({ added: 0, price: world.price, sold: world.sold })] : [] };
       if (url === '/radio/release/create') return { id: REL, title: body.definition.title, tracks: body.definition.tracks.length, existing: false };
       if (url === '/radio/release/shelf') {
         if (world.failShelf) throw new Error('Releases are unavailable right now.');
         const { action, release } = body.request;
+        if (action === 'add' && world.price !== '0' && world.order?.status !== 'paid') { world.order ??= { status: 'pending' }; return { albums: world.shelf, pay: { ...ORDER, amount: world.price, status: world.order.status } }; }
         if (action === 'add' && !world.shelf.some((a) => a.id === release)) world.shelf.unshift({ ...view(), hidden: false });
         if (action === 'hide' || action === 'show') world.shelf = world.shelf.map((a) => (a.id === release ? { ...a, hidden: action === 'hide' } : a));
         if (action === 'remove') world.shelf = world.shelf.filter((a) => a.id !== release);
@@ -33,6 +44,8 @@ function setup(opts: { enabled?: boolean; url?: string; main?: string; player?: 
     }),
     main: () => world.main,
     sign: vi.fn(async () => 'ab'.repeat(65)),
+    pay: vi.fn(async (_main: string, to: string, amount: bigint, memo: string) => { if (world.payFails) throw new Error(world.payFails); world.paid.push([to, amount, memo]); return '0x' + 'e'.repeat(64); }),
+    copies: (_main, release) => { const p = document.createElement('p'); p.textContent = 'COPIES FORM ' + release.id; return [p]; },
     signShelf: vi.fn(async (action, release) => { if (!world.player.unlocked) throw new Error('Unlock your player first.'); world.signed.push([action, release]); return { request: { action, release: release ?? '', player: ME, issued: 1 }, signature: 'cd'.repeat(65) }; }),
     player: () => world.player,
     open: (a) => { world.opened.push(a.id); },
@@ -52,7 +65,7 @@ function setup(opts: { enabled?: boolean; url?: string; main?: string; player?: 
   };
   return { r, deps, world, store, ready, text, press };
 }
-beforeEach(() => { window.history.replaceState(null, '', '/radio'); });
+beforeEach(() => { window.history.replaceState(null, '', '/radio'); priceAtStart = '0'; });
 
 describe('releases on the radio page', () => {
   it('shows nothing at all while releases are switched off', async () => {
@@ -241,5 +254,115 @@ describe('hearing and seeing a release before it is made', () => {
     expect(card.querySelector('.is-cover img')!.getAttribute('src')).toBe('data:image/jpeg;base64,BBBB');
     expect([...card.querySelectorAll('.ppp-rel-songs li')].map((li) => li.textContent)).toEqual(['Entertainment', '2Russian Rampage']);
     expect(card.querySelector('.ppp-release-hear')).toBeNull();                  // listeners hear songs by playing them
+  });
+});
+
+describe('buying a priced release', () => {
+  const LINK = { url: '/radio?release=' + REL, sales: true, price: '2000000' };
+
+  it('shows the price and who is paid, and never offers a free add', async () => {
+    const s = setup(LINK); await s.ready();
+    const t = s.text(s.r.banner());
+    expect(t).toContain('2 STX');
+    expect(t).toMatch(/You pay jim\.btc directly: Xtrata takes nothing, never holds the money and cannot refund it/);
+    expect(t).toContain('Buy · 2 STX');
+    expect(t).not.toContain('Add to my player');
+  });
+
+  it('with a wallet connected: Buy opens the order and asks the wallet for exactly that payment; the album arrives when it confirms', async () => {
+    const s = setup({ ...LINK, main: ME }); await s.ready();
+    s.world.chain = 'pending';
+    s.press(s.r.banner(), /Buy · 2 STX/); await flush(); await flush();
+    expect(s.world.paid).toEqual([[ARTIST, 2_000_000n, 'buy aaaaaaaaaaaaaaaa']]);
+    expect(s.text(s.r.banner())).toMatch(/Payment sent ✓ Waiting for it to confirm/);
+    expect(s.r.albums()).toHaveLength(0);                                       // not in the player until the chain says so
+    s.world.chain = 'success';
+    s.press(s.r.banner(), /Check now/); await flush(); await flush();
+    expect(s.text(s.r.banner())).toContain('In your player ✓');
+    expect(s.r.albums().map((a) => a.id)).toEqual([REL]);
+    expect(s.world.paid).toHaveLength(1);                                       // paid once
+  });
+
+  it('a cancelled payment sends nothing and can be made again; the order is kept', async () => {
+    const s = setup({ ...LINK, main: ME }); await s.ready();
+    s.world.payFails = 'User cancelled';
+    s.press(s.r.banner(), /Buy · 2 STX/); await flush(); await flush();
+    expect(s.text(s.r.banner())).toContain('Payment cancelled. Nothing was sent.');
+    expect(s.world.paid).toHaveLength(0);
+    s.world.payFails = '';
+    s.press(s.r.banner(), /Pay 2 STX from my wallet/); await flush();
+    expect(s.world.paid).toHaveLength(1);
+  });
+
+  it('without a wallet connected: shows the amount, the address and the memo to pay from any wallet, and a check button', async () => {
+    const s = setup(LINK); await s.ready();
+    s.press(s.r.banner(), /Buy · 2 STX/); await flush(); await flush();
+    const t = s.text(s.r.banner());
+    expect(t).toContain(ARTIST);
+    expect(t).toContain('buy aaaaaaaaaaaaaaaa');
+    expect(t).toMatch(/The memo is what ties the payment to your player/);
+    expect(s.world.paid).toHaveLength(0);
+    s.press(s.r.banner(), /I have paid: check/); await flush(); await flush();
+    expect(s.text(s.r.banner())).toContain('No payment found yet');
+    s.world.chain = 'success';
+    s.press(s.r.banner(), /I have paid: check/); await flush(); await flush();
+    expect(s.text(s.r.banner())).toContain('In your player ✓');
+  });
+
+  it('an order survives a reload, and a payment that failed is offered again', async () => {
+    const s = setup({ ...LINK, main: ME }); await s.ready();
+    s.world.chain = 'pending';
+    s.press(s.r.banner(), /Buy · 2 STX/); await flush(); await flush();
+    const kept = JSON.parse(s.store.get('xtrata.radio.releases.orders.v1:' + ME)!);
+    expect(kept[REL]).toMatchObject({ order: 'aaaaaaaaaaaaaaaa', txid: '0x' + 'e'.repeat(64) });
+    s.world.chain = 'bad';
+    s.press(s.r.banner(), /Check now/); await flush(); await flush();
+    const t = s.text(s.r.banner());
+    expect(t).toContain('That payment did not go through');
+    expect(t).toContain('Pay 2 STX from my wallet');
+  });
+
+  it('says buying is paused when sales are off, and offers nothing to pay', async () => {
+    const s = setup({ ...LINK, sales: false }); await s.ready();
+    const t = s.text(s.r.banner());
+    expect(t).toContain('Buying is paused right now.');
+    expect(t).not.toContain('Buy ·');
+  });
+});
+
+describe('an artist’s ways to distribute a release', () => {
+  const rowButtons = (parts: HTMLElement[] | null) => (parts ?? []).filter((p) => p.classList.contains('ppp-release-row')).flatMap((p) => [...p.querySelectorAll('button')].map((b) => b.textContent));
+
+  it('offers only what is open: link always; price with sales; copies with copies', async () => {
+    const none = setup({ main: ARTIST, made: true }); await none.ready(); none.r.fold(); await flush();
+    expect(rowButtons(none.r.fold())).toEqual(['Copy link']);
+    const all = setup({ main: ARTIST, made: true, sales: true, copies: true }); await all.ready(); all.r.fold(); await flush();
+    expect(rowButtons(all.r.fold())).toEqual(['Copy link', 'Price', 'Send copies']);
+  });
+
+  it('sets a price with one signature, and shows it with the number sold', async () => {
+    const s = setup({ main: ARTIST, made: true, sales: true }); await s.ready(); s.r.fold(); await flush();
+    s.press(s.r.fold(), /^Price$/);
+    let parts = s.r.fold()!;
+    expect(s.text(parts)).toMatch(/straight to this wallet\. Xtrata takes nothing, never holds the money and cannot refund a sale/);
+    const input = parts.flatMap((p) => [...p.querySelectorAll('input')]).find((i) => i.getAttribute('aria-label') === 'Price in STX')!;
+    input.value = 'lots';
+    s.press(parts, /Sign this price/); await flush();
+    expect(s.text(s.r.fold())).toContain('A price is 0 (free), or 0.1 to 1,000 STX.');
+    expect(s.deps.sign).not.toHaveBeenCalled();
+    input.value = '2.5';
+    s.press(s.r.fold(), /Sign this price/); await flush(); await flush();
+    const sent = s.world.posts.find(([u]) => u === '/radio/release/price')![1];
+    expect(sent.request).toMatchObject({ artist: ARTIST, release: REL, price: '2500000' });
+    s.r.fold(); await flush();
+    expect(s.text(s.r.fold())).toMatch(/2\.5 STX · 0 sold/);
+  });
+
+  it('opens the copies form for that release', async () => {
+    const s = setup({ main: ARTIST, made: true, copies: true }); await s.ready(); s.r.fold(); await flush();
+    s.press(s.r.fold(), /Send copies/);
+    expect(s.text(s.r.fold())).toContain('COPIES FORM ' + REL);
+    s.press(s.r.fold(), /Send copies/);
+    expect(s.text(s.r.fold())).not.toContain('COPIES FORM');
   });
 });

@@ -58,7 +58,33 @@ Built, and off until `RADIO_RELEASES_ENABLED=1` is set on the `xtrata` Pages pro
 Nothing here moves money or sends a transaction. Not yet built: "remove" for a sponsored or bought copy (those
 are not on the shelf; they stay as they are).
 
+## Stages 2 and 3 (Jim, 15 Nov 2026): answers and what is built
+
+Answers: an artist may have up to **25 STX** in unclaimed copies at a time; a sale is paid **straight to the artist**;
+buyers pay from a **connected Stacks wallet** (or any wallet, by memo) for now, the player's own balance later; the
+price buys **the album only** (it plays with the buyer's own plays).
+
+Each has its own switch on the `xtrata` Pages project, and both need `RADIO_RELEASES_ENABLED=1`:
+
+- **Stage 2, `RADIO_RELEASE_COPIES_ENABLED=1`** (also needs gifts on: `RADIO_GIFT_ENABLED=1` and the treasury).
+  The artist of a release may fund prefunded batches of it (the machinery gift admins already use,
+  `functions/lib/radio-gifts.ts` `createBatch`): one signature, one payment to the gift treasury, N links, each
+  giving the album with its own plays; unclaimed copies are refunded to the artist after 30 days. Only for a release
+  the signer made, never starter copies. Cap: `RADIO_RELEASE_COPIES_CAP` microSTX (default 25 STX) of one artist's
+  money held at once, counting batches still waiting for payment. Gift admins are not capped. Page: "Send copies" on
+  a release in "Your releases".
+- **Stage 3, `RADIO_RELEASE_SALES_ENABLED=1`.** The artist signs a price (0 = free, else 0.1 to 1,000 STX;
+  `POST /radio/release/price`). Adding a priced release opens an order instead (`radio_release_orders`, one per
+  player and release); the buyer sends the price to the artist's wallet with the memo `buy <order>`; the server reads
+  that transfer from the chain (`POST /radio/release/paid`, by txid or by memo) and only once it has confirmed puts
+  the album on the player's shelf. Xtrata never holds the money, takes nothing and cannot refund. A paid album is the
+  player's for good (remove and add again is free); players who added it while free keep it; an unpaid order follows
+  the price, an order with a payment on its way keeps its price. With sales paused a priced album is neither sold nor
+  given away, and a payment already made still counts. A chain that cannot be read is an error, never "unpaid".
+
+Not built: paying from the player's own balance (needs a new wallet box payment action), plays bundled with a sale,
+refunds through Xtrata, editing or deleting a release.
+
 ## Open questions
 
-- Stage 2: the limits for artist-funded batches (size, how many open at once).
-- Stage 3: is the premium a fixed price set by the artist, and is there a refund window?
+- Whether passkey-only listeners should be able to buy from their player's balance (a wallet box change).
