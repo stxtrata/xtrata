@@ -84,11 +84,38 @@ jq -Rs '{action:"add", shuffle:true, text:.}' links.txt | ...   # load in a rand
 out: `notFound` (not a gift link we know) and `notLive` (already claimed, expired…). It never prints a code back.
 Adding links shows the first one straight away unless you `pause` first.
 
+## Loading the 1,000 players, step by step
+
+Two guided halves; each checks itself and stops at the first thing that is not as expected.
+
+1. **Fund the 13 batches** on the radio, as a gift admin: Albums (admin) → "The 1,000 players". The plan is fixed in
+   `src/lib/listening-wallet/drop-plan.ts` (5 Diamond, 10 Gold, 20 Silver, 100 Bronze, 865 Classic in batches of at most
+   100; 29.8875 STX in all). One batch is on offer at a time, top to bottom: a signature, then a payment. A batch is
+   recognised afterwards by its label (`1000 Players 01` … `13`, never the class: a recipient can see a label), its size
+   and its amount together, and only if its links are on this device. So make all 13 in one browser. A step is done
+   when the server says the batch is live with every copy waiting.
+2. **Put them on the wall** from Terminal: when all 13 are live the panel offers "Copy the 1,000 links"; then
+
+   ```bash
+   node scripts/load-players-wall.mjs                      # check only: changes nothing
+   node scripts/load-players-wall.mjs --go --archive-old   # close the drop on the wall now, then load
+   node scripts/load-players-wall.mjs --go --continue      # carry on after a run that stopped part-way
+   ```
+
+   It reads the links from the clipboard and the operator secret from `~/.xtrata-giveaway-secret`, and prints neither.
+   With `--go` it pauses the wall, (optionally) archives the old drop, shuffles the links locally and adds them 100 at a
+   time (every chunk must be accepted whole), reads the public wall back (1,000 spots, all free, the exact mix) and only
+   then opens it. If it stops the wall stays paused. Never use `--archive-old` to retry: an archived link cannot be
+   added again, which is why a retry is `--continue`.
+
+The award contract needs about 0.011 STX per record claimed (about 11 STX for all 1,000): top it up with a plain STX
+transfer to the contract (docs/music/AWARDS-LAUNCH.md).
+
 ## Things to know
 
 - The link on show is public, so a bot could grab it. The normal claim checks still apply (the human check, one
   gift per network address, one copy of an album per passkey), but it is a first-come giveaway by design.
-- Gifts expire 30 days after they were made. A link that expires before it is shown is skipped.
+- Gifts expire 90 days after their payment confirmed (`RADIO_GIFT_BATCH_DAYS`) unless the creator extends them (docs/music/BATCH-EXPIRY.md). A link that expires before it is shown is skipped.
 - When the list runs out the page says it is all done and shows the final counts.
 - A link `skip`ped or lost still belongs to its gift: the funds go back to the treasury by the usual expiry path.
 

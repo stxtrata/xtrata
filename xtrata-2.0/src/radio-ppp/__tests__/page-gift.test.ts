@@ -484,6 +484,54 @@ describe('prefunded batches (admin): the creator pays for every copy up front', 
     expect(pay.mock.calls[0][0]).toMatchObject({ recipient: TREASURY, amount: '222000', memo: 'batch ' + ID, stxAddress: ADMIN });
   });
 
+  it('the 1,000 players panel makes the next batch of the plan, whatever the form above says, and offers the links only when all 13 are live', async () => {
+    const { dropSteps } = await import('../../lib/listening-wallet/drop-plan');
+    const steps = dropSteps();
+    const made = (s: typeof steps[number]) => ({ id: s.n.toString(16).padStart(16, '0'), codes: Array.from({ length: s.count }, (_, i) => `${String(s.n).padStart(2, '0')}${String(i).padStart(20, 'x')}`), count: s.count, amount: s.amount.toString(), label: s.label, player: null, depositTo: TREASURY, deposit: s.deposit.toString(), memo: 'batch ' + s.n.toString(16).padStart(16, '0'), at: Date.now() });
+    const first = made(steps[0]);
+    const viewOf = (b: ReturnType<typeof made>) => ({ ...live, id: b.id, count: b.count, amount: b.amount, label: b.label, deposit: b.deposit, memo: b.memo, expires: Date.now() + 90 * 86_400_000, copies: { waiting: b.count, claiming: 0, claimed: 0, refunding: 0, refunded: 0 } });
+    served({
+      // One answer for both uses of this address: making the batch (POST) and reading it afterwards (GET).
+      '/radio/gift/batch': () => new Response(JSON.stringify({ ...viewOf(first), codes: first.codes, depositTo: TREASURY, links: [] })),
+      '/radio/gift/batch/confirm': () => new Response(JSON.stringify(viewOf(first))),
+      '/radio/giveaway/players': () => new Response(JSON.stringify({ state: 'open', total: 3, claimed: 1, free: 2, held: 0, tiers: [{ id: 'classic', plays: 50, total: 3, left: 2 }] }))
+    });
+    const pay = await payWith((o) => o.onFinish({ txId: '0x' + 'e'.repeat(64) }));
+    const root = await admin();
+    const panel = () => root.querySelector('.ppp-drop') as HTMLElement;
+    await vi.waitFor(() => expect(text(panel())).toContain('The wall is not the 1,000 yet: 3 spots'));
+    expect(text(panel())).toContain('0 of 13 batches live');
+    expect(text(panel())).toContain('29.8875 STX in all');
+    expect(text(panel())).toContain('The links can be copied for the wall once every batch is live.');
+    expect([...panel().querySelectorAll('button')].map((b) => b.textContent)).toEqual(['Sign and pay', 'Check again']); // one batch on offer at a time
+    field(root, 'input[aria-label="Copies"]').value = '77';   // the form above is ignored
+    click(root, /^Sign and pay$/);
+    await vi.waitFor(() => expect(pay).toHaveBeenCalledTimes(1));
+    const req = calls.find((c) => c.url.endsWith('/radio/gift/batch') && c.body)!.body.request;
+    expect(req).toMatchObject({ creator: ADMIN, count: 5, amount: steps[0].amount.toString(), label: '1000 Players 01' });
+    expect(req.player).toBeUndefined();
+    expect(pay.mock.calls[0][0]).toMatchObject({ recipient: TREASURY, amount: steps[0].deposit.toString(), memo: first.memo });
+    await vi.waitFor(() => expect(text(panel())).toContain('1 of 13 batches live'));
+    expect(text(panel())).toMatch(/✓ 1\. Diamond · 5 × 1,000 plays/);
+    expect(text(panel())).toMatch(/○ 2\. Gold · 10 × 500 plays/);
+
+    // Every batch made here and live: the 1,000 links can be copied, and nothing more is on offer to make.
+    localStorage.setItem('xtrata.radio.gift.batches.v1:' + ADMIN, JSON.stringify(steps.map((s) => { const b = made(s); return { ...b, txid: '0x1', view: viewOf(b) }; })));
+    const all = steps.map((s) => made(s));
+    served({ '/radio/giveaway/players': () => new Response('{}'), '/radio/gift/batches': () => new Response(JSON.stringify({ batches: all.map(viewOf) })) });
+    const byId = h.route!;
+    h.route = (url, init) => { const id = /\/radio\/gift\/batch\?id=([0-9a-f]{16})/.exec(url)?.[1]; const b = all.find((x) => x.id === id); return b ? (calls.push({ url, body: null }), new Response(JSON.stringify(viewOf(b)))) : byId(url, init); };
+    const again = await admin();
+    await vi.waitFor(() => expect(calls.some((c) => c.url.includes('/radio/gift/batches'))).toBe(true)); // the background check has finished
+    await new Promise((r) => setTimeout(r, 0));
+    const done = again.querySelector('.ppp-drop') as HTMLElement;
+    expect(text(done)).toContain('13 of 13 batches live');
+    expect(text(done)).toContain('All 13 batches are live: 1,000 links, none claimed.');
+    expect(text(done)).toContain('node scripts/load-players-wall.mjs');
+    expect([...done.querySelectorAll('button')].map((b) => b.textContent)).toEqual(['Copy the 1,000 links', 'Check again']);
+    expect(JSON.parse(localStorage.getItem('xtrata.radio.gift.batches.v1:' + ADMIN)!).filter((b: any) => b.codes.length)).toHaveLength(13); // none pushed out
+  });
+
   it('a live batch shows how long it has left, and one signature extends one batch or all of them', async () => {
     const DAY = 86_400_000;
     const view = (id: string, days: number, waiting = 2) => ({ ...live, id, expires: Date.now() + days * DAY, copies: { ...live.copies, waiting } });
