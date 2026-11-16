@@ -18,6 +18,8 @@ import {
 import { listedTracks, PLAY_PRESETS, playerData, playerHash, validatePlayer } from '../lib/listening-wallet/gift-players';
 import type { FunderResult } from '../lib/listening-wallet/funder';
 import { stx } from '../lib/listening-wallet/policy';
+import { dropStatus, dropTotals, wallCheck, type DropStep } from '../lib/listening-wallet/drop-plan';
+import { tierById } from '../lib/listening-wallet/tiers';
 import type { Snapshot } from './controller';
 import { copyButton, feedbackButton, shareLink } from './feedback';
 
@@ -461,7 +463,8 @@ export function createGifts(deps: GiftDeps) {
   const loadBatches = (main: string): MyBatch[] => {
     try { const v = JSON.parse(deps.store.get(batchesKey(main)) || '[]'); return Array.isArray(v) ? v.filter((x) => x && /^[0-9a-f]{16}$/.test(x.id) && Array.isArray(x.codes)) : []; } catch { return []; }
   };
-  const saveBatches = (main: string, list: MyBatch[]) => deps.store.set(batchesKey(main), JSON.stringify(list.slice(0, 20)));
+  // Links exist only here, so a batch that has them is never pushed out by one that does not (made on another device).
+  const saveBatches = (main: string, list: MyBatch[]) => deps.store.set(batchesKey(main), JSON.stringify([...list.filter((b) => b.codes.length), ...list.filter((b) => !b.codes.length)].slice(0, 80)));
   const batchDone = (b: MyBatch) => !!b.view && b.view.status === 'live' && b.view.copies.waiting + b.view.copies.claiming + b.view.copies.refunding === 0;
   const postJson = (url: string, body: unknown) => deps.json(url, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
   let checkedBatches = 0;
@@ -608,6 +611,49 @@ export function createGifts(deps: GiftDeps) {
   for (const x of [batchPlayer, batchPreset, batchCount]) { x.oninput = syncBill; x.onchange = syncBill; }
   syncBill();
 
+  // ---------------------------------------------------------------- the 1,000 players, step by step (drop-plan.ts)
+  let wall: { ok: boolean; text: string } | null = null, wallAt = 0;
+  async function readWall() {
+    wallAt = deps.now();
+    try { wall = wallCheck(await deps.json('/radio/giveaway/players')); } catch { wall = { ok: false, text: 'The wall could not be read just now.' }; }
+    deps.changed();
+  }
+  const makeDropBatch = (main: string, step: DropStep) => {
+    // Checked again at the press: the plan decides what is made, never what happens to be in the form above.
+    const status = dropStatus(loadBatches(main), deps.now());
+    if (status.next?.n !== step.n) { note = 'That batch is already made. Check again.'; deps.changed(); return; }
+    void makeBatch(main, planFor(false, String(step.plays), String(step.count)), step.label);
+  };
+  function dropPanel(main: string): HTMLElement {
+    const status = dropStatus(loadBatches(main), deps.now());
+    const total = dropTotals();
+    const box = el('div', '', 'ppp-drop');
+    box.append(
+      el('p', `The ${total.players.toLocaleString('en-GB')} players (admin) · ${status.done} of ${total.batches} batches live`, 'ppp-cyan'),
+      el('p', `${total.tiers.map((t) => `${t.count} ${tierById(t.id).name}`).join(', ')}. ${total.batches} batches, ${stxNice(total.deposit)} STX in all, paid from this wallet. One batch at a time, top to bottom: each is a signature, then a payment. The links are saved on this device the moment they are made, so make every batch in this browser.`, 'ppp-mute'));
+    const list = el('ol', '', 'ppp-gift-list ppp-drop-steps');
+    for (const s of status.steps) {
+      const li = el('li');
+      const mark = s.state === 'live' ? '✓' : s.state === 'touched' ? '!' : s.state === 'todo' ? '○' : '…';
+      li.append(el('span', `${mark} ${s.step.n}. ${tierById(s.step.tier).name} · ${s.step.count} × ${s.step.plays.toLocaleString('en-GB')} plays · ${stxNice(s.step.deposit)} STX`, 't'), el('span', s.detail, s.state === 'live' ? 'ppp-ok' : s.state === 'touched' ? 'ppp-warn' : 'ppp-mute'));
+      if (s.state === 'todo' && status.next?.n === s.step.n) { const b = button('Sign and pay', () => makeDropBatch(main, s.step), 'tiny'); b.disabled = !!working; li.append(b); }
+      if (s.state === 'unpaid' && s.batch) { const b = button('Pay now', () => void payBatch(main, s.batch!.id), 'tiny'); b.disabled = !!working; li.append(b); }
+      list.append(li);
+    }
+    box.append(list);
+    for (const p of status.problems) box.append(el('p', p, 'ppp-warn'));
+    if (status.ready) {
+      box.append(
+        el('p', `All ${total.batches} batches are live: ${status.codes.length.toLocaleString('en-GB')} links, none claimed. Copy them, then in Terminal (in the xtrata-2.0 folder) run:  node scripts/load-players-wall.mjs`, 'ppp-ok'),
+        copyButton('drop-copy', `Copy the ${status.codes.length.toLocaleString('en-GB')} links`, () => status.codes.join('\n'), 'tiny', deps.changed));
+    } else box.append(el('p', 'The links can be copied for the wall once every batch is live.', 'ppp-mute'));
+    if (deps.now() - wallAt > 60_000) void readWall();
+    if (wall) box.append(el('p', wall.text, wall.ok ? 'ppp-ok' : 'ppp-mute'));
+    const again = button('Check again', () => { checkedBatches = deps.now(); void refreshBatches(main); void readWall(); }, 'tiny'); again.disabled = !!working;
+    box.append(again);
+    return box;
+  }
+
   /** One batch in a list: what it is, where it stands, and its links once they work. */
   function batchLine(main: string, b: MyBatch, radioUrl: string | null) {
     const v = b.view, c = v?.copies;
@@ -703,6 +749,7 @@ export function createGifts(deps: GiftDeps) {
           const all = extendAllRow(main, myBatches);
           if (all) box.append(all);
         }
+        box.append(dropPanel(main));
         parts.push(box);
       }
     }
