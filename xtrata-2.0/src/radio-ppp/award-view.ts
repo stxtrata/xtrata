@@ -122,6 +122,8 @@ export function createAwardWalk(mount: HTMLElement) {
           actions.push(button('al-primary', 'Check again', i.refresh, i.busy), button('al-link', 'Claim with my address only', () => i.claim('none'), i.busy));
         }
         actions.push(el('p', 'al-hint', 'What is on the plaque cannot be changed afterwards.'));
+        // Always a way out: a claim that cannot go through right now must never leave the listener stuck on this screen.
+        actions.push(button('al-link', 'Later', i.later));
       } else if (s === 'have') {
         if (!i.main) {
           say('Connect the Leather or Xverse wallet that holds your .btc name.');
