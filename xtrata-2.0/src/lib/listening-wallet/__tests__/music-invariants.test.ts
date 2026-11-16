@@ -31,7 +31,7 @@ describe('music invariants', () => {
   it('a listening wallet is small: 1 STX target, a return reserve, a fixed like fee', () => {
     expect(TARGET).toBe(1_000_000n);
     expect(RESERVE).toBe(3_000n);
-    expect(LIKE_FEE).toBe(200n);
+    expect(LIKE_FEE).toBe(300n); // never below a play's fee: a cheaper like stalls the plays queued behind it
   });
 
   it('plays and likes go to the deployed contracts, unchanged', () => {

@@ -59,9 +59,10 @@ export interface StatusResult {
  * `award` (listening.signAward: claim a Music Hero record from the one award contract the box knows),
  * `sendRecord` (listening.signSendRecord: send an inscription the player holds to an address confirmed in the box),
  * `shelf` (listening.signShelf: sign a request about the albums this player keeps; no panel, moves nothing),
+ * `likeFee` (listening.signLike accepts the 0.0003 STX like fee; a box without it signs likes at 0.0002 only),
  * `phrase` (new players have a 24-word backup phrase that opens in other Stacks wallets; listening.backup shows it in the box).
  */
-export const LISTENING_FEATURES = ['cancel', 'like', 'standalone', 'multi', 'partial', 'slots', 'rootLike', 'move', 'phrase', 'award', 'sendRecord', 'shelf', 'another', 'forget'] as const;
+export const LISTENING_FEATURES = ['cancel', 'like', 'standalone', 'multi', 'partial', 'slots', 'rootLike', 'move', 'phrase', 'award', 'sendRecord', 'shelf', 'another', 'forget', 'likeFee'] as const;
 
 /** `listening.status`: the connected main wallet, if any, so the box answers for that address's listening wallet. */
 export interface StatusParams {

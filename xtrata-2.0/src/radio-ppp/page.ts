@@ -1209,7 +1209,7 @@ function start(root: HTMLElement) {
           // Whichever runs out first: the approval or the balance. A new approval brings the same figures back.
           const left = Math.min(s.session.playsLeft, s.playsLeft);
           key.push(el('p', `${left.toLocaleString()} plays left`, 'ppp-ok'));
-          lines.push(el('p', payLine + ' The heart likes or unlikes from this wallet for 0.0002 STX.'));
+          lines.push(el('p', payLine + ' The heart likes or unlikes from this wallet for 0.0003 STX.'));
           actions.push(button('Switch off', () => void ppp.switchOff()));
         } else {
           key.push(el('p', 'Switch on music support to listen.', 'ppp-mute'));

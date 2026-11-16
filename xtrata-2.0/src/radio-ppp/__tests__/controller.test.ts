@@ -26,7 +26,7 @@ const OTHER_MAIN = getAddressFromPrivateKey(otherKey, TransactionVersion.Mainnet
 const HOLDER = 'SP2J6ZY48GV1EZ5V2V5RB9MP66SW86PYKKNRV9EJ7';
 const rid = (n: number) => n.toString(16).padStart(32, '0');
 
-function setup(over: Partial<GateConfig> = {}, opts: { tabLock?: boolean; hold?: string[]; onWait?: () => void; oldWallet?: boolean; noMulti?: boolean } = {}) {
+function setup(over: Partial<GateConfig> = {}, opts: { tabLock?: boolean; hold?: string[]; onWait?: () => void; oldWallet?: boolean; noMulti?: boolean; noLikeFee?: boolean } = {}) {
   let likesChanged = 0;
   const likeBy = new Map<number, string[]>(), sent: [number, boolean][] = [], failed: number[] = [], confirmed: [number, boolean][] = [];
   let likeReadFails = false;
@@ -87,6 +87,8 @@ function setup(over: Partial<GateConfig> = {}, opts: { tabLock?: boolean; hold?:
         const r = await (engine.handlers as any)[m](p);
         if (opts.oldWallet && m === 'listening.status') { const { features: _f, ...rest } = r; return rest; }
         if (opts.noMulti && m === 'listening.status') return { ...r, features: (r.features ?? []).filter((f: string) => f !== 'multi') };
+        // `noLikeFee`: a wallet box from before the like fee went up: it signs likes at 0.0002 STX only.
+        if (opts.noLikeFee && m === 'listening.status') return { ...r, features: (r.features ?? []).filter((f: string) => f !== 'likeFee') };
         return r;
       }
     }),
@@ -423,7 +425,16 @@ describe('likes from the listening wallet, credited to the main wallet', () => {
   const ready = async (s: ReturnType<typeof setup>) => { await s.ppp.forceRefresh(); await s.ppp.create(); await s.ppp.link(); await s.ppp.deposit(); };
   const settleLike = async (s: ReturnType<typeof setup>) => { for (let i = 0; i < 20; i++) await s.settle(); };
 
-  it('takes every heart tap once a listening wallet exists here, and toggles on the likes contract for 0.0002 STX', async () => {
+  it('keeps to the old 0.0002 STX like fee while the wallet box is a build that only signs that', async () => {
+    const s = setup({}, { noLikeFee: true });
+    await ready(s);
+    expect(s.ppp.heart({ song: 7, title: 'Night Drive' })).toBe(true);
+    await settleLike(s);
+    expect(s.chain.broadcasts).toHaveLength(1);
+    expect((deserializeTransaction(s.chain.broadcasts[0]) as any).auth.spendingCondition.fee).toBe(200n);
+  });
+
+  it('takes every heart tap once a listening wallet exists here, and toggles on the likes contract for 0.0003 STX', async () => {
     const s = setup();
     await s.ppp.forceRefresh();
     expect(s.ppp.heart({ song: 7 })).toBe(false); // no listening wallet yet: the main-wallet page handles it
@@ -433,7 +444,7 @@ describe('likes from the listening wallet, credited to the main wallet', () => {
     expect(s.chain.broadcasts).toHaveLength(1);
     const tx = deserializeTransaction(s.chain.broadcasts[0]) as any;
     expect(tx.payload.functionName.content).toBe('set-liked');
-    expect(tx.auth.spendingCondition.fee).toBe(200n);
+    expect(tx.auth.spendingCondition.fee).toBe(300n);
     expect(cvToJSON(tx.payload.functionArgs[1]).value).toBe(true);
     expect(s.sent).toEqual([[7, true]]);
     expect(s.ppp.snapshot().message).toBe('♥ Liked “Night Drive”');
@@ -475,7 +486,7 @@ describe('likes from the listening wallet, credited to the main wallet', () => {
     expect(s.ppp.snapshot().error).toMatch(/Link the listening wallet/);
     await s.ppp.link();
     await s.ppp.toggleLike({ song: 1 });
-    expect(s.ppp.snapshot().error).toMatch(/Top up the listening wallet to like: each like or unlike costs 0\.0002 STX/);
+    expect(s.ppp.snapshot().error).toMatch(/Top up the listening wallet to like: each like or unlike costs 0\.0003 STX/);
     await s.ppp.deposit();
     await s.ppp.switchOff();
     await s.ppp.toggleLike({ song: 1 });
@@ -509,7 +520,7 @@ describe('likes from the listening wallet, credited to the main wallet', () => {
     mine = () => s.mineAll();
     await s.ppp.toggleLike({ song: 2 });
     expect(s.chain.broadcasts).toHaveLength(2);
-    expect(s.ppp.snapshot().entries[0]).toMatchObject({ kind: 'like', song: 2, status: 'pending', fee: '200' });
+    expect(s.ppp.snapshot().entries[0]).toMatchObject({ kind: 'like', song: 2, status: 'pending', fee: '300' });
   });
 
   it('a song played while a like is being sent plays free rather than racing it for the nonce', async () => {

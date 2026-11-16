@@ -26,8 +26,14 @@ export const LOW_BALANCE = 50_000n;
 export const MIN_PLAY_INTERVAL_MS = 20_000;
 /** Likes cost only the network fee; this spacing stops a runaway page from spending the budget on them. */
 export const MIN_LIKE_INTERVAL_MS = 3_000;
-/** Network fee for one like or unlike (set-liked): 0.0002 STX, the same as the main-wallet like page. */
-export const LIKE_FEE = 200n;
+/**
+ * Network fee for one like or unlike (set-liked): 0.0003 STX, the same as a play. It was 0.0002, which is barely over the
+ * network's floor of one microSTX a byte for a 193-byte like: a like then sat unmined for most of an hour and held up
+ * every play queued behind it (a wallet's payments confirm in order).
+ */
+export const LIKE_FEE = 300n;
+/** What a like paid before; a wallet box still signs one at this fee for a radio page that has not been updated yet. */
+export const LIKE_FEE_OLD = 200n;
 /** Money moved between a passkey's own wallets: at least this much, and the network fee may not exceed the cap. */
 export const MOVE_MIN = 5_000n;
 export const MOVE_FEE_CAP = 10_000n;
@@ -156,7 +162,7 @@ export class SessionLedger {
   consumeLike(fee: bigint, now = Date.now()): void {
     const t = this.terms;
     if (now >= t.expires) throw new Error('This listening session has ended. Approve a new one to keep paying.');
-    if (fee !== LIKE_FEE) throw new Error('Like fee must be 0.0002 STX.');
+    if (fee !== LIKE_FEE && fee !== LIKE_FEE_OLD) throw new Error('Like fee must be 0.0003 STX.');
     if (this.spent + fee > t.budget) throw new Error('Approved session budget reached.');
     if (now - this.lastLikeAt < MIN_LIKE_INTERVAL_MS) throw new Error('Too soon after the last like. Try again in a moment.');
     this.spent += fee;

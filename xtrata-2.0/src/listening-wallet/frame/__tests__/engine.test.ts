@@ -63,7 +63,7 @@ const play = (balance = '500000', nonce = '0') => ({ core: 3, song: 1234, receip
 describe('listening wallet engine (wallet origin)', () => {
   it('creates a wallet only after two matching PRF results and stores no secrets', async () => {
     const s = setup();
-    expect(await s.h['listening.status']()).toEqual({ state: 'none', session: null, features: ['cancel', 'like', 'standalone', 'multi', 'partial', 'slots', 'rootLike', 'move', 'phrase', 'award', 'sendRecord', 'shelf', 'another', 'forget'] });
+    expect(await s.h['listening.status']()).toEqual({ state: 'none', session: null, features: ['cancel', 'like', 'standalone', 'multi', 'partial', 'slots', 'rootLike', 'move', 'phrase', 'award', 'sendRecord', 'shelf', 'another', 'forget', 'likeFee'] });
     const r = await s.h['listening.unlock']({ mode: 'create' });
     expect(r.address).toBe(ADDRESS);
     expect(s.panels.map((p) => p.kind)).toEqual(['create', 'confirm-passkey', 'verify-passkey']);
@@ -86,7 +86,7 @@ describe('listening wallet engine (wallet origin)', () => {
     const other = Uint8Array.from(PRF); other[5] ^= 0xff;
     const s = setup({ outputs: [PRF, other] });
     await expect(s.h['listening.unlock']({ mode: 'create' })).rejects.toThrow(/stable/);
-    expect(await s.h['listening.status']()).toEqual({ state: 'none', session: null, features: ['cancel', 'like', 'standalone', 'multi', 'partial', 'slots', 'rootLike', 'move', 'phrase', 'award', 'sendRecord', 'shelf', 'another', 'forget'] });
+    expect(await s.h['listening.status']()).toEqual({ state: 'none', session: null, features: ['cancel', 'like', 'standalone', 'multi', 'partial', 'slots', 'rootLike', 'move', 'phrase', 'award', 'sendRecord', 'shelf', 'another', 'forget', 'likeFee'] });
     // No wallet, and no half-made passkey kept either: an unstable passkey is dropped, not picked up again.
     const kept = JSON.parse(s.map.get('xtrata.listening-wallet.v1') ?? '{"wallets":[]}');
     expect(kept.wallets).toEqual([]);
@@ -161,7 +161,11 @@ describe('listening wallet engine (wallet origin)', () => {
     await expect(s.h['listening.signLike'](like(false, '1', '3100'))).rejects.toThrow(/out of funds/);
     await expect(s.h['listening.signLike'](like(false, '1', '3200'))).resolves.toBeDefined(); // 3000 reserve + 200 fee
     s.tick(MIN_LIKE_INTERVAL_MS);
-    await expect(s.h['listening.signLike']({ ...like(false, '1'), fee: '300' })).rejects.toThrow(/0.0002 STX/);
+    await expect(s.h['listening.signLike']({ ...like(false, '1'), fee: '250' })).rejects.toThrow(/0.0003 STX/);
+    await expect(s.h['listening.signLike']({ ...like(false, '1'), fee: '301' })).rejects.toThrow(/0.0003 STX/);
+    // The current fee is signed as it is; this file's other likes use the old one, which a box still signs for an older radio page.
+    expect((deserializeTransaction((await s.h['listening.signLike']({ ...like(false, '1'), fee: '300' })).raw) as any).auth.spendingCondition.fee).toBe(300n);
+    s.tick(MIN_LIKE_INTERVAL_MS);
     await expect(s.h['listening.signLike']({ ...like(false, '1'), liked: 'yes' })).rejects.toThrow(/like or unlike/);
     expect((deserializeTransaction((await s.h['listening.signLike'](like(false, '1'))).raw) as any).payload.functionArgs[1].type).toBeDefined();
   });
@@ -506,7 +510,7 @@ describe('one listening wallet per main-wallet address', () => {
     });
 
     it('the box says it can do this, so a page only offers it to a box that can', async () => {
-      expect((await box().h['listening.status']()).features).toEqual(expect.arrayContaining(['another', 'forget']));
+      expect((await box().h['listening.status']()).features).toEqual(expect.arrayContaining(['another', 'forget', 'likeFee']));
     });
   });
 
