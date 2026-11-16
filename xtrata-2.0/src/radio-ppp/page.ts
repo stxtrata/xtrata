@@ -167,6 +167,16 @@ function start(root: HTMLElement) {
     appDetails: { name: app, icon: '/favicon.svg' },
     onFinish: (r) => resolve(r.txId || ''), onCancel: () => reject(new Error(cancelled)), onError: reject
   }));
+  /**
+   * A free player waiting, on a device whose player was made BEFORE the giveaway (it was never a gift itself) and cannot
+   * take this one: offer to claim it as a new, separate player. Not for a player that was a gift (one free player each),
+   * not while a Stacks wallet is connected (that wallet's own player is the one shown), and only with a wallet box that
+   * can do it. Everyone else keeps the one player they have.
+   */
+  const claimNewFor = (s: Snapshot): (() => void) | null =>
+    (gifts.incomingStarter() && s.canAnother && s.hadGift === false && !s.main && !!s.listening && !s.createdHere && !s.brandNew
+      && ['locked', 'ready', 'fund', 'over', 'link'].includes(s.step) && !s.busy
+      ? () => void ppp.create({ quick: true, another: true }) : null);
   const gifts = createGifts({
     json,
     main: () => { const s = sessionStore.load(); return s.isConnected && s.network === 'mainnet' ? s.address : undefined; },
@@ -174,6 +184,7 @@ function start(root: HTMLElement) {
     sign: (main, data) => requestStructuredSignature({ ...data, network: 'mainnet', stxAddress: main }),
     giftSent: (txid, amount) => ppp.giftSent(txid, amount),
     claiming: (on) => ppp.giftClaiming(on),
+    claimNew: (s) => claimNewFor(s),
     album: { bind: (slot) => ppp.bindAlbum(slot), arrived: async (slot, address, txid, amount) => { shelf.invalidate(); await ppp.albumArriving(slot, address, txid, amount); } },
     who: (address) => who(address),
     changed: () => render(ppp.snapshot()),
@@ -335,6 +346,7 @@ function start(root: HTMLElement) {
       plays: starter ? starter.plays : mode === 'landed' ? s.playsLeft : null, from: starter?.from ?? null,
       tier: tierNow, mystery,
       albums: mode === 'landed' ? featured.map((p) => ({ title: p.title, by: p.subtitle, cover: coverArt(p.cover), run: () => { showFull(); openFeatured(p, true); } })) : [],
+      claimNew: mode === 'back' ? claimNewFor(s) : null,
       start: () => void ppp.create({ quick: !!gifts.incomingStarter() }), unlock: () => void ppp.unlock(), returning: () => void ppp.unlock(true), restock: () => openRestock(),
       full: () => {
         // "Start listening" starts the music: it is the listener's own tap, and nothing is playing yet.

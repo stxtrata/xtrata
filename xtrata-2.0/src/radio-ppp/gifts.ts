@@ -37,6 +37,11 @@ export interface GiftDeps {
     bind(slot: number): Promise<{ root: string; slot: number; address: string; issued: number; rootSignature: string; slotSignature: string }>;
     arrived(slot: number, address: string, txid: string, amount: bigint): Promise<void>;
   };
+  /**
+   * Someone whose player on this device was made before the giveaway (it was never a gift) may claim a free player as a
+   * NEW, separate player. Returns the action when that applies to this snapshot, else null.
+   */
+  claimNew?(s: Snapshot): (() => void) | null;
   /** "jim.btc · SP12…AB" style label. */
   who(address?: string): string;
   changed(): void;
@@ -328,6 +333,11 @@ export function createGifts(deps: GiftDeps) {
     // An existing wallet is open (linked, funded or used before): the gift is not for it. One quiet line,
     // so it does not read as if this wallet were the gift.
     const notNew = !!s.listening && (!(s.createdHere || s.brandNew) || !!s.linked || !!s.creditedTo || (s.balance ?? 0n) > 0n || s.entries.length > 0);
+    // Someone who made their player before the giveaway (it was never a gift) may claim this one as a new, separate player.
+    const asNew = notNew ? deps.claimNew?.(s) ?? null : null;
+    if (asNew)
+      return [el('p', '🎁 This device already has a player you made before. You can claim this free one as a new, separate player with its own passkey. Your existing player, and anything in it, stays exactly as it is; you can switch between them with “Use a different listening wallet”.', 'ppp-mute'),
+        button('Claim it as a new player', asNew, 'primary'), button('Not now', setAside, 'quiet')];
     if (notNew)
       return [el('p', '🎁 You already have a player, so this free one is for someone new. Know a friend or someone in your family who loves music? Pass it on and bring them in.', 'ppp-mute'), ...passOn(), button('Forget this gift link here', setAside, 'quiet')];
     const amount = BigInt(v.amount);

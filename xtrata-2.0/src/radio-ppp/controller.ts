@@ -187,6 +187,10 @@ export interface Snapshot {
    * signing: the heart falls back to the main-wallet page until it is updated.
    */
   walletOutdated: boolean;
+  /** The wallet box can make a second, separate player on a device that already has one (for a free-player claim). */
+  canAnother: boolean;
+  /** Whether the player this device shows was itself a gift: true, false, or null when that has not been read yet. */
+  hadGift: boolean | null;
   /** Listening wallets linked to the connected main wallet (dual-signed, public), newest first. */
   linkedListening: string[];
   /** The server holds a link for this listening wallet, so linking needs no new wallet popup. */
@@ -619,6 +623,8 @@ export function createPppController(deps: PppDeps) {
     depositPending: arrivalExpected(),
     arrival: arrivalExpected() ? { since: pendingDeposit()?.at ?? arrival?.since ?? deps.now(), graceMs: ARRIVAL_GRACE_MS } : null,
     walletOutdated: walletLacks('like'),
+    canAnother: !!status && !walletLacks('another'),
+    hadGift: status?.address && giftRes?.for === status.address && giftRes.ok ? !!giftRes.info : null,
     linkedListening: mainLinksFor && mainLinksFor === creditMain() ? mainLinks.map((l) => l.listening) : [],
     serverLinked: !!serverLink && serverLinkFor === `${creditMain()}:${status?.address}`,
     stuck: stuck().length, armed,
@@ -1137,9 +1143,13 @@ export function createPppController(deps: PppDeps) {
     },
 
     /** `quick`: a free starter player is being claimed, so the wallet box may put off its second passkey check. */
-    create: (opts?: { quick?: boolean }) => task('Waiting for your passkey…', async () => {
+    create: (opts?: { quick?: boolean; another?: boolean }) => task('Waiting for your passkey…', async () => {
       const b = await ensureBridge();
-      await b.request('listening.unlock', { mode: 'create', terms: onTerms(), ...(deps.main() ? { main: deps.main() } : {}), ...(opts?.quick && !deps.main() ? { quick: true } : {}) });
+      // `another`: a new, separate player beside the one this device has (passkey-only; a free-player claim by someone
+      // who made theirs before the giveaway). The open player is locked first: the box makes one only when none is open.
+      const another = !!opts?.another && !deps.main() && !walletLacks('another');
+      if (another && status?.state === 'unlocked') await b.request('listening.lock');
+      await b.request('listening.unlock', { mode: 'create', terms: onTerms(), ...(deps.main() ? { main: deps.main() } : {}), ...(opts?.quick && !deps.main() ? { quick: true } : {}), ...(another ? { another: true } : {}) });
       status = await readStatus(b);
       if (status.address) deps.store.set(key('created', status.address), '1');
       setPayingOn(true);

@@ -304,16 +304,24 @@ export function createListeningEngine(deps: {
     return identity;
   };
 
-  async function create(terms?: SessionTerms, main?: string, quick = false): Promise<{ id: ListeningIdentity; base: WalletBase }> {
+  async function create(terms?: SessionTerms, main?: string, quick = false, another = false): Promise<{ id: ListeningIdentity; base: WalletBase }> {
     const existing = load().wallets;
-    const exclude = main ? [] : existing.map((w) => w.credentialId);
-    const name = main ? `Xtrata listening wallet · ${short(main)}` : undefined;
+    // `another`: a deliberate second player on a device that already has one. Like a wallet for a specific address, it
+    // must be a NEW passkey beside the others, so nothing is excluded (an authenticator refuses to make a passkey while
+    // an excluded one is on it). It gets a name with a tag, so the two can be told apart in the device's passkey list.
+    another = another && !main && existing.length > 0;
+    const exclude = main || another ? [] : existing.map((w) => w.credentialId);
+    const anotherId = another ? crypto.getRandomValues(new Uint8Array(16)) : null;
+    const tagOf = (b: Uint8Array) => Array.from(b.slice(0, 2), (x) => x.toString(16).padStart(2, '0')).join('').toUpperCase();
+    const name = main ? `Xtrata listening wallet · ${short(main)}` : anotherId ? `Xtrata player · ${tagOf(anotherId)}` : undefined;
     const createPanel: Panel = {
       kind: 'create',
-      title: 'Make your player',
+      title: another ? 'Make a new player' : 'Make your player',
       // One glance, in a listener's words: no prices or wallet talk. The costs and the 1 STX rule are under Details.
-      summary: 'Kept on this device with your passkey. No app or account needed.'
-        + (existing.length ? (main ? ` (A separate wallet for ${short(main)}.)` : ' (A second wallet on this device.)') : ''),
+      summary: another
+        ? `A new, separate player with its own passkey${name ? ` (“${name}”)` : ''}. Your other player and everything in it stay exactly as they are.`
+        : 'Kept on this device with your passkey. No app or account needed.'
+          + (existing.length ? (main ? ` (A separate wallet for ${short(main)}.)` : ' (A second wallet on this device.)') : ''),
       lines: [
         'A small spending wallet for paying artists as you listen. It is made from a passkey on this device, so there is nothing to install and no key is stored anywhere.',
         'Your browser will ask you to save a passkey (Face ID, Touch ID, Windows Hello or your phone).',
@@ -338,7 +346,7 @@ export function createListeningEngine(deps: {
       if (!deps.passkey.createsInNewTab?.() || !deps.passkey.openCreator) {
         if (resume?.credentialId) { created = { credentialId: resume.credentialId }; version = resume.v === 2 ? 2 : 1; }
         else {
-          const uid = newPhraseUserId();
+          const uid = anotherId ? newPhraseUserId(anotherId) : newPhraseUserId();
           created = await deps.ui.act(createPanel, () => deps.passkey.create(
             // A wallet for a specific address is meant to be a NEW passkey beside the others. Excluding the existing
             // credentials there makes the authenticator refuse ("already registered") on exactly the device that has them.
@@ -356,11 +364,11 @@ export function createListeningEngine(deps: {
           // The tab was opened before a reload: go straight back to "Made your passkey?" instead of opening a second one.
           userId = resume.userId; label = resume.label;
         } else {
-          const idBytes = crypto.getRandomValues(new Uint8Array(16));
+          const idBytes = anotherId ?? crypto.getRandomValues(new Uint8Array(16));
           userId = newPhraseUserId(idBytes);
           // Four characters to tell this passkey apart in the device's passkey list.
           const tag = Array.from(idBytes.slice(0, 2), (b) => b.toString(16).padStart(2, '0')).join('').toUpperCase();
-          label = `${name ?? 'Xtrata listening wallet'} · ${tag}`;
+          label = anotherId ? name! : `${name ?? 'Xtrata listening wallet'} · ${tag}`;
           const [u, l] = [userId, label];
           await deps.ui.act({
             ...createPanel,
@@ -521,7 +529,7 @@ export function createListeningEngine(deps: {
         // The terms are shown on the same panel as the passkey button, so that one confirm click
         // inside the frame both unlocks and approves paying as you listen.
         // `quick` is honoured only for a passkey-only player (no main wallet): the free starter claim.
-        const opened = p.mode === 'create' ? await create(terms, main, p.quick === true && !main) : await unlockExisting(p.anyPasskey === true, terms, p.label, main);
+        const opened = p.mode === 'create' ? await create(terms, main, p.quick === true && !main, p.another === true && !main) : await unlockExisting(p.anyPasskey === true, terms, p.label, main);
         identity = root = opened.id;
         base = opened.base;
         slot = 0;
