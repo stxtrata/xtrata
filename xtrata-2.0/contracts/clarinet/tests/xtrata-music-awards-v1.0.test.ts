@@ -61,7 +61,7 @@ const claim = (sender: string, said: Note, signed: Note = said, name = NAME) => 
 
 function deploy(name: string) {
   const source = readFileSync('../live/xtrata-music-awards-v1.0.clar', 'utf8').replaceAll(MAINNET, admin);
-  expect(simnet.deployContract(name, source, { clarityVersion: 3 }, admin).result).toBeBool(true);
+  expect(simnet.deployContract(name, source, { clarityVersion: 4 }, admin).result).toBeBool(true);
 }
 function setup() {
   deploy(NAME);

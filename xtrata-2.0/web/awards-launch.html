@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="robots" content="noindex" />
+    <title>Music Hero Launch</title>
+    <style>
+      :root { color-scheme: dark; font-family: Inter, ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif; background: #0d1118; color: #eef2f8; --line: #2a3344; --mut: #9aa6ba; --done: #2fb86f; --next: #5fd0ff; --wait: #f0b23c; --bad: #ff6b6b; }
+      * { box-sizing: border-box; }
+      body { margin: 0; }
+      main { max-width: 780px; margin: 0 auto; padding: 24px 16px 60px; display: grid; gap: 16px; }
+      h1 { margin: 0; font-size: 24px; } h2 { margin: 0 0 6px; font-size: 15px; }
+      p { margin: 0; line-height: 1.5; } .mute { color: var(--mut); font-size: 14px; } .bad { color: var(--bad); font-weight: 600; }
+      button { font: inherit; color: inherit; background: transparent; border: 1.5px solid var(--line); border-radius: 10px; padding: 9px 14px; cursor: pointer; }
+      button.primary { background: var(--next); border-color: var(--next); color: #06131c; font-weight: 700; }
+      button:disabled { opacity: .45; cursor: default; } button:focus-visible, input:focus-visible, a:focus-visible { outline: 3px solid #fff; outline-offset: 2px; }
+      a { color: var(--next); }
+      .wallet { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+      .wallet .mute { flex: 1 1 100%; }
+      .summary { font-size: 17px; font-weight: 600; }
+      .chip { display: inline-block; border-radius: 999px; padding: 3px 11px; font-size: 12.5px; font-weight: 700; letter-spacing: .03em; }
+      .chip.done { background: var(--done); color: #04150b; } .chip.next { background: var(--next); color: #06131c; } .chip.waiting { background: var(--wait); color: #1c1300; }
+      .chip.problem { background: var(--bad); color: #1c0303; } .chip.locked { border: 1.5px solid var(--line); color: var(--mut); }
+      .steps { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+      .step { border: 1.5px solid var(--line); border-radius: 14px; padding: 12px 14px; display: grid; gap: 8px; }
+      .step.next { border-color: var(--next); background: #101b26; } .step.waiting { border-color: var(--wait); } .step.problem { border-color: var(--bad); background: #1e1113; }
+      .step.locked { opacity: .55; } .step.done .mute { color: #8fd9ad; }
+      .head { display: flex; align-items: center; gap: 10px; } .head i { font-style: normal; font-weight: 700; color: var(--mut); min-width: 22px; } .head b { flex: 1; min-width: 0; }
+      .wallet-line { font-size: 14px; border-left: 3px solid var(--next); padding-left: 10px; }
+      input { font: inherit; color: inherit; width: 100%; padding: 10px 12px; border-radius: 10px; border: 1.5px solid var(--line); background: #0a0e14; }
+      pre { margin: 0; padding: 10px 12px; border-radius: 10px; background: #0a0e14; border: 1px solid var(--line); overflow-x: auto; font-size: 12.5px; }
+      .log p { font-size: 13px; color: var(--mut); padding: 3px 0; overflow-wrap: anywhere; } .log p.ok { color: #8fd9ad; } .log p.error { color: var(--bad); }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Music Hero awards: mainnet launch</h1>
+      <p class="mute">One step at a time. Each step is checked on chain before the next unlocks, and only xtrata.btc can sign. Green means verified on chain, not just sent.</p>
+      <div id="launch"></div>
+    </main>
+    <script type="module" src="/src/awards-launch.ts"></script>
+  </body>
+</html>
