@@ -359,20 +359,23 @@ describe('radio giveaway', () => {
     expect((await call(['nothing'])).status).toBe(404);
     expect((await call([], {}, setup({ RADIO_GIFT_ENABLED: '0' }).env)).status).toBe(404);
   });
-  it('the wall will not hold a disc for a connection that has already claimed two players today', async () => {
+  it('the wall will not hold a disc for a connection that has already claimed a player, and does not say when that lifts', async () => {
     const { ipHash } = await import('../radio-gifts');
-    const s = setup();
+    const s = setup({ RADIO_WALL_CLAIMS_DAYS: '7' } as any);   // a week here, so the test gifts outlive it; the default is a month
     const codes = await s.gifts(5);
     await giveawayAdmin(s.env, { action: 'add', list: 'players', text: s.list(codes) }, T0);
-    const IP = '203.0.113.7', h = ipHash(s.env as any, IP);
+    const IP = '203.0.113.7', h = ipHash(s.env as any, IP), DAY = 86_400_000;
     const claimed = (code: string, at: number) => s.sql.prepare("UPDATE radio_gifts SET status='claimed', claimed_at=?, claimed_by=?, ip_hash=? WHERE code_hash=?").run(at, 'SP' + code.slice(0, 8), h, giftCodeHash(code));
+    expect((await pickSpot(s.env, { spot: 2 }, T0 + 500, IP, 'players')).code).toBe(codes[1]);        // nothing claimed yet: welcome
     claimed(codes[0], T0 + 1000);
-    expect((await pickSpot(s.env, { spot: 3 }, T0 + 2000, IP, 'players')).code).toBe(codes[2]);   // one claimed: still welcome
-    claimed(codes[1], T0 + 3000);
-    await expect(pickSpot(s.env, { spot: 4 }, T0 + 4000, IP, 'players')).rejects.toMatchObject({ status: 429, message: expect.stringMatching(/2 free players have already been claimed on this connection today/) });
-    expect((await pickSpot(s.env, { spot: 4 }, T0 + 4000, '203.0.113.8', 'players')).code).toBe(codes[3]); // someone else is not held back
-    expect((await pickSpot(s.env, { spot: 5 }, T0 + 25 * 3600_000, IP, 'players')).code).toBe(codes[4]);   // nor is the same connection a day later
-    await expect(pickSpot({ ...s.env, RADIO_WALL_CLAIMS_PER_IP: '1' } as any, { spot: 3 }, T0 + 26 * 3600_000 + HOLD_MS, IP, 'players')).resolves.toBeTruthy(); // nothing claimed in the last day
+    const refused = await pickSpot(s.env, { spot: 3 }, T0 + 2000 + HOLD_MS, IP, 'players').catch((e) => e);
+    expect(refused).toMatchObject({ status: 429 });
+    expect(refused.message).toMatch(/^A player has already been claimed on this connection\./);
+    expect(refused.message).not.toMatch(/today|tomorrow|day|week|month|again|later/i);
+    expect((await pickSpot(s.env, { spot: 3 }, T0 + 4000, '203.0.113.8', 'players')).code).toBe(codes[2]); // someone else is not held back
+    await expect(pickSpot(s.env, { spot: 4 }, T0 + 6 * DAY, IP, 'players')).rejects.toMatchObject({ status: 429 });
+    expect((await pickSpot(s.env, { spot: 4 }, T0 + 8 * DAY, IP, 'players')).code).toBe(codes[3]);     // later on, the address may be someone else's
+    expect((await pickSpot({ ...s.env, RADIO_WALL_CLAIMS_PER_IP: '0' } as any, { spot: 5 }, T0 + 2 * DAY, IP, 'players')).code).toBe(codes[4]); // switched off
   });
 
   it('the intro song: a default until the operator sets one, changed or switched off with one command, read by anyone', async () => {

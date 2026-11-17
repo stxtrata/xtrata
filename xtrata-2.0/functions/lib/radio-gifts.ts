@@ -55,8 +55,9 @@ import {
 
 export type GiftEnv = PppEnv & {
   RADIO_GIFT_ENABLED?: string;
-  /** Free wall players one connection may claim in 24 hours (default WALL_CLAIMS_PER_IP; 0 = no limit). */
+  /** Free wall players one connection may claim (default WALL_CLAIMS_PER_IP; 0 = no limit), and for how many days that is remembered (default WALL_CLAIMS_DAYS). */
   RADIO_WALL_CLAIMS_PER_IP?: string;
+  RADIO_WALL_CLAIMS_DAYS?: string;
   RADIO_GIFT_TREASURY_KEY?: string;
   RADIO_GIFT_ADMIN?: string;
   RADIO_GIFT_ESCROW_CAP?: string;
@@ -88,13 +89,18 @@ export const MAX_PENDING_BATCHES = 10;
 /** Claims per IP (hashed) per 24 hours. */
 export const CLAIMS_PER_IP = 10;
 /**
- * Free players from the giveaway wall one connection may claim in 24 hours, unless the deployment says otherwise
- * (RADIO_WALL_CLAIMS_PER_IP; 0 = no limit). A player's class is a surprise, and a private browser window looks like a
- * new person every time: without this, one person could claim until a Diamond turned up. Two, not one, so that two
- * people sharing a home connection can both have theirs on the same day.
+ * Free players from the giveaway wall one connection may claim, and for how long that is remembered, unless the
+ * deployment says otherwise (RADIO_WALL_CLAIMS_PER_IP, 0 = no limit; RADIO_WALL_CLAIMS_DAYS). A player's class is a
+ * surprise, and a private browser window looks like a new person every time: without this, one person could claim
+ * until a Diamond turned up. One, for a month. Not for ever: a connection's address is shared (a household, an office,
+ * a whole mobile network) and handed on to other people, so a block that never lifts would end up refusing strangers.
+ * The refusal does not say when it lifts, so nobody is told to come back and try again.
  */
-export const WALL_CLAIMS_PER_IP = 2;
+export const WALL_CLAIMS_PER_IP = 1;
+export const WALL_CLAIMS_DAYS = 30;
+export const WALL_CLAIMED_TEXT = 'A player has already been claimed on this connection.';
 export const wallClaimsPerIp = (env: GiftEnv) => { const v = String(env.RADIO_WALL_CLAIMS_PER_IP ?? '').trim(); return /^\d{1,4}$/.test(v) && Number(v) <= 1000 ? Number(v) : WALL_CLAIMS_PER_IP; };
+export const wallClaimsWindowMs = (env: GiftEnv) => { const v = String(env.RADIO_WALL_CLAIMS_DAYS ?? '').trim(); return (/^\d{1,4}$/.test(v) && Number(v) >= 1 && Number(v) <= 3650 ? Number(v) : WALL_CLAIMS_DAYS) * 86_400_000; };
 /** Friend gifts started per IP per hour (each needs a real deposit to go live). */
 export const CREATES_PER_IP = 10;
 /** A friend gift nobody paid for is dropped after this long (after one last look for its deposit). */
@@ -1080,7 +1086,7 @@ export async function claimGift(env: GiftEnv, body: { code: string; wallet: stri
   // treasury balance check below is what bounds them.
   if (r.source === 'campaign' && h && (await all(env, "SELECT id FROM radio_gifts WHERE ip_hash=? AND source='campaign' AND claimed_at>? AND status IN ('claiming','claimed')", [h, deps.now - 86_400_000])).length >= CLAIMS_PER_IP)
     throw new GiftError('A lot of gifts have been opened on this connection today. Try this one again tomorrow, or on another connection (for example mobile data).', 429);
-  // A free player from the giveaway wall: a few per connection a day (WALL_CLAIMS_PER_IP says why). Only those: any
+  // A free player from the giveaway wall: one per connection for a month (WALL_CLAIMS_PER_IP says why). Only those: any
   // other gift someone paid for and handed over is never held back. If the giveaway's tables cannot be read, the claim
   // goes ahead: a limit that cannot be checked must not stop someone getting the player they were given.
   const wallMax = h ? wallClaimsPerIp(env) : 0;
@@ -1088,8 +1094,8 @@ export async function claimGift(env: GiftEnv, body: { code: string; wallet: stri
     try {
       if (await one(env, "SELECT pos FROM radio_giveaway_links WHERE code_hash=? AND list='players' AND archived=0", [r.code_hash])) {
         const had = await all(env, `SELECT g.id FROM radio_gifts g JOIN radio_giveaway_links l ON l.code_hash=g.code_hash
-          WHERE l.list='players' AND g.ip_hash=? AND g.claimed_at>? AND g.status IN ('claiming','claimed')`, [h, deps.now - 86_400_000]);
-        if (had.length >= wallMax) throw new GiftError(`${wallMax === 1 ? 'A free player has' : `${wallMax} free players have`} already been claimed on this connection today. Come back tomorrow, or pass this one on to a friend.`, 429);
+          WHERE l.list='players' AND g.ip_hash=? AND g.claimed_at>? AND g.status IN ('claiming','claimed')`, [h, deps.now - wallClaimsWindowMs(env)]);
+        if (had.length >= wallMax) throw new GiftError(`${WALL_CLAIMED_TEXT} Know someone who would love this one? Pass it on.`, 429);
       }
     } catch (e) { if (e instanceof GiftError) throw e; }
   }
