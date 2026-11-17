@@ -489,7 +489,10 @@ export function createPppController(deps: PppDeps) {
     if (!player || !deps.awardStatus || awardLooking) return;
     const known = awardRes?.for === player ? awardRes : null;
     const s = known?.view.state;
-    const wait = !known ? 0 : s === 'off' || s === 'not-a-player' ? 30 * 60_000 : claimNow(player) || sendNow(player) ? 20_000 : s === 'claimed' ? 10 * 60_000 : 60_000;
+    // A player straight off the giveaway wall is "not a player" for the few minutes its plays take to land: asked
+    // again soon, not in half an hour, or its record and progress stay hidden for the whole first visit.
+    const landing = s === 'not-a-player' && giftNow()?.drop === 'players';
+    const wait = !known ? 0 : landing ? 20_000 : s === 'off' || s === 'not-a-player' ? 30 * 60_000 : claimNow(player) || sendNow(player) ? 20_000 : s === 'claimed' ? 10 * 60_000 : 60_000;
     if (known && !force && deps.now() - known.at < wait) return;
     awardLooking = true;
     try {
@@ -1199,6 +1202,7 @@ export function createPppController(deps: PppDeps) {
       setPendingDeposit({ txid, amount: amount.toString(), at: deps.now() });
       balanceAt = -Infinity;
       giftRes = null; // the record now exists: ask for it (and the album that came with it) on the next refresh
+      if (awardRes) awardRes = { ...awardRes, at: -Infinity }; // and whether it is a numbered player with a record to earn
       say('🎁 Gift on its way ✓ Usually arrives in a few minutes.');
     },
 
