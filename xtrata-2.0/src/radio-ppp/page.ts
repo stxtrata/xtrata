@@ -221,9 +221,26 @@ function start(root: HTMLElement) {
     now: Date.now
   });
 
+  // An album (or My player, slot 0) picked from the shelf or the search box. If it opened, the new look goes to Listen, where
+  // the radio has already started it at its first song, or is still on it if it was open; if it could not (the player is
+  // locked, say), the You screen is where the reason and the unlock are.
+  const openFromShelf = (slot: number) => {
+    void Promise.resolve(ppp.openAlbum(slot)).then(() => {
+      if (!shelfInBrowse()) return;   // only the new look's Browse tab sends the listener on; the old panel stays where it is
+      const s = ppp.snapshot();
+      window.dispatchEvent(new CustomEvent(s.slot === slot && !s.error ? 'xtrata:radio-listen' : 'xtrata:radio-panel'));
+    });
+  };
+  /** Tell the page whether there are albums to show, so Browse can offer "My albums" (only when it changes). */
+  let albumsAnnounced: boolean | undefined;
+  const announceAlbums = (has: boolean) => {
+    if (has === albumsAnnounced) return;
+    albumsAnnounced = has;
+    window.dispatchEvent(new CustomEvent('xtrata:radio-albums', { detail: { has } }));
+  };
   const shelf = createShelf({
     json,
-    open: (slot) => { void ppp.openAlbum(slot); },
+    open: openFromShelf,
     store: {
       get: (k) => { try { return localStorage.getItem(k); } catch { return null; } },
       set: (k, v) => { try { if (v === null) localStorage.removeItem(k); else localStorage.setItem(k, v); } catch { /* best effort */ } }
@@ -636,6 +653,17 @@ function start(root: HTMLElement) {
   const el = (tag: string, text = '', cls = '') => { const n = document.createElement(tag); if (text) n.textContent = text; if (cls) n.className = cls; return n; };
   const button = (label: string, run: () => void, cls = '') => { const b = el('button', label, cls) as HTMLButtonElement; b.type = 'button'; b.onclick = run; return b; };
   const link = (label: string, href: string) => { const a = el('a', label) as HTMLAnchorElement; a.href = href; a.target = '_blank'; a.rel = 'noopener'; return a; };
+
+  // The new look's You screen: who this player has paid lately, a receipt on each row. Plain words, no amounts.
+  const PAID_FIRST = 6, PAID_MAX = 20;
+  let paidMore = false, paidShowing = false;
+  /** "just now", "5 min ago", "3 h ago", "2 days ago" (the old log says 5m, 3h, 2d). */
+  const whenPlain = (t: number) => {
+    const m = Math.round((Date.now() - t) / 60_000);
+    return m < 1 ? 'just now' : m < 60 ? `${m} min ago` : m < 1440 ? `${Math.round(m / 60)} h ago` : `${Math.round(m / 1440)} ${Math.round(m / 1440) === 1 ? 'day' : 'days'} ago`;
+  };
+  // Song artwork turns up in the background, one at a time: draw the list again when it does.
+  onArt(() => { if (paidShowing) render(ppp.snapshot()); });
 
   let lastStage: StageView | null = null;
   // radio.xtrata.xyz/radio#give (the homepage's "Send someone a wallet") opens the gift section once it is there.
@@ -1472,6 +1500,8 @@ function start(root: HTMLElement) {
         const albumTitle = inAlbum ? s.gift?.player?.title ?? 'Album' : latestAlbum!.title;
         // "View all albums" opens the "My albums" fold: every album on this device, one tap to open.
         const all = button('View all albums' + (shelf.count() > 1 ? ` (${shelf.count()})` : ''), () => {
+          // The new look keeps the albums on Browse.
+          if (shelfInBrowse()) { window.dispatchEvent(new CustomEvent('xtrata:radio-browse', { detail: { tab: 'albums' } })); return; }
           const fold = document.querySelector('.ppp-shelf') as HTMLDetailsElement | null;
           if (!fold) return;
           fold.hidden = false;
@@ -1489,7 +1519,13 @@ function start(root: HTMLElement) {
     }
     const shelfBox = shelf.render(s);
     const shelfFold = document.querySelector('.ppp-shelf') as HTMLDetailsElement | null;
-    if (shelfFold) {
+    const browseMount = shelfInBrowse() ? document.getElementById('shelfBox') : null;
+    if (browseMount) {
+      // The new look: the albums are a tab of Browse. (The album page's own sheet keeps the fold below.)
+      if (shelfBox) { if (browseMount.firstChild !== shelfBox) browseMount.replaceChildren(shelfBox); } else browseMount.replaceChildren();
+      if (shelfFold) shelfFold.hidden = true;
+      announceAlbums(!!shelfBox);
+    } else if (shelfFold) {
       shelfFold.hidden = !shelfBox;
       const shelfSummary = shelfFold.querySelector('summary');
       if (shelfSummary) shelfSummary.textContent = shelf.count() > 0 ? `♪ My albums (${shelf.count()})` : '♪ My albums';
@@ -1588,6 +1624,7 @@ function start(root: HTMLElement) {
       if (e.txid) li.append(link('tx', explorer(e.txid)));
       return li;
     }));
+    renderPaid(s);
     $('.ppp-wallets').hidden = !(facts.childElementCount || more.length);
     $('.ppp-more').hidden = !lines.length;
     const history = $('.ppp-history');
@@ -1615,6 +1652,12 @@ function start(root: HTMLElement) {
     const loaded = albumNow?.mode === 'open' ? null : featuredFor(s);
     albumList?.render(albumNow?.mode === 'open' ? albumInput(s, albumNow, [])
       : loaded ? { ...albumInput(s, { mode: 'open', player: loaded }, []), plays: s.balance === undefined ? null : s.playsLeft } : null);
+  }
+
+  /** Is the new look on, with a place for the albums on Browse? (Not in the arcade dock, ?classic=1 or the album page.) */
+  function shelfInBrowse() {
+    const root = document.documentElement;
+    return root.hasAttribute('data-skin') && !root.hasAttribute('data-view') && !!document.getElementById('shelfBox');
   }
 
   type AlbumState = { mode: 'arrive' | 'locked' | 'open'; player: PlayerView; from?: string | null; offered?: number };
@@ -1679,6 +1722,42 @@ function start(root: HTMLElement) {
    * exactly what will be made, and the name it would carry), and the record itself once it is theirs. Nothing here
    * decides anything: the server says where the player stands and the wallet box checks the claim.
    */
+  function renderPaid(s: Snapshot) {
+    const box = document.querySelector('#ppp .ppp-paid') as HTMLElement | null;
+    if (!box) return;
+    const root = document.documentElement;
+    // A play that failed or was cancelled paid nobody, so it is not listed.
+    const plays = (s.entries as Shown[]).filter((e) => e.kind === 'play' && !['failed', 'cancelled'].includes(e.status));
+    const on = root.hasAttribute('data-skin') && !root.hasAttribute('data-view') && plays.length > 0;
+    paidShowing = on;
+    box.hidden = !on;
+    if (!on) { box.replaceChildren(); return; }
+    loadCatalogue();
+    const list = el('ol');
+    for (const e of plays.slice(0, paidMore ? PAID_MAX : PAID_FIRST)) {
+      const { title, artist } = songName(e.song, e);
+      const name = title || `Song #${e.song}`;
+      const li = el('li', '', 'ppp-paid__row');
+      const art = el('span', '', 'ppp-paid__art');
+      const url = thumb(String(e.song));
+      if (url) { const img = document.createElement('img'); img.src = url; img.alt = ''; img.decoding = 'async'; art.append(img); } else { art.textContent = '♪'; art.setAttribute('aria-hidden', 'true'); }
+      const txt = el('span', '', 'ppp-paid__t');
+      txt.append(el('b', name), el('span', [artist, whenPlain(e.created)].filter(Boolean).join(' · ')));
+      li.append(art, txt);
+      if (e.status === 'confirmed' && e.txid) {
+        const r = link('Receipt', explorer(e.txid)); r.className = 'ppp-paid__r'; r.setAttribute('aria-label', `Receipt for ${name}`);
+        li.append(r);
+      } else li.append(el('span', e.status === 'unknown' ? 'Checking…' : 'Paying…', 'ppp-paid__r ppp-mute'));
+      list.append(li);
+    }
+    const kids: HTMLElement[] = [el('h4', 'Who you have paid'), list];
+    if (plays.length > PAID_FIRST) {
+      const more = button(paidMore ? 'Show fewer' : `Show more (${Math.min(plays.length, PAID_MAX) - PAID_FIRST})`, () => { paidMore = !paidMore; render(ppp.snapshot()); }, 'ppp-paid__more');
+      kids.push(more);
+    }
+    kids.push(el('p', 'Every play pays the artist, and anyone can check it.', 'ppp-paid__note'));
+    box.replaceChildren(...kids);
+  }
   function renderAward(s: Snapshot) {
     const box = document.querySelector('#ppp .ppp-award') as HTMLElement | null;
     if (!box) return;
@@ -1840,7 +1919,9 @@ function start(root: HTMLElement) {
     current: () => { const n = Number((window as any).XtrataRadio?.getState?.()?.nowPlaying?.tokenId); return Number.isSafeInteger(n) ? n : null; },
     locked: () => !!ppp.snapshot().albumLock?.locked,
     explicit: (id) => !!(window as any).XtrataRadio?.isExplicit?.(id),
-    liked: (id) => likedNow().has(id)
+    liked: (id) => likedNow().has(id),
+    grid: document.documentElement.hasAttribute('data-skin'),   // the new look lists artist names three across
+    leaveAlbum: () => openFromShelf(0)
   }) : null;
   findBox?.addEventListener('toggle', () => { if (findBox.open) find?.load(); });
   let findSeen = '';

@@ -79,10 +79,17 @@ export interface FindDeps {
   liked?(id: number): boolean;
   /** An album that plays only its own songs is open: finding other music is off until the listener leaves it. */
   locked(): boolean;
+  /** The new look: artists whose names fit a column sit three across, and the longer names wait behind one button. */
+  grid?: boolean;
+  /** Leave the open album and go back to the listener's own player. When given, the "an album is open" note carries a button for it. */
+  leaveAlbum?(): void;
 }
 
 const el = (tag: string, cls = '', text = '') => { const n = document.createElement(tag); if (cls) n.className = cls; if (text) n.textContent = text; return n; };
 const ARTISTS_SHOWN = 12;
+/** In the three-column list, a name this short (in characters) fits a column on a phone. Longer names are listed under "more artists". */
+export const SHORT_NAME = 14;
+export const isShortName = (name: string) => [...name.trim()].length <= SHORT_NAME;
 
 export function createFindBox(mount: HTMLElement, deps: FindDeps) {
   let songs: Song[] | null = null;
@@ -90,7 +97,7 @@ export function createFindBox(mount: HTMLElement, deps: FindDeps) {
   let query = '', artist = '', allArtists = false;
   const input = el('input', 'find-q') as HTMLInputElement;
   input.type = 'search'; input.placeholder = 'Search songs, artists or #'; input.setAttribute('aria-label', 'Search all music'); input.autocomplete = 'off';
-  const status = el('div', 'hint'), chips = el('div', 'find-artists'), list = el('ol', 'likesList find-list');
+  const status = el('div', 'hint'), chips = el('div', 'find-artists' + (deps.grid ? ' find-artists--grid' : '')), list = el('ol', 'likesList find-list');
   status.setAttribute('role', 'status');
   const tools = el('div', 'likesTools'); tools.append(input);
   mount.replaceChildren(tools, status, chips, list);
@@ -104,7 +111,15 @@ export function createFindBox(mount: HTMLElement, deps: FindDeps) {
   function paint() {
     const locked = deps.locked();
     input.disabled = locked;
-    if (locked) { status.textContent = 'An album is open and plays only its own songs. Go back to My player to find other music.'; chips.replaceChildren(); list.replaceChildren(); return; }
+    if (locked) {
+      status.textContent = 'An album is open and plays only its own songs. Go back to My player to find other music.';
+      if (deps.leaveAlbum) {
+        const back = el('button', 'find-back', 'Back to My player') as HTMLButtonElement;
+        back.type = 'button'; back.onclick = () => deps.leaveAlbum!();
+        status.append(' ', back);
+      }
+      chips.replaceChildren(); list.replaceChildren(); return;
+    }
     if (state === 'idle') { status.textContent = ''; return; }
     if (state === 'loading') { status.textContent = 'Loading the catalogue…'; return; }
     if (state === 'failed' || !songs) {
@@ -114,15 +129,26 @@ export function createFindBox(mount: HTMLElement, deps: FindDeps) {
       return;
     }
     const artists = artistsOf(songs);
-    const shown = allArtists ? artists : artists.slice(0, ARTISTS_SHOWN);
-    const chip = (label: string, on: boolean, run: () => void, title = '') => {
-      const b = el('button', 'find-chip' + (on ? ' is-on' : ''), label) as HTMLButtonElement;
+    const chip = (label: string, on: boolean, run: () => void, title = '', cls = '') => {
+      const b = el('button', 'find-chip' + (cls ? ' ' + cls : '') + (on ? ' is-on' : ''), label) as HTMLButtonElement;
       b.type = 'button'; b.setAttribute('aria-pressed', String(on)); if (title) b.title = title; b.onclick = run;
       return b;
     };
-    chips.replaceChildren(
-      ...shown.map((a) => chip(`${a.name} · ${a.songs}`, fold(a.name) === fold(artist), () => { artist = fold(a.name) === fold(artist) ? '' : a.name; paint(); }, `Show ${a.name}’s ${a.songs === 1 ? 'song' : `${a.songs} songs`}`)),
-      ...(artists.length > ARTISTS_SHOWN ? [chip(allArtists ? 'Fewer artists' : `All ${artists.length} artists`, false, () => { allArtists = !allArtists; paint(); })] : []));
+    const pick = (a: ArtistCount, label: string, cls = '') => chip(label, fold(a.name) === fold(artist), () => { artist = fold(a.name) === fold(artist) ? '' : a.name; paint(); }, `Show ${a.name}’s ${a.songs === 1 ? 'song' : `${a.songs} songs`}`, cls);
+    if (deps.grid) {
+      // Every short name goes in the grid. Longer names are tucked behind one button; an artist already picked stays in view.
+      const short = artists.filter((a) => isShortName(a.name)), long = artists.filter((a) => !isShortName(a.name));
+      const longShown = allArtists ? long : long.filter((a) => fold(a.name) === fold(artist));
+      chips.replaceChildren(
+        ...short.map((a) => pick(a, a.name)),
+        ...(long.length ? [chip(allArtists ? 'Fewer artists' : `${long.length} more ${long.length === 1 ? 'artist' : 'artists'}`, false, () => { allArtists = !allArtists; paint(); }, '', 'find-more')] : []),
+        ...longShown.map((a) => pick(a, `${a.name} · ${a.songs}`, 'find-chip--long')));
+    } else {
+      const shown = allArtists ? artists : artists.slice(0, ARTISTS_SHOWN);
+      chips.replaceChildren(
+        ...shown.map((a) => pick(a, `${a.name} · ${a.songs}`)),
+        ...(artists.length > ARTISTS_SHOWN ? [chip(allArtists ? 'Fewer artists' : `All ${artists.length} artists`, false, () => { allArtists = !allArtists; paint(); })] : []));
+    }
     const found = findSongs(songs, query, artist);
     const now = deps.current();
     list.replaceChildren(...found.songs.map((s) => {
