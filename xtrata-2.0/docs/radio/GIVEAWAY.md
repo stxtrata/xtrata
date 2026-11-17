@@ -84,6 +84,30 @@ jq -Rs '{action:"add", shuffle:true, text:.}' links.txt | ...   # load in a rand
 out: `notFound` (not a gift link we know) and `notLive` (already claimed, expired…). It never prints a code back.
 Adding links shows the first one straight away unless you `pause` first.
 
+## The intro song (what a new player starts on)
+
+Someone claiming a player from the wall hears one song from their first tap on the radio page, through making the
+passkey and the minute their plays take to land. It is set per list, by the operator, with no redeploy:
+
+```bash
+call '{"action":"intro","list":"players"}'               # what it is now
+call '{"action":"intro","list":"players","song":317}'    # set it (an inscription id)
+call '{"action":"intro","list":"players","song":"off"}'  # none: the claim goes back to the plain "Claim my free player"
+```
+
+- Until it is set it is the built-in default (`DEFAULT_INTRO_SONG` in `src/lib/listening-wallet/intro.ts`).
+- It applies to the next person who claims. `GET /radio/giveaway/players/intro` is what the radio page reads (`{song}`).
+- The play is paid like any other: it waits in the player's queue and is paid the moment the plays land. A claim that
+  never lands gives up after 30 minutes, and that one listen is then unpaid.
+- Only that one song is let through before the plays land. When it ends, or anything else is put on, the radio waits
+  for the plays as before.
+- It happens once, in the claim. A player never starts a song by itself on a later visit.
+- The server does not check that the id is a song: check it plays on the radio before setting it.
+
+The claim, as a newcomer meets it: tap a disc on the wall (it is held and the radio opens, no confirm step) → one
+screen with the disc and **Play** → the secure box's own button and Face ID, with the song already playing → the song's
+artwork and a countdown while the plays land → the class revealed over the music.
+
 ## Loading the 1,000 players, step by step
 
 Two guided halves; each checks itself and stops at the first thing that is not as expected.

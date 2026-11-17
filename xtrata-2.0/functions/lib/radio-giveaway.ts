@@ -15,6 +15,7 @@
  *
  * Operator: POST /radio/giveaway/admin with `Authorization: Bearer <RADIO_GIVEAWAY_SECRET>` (see the handler).
  */
+import { DEFAULT_INTRO_SONG, isSongId } from '../../src/lib/listening-wallet/intro';
 import type { GiftEnv } from './radio-gifts';
 import { GiftError, ipHash, playerView } from './radio-gifts';
 import { giftCodeHash, giftPlays, isGiftCode } from '../../src/lib/listening-wallet/gifts';
@@ -87,6 +88,20 @@ export async function ensureGiveawayTables(env: GiveawayEnv) {
   await exec(env, 'ALTER TABLE radio_giveaway_links ADD COLUMN hold_by TEXT').catch(() => undefined);
   await exec(env, 'CREATE TABLE IF NOT EXISTS radio_giveaway_picks(ip_hash TEXT NOT NULL, at INTEGER NOT NULL, pos INTEGER NOT NULL)');
   await exec(env, 'CREATE INDEX IF NOT EXISTS radio_giveaway_picks_ip ON radio_giveaway_picks(ip_hash, at)');
+  // Added with the intro song: small per-list settings the operator changes without a redeploy.
+  await exec(env, 'CREATE TABLE IF NOT EXISTS radio_giveaway_settings(list TEXT NOT NULL, key TEXT NOT NULL, value TEXT NOT NULL, updated_at INTEGER NOT NULL, PRIMARY KEY(list, key))');
+}
+
+/**
+ * The song a new player from this list starts on while it is being claimed (src/lib/listening-wallet/intro.ts), or null
+ * when the operator has switched that off. Until the operator sets one it is the built-in default.
+ */
+export async function introSong(env: GiveawayEnv, list: GiveawayList = 'players'): Promise<number | null> {
+  await ensureGiveawayTables(env);
+  const r = await first<{ value: string }>(env, "SELECT value FROM radio_giveaway_settings WHERE list=? AND key='intro'", [list]);
+  if (!r) return DEFAULT_INTRO_SONG;
+  const n = Number(r.value);
+  return r.value !== 'off' && isSongId(n) ? n : null;
 }
 
 const readState = async (env: GiveawayEnv, list: GiveawayList = 'main') => {
@@ -284,7 +299,7 @@ export function giveawayAuthorised(env: GiveawayEnv, header: string | null): boo
  * Operator actions. `add` takes `text`, any blob with links or codes in it; only codes that are real, live gifts are
  * kept (a typo cannot sit in the list unnoticed) and the report says what was left out. No action ever returns a code.
  */
-export async function giveawayAdmin(env: GiveawayEnv, body: { action?: string; text?: unknown; minSeconds?: unknown; maxSeconds?: unknown; count?: unknown; shuffle?: unknown; list?: unknown }, now: number) {
+export async function giveawayAdmin(env: GiveawayEnv, body: { action?: string; text?: unknown; minSeconds?: unknown; maxSeconds?: unknown; count?: unknown; shuffle?: unknown; list?: unknown; song?: unknown }, now: number) {
   await ensureGiveawayTables(env);
   // Which giveaway: `list` ("players" for the free-player page), or the album drop when none is named.
   const list = giveawayList(body.list);
@@ -328,6 +343,16 @@ export async function giveawayAdmin(env: GiveawayEnv, body: { action?: string; t
     const archived = await exec(env, 'UPDATE radio_giveaway_links SET archived=1 WHERE list=? AND archived=0', [list]);
     await exec(env, `UPDATE ${x.t} SET current=NULL, next_at=0, held=0, updated_at=? WHERE ${x.w}`, [now, ...x.b]);
     return { archived, withdrawn, ...(await adminStatus(env, now, list)) };
+  }
+  if (act === 'intro') {
+    // The song new players start on while they claim: `song` an inscription id, or "off" for none. Without `song`
+    // it only reports. It applies to the next person who claims; nothing about a claimed player changes.
+    if (body.song !== undefined) {
+      const off = body.song === 'off' || body.song === null || body.song === 0;
+      if (!off && !isSongId(body.song)) throw new GiftError('song must be an inscription id (a whole number), or "off".');
+      await exec(env, "INSERT INTO radio_giveaway_settings(list, key, value, updated_at) VALUES(?, 'intro', ?, ?) ON CONFLICT(list, key) DO UPDATE SET value=excluded.value, updated_at=excluded.updated_at", [list, off ? 'off' : String(body.song), now]);
+    }
+    return { intro: await introSong(env, list), ...(await adminStatus(env, now, list)) };
   }
   if (act === 'pause' || act === 'resume') {
     await exec(env, `UPDATE ${x.t} SET paused=?, updated_at=? WHERE ${x.w}`, [act === 'pause' ? 1 : 0, now, ...x.b]);

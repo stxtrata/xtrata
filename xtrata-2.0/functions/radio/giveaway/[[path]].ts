@@ -1,6 +1,6 @@
 import { GiftError, hiroGiftChain, sweepGifts, type GiftDeps } from '../../lib/radio-gifts';
 import { checkSongsNow } from '../../lib/radio-metadata';
-import { giveawayAdmin, giveawayAuthorised, giveawayList, giveawayView, isWall, pickSpot, spotView, wallView, type GiveawayEnv } from '../../lib/radio-giveaway';
+import { giveawayAdmin, giveawayAuthorised, giveawayList, giveawayView, introSong, isWall, pickSpot, spotView, wallView, type GiveawayEnv } from '../../lib/radio-giveaway';
 
 /**
  * The free-album giveaway (functions/lib/radio-giveaway.ts, page: public/giveaway.html):
@@ -8,6 +8,7 @@ import { giveawayAdmin, giveawayAuthorised, giveawayList, giveawayView, isWall, 
  *   GET  /radio/giveaway/players           the free-player wall (page: /players): every spot and its state, never a link
  *   POST /radio/giveaway/players/pick      {spot}: hold that spot for three minutes and get its link
  *   GET  /radio/giveaway/players/spot/<n>  one spot: once claimed, its class and the player it became
+ *   GET  /radio/giveaway/players/intro     the song a new player starts on while it is claimed ({song: id | null})
  *   POST /radio/giveaway/admin    the operator: {action: status | add | pause | resume | gap | skip | now | archive, list?, …};
  *                                 needs `Authorization: Bearer <RADIO_GIVEAWAY_SECRET>` (anything else: 404)
  * Reading it also nudges the gift sweep along (a claimed link only counts once its funds have arrived).
@@ -43,6 +44,10 @@ export async function onRequest(context: Ctx) {
       let body: any;
       try { body = JSON.parse(text || '{}'); } catch { return reply({ error: 'Invalid JSON' }, 400); }
       return reply(await pickSpot(env, body ?? {}, Date.now(), request.headers.get('cf-connecting-ip'), list));
+    }
+    if (parts[1] === 'intro' && parts.length === 2) {
+      if (request.method !== 'GET') return reply({ error: 'GET required' }, 405);
+      return reply({ song: await introSong(env, list) }, 200, { 'cache-control': 'public, max-age=0, s-maxage=20' });
     }
     if (parts[1] === 'spot' && parts.length === 3) {
       if (request.method !== 'GET') return reply({ error: 'GET required' }, 405);
