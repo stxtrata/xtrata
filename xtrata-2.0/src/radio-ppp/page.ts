@@ -39,6 +39,7 @@ import { isTierId, tierById, tierOfAmount, type Tier } from '../lib/listening-wa
 import { AWARDS_DROP } from '../lib/listening-wallet/tx';
 import { awardSeed } from '../lib/music-awards/record';
 import { DEFAULT_INTRO_SONG, INTRO_MAX_MS, isSongId } from '../lib/listening-wallet/intro';
+import { createInstall } from './install';
 
 const root = document.getElementById('ppp');
 if (root) start(root);
@@ -322,6 +323,12 @@ function start(root: HTMLElement) {
     badge.title = `A ${tierNow.name} player from the Xtrata Music giveaway`;
   }
 
+  // "Add to Home Screen" (install.ts): the button at the top of the radio. `standalone`: this IS the home-screen app.
+  const standalone = (() => { try { return !!window.matchMedia?.('(display-mode: standalone)').matches || (navigator as any).standalone === true; } catch { return false; } })();
+  const a2hs = document.getElementById('a2hs') as HTMLButtonElement | null;
+  if (a2hs) createInstall({ button: a2hs, icon: '/radio/icons/app-192.png', mount: document.body, target: window,
+    env: () => ({ userAgent: navigator.userAgent, maxTouchPoints: navigator.maxTouchPoints || 0, standalone }) });
+
   // ---- the intro song (src/lib/listening-wallet/intro.ts) ----
   // Someone claiming a free player from the wall hears one song from their first tap here, through making the passkey
   // and the minute their plays take to land. Once, as part of claiming: nothing here ever starts a song on a later visit.
@@ -422,7 +429,7 @@ function start(root: HTMLElement) {
     welcome.render({
       mode, status, asking: !!s.busy || s.armed, busy: !!s.busy, canStart: (s.step === 'intro' || s.step === 'locked') && !inApp,
       plays: starter ? starter.plays : mode === 'landed' ? s.playsLeft : null, from: starter?.from ?? null,
-      tier: tierNow, mystery, spot: spotPicked,
+      tier: tierNow, mystery, spot: spotPicked, installed: standalone,
       intro: starter && introSong !== null && (s.step === 'intro') ? { ready: true } : null,
       now: introNow(),
       albums: mode === 'landed' ? featured.map((p) => ({ title: p.title, by: p.subtitle, cover: coverArt(p.cover), run: () => { showFull(); openFeatured(p, true); } })) : [],

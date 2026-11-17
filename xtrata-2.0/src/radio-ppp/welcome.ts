@@ -35,6 +35,11 @@ export interface WelcomeInput {
   albums?: { title: string; by: string; cover?: string; run(): void }[];
   /** gift: do not say how many plays it holds yet (a lottery drop): that is the reveal when it lands. */
   mystery?: boolean;
+  /**
+   * new: this is the home-screen app. A phone keeps an installed app's storage apart from the browser's, so someone who
+   * made their player in the browser arrives here looking new: opening the player they have comes first.
+   */
+  installed?: boolean;
   /** gift: the number of the disc they picked on the wall, when known. */
   spot?: number | null;
   /** gift: an intro song is set, so the one button is "Play": it starts the music and asks for the passkey together. */
@@ -100,6 +105,7 @@ export const PLAYER_PROMISES = [
 
 export const WELCOME_TEXT = {
   gift: { title: 'Your disc is ready', primary: 'Claim my free player', play: 'Play', hint: 'Free. Face ID or fingerprint.', returning: 'I already have a player', full: 'Look around first' },
+  installedNew: { title: 'Open your player', body: 'Use your face or fingerprint to open the player you already have.', primary: 'Open my player', hint: 'Face ID or fingerprint.', fresh: 'I’m new: make my player' },
   new: { title: 'Music that pays the artist', body: 'Every play counts for whoever owns the song. Make your player once and you’re in.', primary: 'Make my player',
     hint: 'One tap with Face ID or your fingerprint. No app, no account, no password.', returning: 'I’ve listened here before', full: 'Look around first' },
   back: { title: 'Welcome back', body: 'Unlock your player and carry on listening.', primary: 'Unlock my player', hint: 'One tap with Face ID or your fingerprint.', returning: 'Use a different passkey', full: 'Look around first' },
@@ -176,10 +182,11 @@ export function createWelcomeView(mount: HTMLElement) {
         else if (m === 'gift' || m === 'arriving') box.append(mysteryDisc());
         else if (m === 'new') box.append(xtrataMark('al-hero-mark'));
         const sounding = input.now && (m === 'gift' || m === 'arriving' || m === 'landed') ? input.now : null;
-        box.append(el('h1', '', m === 'landed' ? landedTitle(input.tier) : m === 'back' && input.tier ? `Your ${input.tier.name} player` : m === 'gift' ? giftTitle(input.spot) : WELCOME_TEXT[m].title));
+        const home = m === 'new' && !!input.installed;
+        box.append(el('h1', '', m === 'landed' ? landedTitle(input.tier) : m === 'back' && input.tier ? `Your ${input.tier.name} player` : m === 'gift' ? giftTitle(input.spot) : home ? WELCOME_TEXT.installedNew.title : WELCOME_TEXT[m].title));
         // With the intro song sounding, the song stands where the explanation was: nobody reads while music starts.
         if (sounding && m === 'arriving') box.append(nowPlaying(sounding, true));
-        else box.append(el('p', '', m === 'gift' ? giftBody(input.plays, input.from, input.mystery) : m === 'landed' ? landedBody(input.plays) : WELCOME_TEXT[m].body));
+        else box.append(el('p', '', m === 'gift' ? giftBody(input.plays, input.from, input.mystery) : m === 'landed' ? landedBody(input.plays) : home ? WELCOME_TEXT.installedNew.body : WELCOME_TEXT[m].body));
         if (sounding && m !== 'arriving') box.append(nowPlaying(sounding));
         if (input.status.length) { const s = el('div', 'al-status'); s.setAttribute('role', 'status'); s.append(...input.status); box.append(s); }
         if (input.asking) box.append(el('p', 'al-hint al-hint--ask', WELCOME_TEXT.asking));
@@ -195,6 +202,10 @@ export function createWelcomeView(mount: HTMLElement) {
           if (input.canStart) { const b = button('al-primary' + (input.intro ? ' al-primary--play' : ''), input.intro ? w.play : w.primary, input.start, input.busy); box.append(b, el('p', 'al-hint', w.hint)); }
           if (input.canStart) box.append(button('al-link', w.returning, input.returning, input.busy));
           else box.append(button('al-link', w.full, input.full));
+        } else if (m === 'new' && input.installed) {
+          const w = WELCOME_TEXT.installedNew;
+          if (input.canStart) box.append(button('al-primary', w.primary, input.returning, input.busy), el('p', 'al-hint', w.hint), button('al-link', w.fresh, input.start, input.busy));
+          box.append(button('al-link', WELCOME_TEXT.new.full, input.full));
         } else if (m === 'new' || m === 'back') {
           const w = WELCOME_TEXT[m];
           if (input.canStart) box.append(button('al-primary', w.primary, m === 'back' ? input.unlock : input.start, input.busy), el('p', 'al-hint', w.hint));

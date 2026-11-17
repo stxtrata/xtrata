@@ -1,0 +1,17 @@
+{
+  "name": "Xtrata Music",
+  "short_name": "Xtrata Music",
+  "description": "A music player where every play pays the artist.",
+  "id": "/radio",
+  "start_url": "/radio?novice=1&source=home",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0c0e13",
+  "theme_color": "#0c0e13",
+  "icons": [
+    { "src": "/radio/icons/app-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/radio/icons/app-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/radio/icons/app-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

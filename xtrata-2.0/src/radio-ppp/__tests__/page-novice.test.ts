@@ -304,6 +304,19 @@ describe('a free starter player: claimed, arriving, landed', () => {
     expect(h.calls.filter(([n]) => n === 'create')).toEqual([['create', [{ quick: true }]]]);
   });
 
+  it('opened from the home screen with no player known here, opening the player they already have comes first', async () => {
+    // A phone keeps an installed app's storage apart from the browser's: their player exists, this app has not met it.
+    vi.stubGlobal('matchMedia', (q: string) => ({ matches: q.includes('standalone'), media: q, addEventListener() {}, removeEventListener() {} }));
+    await open(NEW);
+    await vi.waitFor(() => expect(html().dataset.welcome).toBe('new'));
+    expect(text(page())).toContain('Open your player');
+    expect([...page().querySelectorAll('button')].map((b) => b.textContent)).toEqual(['Open my player', 'I’m new: make my player', 'Look around first']);
+    named(/Open my player/)!.click();
+    expect(h.calls.filter(([n]) => n === 'unlock').at(-1)).toEqual(['unlock', [true]]);
+    expect(h.calls.filter(([n]) => n === 'create')).toHaveLength(0);
+    expect(text(page())).not.toMatch(BANNED_WORDS);
+  });
+
   it('greets them with the disc they picked on the wall', async () => {
     starter();
     sessionStorage.setItem('xtrata.radio.spot', '333');
