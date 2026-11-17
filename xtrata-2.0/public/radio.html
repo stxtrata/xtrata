@@ -870,12 +870,11 @@ d.setAttribute('data-skin','1');d.setAttribute('data-tab','listen');}catch(e){}}
   html[data-skin]:not([data-view]) .rx{display:flex;flex-direction:column;gap:16px;min-width:0;order:0}
   /* one screen at a time */
   html[data-skin]:not([data-view]):not([data-tab=you]) .ppp,html[data-skin]:not([data-view]):not([data-tab=you]) .strap,html[data-skin]:not([data-view]):not([data-tab=you]) .radio-wallet,
-  html[data-skin]:not([data-view]):not([data-tab=liked]) #likesBox,html[data-skin]:not([data-view]):not([data-tab=browse]) #findBox,html[data-skin]:not([data-view]):not([data-tab=browse]) #bands,
+  html[data-skin]:not([data-view]):not([data-tab=liked]) #likesBox,html[data-skin]:not([data-view]):not([data-tab=browse]) #findBox,html[data-skin]:not([data-view]):not([data-tab=listen]) #bands,
   html[data-skin]:not([data-view]):not([data-tab=listen]) #albumList,html[data-skin]:not([data-view]):not([data-tab=listen]) .rx>*:not(#bands):not(.sk-h),
   html[data-skin]:not([data-view])[data-tab=liked] .rx,html[data-skin]:not([data-view])[data-tab=you] .rx{display:none}
   html[data-skin]:not([data-view])[data-tab=browse] .rx{display:contents}
-  html[data-skin]:not([data-view])[data-tab=browse] .sk-h[data-for=browse],html[data-skin]:not([data-view])[data-tab=you] .sk-h[data-for=you]{display:block}
-  html[data-skin]:not([data-view])[data-tab=browse] #findBox{order:0} html[data-skin]:not([data-view])[data-tab=browse] .sk-h{order:1} html[data-skin]:not([data-view])[data-tab=browse] #bands{order:2}
+  html[data-skin]:not([data-view])[data-tab=listen] .sk-h[data-for=listen],html[data-skin]:not([data-view])[data-tab=you] .sk-h[data-for=you]{display:block}
   html[data-skin]:not([data-view]) #albumList{order:1}
   html[data-skin]:not([data-view]) .sk-h[data-for=you]{order:-1} html[data-skin]:not([data-view]) .ppp{order:1;margin:0;border-radius:18px} html[data-skin]:not([data-view]) .radio-wallet{order:2} html[data-skin]:not([data-view]) .strap{order:3}
   html[data-skin]:not([data-view]) .sk-h{margin:6px 0 -6px;font-size:13px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:#a9b2bf}
@@ -926,16 +925,18 @@ d.setAttribute('data-skin','1');d.setAttribute('data-tab','listen');}catch(e){}}
   .upnext small,.mini small{display:block;font-size:12px;color:#a9b2bf;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .upnext b,.mini b{display:block;font-size:14px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 
-  /* Browse: the stations, then every song and artist */
-  html[data-skin]:not([data-view]) .stations{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin:0}
-  html[data-skin]:not([data-view]) .stations button,html[data-skin]:not([data-view]) .stations [data-sh="1"]{display:flex;justify-content:space-between;gap:10px;min-height:92px;padding:12px;border:0;border-radius:16px;background:#171b23;color:#f2efe6}
-  html[data-skin]:not([data-view]) .stations button b{font-family:inherit;font-size:15px;font-weight:600;letter-spacing:0;color:#f2efe6}
-  html[data-skin]:not([data-view]) .stations button span{display:block;max-width:100%;font-size:12.5px;line-height:1.3;color:rgba(242,239,230,.72);white-space:normal}
+  /* Listen: what to play, under the player and smaller than before (the one-line descriptions show as a tooltip). Picking one stays on this screen. */
+  html[data-skin]:not([data-view]) .sk-h[data-for=listen]{order:4;margin:8px 0 -8px}
+  html[data-skin]:not([data-view]) .stations{order:5;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin:0}
+  html[data-skin]:not([data-view]) .stations button,html[data-skin]:not([data-view]) .stations [data-sh="1"]{display:flex;justify-content:center;gap:2px;min-height:50px;padding:8px 12px;border:0;border-radius:14px;background:#171b23;color:#f2efe6}
+  html[data-skin]:not([data-view]) .stations button b{font-family:inherit;font-size:14px;font-weight:600;letter-spacing:0;color:#f2efe6}
+  html[data-skin]:not([data-view]) .stations button span{display:none}
   html[data-skin]:not([data-view]) .stations [data-b=fm]{background:#134a54} html[data-skin]:not([data-view]) .stations [data-b=liked]{background:#3a2b6b}
   html[data-skin]:not([data-view]) .stations [data-b=chain]{background:#5a3418} html[data-skin]:not([data-view]) .stations [data-b=chain][data-sh="1"]{background:#4b2444}
   html[data-skin]:not([data-view]) .stations button.on{outline:2px solid #8fe0f2;outline-offset:2px}
   html[data-skin]:not([data-view]) .stations .lamp{display:none} html[data-skin]:not([data-view]) .stations button.on .lamp{display:block;background:#8fe0f2;box-shadow:none}
   html[data-skin]:not([data-view]) .stations button:disabled{opacity:.4;filter:none}
+  /* Browse: search, then the artists, then the songs */
   html[data-skin]:not([data-view]) .likes{border:0;border-radius:0;background:none;padding:0}
   html[data-skin]:not([data-view]) .likes>summary{margin:6px 0 4px;font-size:30px;font-weight:700;letter-spacing:-.4px;pointer-events:none}
   html[data-skin]:not([data-view]) .likes>summary::after{content:none}
@@ -954,6 +955,12 @@ d.setAttribute('data-skin','1');d.setAttribute('data-tab','listen');}catch(e){}}
   html[data-skin]:not([data-view]) .find-chip{min-height:44px;padding:0 16px;font-size:14px;border-color:#2c3341;background:#171b23}
   html[data-skin]:not([data-view]) .find-chip.is-on{border-color:#8fe0f2;color:#8fe0f2;background:#171b23}
   html[data-skin]:not([data-view]) .likesFoot{font-size:13px}
+  /* Artists whose names fit a column sit three across; "more artists" opens the longer names underneath. */
+  html[data-skin]:not([data-view]) .find-artists--grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+  html[data-skin]:not([data-view]) .find-artists--grid .find-chip{min-width:0;min-height:44px;padding:0 8px;font-size:13px;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  html[data-skin]:not([data-view]) .find-artists--grid .find-more,html[data-skin]:not([data-view]) .find-artists--grid .find-chip--long{grid-column:1/-1}
+  html[data-skin]:not([data-view]) .find-artists--grid .find-more{border-style:dashed;color:#8fe0f2}
+  html[data-skin]:not([data-view]) .find-artists--grid .find-chip--long{padding:9px 16px;text-align:left;white-space:normal}
   /* You: the player panel as it is for now, with the other-wallet controls under it */
   html[data-skin]:not([data-view]) .radio-wallet{padding:12px 14px;border-radius:14px;background:#171b23;font-size:13px}
   html[data-skin]:not([data-view]) #radio-wallet-address{display:inline;max-width:60%}
@@ -1071,7 +1078,7 @@ d.setAttribute('data-skin','1');d.setAttribute('data-tab','listen');}catch(e){}}
     </div>
     <!-- After the strip changes the song: one tap back to where you were. -->
     <div class="tuner-undo" id="tunerUndoRow" hidden><button class="chip" id="tunerUndo" type="button"></button></div>
-    <h3 class="sk-h" data-for="browse">Stations</h3>
+    <h3 class="sk-h" data-for="listen">Stations</h3>
     <div class="stations" id="bands" role="group" aria-label="Stations">
       <button type="button" data-b="fm" title="Xtrata’s own mix: hand-picked songs and new arrivals. The place to discover music."><b><i class="lamp"></i>FM</b><span>Curated + new on-chain</span></button>
       <button type="button" data-b="liked" title="Your own station: only the songs you have liked, in your order."><b><i class="lamp"></i>LIKED</b><span>Your likes, your order</span></button>
@@ -1634,7 +1641,7 @@ function showUnavailable(){
 fetch('/radio/listening-wallet/config',{cache:'no-store',signal:AbortSignal.timeout(15000)})
   .then(function(r){return r.ok?r.json():{}})
   .then(function(c){
-    if(c?.enabled && (!paidHost || c.here)) return import('/radio/ppp.js?v=91548585c3af');
+    if(c?.enabled && (!paidHost || c.here)) return import('/radio/ppp.js?v=de51c20c6d1b');
     showUnavailable();
   }).catch(showUnavailable);
 </script>

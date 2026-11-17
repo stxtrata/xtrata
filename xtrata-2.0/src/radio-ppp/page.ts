@@ -1840,7 +1840,8 @@ function start(root: HTMLElement) {
     current: () => { const n = Number((window as any).XtrataRadio?.getState?.()?.nowPlaying?.tokenId); return Number.isSafeInteger(n) ? n : null; },
     locked: () => !!ppp.snapshot().albumLock?.locked,
     explicit: (id) => !!(window as any).XtrataRadio?.isExplicit?.(id),
-    liked: (id) => likedNow().has(id)
+    liked: (id) => likedNow().has(id),
+    grid: document.documentElement.hasAttribute('data-skin')   // the new look lists artist names three across
   }) : null;
   findBox?.addEventListener('toggle', () => { if (findBox.open) find?.load(); });
   let findSeen = '';

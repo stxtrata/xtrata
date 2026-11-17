@@ -4,6 +4,7 @@
 // No audio, chain or wallet: the real engine (xtrata-radio.js) and pay-per-play are not loaded.
 // Usage: node scripts/test-radio-page-browser.mjs [screenshot-dir]
 import { chromium } from 'playwright';
+import { build } from 'esbuild';
 import { readFile } from 'node:fs/promises';
 import assert from 'node:assert/strict';
 
@@ -14,6 +15,10 @@ const WALLET_ADDR = 'SP2J6ZY48GV1EZ5V2V5RB9MP66SW86PYKKNRV9EJ7';
 const types = { js: 'text/javascript', mjs: 'text/javascript', css: 'text/css', html: 'text/html', svg: 'image/svg+xml', json: 'application/json' };
 const type = (p) => types[p.split('.').pop()] || 'application/octet-stream';
 const tracks = Array.from({ length: 40 }, (_, i) => ({ id: 2900 + i * 3, title: ['Night Drive', 'SuperUser', 'Liquidez', 'Smalltalk', 'Entertainment'][i % 5] + ' ' + (i + 1), artist: ['Audionals', 'melophonic', '3ai3'][i % 3] }));
+// The real "Find music" code (src/radio-ppp/find.ts), bundled here and run inside the real page, because the stand-in setup below never loads the panel (ppp.js).
+const findJs = (await build({ entryPoints: [new URL('../src/radio-ppp/find.ts', import.meta.url).pathname], bundle: true, format: 'iife', globalName: 'FindMod', write: false })).outputFiles[0].text;
+const artistSongs = ['melophonic', 'melophonic', 'melophonic', 'Audionals', '3ai3', 'Cicada', 'Xtrata Arcade', 'Hundred Little Reasons', 'Rex Speedway and The Denim Avengers']
+  .map((artist, i) => ({ id: 100 + i, title: `Song ${i + 1}`, artist }));
 const cover = 'data:image/svg+xml;base64,' + Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64"><rect width="64" height="64" fill="#b0306a"/><circle cx="32" cy="32" r="18" fill="#ffb547"/></svg>').toString('base64');
 
 // A short WAV whose loudness rises left to right, so the drawn waveform can be checked.
@@ -175,7 +180,7 @@ for (const viewport of [{ width: 1280, height: 900 }, { width: 390, height: 844 
 
   // Listen: artwork, the song, a like beside it, the bar, three controls, what is next. No strip, no power, no receiver.
   assert.equal(await tab(), 'listen');
-  for (const id of ['tuner', 'power', 'presetBtn', 'spectrum', 'bands', 'likesBox', 'findBox', 'howto', 'mini']) assert.equal(await page.locator('#' + id).isVisible(), false, id + ' is not on Listen');
+  for (const id of ['tuner', 'power', 'presetBtn', 'spectrum', 'likesBox', 'findBox', 'howto', 'mini']) assert.equal(await page.locator('#' + id).isVisible(), false, id + ' is not on Listen');
   for (const id of ['art', 'ttl', 'artst', 'heart', 'prev', 'pp', 'next', 'tlWave', 'upNext', 'tabs']) assert.equal(await page.locator('#' + id).isVisible(), true, id + ' is on Listen');
   assert.equal(await page.locator('#stn').innerText(), 'ALL MUSIC');
   assert.match(await page.locator('#upNextT').innerText(), new RegExp(tracks[10].title));
@@ -193,33 +198,63 @@ for (const viewport of [{ width: 1280, height: 900 }, { width: 390, height: 844 
   await page.mouse.click(wbox.x + wbox.width * 0.5, wbox.y + wbox.height / 2);
   assert.deepEqual((await calls()).at(-1), ['seek', 100]);
   if (viewport.width < 500) { const t = await page.locator('#tabs').boundingBox(), u = await page.locator('#upNext').boundingBox(); assert.ok(u.y + u.height <= t.y + 1, 'everything on Listen fits above the tabs on a phone'); }
+  // The four stations sit under the player, in plain words, smaller than they were on Browse.
+  assert.equal(await page.locator('#bands').isVisible(), true);
+  assert.deepEqual(await page.locator('#bands button b').allInnerTexts(), ['All music', 'Your likes', 'Everything, in order', 'Everything, shuffled']);
+  assert.equal(await page.locator('#bands button.on').count(), 1);
+  { const u = await page.locator('#upNext').boundingBox(), b = await page.locator('#bands').boundingBox(); assert.ok(b.y >= u.y + u.height - 1, 'the stations come after the player'); }
+  for (const b of await page.locator('#bands button').all()) { const r = await b.boundingBox(); assert.ok(r.height >= 44 && r.height <= 70, 'a station is small but easy to tap (' + r.height + 'px)'); }
   await noSideScroll('Listen');
   await shot('listen');
+  await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
+  { const t = await page.locator('#tabs').boundingBox(), b = await page.locator('#bands').boundingBox(); assert.ok(b.y + b.height <= t.y + 1, 'scrolled to the bottom, every station is clear of the tabs'); }
+  await shot('listen-stations');
+  await page.evaluate(() => window.scrollTo(0, 0));
 
-  // Browse: search, then four stations in plain words. Each of the two "Everything" stations sets the order.
+  // Browse: search and artists only. The stations are not here. Artist names that fit a column sit three across.
   await page.locator('#tabs button[data-t="browse"]').click();
   assert.equal(await tab(), 'browse');
   assert.equal(await page.locator('#tabs button[aria-current="page"]').innerText(), 'Browse');
-  assert.deepEqual(await page.locator('#bands button b').allInnerTexts(), ['All music', 'Your likes', 'Everything, in order', 'Everything, shuffled']);
-  assert.equal(await page.locator('#bands button.on').count(), 1);
+  assert.equal(await page.locator('#bands').isVisible(), false);
+  assert.equal(await page.locator('.sk-h:visible').count(), 0);
   assert.equal(await page.locator('#art').isVisible(), false);
   assert.equal(await page.locator('#findBox').evaluate((d) => d.open), true);
   assert.equal(await page.locator('#mini').isVisible(), true);
   assert.equal(await page.locator('#miniT').innerText(), tracks[9].title);
+  await page.addScriptTag({ content: findJs });
+  await page.evaluate((songs) => { window.FindMod.createFindBox(document.getElementById('findBody'), { load: async () => songs, play: (id) => window.__calls.push(['playToken', id]), current: () => null, locked: () => false, grid: document.documentElement.hasAttribute('data-skin') }).load(); }, artistSongs);
+  await page.locator('.find-artists--grid .find-chip').first().waitFor();
+  assert.equal(await page.locator('.find-artists').evaluate((n) => getComputedStyle(n).gridTemplateColumns.split(' ').length), 3);
+  assert.deepEqual(await page.locator('.find-artists .find-chip').allInnerTexts(), ['melophonic', '3ai3', 'Audionals', 'Cicada', 'Xtrata Arcade', '2 more artists']);
+  { const chips = await page.locator('.find-artists .find-chip:not(.find-more)').all(); const xs = [];
+    for (const c of chips) { const r = await c.boundingBox(); xs.push(r); assert.ok(await c.evaluate((n) => n.scrollWidth <= n.clientWidth + 1), 'a short name is not cut off at ' + viewport.width + 'px'); }
+    assert.ok(xs[0].y === xs[1].y && xs[1].y === xs[2].y && xs[3].y > xs[0].y && xs[3].x === xs[0].x, 'names sit three to a row'); }
+  assert.equal(await page.locator('.find-chip--long').count(), 0);
   await noSideScroll('Browse');
   await shot('browse');
+  await page.locator('.find-more').click();
+  assert.deepEqual(await page.locator('.find-chip--long').allInnerTexts(), ['Hundred Little Reasons · 1', 'Rex Speedway and The Denim Avengers · 1']);
+  { const m = await page.locator('.find-more').boundingBox(), l = await page.locator('.find-chip--long').first().boundingBox(); assert.ok(l.y > m.y, 'the longer names open underneath'); }
+  await noSideScroll('Browse, all artists');
+  await shot('browse-all');
+  await page.locator('.find-chip--long').nth(1).click();
+  assert.deepEqual(await page.locator('#findBody li .lt').allInnerTexts(), ['Song 9']);
+  await page.locator('#findBody li .lt').click();
+  assert.deepEqual((await calls()).at(-1), ['playToken', 108]);
+
+  // Stations: picked on Listen, and the listener stays on Listen. Each of the two "Everything" stations sets the order.
+  await page.locator('#tabs button[data-t="listen"]').click();
   await page.locator('#bands button[data-b="chain"][data-sh="1"]').click();
   assert.deepEqual((await calls()).slice(-2), [['setShuffle', true], ['setBand', 'chain']]);
   assert.equal(await tab(), 'listen');
   assert.equal(await page.locator('#stn').innerText(), 'EVERYTHING, SHUFFLED');
-  await page.locator('#tabs button[data-t="browse"]').click();
   assert.equal(await page.locator('#bands button.on').getAttribute('data-sh'), '1');
   await page.locator('#bands button[data-b="chain"][data-sh="0"]').click();
   assert.deepEqual((await calls()).slice(-2), [['setShuffle', false], ['setBand', 'chain']]);
   assert.equal(await page.locator('#stn').innerText(), 'EVERYTHING, IN ORDER');
-  await page.locator('#tabs button[data-t="browse"]').click();
   await page.locator('#bands button[data-b="fm"]').click();
   assert.deepEqual((await calls()).slice(-2), [['setShuffle', false], ['setBand', 'fm']]);
+  assert.equal(await tab(), 'listen');
 
   // Liked: the list, always open; the small bar opens the player and pauses.
   await page.locator('#tabs button[data-t="liked"]').click();
