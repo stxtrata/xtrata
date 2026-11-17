@@ -716,6 +716,8 @@ function start(root: HTMLElement) {
   // the passkey from a tap inside the wallet box, so it brings that box into view, ready to tap.
   const top = document.getElementById('ppp-top') as HTMLButtonElement | null;
   const focusPanel = () => {
+    // The radio page's tabs (public/radio.html) show the panel first: it lives under "You".
+    window.dispatchEvent(new CustomEvent('xtrata:radio-panel'));
     const target = frameWrap.hidden || frameWrap.classList.contains('ppp-frame--rest') ? root : frameWrap;
     target.scrollIntoView({ behavior: 'smooth', block: 'center' });
     root.classList.remove('ppp-flash'); void root.offsetWidth; root.classList.add('ppp-flash');
@@ -838,6 +840,25 @@ function start(root: HTMLElement) {
     elsewhere: 'Open', connect: 'Connect', 'wrong-wallet': 'Switch wallet', intro: 'Set up', locked: 'Unlock',
     link: 'Finish setup', fund: 'Add plays', over: 'Fix it', ready: 'Switch on'
   };
+  // Someone here with no player at all (they followed a link to the radio): while free players are being given
+  // away, one card leads straight to them (public/players.html). Asked once; if the answer cannot be read the card
+  // stays hidden rather than promise players that may not be there.
+  const claim = document.getElementById('claimCard');
+  let wallAsked = false, wallFree = 0, wallTotal = 0;
+  function renderClaim(s: Snapshot) {
+    if (!claim) return;
+    const cold = (s.step === 'intro' || s.step === 'connect' || s.step === 'elsewhere') && !s.gift;
+    if (cold && !wallAsked) {
+      wallAsked = true;
+      void json('/radio/giveaway/players').then((w) => {
+        if (w?.state !== 'open' || typeof w.free !== 'number' || typeof w.total !== 'number' || w.free <= 0) return;
+        wallFree = w.free; wallTotal = w.total; renderClaim(ppp.snapshot());
+      }).catch(() => undefined);
+    }
+    claim.hidden = !(cold && wallFree > 0);
+    const count = claim.querySelector('.claim-n');
+    if (count && wallFree > 0) count.textContent = `${wallFree.toLocaleString()} of ${wallTotal.toLocaleString()} left`;
+  }
   function renderMode(s: Snapshot) {
     if (s.step === 'loading') return; // keep the last look while it checks
     const left = s.session ? Math.min(s.session.playsLeft, s.playsLeft) : 0;
@@ -1059,6 +1080,7 @@ function start(root: HTMLElement) {
     if (!giftWait && gifts.inProgress(raw)) return;
     renderTop(s);
     renderMode(s);
+    renderClaim(s);
     if (paidHost && paidStatus) {
       paidStatus.hidden = !['off', 'elsewhere', 'loading'].includes(s.step);
       paidStatus.textContent = s.step === 'loading' || !s.gate ? (novice.on ? PLAIN_CHECKING : 'Checking your listening wallet…') : novice.on ? 'Xtrata Music is unavailable here. Reload to check again.' : 'Paid radio is unavailable. Reload to check again.';

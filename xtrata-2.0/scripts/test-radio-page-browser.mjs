@@ -1,5 +1,6 @@
 // Browser check of the radio page (public/radio.html) itself, with a stand-in radio engine:
-// layout at desktop and phone width, tuning strip, stations, likes filter / reorder / collapse.
+// the classic receiver (?classic=1: tuning strip, stations, likes filter / reorder / collapse) at desktop and phone width,
+// then the new look (Listen, Browse, Liked, You with tabs along the bottom).
 // No audio, chain or wallet: the real engine (xtrata-radio.js) and pay-per-play are not loaded.
 // Usage: node scripts/test-radio-page-browser.mjs [screenshot-dir]
 import { chromium } from 'playwright';
@@ -28,9 +29,10 @@ const wav = (() => {
 const fakeEngine = ([tracks, cover, wav]) => {
   const calls = [];
   const likes = [5, 9, 14].map((i) => ({ tokenId: String(tracks[i].id), title: tracks[i].title, artist: tracks[i].artist }));
-  let band = 'fm', on = true, listeners = [];
+  let band = 'fm', shuffle = false, on = true, listeners = [];
   const snap = () => ({
-    on, playing: true, band, preset: 'all', likesStatus: 'ready', likes,
+    on, playing: true, band, shuffle, preset: 'all', likesStatus: 'ready', likes,
+    upNext: { tokenId: tracks[10].id, title: tracks[10].title, artist: tracks[10].artist, cover },
     nowPlaying: { tokenId: tracks[9].id, title: tracks[9].title, artist: tracks[9].artist, album: 'Night Shift', cover, href: '/inscription/' + tracks[9].id },
     relatives: [{ id: tracks[3].id, kind: 'audio', playable: true }, { id: 77, kind: 'other', playable: false }],
     heart: { liked: true, pending: false, locked: false }
@@ -42,6 +44,7 @@ const fakeEngine = ([tracks, cover, wav]) => {
     playPause: () => calls.push(['playPause']), next: () => calls.push(['next']), prev: () => calls.push(['prev']),
     toggleLike: () => calls.push(['toggleLike']), unlike: (id) => calls.push(['unlike', id]),
     playToken: (id) => calls.push(['playToken', String(id)]),
+    setShuffle: (v) => { shuffle = !!v; calls.push(['setShuffle', shuffle]); listeners.forEach((cb) => cb(snap())); },
     setBand: (b) => { band = b; calls.push(['setBand', b]); listeners.forEach((cb) => cb(snap())); },
     cyclePreset: () => calls.push(['cyclePreset']), refreshLikes: () => calls.push(['refreshLikes']),
     setLikedOrder: (ids) => { window.__order = ids; },
@@ -73,7 +76,7 @@ for (const viewport of [{ width: 1280, height: 900 }, { width: 390, height: 860 
   const page = await context.newPage();
   page.setDefaultTimeout(10000);
   page.on('pageerror', (e) => errors.push(e.message));
-  await page.goto(SITE + '/radio.html');
+  await page.goto(SITE + '/radio.html?classic=1');
   await page.locator('#ttl', { hasText: tracks[9].title }).waitFor();
   await page.locator('#tuner:not([hidden])').waitFor();
   await page.waitForTimeout(700); // glow, spectrum, needle settle
@@ -112,7 +115,9 @@ for (const viewport of [{ width: 1280, height: 900 }, { width: 390, height: 860 
   const box = await page.locator('#ticks').boundingBox();
   await page.mouse.click(box.x + box.width * (20 / 39), box.y + 10);
   assert.deepEqual(await page.evaluate(() => window.__calls.at(-1)), ['playToken', String(tracks[20].id)]);
-  // stations
+  // stations (the shuffled CHAIN button belongs to the new look only)
+  assert.equal(await page.locator('#bands button:visible').count(), 3);
+  assert.equal(await page.locator('#tabs').isVisible(), false);
   await page.locator('#bands button[data-b="liked"]').click();
   assert.equal(await page.locator('#bands button.on').getAttribute('data-b'), 'liked');
   // likes: count, filter, reorder (saved per wallet and handed to the engine), collapse remembered
@@ -137,6 +142,107 @@ for (const viewport of [{ width: 1280, height: 900 }, { width: 390, height: 860 
   assert.deepEqual(await page.locator('#likesList .lt').allTextContents(), after); // order kept (list folded away)
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
   assert.ok(overflow <= 1, `no horizontal scroll at ${viewport.width}px (${overflow})`);
+  await context.close();
+}
+
+// The new look: one screen at a time, tabs along the bottom, no tuning strip.
+for (const viewport of [{ width: 1280, height: 900 }, { width: 390, height: 844 }]) {
+  const context = await browser.newContext({ viewport, deviceScaleFactor: shots ? 2 : 1 });
+  await context.addInitScript(([key, addr]) => { localStorage.setItem(key, JSON.stringify({ isConnected: true, address: addr, network: 'mainnet' })); }, ['xtrata.v15.1.wallet.session', WALLET_ADDR]);
+  await context.addInitScript(fakeEngine, [tracks, cover, wav]);
+  await context.route('**/*', async (route) => {
+    const url = new URL(route.request().url());
+    if (url.protocol === 'data:') return route.continue();
+    if (url.origin !== SITE) return route.abort();
+    if (url.pathname.startsWith('/xtrata-radio.js') || url.pathname === '/radio/wallet.js') return route.fulfill({ body: '', headers: { 'content-type': 'text/javascript' } });
+    if (url.pathname === '/radio/listening-wallet/config') return route.fulfill({ contentType: 'application/json', body: JSON.stringify({ enabled: false }) });
+    if (url.pathname === '/radio/song-stats') return route.fulfill({ contentType: 'application/json', body: JSON.stringify({ id: Number(url.searchParams.get('id')), likes: 12, plays: 34567 }) });
+    if (url.pathname === '/radio/counts') return route.fulfill({ contentType: 'application/json', body: JSON.stringify({ tracks }) });
+    try { const path = url.pathname.slice(1) || 'index.html'; return route.fulfill({ body: await readFile(new URL(path, pub)), headers: { 'content-type': type(path) } }); }
+    catch { return route.fulfill({ status: 404, body: '' }); }
+  });
+  const page = await context.newPage();
+  page.setDefaultTimeout(10000);
+  page.on('pageerror', (e) => errors.push(e.message));
+  const shot = async (name) => { if (shots) await page.screenshot({ path: `${shots}/radio-new-${name}-${viewport.width}.png` }); };
+  const tab = () => page.evaluate(() => document.documentElement.dataset.tab);
+  const calls = () => page.evaluate(() => window.__calls);
+  const noSideScroll = async (where) => { const o = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth); assert.ok(o <= 1, `no horizontal scroll on ${where} at ${viewport.width}px (${o})`); };
+  await page.goto(SITE + '/radio.html');
+  await page.locator('#ttl', { hasText: tracks[9].title }).waitFor();
+  await page.locator('#timeline:not([hidden])').waitFor();
+  await page.waitForTimeout(500);
+
+  // Listen: artwork, the song, a like beside it, the bar, three controls, what is next. No strip, no power, no receiver.
+  assert.equal(await tab(), 'listen');
+  for (const id of ['tuner', 'power', 'presetBtn', 'spectrum', 'bands', 'likesBox', 'findBox', 'howto', 'mini']) assert.equal(await page.locator('#' + id).isVisible(), false, id + ' is not on Listen');
+  for (const id of ['art', 'ttl', 'artst', 'heart', 'prev', 'pp', 'next', 'tlWave', 'upNext', 'tabs']) assert.equal(await page.locator('#' + id).isVisible(), true, id + ' is on Listen');
+  assert.equal(await page.locator('#stn').innerText(), 'ALL MUSIC');
+  assert.match(await page.locator('#upNextT').innerText(), new RegExp(tracks[10].title));
+  assert.equal(await page.locator('.logo-name').innerText(), 'Xtrata Music');
+  const heartBox = await page.locator('#heart').boundingBox(), titleBox = await page.locator('#ttl').boundingBox();
+  assert.ok(heartBox.x > titleBox.x && Math.abs(heartBox.y + heartBox.height / 2 - (titleBox.y + titleBox.height / 2)) < 40, 'the like sits beside the title');
+  for (const id of ['heart', 'prev', 'pp', 'next']) { const b = await page.locator('#' + id).boundingBox(); assert.ok(b.width >= 44 && b.height >= 44, id + ' is big enough to tap'); }
+  await page.locator('#heart').click();
+  assert.deepEqual((await calls()).at(-1), ['toggleLike']);
+  await page.locator('#pp').click();
+  assert.deepEqual((await calls()).at(-1), ['playPause']);
+  await page.locator('#upNext').click();
+  assert.deepEqual((await calls()).at(-1), ['next']);
+  const wbox = await page.locator('#tlWave').boundingBox();
+  await page.mouse.click(wbox.x + wbox.width * 0.5, wbox.y + wbox.height / 2);
+  assert.deepEqual((await calls()).at(-1), ['seek', 100]);
+  if (viewport.width < 500) { const t = await page.locator('#tabs').boundingBox(), u = await page.locator('#upNext').boundingBox(); assert.ok(u.y + u.height <= t.y + 1, 'everything on Listen fits above the tabs on a phone'); }
+  await noSideScroll('Listen');
+  await shot('listen');
+
+  // Browse: search, then four stations in plain words. Each of the two "Everything" stations sets the order.
+  await page.locator('#tabs button[data-t="browse"]').click();
+  assert.equal(await tab(), 'browse');
+  assert.equal(await page.locator('#tabs button[aria-current="page"]').innerText(), 'Browse');
+  assert.deepEqual(await page.locator('#bands button b').allInnerTexts(), ['All music', 'Your likes', 'Everything, in order', 'Everything, shuffled']);
+  assert.equal(await page.locator('#bands button.on').count(), 1);
+  assert.equal(await page.locator('#art').isVisible(), false);
+  assert.equal(await page.locator('#findBox').evaluate((d) => d.open), true);
+  assert.equal(await page.locator('#mini').isVisible(), true);
+  assert.equal(await page.locator('#miniT').innerText(), tracks[9].title);
+  await noSideScroll('Browse');
+  await shot('browse');
+  await page.locator('#bands button[data-b="chain"][data-sh="1"]').click();
+  assert.deepEqual((await calls()).slice(-2), [['setShuffle', true], ['setBand', 'chain']]);
+  assert.equal(await tab(), 'listen');
+  assert.equal(await page.locator('#stn').innerText(), 'EVERYTHING, SHUFFLED');
+  await page.locator('#tabs button[data-t="browse"]').click();
+  assert.equal(await page.locator('#bands button.on').getAttribute('data-sh'), '1');
+  await page.locator('#bands button[data-b="chain"][data-sh="0"]').click();
+  assert.deepEqual((await calls()).slice(-2), [['setShuffle', false], ['setBand', 'chain']]);
+  assert.equal(await page.locator('#stn').innerText(), 'EVERYTHING, IN ORDER');
+  await page.locator('#tabs button[data-t="browse"]').click();
+  await page.locator('#bands button[data-b="fm"]').click();
+  assert.deepEqual((await calls()).slice(-2), [['setShuffle', false], ['setBand', 'fm']]);
+
+  // Liked: the list, always open; the small bar opens the player and pauses.
+  await page.locator('#tabs button[data-t="liked"]').click();
+  assert.equal(await page.locator('#likesBox').evaluate((d) => d.open), true);
+  assert.equal(await page.locator('#likesList .lrow').count(), 3);
+  assert.equal(await page.locator('#bands').isVisible(), false);
+  await page.locator('#miniPp').click();
+  assert.deepEqual((await calls()).at(-1), ['playPause']);
+  await noSideScroll('Liked');
+  await shot('liked');
+  await page.locator('#miniOpen').click();
+  assert.equal(await tab(), 'listen');
+
+  // You: the other-wallet controls moved here from the top bar; the panel asking to be seen opens this screen.
+  await page.locator('#tabs button[data-t="you"]').click();
+  assert.equal(await page.locator('#radio-wallet-connect').isVisible(), true);
+  assert.equal(await page.locator('.topbar #radio-wallet-connect').count(), 0);
+  assert.equal(await page.locator('#likesBox').isVisible(), false);
+  await noSideScroll('You');
+  await shot('you');
+  await page.locator('#tabs button[data-t="listen"]').click();
+  await page.evaluate(() => window.dispatchEvent(new CustomEvent('xtrata:radio-panel')));
+  assert.equal(await tab(), 'you');
   await context.close();
 }
 await browser.close();
