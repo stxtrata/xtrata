@@ -1741,6 +1741,64 @@ describe('over 1 STX', () => {
 });
 
 
+describe('the first song of a brand-new player (the intro song)', () => {
+  const GIFTS = { enabled: true, treasury: 'SP1RKMSSGS3TCZW6HXFYXAM0DGHS2VNKSBTB4G183', turnstileSiteKey: null, admin: false, fee: '3000' };
+  const fresh = async () => { const s = setup({ passkeyOnly: true, gifts: GIFTS } as any); s.setMain(undefined); await s.ppp.forceRefresh(); return s; };
+  const plays = (s: Awaited<ReturnType<typeof fresh>>) => s.chain.broadcasts.map((raw: any) => deserializeTransaction(raw) as any).filter((tx: any) => tx.payload.functionName?.content === 'play');
+
+  it('heard before the player exists and before its plays land, it is kept and paid the moment they do', async () => {
+    const s = await fresh();
+    expect(s.ppp.snapshot().step).toBe('intro');
+    s.ppp.holdFirstPlay();
+    await s.ppp.onListened({ song: 7, id: rid(1), title: 'Entertainment', artist: 'melophonic' });   // 30 seconds in, no player yet
+    expect(s.chain.broadcasts).toHaveLength(0);
+    expect(s.ppp.snapshot().queued).toBe(1);
+    await s.ppp.create();
+    s.ppp.giftClaiming(true);                       // the claim is under way: the plays are expected
+    await s.ppp.forceRefresh();
+    expect(s.ppp.snapshot()).toMatchObject({ step: 'fund', queued: 1 });
+    expect(s.chain.broadcasts).toHaveLength(0);     // nothing to pay with yet, and nothing forgotten
+    s.chain.balance = 20_500n;                      // the plays land
+    await s.ppp.forceRefresh();
+    for (let i = 0; i < 20; i++) await s.settle();
+    expect(plays(s)).toHaveLength(1);
+    expect(cvToJSON(plays(s)[0].payload.functionArgs[1]).value).toBe('7');
+    expect(s.ppp.snapshot().queued).toBe(0);
+    expect(s.ppp.snapshot().entries[0]).toMatchObject({ kind: 'play', song: 7, title: 'Entertainment' });
+  });
+
+  it('without that hold nothing changes: a play heard before a player is ready is not kept', async () => {
+    const s = await fresh();
+    await s.ppp.onListened({ song: 7, id: rid(1) });
+    expect(s.ppp.snapshot().queued).toBe(0);
+    await s.ppp.create();
+    s.chain.balance = 20_500n;
+    await s.ppp.forceRefresh();
+    for (let i = 0; i < 20; i++) await s.settle();
+    expect(plays(s)).toHaveLength(0);
+  });
+
+  it('the hold is for the wait only: an empty player nobody is sending plays to does not keep songs queued', async () => {
+    const s = await fresh();
+    s.ppp.holdFirstPlay();
+    await s.ppp.create();
+    await s.ppp.forceRefresh();
+    expect(s.ppp.snapshot().step).toBe('fund');
+    await s.ppp.onListened({ song: 7, id: rid(2) });
+    expect(s.ppp.snapshot().queued).toBe(0);         // no claim under way: it is simply out of plays
+  });
+
+  it('gives up after half an hour: a claim that never lands does not hold a song forever', async () => {
+    const s = await fresh();
+    s.ppp.holdFirstPlay();
+    await s.ppp.onListened({ song: 7, id: rid(1) });
+    expect(s.ppp.snapshot().queued).toBe(1);
+    s.tick(31 * 60_000);
+    await s.ppp.onListened({ song: 8, id: rid(2) });
+    expect(s.ppp.snapshot().queued).toBe(0);
+  });
+});
+
 describe('the Music Hero award', () => {
   const hexOf = (b: Uint8Array) => Array.from(b, (x) => x.toString(16).padStart(2, '0')).join('');
   const ready = { state: 'ready', cls: 'gold', number: 412, need: 50, have: 50 };

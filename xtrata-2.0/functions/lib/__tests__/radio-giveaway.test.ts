@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { createRequire } from 'node:module';
 import { readFileSync } from 'node:fs';
 import { ensureGiftTables, type GiftEnv } from '../radio-gifts';
-import { advance, codesIn, giveawayAdmin, giveawayAuthorised, giveawayList, giveawayView, HOLD_MS, pickSpot, PICKS_PER_IP, spotView, wallView, type GiveawayEnv } from '../radio-giveaway';
+import { advance, codesIn, giveawayAdmin, giveawayAuthorised, giveawayList, giveawayView, HOLD_MS, introSong, pickSpot, PICKS_PER_IP, spotView, wallView, type GiveawayEnv } from '../radio-giveaway';
 import { GIFT_EXPIRY_MS, giftCodeHash, newGiftCode } from '../../../src/lib/listening-wallet/gifts';
 const { DatabaseSync } = createRequire(import.meta.url)('node:sqlite');
 
@@ -359,6 +359,28 @@ describe('radio giveaway', () => {
     expect((await call(['nothing'])).status).toBe(404);
     expect((await call([], {}, setup({ RADIO_GIFT_ENABLED: '0' }).env)).status).toBe(404);
   });
+  it('the intro song: a default until the operator sets one, changed or switched off with one command, read by anyone', async () => {
+    const { onRequest } = await import('../../radio/giveaway/[[path]]');
+    const { DEFAULT_INTRO_SONG } = await import('../../../src/lib/listening-wallet/intro');
+    const s = setup();
+    const call = (path: string[], init: RequestInit = {}) => onRequest({ request: new Request('https://xtrata.test/radio/giveaway/' + path.join('/'), init), env: s.env, params: { path } });
+    const pub = async () => (await (await call(['players', 'intro'])).json()) as { song: number | null };
+    expect(DEFAULT_INTRO_SONG).toBe(317);
+    expect(await introSong(s.env)).toBe(317);
+    expect(await pub()).toEqual({ song: 317 });
+    expect(await giveawayAdmin(s.env, { action: 'intro', list: 'players' }, T0)).toMatchObject({ intro: 317, wall: true });   // asking changes nothing
+    expect(await giveawayAdmin(s.env, { action: 'intro', list: 'players', song: 2910 }, T0)).toMatchObject({ intro: 2910 });
+    expect(await pub()).toEqual({ song: 2910 });
+    expect(await giveawayAdmin(s.env, { action: 'intro', list: 'players', song: 'off' }, T0)).toMatchObject({ intro: null });
+    expect(await pub()).toEqual({ song: null });
+    expect(await giveawayAdmin(s.env, { action: 'intro', list: 'players', song: 317 }, T0)).toMatchObject({ intro: 317 });
+    for (const bad of [-1, 1.5, '317', 'entertainment', 10 ** 12, {}]) await expect(giveawayAdmin(s.env, { action: 'intro', list: 'players', song: bad }, T0)).rejects.toThrow(/inscription id/);
+    expect(await introSong(s.env)).toBe(317);                         // a refused value changes nothing
+    expect((await call(['players', 'intro'], { method: 'POST' })).status).toBe(405);
+    expect((await call(['main', 'intro'])).status).toBe(404);         // the album drop has no intro song
+    expect(JSON.stringify(await pub())).toBe('{"song":317}');         // and it says nothing else
+  });
+
   it('keeps each list to itself: the album drop drips while the players wall stands open', async () => {
     const s = setup();
     const albums = await s.gifts(3, { player: 'p1' });

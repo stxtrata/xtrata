@@ -1191,6 +1191,9 @@ export function createPppController(deps: PppDeps) {
      * A gift funded this wallet (the server sent it from the gift treasury): tracked exactly like a
      * deposit, so the panel says it is on its way and paying starts by itself once it confirms.
      */
+    /** The intro song has started for someone claiming a new player: its play waits for the plays to land (30 minutes at most). */
+    holdFirstPlay: () => { firstPlayHoldUntil = deps.now() + QUEUE_TTL_MS; },
+
     /** A gift claim started (true) or stopped for good (false): the plays are expected, so nothing reads as empty meanwhile. */
     giftClaiming: (on: boolean) => {
       if (on) expectArrival(); else arrival = null;
@@ -1488,6 +1491,12 @@ export function createPppController(deps: PppDeps) {
   const QUEUE_MAX = 10;
   const QUEUE_TTL_MS = 30 * 60_000;
   let draining = false;
+  /**
+   * A brand-new player's first song starts before the player has its plays (page.ts, the intro song). Until this
+   * time a play heard meanwhile is kept and paid when the plays land, instead of being let through unpaid.
+   */
+  let firstPlayHoldUntil = 0;
+  const holdingFirstPlay = (s: Step) => deps.now() < firstPlayHoldUntil && (s === 'intro' || s === 'locked' || s === 'link' || (s === 'fund' && arrivalExpected()));
   const walletBusy = () => paying || !!busy || liking || checkingLike;
   const forgetQueue = () => { if (queue.length) { queue.length = 0; deps.changed(); } };
 
@@ -1526,7 +1535,7 @@ export function createPppController(deps: PppDeps) {
       // Background tabs barely run timers: catch up on confirmations and the kill switch here.
       await refresh();
       const s = step();
-      if (s === 'loading') return 'wait';
+      if (s === 'loading' || holdingFirstPlay(s)) return 'wait';
       if (s !== 'ready' || !payingOn() || !status?.session || status.session.playsLeft < 1 || !lockHeld) return 'done';
       if (unresolved().length) return 'wait'; // one transaction in flight per wallet
       if (!verified) { await deps.chain.verify(); verified = true; }

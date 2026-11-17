@@ -31,6 +31,8 @@ nav{display:flex;gap:8px;flex-wrap:wrap}
 nav a{padding:8px 12px;border:1px solid var(--line);border-radius:8px;font-size:13px;font-weight:600;text-decoration:none}
 nav a:hover{background:var(--panel2)}
 .hero{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,1fr);gap:28px;align-items:end;margin:34px 0 22px}
+.hero--short{grid-template-columns:1fr;margin:26px 0 16px}
+.wall #prize-box{margin-top:18px}
 .kicker{margin:0 0 10px;font-size:11px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:var(--muted)}
 h1{margin:0;font-size:clamp(36px,6.4vw,64px);line-height:1.02;letter-spacing:-.03em}
 h1 em{font-style:normal;background:linear-gradient(90deg,var(--violet),var(--pink));-webkit-background-clip:text;background-clip:text;color:transparent}
@@ -112,21 +114,14 @@ footer{margin-top:44px;padding-top:16px;border-top:1px solid var(--line);font-si
 <body>
 <div class="wrap">
   <header class="top">
-    <a class="brand" href="/music/lounge"><img src="/favicons/xtrata-apple-touch-icon.png" alt="" /><span><b>XTRATA MUSIC</b><span>Songs that live on-chain and pay the artist every play</span></span></a>
+    <a class="brand" href="/music/lounge"><img src="/favicons/xtrata-apple-touch-icon.png" alt="" /><span><b>XTRATA MUSIC</b><span>Every play pays the artist</span></span></a>
     <nav><a href="https://radio.xtrata.xyz/radio.html">Free radio</a><a href="/giveaway">Free album drop</a><a href="/">Xtrata home</a></nav>
   </header>
 
-  <div class="hero">
+  <div class="hero hero--short">
     <div>
-      <p class="kicker">Free players &middot; <span id="k-total">1,000</span> exist &middot; one each</p>
-      <h1>Pick a player.<br /><em>It&rsquo;s yours to keep.</em></h1>
-      <p class="lead">Every disc below is a real music player with plays already paid for. <strong>Choose any one that&rsquo;s free.</strong> You won&rsquo;t know what&rsquo;s inside until it&rsquo;s yours: <span id="range">anything from 50 to 1,000 plays</span>. It plays any song, and every play pays the artist.</p>
-      <ol class="steps"><li><i>1</i>Pick a disc</li><li><i>2</i>Face or fingerprint</li><li><i>3</i>Press play</li></ol>
-      <p class="small">No app, no account, no password. Works best on a phone or laptop with Face ID, Touch ID or a fingerprint reader. One player per person.</p>
-    </div>
-    <div id="prize-box" hidden>
-      <p class="prize-head">What&rsquo;s hidden in the wall</p>
-      <ul class="prizes" id="prizes"></ul>
+      <h1>Pick a disc.<br /><em>Press play.</em></h1>
+      <p class="lead"><span id="k-total">1,000</span> free players. One each. <span id="range" hidden></span></p>
     </div>
   </div>
 
@@ -138,21 +133,15 @@ footer{margin-top:44px;padding-top:16px;border-top:1px solid var(--line);font-si
     </div>
     <div class="grid" id="grid" role="list" aria-label="The players"></div>
     <div class="legend">
-      <span><i class="d"></i>Free: tap to pick</span>
-      <span><i class="d held"></i>Someone is claiming it</span>
-      <span><i class="d t-classic"></i>Claimed: tap to see whose</span>
+      <span><i class="d"></i>Free</span>
+      <span><i class="d held"></i>Being claimed</span>
+      <span><i class="d t-classic"></i>Claimed</span>
+    </div>
+    <div id="prize-box" hidden>
+      <p class="prize-head">Hidden in the wall</p>
+      <ul class="prizes" id="prizes"></ul>
     </div>
   </div>
-
-  <section>
-    <p class="kicker">How it works</p>
-    <h2>Three taps to your player</h2>
-    <div class="cards">
-      <div class="card"><i>1</i><strong>Pick a disc</strong><span>Any free one. It is held for you for three minutes while you claim it.</span></div>
-      <div class="card"><i>2</i><strong>Use your face or fingerprint</strong><span>That&rsquo;s the whole sign-up. Your device sets up your player in a few seconds.</span></div>
-      <div class="card"><i>3</i><strong>Press play</strong><span>Find out which player you got, then listen. Likes build your own playlist.</span></div>
-    </div>
-  </section>
 
   <section>
     <p class="kicker">Pass it on</p>
@@ -164,13 +153,13 @@ footer{margin-top:44px;padding-top:16px;border-top:1px solid var(--line);font-si
     </div>
   </section>
 
-  <footer>Each player is its own address on Stacks, made on your device from a passkey. The key never leaves your device. Already on Stacks? Listen with your own wallet on the <a href="https://radio.xtrata.xyz/radio.html">radio</a>.</footer>
+  <footer>Your player lives on your device and opens with your face or fingerprint. No app, no account, no password. Already have a wallet? Use the <a href="https://radio.xtrata.xyz/radio.html">radio</a>.</footer>
 </div>
 
 <div class="bar" id="bar" hidden>
   <div class="bar-in">
     <div><strong id="bar-title"></strong><span id="bar-text"></span></div>
-    <div class="bar-btns"><button class="btn" id="bar-cancel" type="button">Not this one</button><button class="btn primary" id="bar-go" type="button">Claim this player</button></div>
+    <div class="bar-btns"><button class="btn" id="bar-cancel" type="button">Not this one</button><button class="btn primary" id="bar-go" type="button">Play this disc</button></div>
   </div>
 </div>
 
@@ -180,7 +169,7 @@ footer{margin-top:44px;padding-top:16px;border-top:1px solid var(--line);font-si
     <h2 id="dt-title"></h2>
     <p class="sub" id="dt-sub"></p>
     <ul class="facts" id="dt-facts"></ul>
-    <div class="row"><a class="btn" id="dt-chain" target="_blank" rel="noopener">See its plays and likes on-chain</a><button class="btn" id="dt-close" type="button">Close</button></div>
+    <div class="row"><a class="btn" id="dt-chain" target="_blank" rel="noopener">See its plays and likes</a><button class="btn" id="dt-close" type="button">Close</button></div>
   </div>
 </dialog>
 
@@ -201,7 +190,7 @@ footer{margin-top:44px;padding-top:16px;border-top:1px solid var(--line);font-si
     return null;
   }
   function pad(n){return String(n).padStart(String(view?view.total:1000).length,'0');}
-  function link(code){return RADIO+(lottery?'&mystery=1':'')+'#gift='+code;}
+  function link(code,n){return RADIO+(lottery?'&mystery=1':'')+(n?'&n='+n:'')+'#gift='+code;}
 
   function build(total){
     if(dots.length===total)return;
@@ -262,17 +251,17 @@ footer{margin-top:44px;padding-top:16px;border-top:1px solid var(--line);font-si
     if(m&&(!sel||sel===m.spot)){
       box.hidden=false;
       var left=Math.max(0,Math.ceil((m.holdUntil-(Date.now()+skew))/1000));
-      $('bar-title').textContent='Player No. '+pad(m.spot)+' is held for you';
+      $('bar-title').textContent='Disc '+pad(m.spot)+' is held for you';
       $('bar-text').className='';$('bar-text').textContent='Finish claiming it in the next '+Math.floor(left/60)+':'+String(left%60).padStart(2,'0')+', or it goes back on the wall.';
-      $('bar-go').textContent='Carry on claiming';$('bar-go').disabled=false;$('bar-cancel').hidden=true;
+      $('bar-go').textContent='Carry on';$('bar-go').disabled=false;$('bar-cancel').hidden=true;
       return;
     }
     if(!sel){box.hidden=true;return;}
     box.hidden=false;$('bar-cancel').hidden=false;
-    $('bar-title').textContent='Player No. '+pad(sel);
+    $('bar-title').textContent='Disc '+pad(sel);
     $('bar-text').className=barMsg?'warn':'';
-    $('bar-text').textContent=barMsg||(lottery?'A mystery player. Claim it to find out what it holds.':'Free, with plays already paid for.');
-    $('bar-go').textContent=busy?'Holding it for you…':'Claim this player';$('bar-go').disabled=busy;
+    $('bar-text').textContent=barMsg||(busy?'One moment…':'');
+    $('bar-go').textContent=busy?'Opening your player…':barMsg?'Try again':'Play this disc';$('bar-go').disabled=busy;
   }
   setInterval(function(){if(mine())bar();},1000);
 
@@ -280,7 +269,7 @@ footer{margin-top:44px;padding-top:16px;border-top:1px solid var(--line);font-si
   grid.addEventListener('click',function(e){
     var b=e.target.closest('button.d'); if(!b||!view)return;
     var n=Number(b.dataset.n), c=view.spots.charAt(n-1), m=mine();
-    if(c==='.'||(m&&m.spot===n)){choose(n);return;}
+    if(c==='.'||(m&&m.spot===n)){choose(n);go();return;}
     if(c==='h'){sel=0;barMsg='';render(view);flash('Someone is claiming No. '+pad(n)+' right now. Pick another, or try it again in a few minutes.');return;}
     if(TIER[c])detail(n,TIER[c]);
   });
@@ -290,13 +279,12 @@ footer{margin-top:44px;padding-top:16px;border-top:1px solid var(--line);font-si
     for(var i=0;i<view.spots.length;i++)if(view.spots.charAt(i)==='.')free.push(i+1);
     if(!free.length)return;
     var r=new Uint32Array(1);crypto.getRandomValues(r);
-    var n=free[r[0]%free.length];choose(n);
-    dots[n-1].scrollIntoView({block:'center',behavior:'smooth'});
+    var n=free[r[0]%free.length];choose(n);go();
   });
   $('bar-cancel').addEventListener('click',function(){sel=0;barMsg='';if(view)render(view);});
-  $('bar-go').addEventListener('click',function(){
+  function go(){
     var m=mine();
-    if(m&&(!sel||sel===m.spot)){location.href=link(m.code);return;}
+    if(m&&(!sel||sel===m.spot)){location.href=link(m.code,m.spot);return;}
     if(!sel||busy)return;
     busy=true;barMsg='';bar();
     var n=sel;
@@ -306,9 +294,10 @@ footer{margin-top:44px;padding-top:16px;border-top:1px solid var(--line);font-si
       busy=false;
       if(!x.ok||!x.j||!/^[A-Za-z0-9_-]{22}$/.test(x.j.code||'')){barMsg=(x.j&&x.j.error)||'That did not work. Try another player.';bar();poll();return;}
       try{sessionStorage.setItem(KEY,JSON.stringify({spot:n,code:x.j.code,holdUntil:x.j.holdUntil}));}catch(e){}
-      location.href=link(x.j.code);
+      location.href=link(x.j.code,n);
     }).catch(function(){busy=false;barMsg='Could not reach the giveaway. Check your connection and try again.';bar();});
-  });
+  }
+  $('bar-go').addEventListener('click',go);
 
   // A claimed player: what it was, and where it lives now.
   var dlg=$('detail');

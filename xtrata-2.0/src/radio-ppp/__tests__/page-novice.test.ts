@@ -282,21 +282,116 @@ describe('a free starter player: claimed, arriving, landed', () => {
     h.route = (url) => (url.endsWith('/radio/gift/status') ? new Response(JSON.stringify({ status, amount: '100000', source: 'batch', from: null, label: '', expires: 0, player: null })) : undefined);
   };
 
-  it('the link opens on one screen: how many plays, what a player is, one button', async () => {
+  it('the link opens on one screen with one button, Play: a few words, and the tap starts the music and asks for the passkey together', async () => {
     starter();
     await open(NEW);
     await vi.waitFor(() => expect(html().dataset.welcome).toBe('gift'));
-    expect(text(page())).toContain('Your free player is waiting');
-    expect(text(page())).toContain('277 plays');
-    expect(text(page())).toContain('Play any song you like');
-    expect(text(page())).toContain('It pays the artist');
-    expect(text(page())).toContain('Likes build your playlist');
+    expect(text(page())).toContain('Your disc is ready');
+    expect(text(page())).toContain('277 plays inside. Every play pays the artist.');
+    expect(text(page())).not.toMatch(/It pays the artist|Likes build your playlist|Look around first/); // the three tiles and the second link are gone
     expect(text(page())).not.toMatch(BANNED_WORDS);
-    // The secure box was asked for its button the moment the link opened (the visitor already pressed "claim" on the
-    // page that sent them): once, and never again by itself. This screen's button is there to ask again.
-    expect(h.calls.filter(([n]) => n === 'create')).toHaveLength(1);
+    expect([...page().querySelectorAll('button')].map((b) => b.textContent)).toEqual(['Play', 'I already have a player']);
+    // Nothing is asked for, and nothing sounds, until the visitor's own tap.
+    expect(h.calls.filter(([n]) => n === 'create')).toHaveLength(0);
+    expect(h.radio.playToken).not.toHaveBeenCalled();
+    named(/^Play$/)!.click();
+    // In that one tap: the radio is let through for this song, the song starts, its play is kept to be paid, the box is asked.
+    expect(h.radio.setGiftStop).toHaveBeenLastCalledWith(null);
+    expect(h.radio.playToken).toHaveBeenCalledTimes(1);
+    expect(h.radio.playToken).toHaveBeenCalledWith(317);
+    expect(h.radio.setGiftStop.mock.invocationCallOrder.at(-1)!).toBeLessThan(h.radio.playToken.mock.invocationCallOrder[0]);
+    expect(h.calls.filter(([n]) => n === 'holdFirstPlay')).toHaveLength(1);
+    expect(h.calls.filter(([n]) => n === 'create')).toEqual([['create', [{ quick: true }]]]);
+  });
+
+  it('greets them with the disc they picked on the wall', async () => {
+    starter();
+    sessionStorage.setItem('xtrata.radio.spot', '333');
+    await open(NEW);
+    await vi.waitFor(() => expect(html().dataset.welcome).toBe('gift'));
+    expect(text(page())).toContain('Disc 333 is yours');
+    sessionStorage.removeItem('xtrata.radio.spot');
+  });
+
+  it('the song plays through the wait: its name and artwork stand where the explanation was, and the radio is not stopped or greyed', async () => {
+    starter();
+    await open(NEW);
+    await vi.waitFor(() => expect(html().dataset.welcome).toBe('gift'));
+    named(/^Play$/)!.click();
+    h.state = { playing: true, nowPlaying: { tokenId: '317', title: 'Entertainment', artist: 'melophonic' } };
+    h.feeds.forEach((f) => f(h.state));
+    // The player now exists and is empty: the plays are on their way.
+    h.snap = { ...base, step: 'fund', balance: 0n, playsLeft: 0, session: null, createdHere: true, depositPending: true, arrival: { since: Date.now(), graceMs: 60_000 }, giftStop: { reason: 'arriving', text: 'YOUR PLAYS ARE ARRIVING' } };
+    h.changed();
+    expect(html().dataset.welcome).toBe('arriving');
+    const now = page().querySelector('.al-now--big')!;
+    expect(text(now)).toBe('Entertainmentmelophonic');
+    expect((now.querySelector('img') as HTMLImageElement).getAttribute('src')).toBe('/radio/artwork?id=317');
+    expect(text(page())).not.toContain('This usually takes about a minute');
+    expect(text(page())).toMatch(/Loading your plays · \d+s/);
+    expect(h.radio.setGiftStop).toHaveBeenLastCalledWith(null);
+    expect(h.radio.setGiftWait).not.toHaveBeenCalledWith(true);
+    // The plays land: the class is revealed over the music, and moving on does not restart or pause anything.
+    h.snap = { ...base, step: 'ready', balance: 100_000n, playsLeft: 277, entries: PLAYED, gift: { player: null, from: null, source: 'batch', amount: '100000', drop: 'players' }, giftPlays: 277 };
+    localStorage.removeItem('xtrata.radio.gift.incoming.v1');
+    h.changed();
+    await vi.waitFor(() => expect(html().dataset.welcome).toBe('landed')); // even though the intro song has just been paid for
+    expect(text(page())).toContain('You got a Silver player');
+    expect(text(page())).toContain('277 plays. Every one pays the artist.');
+    expect(text(page().querySelector('.al-now')!)).toBe('Entertainmentmelophonic');
+    named(/Keep listening/)!.click();
+    expect(h.radio.playPause).not.toHaveBeenCalled();
+    expect(html().dataset.view).toBeUndefined();
+    expect(h.radio.playToken).toHaveBeenCalledTimes(1); // once, in the claim: never again
+  });
+
+  it('only that one song is let through: when it ends before the plays land, the radio waits again', async () => {
+    starter();
+    await open(NEW);
+    await vi.waitFor(() => expect(html().dataset.welcome).toBe('gift'));
+    named(/^Play$/)!.click();
+    h.state = { playing: true, nowPlaying: { tokenId: '317', title: 'Entertainment', artist: 'melophonic' } };
+    h.feeds.forEach((f) => f(h.state));
+    h.snap = { ...base, step: 'fund', balance: 0n, playsLeft: 0, session: null, createdHere: true, depositPending: true, arrival: { since: Date.now(), graceMs: 60_000 }, giftStop: { reason: 'arriving', text: 'YOUR PLAYS ARE ARRIVING' } };
+    h.changed();
+    expect(h.radio.setGiftStop).toHaveBeenLastCalledWith(null);
+    h.state = { playing: true, nowPlaying: { tokenId: '2910', title: 'MORE LIKE THIS', artist: 'Audionals' } };
+    h.feeds.forEach((f) => f(h.state));
+    expect(h.radio.setGiftStop.mock.calls.at(-1)![0]).toMatch(/arriv|on their way|way/i);
+    expect(h.radio.setGiftWait).toHaveBeenLastCalledWith(true);
+    expect(page().querySelector('.al-now')).toBeNull();
+  });
+
+  it('a player never starts a song by itself on a later visit', async () => {
+    await open({ ...base, step: 'locked' });
+    await vi.waitFor(() => expect(html().dataset.welcome).toBe('back'));
+    h.snap = { ...base, step: 'ready', balance: 100_000n, playsLeft: 277, entries: PLAYED };
+    h.changed();
+    expect(h.radio.playToken).not.toHaveBeenCalled();
+    expect(h.calls.filter(([n]) => n === 'holdFirstPlay')).toHaveLength(0);
+  });
+
+  it('with the intro song switched off by the operator it is the plain claim: the box is asked on arrival and the button says so', async () => {
+    starter();
+    const plain = h.route!;
+    h.route = (url, init) => (url.endsWith('/radio/giveaway/players/intro') ? new Response(JSON.stringify({ song: null })) : plain(url, init));
+    await open(NEW);
+    await vi.waitFor(() => expect(named(/Claim my free player/)).toBeTruthy());
+    await vi.waitFor(() => expect(h.calls.filter(([n]) => n === 'create')).toHaveLength(1));
     named(/Claim my free player/)!.click();
-    expect(h.calls.filter(([n]) => n === 'create')).toHaveLength(2);
+    expect(h.radio.playToken).not.toHaveBeenCalled();
+    expect(h.calls.filter(([n]) => n === 'holdFirstPlay')).toHaveLength(0);
+  });
+
+  it('the operator can change the intro song: the next claim starts on the new one', async () => {
+    starter();
+    const plain = h.route!;
+    h.route = (url, init) => (url.endsWith('/radio/giveaway/players/intro') ? new Response(JSON.stringify({ song: 2910 })) : plain(url, init));
+    await open(NEW);
+    await vi.waitFor(() => expect(html().dataset.welcome).toBe('gift'));
+    await new Promise((r) => setTimeout(r, 0));
+    named(/^Play$/)!.click();
+    expect(h.radio.playToken).toHaveBeenCalledWith(2910);
   });
 
   it('after the tap it waits calmly for the plays, then says "You’re in" and starts the music', async () => {
@@ -380,7 +475,7 @@ describe('a free starter player: claimed, arriving, landed', () => {
         // the old player is gone from the device: the ordinary claim follows, with a named passkey
         h.changed();
         await vi.waitFor(() => expect(html().dataset.welcome).toBe('gift'));
-        named(/Claim my free player/)?.click();
+        named(/^Play$/)?.click();
         expect(h.calls.filter(([n]) => n === 'create').at(-1)).toEqual(['create', [{ quick: true, another: true }]]);
         localStorage.removeItem('xtrata.radio.replace.v1');
       });
@@ -531,7 +626,7 @@ describe('player classes from the giveaway', () => {
     sessionStorage.setItem('xtrata.radio.mystery', '1');
     await open({ step: 'intro', listening: undefined, root: undefined, balance: undefined, session: null, giftStop: { reason: 'setup', text: 'SET UP YOUR PLAYER TO LISTEN' } });
     await vi.waitFor(() => expect(html().dataset.welcome).toBe('gift'));
-    expect(text(page())).toContain('Claim it to find out which one is yours');
+    expect(text(page())).toContain('What is inside? Play it to find out.');
     expect(text(page())).not.toMatch(/1,000|plays are/);
     expect(text(page())).not.toMatch(BANNED_WORDS);
   });

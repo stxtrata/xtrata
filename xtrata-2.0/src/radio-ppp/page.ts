@@ -38,6 +38,7 @@ import { buildSongs, createFindBox } from './find';
 import { isTierId, tierById, tierOfAmount, type Tier } from '../lib/listening-wallet/tiers';
 import { AWARDS_DROP } from '../lib/listening-wallet/tx';
 import { awardSeed } from '../lib/music-awards/record';
+import { DEFAULT_INTRO_SONG, INTRO_MAX_MS, isSongId } from '../lib/listening-wallet/intro';
 
 const root = document.getElementById('ppp');
 if (root) start(root);
@@ -321,6 +322,53 @@ function start(root: HTMLElement) {
     badge.title = `A ${tierNow.name} player from the Xtrata Music giveaway`;
   }
 
+  // ---- the intro song (src/lib/listening-wallet/intro.ts) ----
+  // Someone claiming a free player from the wall hears one song from their first tap here, through making the passkey
+  // and the minute their plays take to land. Once, as part of claiming: nothing here ever starts a song on a later visit.
+  // Which song is the operator's setting; until the server answers, the built-in default stands.
+  let introSong: number | null = novice.on ? DEFAULT_INTRO_SONG : null;
+  let introOn = false, introAt = 0, introMark = '';
+  if (novice.on) void json('/radio/giveaway/players/intro').then((r) => {
+    const next = r && r.song === null ? null : isSongId(r?.song) ? r.song as number : introSong;
+    if (next !== introSong && !introOn) { introSong = next; render(ppp.snapshot()); }
+  }).catch(() => undefined);
+  // The disc they picked on the wall (`?n=333`), to greet them with: kept for this tab only.
+  const spotPicked = (() => {
+    try {
+      const n = Number(new URLSearchParams(location.search).get('n'));
+      if (Number.isSafeInteger(n) && n >= 1 && n <= 100_000) sessionStorage.setItem('xtrata.radio.spot', String(n));
+      const v = Number(sessionStorage.getItem('xtrata.radio.spot'));
+      return Number.isSafeInteger(v) && v >= 1 ? v : null;
+    } catch { return null; }
+  })();
+  /** The intro song is what the radio is on (or is still tuning to, for a few seconds after the tap). */
+  const introLive = (s: Snapshot): boolean => {
+    if (!introOn || introSong === null) return false;
+    if (Date.now() - introAt > INTRO_MAX_MS || s.step === 'ready') { if (s.step !== 'ready') introOn = false; return false; }
+    const st = (window as any).XtrataRadio?.getState?.();
+    const playing = Number(st?.nowPlaying?.tokenId);
+    if (Date.now() - introAt < 20_000 && !Number.isSafeInteger(playing)) return true; // still tuning to it
+    if (playing !== introSong) { introOn = false; return false; }                    // it ended, or something else was put on
+    return true;
+  };
+  /** The visitor's tap on "Play": the music starts in that same tap, before anything else is asked of them. */
+  function startIntro() {
+    const radio = (window as any).XtrataRadio;
+    if (introSong === null || !radio?.playToken) return;
+    introOn = true; introAt = Date.now();
+    ppp.holdFirstPlay();
+    render(ppp.snapshot());            // lifts "set up your player to listen" for this one song (syncGift), in this tap
+    try { radio.playToken(introSong); } catch { introOn = false; }
+  }
+  /** What is sounding during the claim, for the welcome screens: the song, who it is by and its artwork. */
+  const introNow = (): { title: string; artist: string; art: string; playing: boolean } | null => {
+    if (!introOn || introSong === null) return null;
+    const st = (window as any).XtrataRadio?.getState?.();
+    const np = st?.nowPlaying && Number(st.nowPlaying.tokenId) === introSong ? st.nowPlaying : null;
+    const known = titles.get(introSong);
+    return { title: np?.title || known?.title || '', artist: np?.artist || known?.artist || '', art: `/radio/artwork?id=${introSong}`, playing: !!st?.playing };
+  };
+
   // Novice mode's first screen (welcome.ts): a newcomer with no player and no album sees one short page and one button,
   // not the whole radio. Until the page knows who this is, a quiet holding screen stands in (never the radio flashing by).
   const welcome = novice.on && albumMount ? createWelcomeView(albumMount) : null;
@@ -341,10 +389,12 @@ function start(root: HTMLElement) {
     if (s.step === 'intro' || s.step === 'unsupported') return gifts.incomingStarter() ? 'gift' : 'new';
     if (s.step === 'locked') return 'back';
     // The listener's own player (not an album), never played from on this device.
-    const fresh = s.slot === 0 && !s.gift?.player && !s.entries.some((e) => e.kind === 'play');
+    const own = s.slot === 0 && !s.gift?.player;
+    const fresh = own && !s.entries.some((e) => e.kind === 'play');
     if (s.step === 'fund' && fresh) return s.depositPending ? 'arriving' : 'empty';
-    // The plays this page was waiting for have landed: one screen that says what the player is, then the radio.
-    if (s.step === 'ready' && fresh && (welcomeLast === 'arriving' || welcomeLast === 'landed')) return 'landed';
+    // The plays this page was waiting for have landed: one screen that says what the player is, then the radio. It
+    // stays until the listener moves on, even though the intro song is paid for the moment the plays land.
+    if (s.step === 'ready' && own && (welcomeLast === 'landed' || (welcomeLast === 'arriving' && (fresh || introOn)))) return 'landed';
     return s.step === 'loading' && welcomeLast !== 'checking' ? welcomeLast : null; // a check in between: stay where we were
   };
   let autoClaimTried = false;
@@ -363,21 +413,26 @@ function start(root: HTMLElement) {
     // secure box is asked to offer its own button straight away instead of after a second, identical press here. Once
     // only: if they close the box, this screen's button is there to ask again. The box's own button and its wait are
     // untouched: making the passkey still takes the visitor's tap inside the box.
-    if (starter && !autoClaimTried && s.step === 'intro' && !s.busy && !s.armed && !s.error && !inApp) {
+    // With an intro song the visitor's first tap here is "Play": it starts the music (a browser only lets sound start
+    // from a tap on this page) and asks the box at the same moment, so nothing is asked for before that tap.
+    if (starter && introSong === null && !autoClaimTried && s.step === 'intro' && !s.busy && !s.armed && !s.error && !inApp) {
       autoClaimTried = true;
       void ppp.create({ quick: true, ...(replace.claiming() ? { another: true } : {}) });
     }
     welcome.render({
       mode, status, asking: !!s.busy || s.armed, busy: !!s.busy, canStart: (s.step === 'intro' || s.step === 'locked') && !inApp,
       plays: starter ? starter.plays : mode === 'landed' ? s.playsLeft : null, from: starter?.from ?? null,
-      tier: tierNow, mystery,
+      tier: tierNow, mystery, spot: spotPicked,
+      intro: starter && introSong !== null && (s.step === 'intro') ? { ready: true } : null,
+      now: introNow(),
       albums: mode === 'landed' ? featured.map((p) => ({ title: p.title, by: p.subtitle, cover: coverArt(p.cover), run: () => { showFull(); openFeatured(p, true); } })) : [],
       claimNew: mode === 'back' ? claimNewFor(s) : null, replaceOld: mode === 'back' ? replaceFor(s) : null,
-      start: () => void ppp.create(createOpts()), unlock: () => void ppp.unlock(), returning: () => void ppp.unlock(true), restock: () => openRestock(),
+      start: () => { if (starter && introSong !== null) startIntro(); void ppp.create(createOpts()); }, unlock: () => void ppp.unlock(), returning: () => void ppp.unlock(true), restock: () => openRestock(),
       full: () => {
         // "Start listening" starts the music: it is the listener's own tap, and nothing is playing yet.
         const radio = (window as any).XtrataRadio;
         const begin = mode === 'landed' && !radio?.getState?.()?.playing;
+        introOn = false; // the claim is over: from here the player is an ordinary one, and nothing starts by itself again
         showFull();
         if (begin) radio?.playPause?.();
       }
@@ -517,8 +572,11 @@ function start(root: HTMLElement) {
     // The free first song (novice preview): the shared album is handed to the radio before a player exists, and
     // nothing else may play. It is unpaid, once per album per device, and ends by itself (novice.ts, stepPreview).
     const pre = previewNow;
+    // The intro song of someone claiming a new player: it may play before the player has its plays (its play is
+    // queued and paid when they land), and only while it is that song.
+    const intro = introLive(raw);
     const said = gs ? (plainFor(raw) ? plainStop(gs.reason as GiftStopReason, gs.text) : gs.text) : null;
-    const stop = pre ? null : said ?? (paidHost && (!raw.gate?.here || raw.step === 'off') ? 'PAID RADIO IS UNAVAILABLE' : null);
+    const stop = pre || intro ? null : said ?? (paidHost && (!raw.gate?.here || raw.step === 'off') ? 'PAID RADIO IS UNAVAILABLE' : null);
     if (stop && stop !== stopPushed) { radio.setGiftStop(stop); stopPushed = stop; }
     const p = raw.step === 'off' || raw.step === 'elsewhere' ? null : raw.gift?.player ?? pre ?? featuredFor(raw) ?? null;
     const id = p ? p.id + ':' + p.cover + ':' + p.tracks.map((t) => t.id).join(',') : '';
@@ -529,7 +587,7 @@ function start(root: HTMLElement) {
     // Plays on their way (as the panel sees it): the radio says so, never "out of plays".
     if (stop !== stopPushed) { radio.setGiftStop(stop); stopPushed = stop; }
     // Plays on their way: the radio greys its controls and says so, instead of looking broken.
-    const wait = gs?.reason === 'arriving';
+    const wait = !intro && gs?.reason === 'arriving';
     if (wait !== waitPushed) { radio.setGiftWait?.(wait); waitPushed = wait; }
     const lock = !!p && (!!pre || !!raw.albumLock?.locked);
     if (lock !== lockPushed) { radio.setGiftLock?.(lock); lockPushed = lock; }
@@ -930,7 +988,7 @@ function start(root: HTMLElement) {
     if (elapsed < grace) {
       const left = Math.ceil((grace - elapsed) / 1000);
       fill.style.width = Math.max(4, Math.min(95, (elapsed / grace) * 100)).toFixed(0) + '%';
-      text.textContent = `Your plays are arriving… usually about a minute · ${left}s`;
+      text.textContent = `Loading your plays · ${left}s`;
       box.classList.remove('is-long');
       box.setAttribute('aria-valuenow', String(Math.round((elapsed / grace) * 100)));
     } else {
@@ -1761,6 +1819,7 @@ function start(root: HTMLElement) {
       const np = st?.nowPlaying;
       if (np && Number.isSafeInteger(Number(np.tokenId))) titles.set(Number(np.tokenId), { title: np.title || undefined, artist: np.artist || undefined });
       syncFind();
+      if (introOn) { const mark = `${np?.tokenId ?? ''}|${!!st?.playing}`; if (mark !== introMark) { introMark = mark; render(ppp.snapshot()); } }
       if (previewLive(preview)) {
         const sounding = !!st?.playing;
         advancePreview({ kind: 'now', track: np && np.tokenId != null ? String(np.tokenId) : null, playing: sounding, at: Date.now() });

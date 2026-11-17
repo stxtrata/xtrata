@@ -210,7 +210,7 @@ describe('an open album is a player', () => {
     expect([...album.querySelectorAll<HTMLButtonElement>('.al-play, .al-icon--big, .al-track')].every((b) => b.disabled)).toBe(true);
     expect(album.querySelector('.al-ctl')!.classList.contains('is-off')).toBe(true);
     const bar = album.querySelector('.ppp-wait')!;
-    expect(text(bar)).toMatch(/Your plays are arriving.*usually about a minute · (39|40|41)s/);
+    expect(text(bar)).toMatch(/Loading your plays · (39|40|41)s/);
     expect(album.querySelector('.ppp-bad')).toBeNull();
     expect(text(album)).not.toMatch(/No plays left|played this album out|artists unpaid/);
   });

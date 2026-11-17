@@ -741,7 +741,7 @@ describe('waiting for plays to arrive', () => {
     const bar = root.querySelector('.ppp-wait')!;
     expect(bar).not.toBeNull();
     expect(bar.getAttribute('role')).toBe('progressbar');
-    expect(text(bar)).toMatch(/Your plays are arriving.*usually about a minute · (4[6-9]|48)s/);
+    expect(text(bar)).toMatch(/Loading your plays · (4[6-9]|48)s/);
     expect(bar.classList.contains('is-long')).toBe(false);
     expect(root.querySelector('.ppp-bad')).toBeNull();
     expect(text(root)).not.toMatch(/artists unpaid|Add funds|Out of plays|Out of funds/);

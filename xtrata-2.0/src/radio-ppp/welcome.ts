@@ -35,6 +35,12 @@ export interface WelcomeInput {
   albums?: { title: string; by: string; cover?: string; run(): void }[];
   /** gift: do not say how many plays it holds yet (a lottery drop): that is the reveal when it lands. */
   mystery?: boolean;
+  /** gift: the number of the disc they picked on the wall, when known. */
+  spot?: number | null;
+  /** gift: an intro song is set, so the one button is "Play": it starts the music and asks for the passkey together. */
+  intro?: { ready: boolean } | null;
+  /** The intro song sounding during the claim: shown in place of words while the passkey is made and the plays land. */
+  now?: { title: string; artist: string; art: string; playing: boolean } | null;
   /**
    * back, arriving with a free player to claim on a device whose player was made before the giveaway: claim it as a new,
    * separate player (its own passkey). Null for everyone else.
@@ -93,25 +99,36 @@ export const PLAYER_PROMISES = [
 ] as const;
 
 export const WELCOME_TEXT = {
-  gift: { title: 'Your free player is waiting', primary: 'Claim my free player', hint: 'One tap with Face ID or your fingerprint. No app, no account, no password.', returning: 'I already have a player', full: 'Look around first' },
+  gift: { title: 'Your disc is ready', primary: 'Claim my free player', play: 'Play', hint: 'Free. Face ID or fingerprint.', returning: 'I already have a player', full: 'Look around first' },
   new: { title: 'Music that pays the artist', body: 'Every play counts for whoever owns the song. Make your player once and you’re in.', primary: 'Make my player',
     hint: 'One tap with Face ID or your fingerprint. No app, no account, no password.', returning: 'I’ve listened here before', full: 'Look around first' },
   back: { title: 'Welcome back', body: 'Unlock your player and carry on listening.', primary: 'Unlock my player', hint: 'One tap with Face ID or your fingerprint.', returning: 'Use a different passkey', full: 'Look around first' },
   backClaim: { title: 'A free player is waiting', body: 'This device already has a player you made before. You can claim the free one as a new, separate player with its own passkey. Your existing player, and anything in it, stays exactly as it is.',
     primary: 'Claim it as a new player', hint: 'One tap with Face ID or your fingerprint. You can switch between your players at any time.', unlock: 'Open my existing player instead',
     replace: 'Replace my old player', replaceHint: 'Its balance is sent back first, then it is removed from this device. You end up with one player that has 24 backup words.', both: 'Keep both players' },
-  arriving: { title: 'Your player is made', body: 'Your plays are on their way to it. This usually takes about a minute: keep this page open and it carries on by itself.' },
-  landed: { title: 'You’re in', primary: 'Start listening' },
+  arriving: { title: 'Your player is made', body: 'Your plays are on their way to it. This usually takes about a minute: keep this page open and it carries on by itself.', playing: 'Your player is made' },
+  landed: { title: 'You’re in', primary: 'Start listening', playing: 'Keep listening' },
   empty: { title: 'Your player is ready', body: 'It has no plays yet. Add some and every song you hear pays its artist.', primary: 'Add plays', full: 'Look around the radio' },
   checking: 'One moment…',
   asking: 'Continue in the box below.'
 } as const;
 
-export const giftBody = (plays: number | null | undefined, from: string | null | undefined, mystery = false) =>
-  mystery ? `${from || 'Xtrata Music'} has loaded it with plays. Classic, Bronze, Silver, Gold or Diamond? Claim it to find out which one is yours.`
-    : `${from || 'Xtrata Music'} has covered ${plays ? `${count(plays)} plays` : 'your first plays'}. Play any song you like, and every play pays the artist.`;
-export const landedBody = (plays: number | null | undefined) =>
-  plays ? `Your player holds ${count(plays)} plays. Play anything: each one pays the artist you’re hearing.` : 'Your player is ready. Play anything: each play pays the artist you’re hearing.';
+/** Few words: a newcomer is here to hear music, and the screens that follow show the rest. */
+export const giftTitle = (spot: number | null | undefined) => (spot ? `Disc ${spot} is yours` : WELCOME_TEXT.gift.title);
+export const giftBody = (plays: number | null | undefined, _from?: string | null, mystery = false) =>
+  mystery ? 'What is inside? Play it to find out.' : plays ? `${count(plays)} plays inside. Every play pays the artist.` : 'Every play pays the artist.';
+export const landedBody = (plays: number | null | undefined) => (plays ? `${count(plays)} plays. Every one pays the artist.` : 'Every play pays the artist.');
+/** The song sounding during the claim: its artwork, its name and who it is by. A picture, not a sentence. */
+export function nowPlaying(now: NonNullable<WelcomeInput['now']>, big = false): HTMLElement {
+  const box = el('div', 'al-now' + (big ? ' al-now--big' : ''));
+  const img = el('img', 'al-now__art') as HTMLImageElement; img.src = now.art; img.alt = '';
+  const t = el('div', 'al-now__t');
+  t.append(el('b', '', now.title || 'Playing now'), el('span', '', now.artist));
+  const eq = el('i', 'al-now__eq' + (now.playing ? ' is-on' : '')); eq.setAttribute('aria-hidden', 'true'); eq.append(el('s'), el('s'), el('s'));
+  box.append(img, t, eq);
+  box.setAttribute('role', 'group'); box.setAttribute('aria-label', `${now.playing ? 'Playing' : 'Starting'}: ${now.title || 'your first song'}${now.artist ? ` by ${now.artist}` : ''}`);
+  return box;
+}
 export const landedTitle = (tier: WelcomeInput['tier']) => (tier ? `You got a ${tier.name} player` : WELCOME_TEXT.landed.title);
 /** The record a tier is drawn as (public/radio.html styles `.tier-disc[data-tier]`). */
 export function tierDisc(tier: NonNullable<WelcomeInput['tier']>, big = true): HTMLElement {
@@ -125,12 +142,6 @@ export function tierDisc(tier: NonNullable<WelcomeInput['tier']>, big = true): H
 export function createWelcomeView(mount: HTMLElement) {
   const root = document.documentElement;
   let on = false;
-  const promises = () => {
-    const list = el('ul', 'al-welcome-points');
-    // Three tiles: a sign and a few words each. The longer line is there for anyone who wants it (hover, screen readers).
-    for (const [title, text, sign] of PLAYER_PROMISES) { const li = el('li'); li.title = text; const s = el('em', '', sign); s.setAttribute('aria-hidden', 'true'); li.append(s, el('b', '', title), el('span', '', text)); list.append(li); }
-    return list;
-  };
   return {
     showing: () => on,
     /** `albumActive`: the album view owns the mount right now, so this view only steps aside and touches nothing. */
@@ -164,9 +175,12 @@ export function createWelcomeView(mount: HTMLElement) {
         if (input.tier && (m === 'landed' || m === 'back' || m === 'empty')) box.append(tierDisc(input.tier));
         else if (m === 'gift' || m === 'arriving') box.append(mysteryDisc());
         else if (m === 'new') box.append(xtrataMark('al-hero-mark'));
-        box.append(el('h1', '', m === 'landed' ? landedTitle(input.tier) : m === 'back' && input.tier ? `Your ${input.tier.name} player` : WELCOME_TEXT[m].title));
-        box.append(el('p', '', m === 'gift' ? giftBody(input.plays, input.from, input.mystery) : m === 'landed' ? landedBody(input.plays) : WELCOME_TEXT[m].body));
-        if (m === 'landed' || m === 'gift') box.append(promises());
+        const sounding = input.now && (m === 'gift' || m === 'arriving' || m === 'landed') ? input.now : null;
+        box.append(el('h1', '', m === 'landed' ? landedTitle(input.tier) : m === 'back' && input.tier ? `Your ${input.tier.name} player` : m === 'gift' ? giftTitle(input.spot) : WELCOME_TEXT[m].title));
+        // With the intro song sounding, the song stands where the explanation was: nobody reads while music starts.
+        if (sounding && m === 'arriving') box.append(nowPlaying(sounding, true));
+        else box.append(el('p', '', m === 'gift' ? giftBody(input.plays, input.from, input.mystery) : m === 'landed' ? landedBody(input.plays) : WELCOME_TEXT[m].body));
+        if (sounding && m !== 'arriving') box.append(nowPlaying(sounding));
         if (input.status.length) { const s = el('div', 'al-status'); s.setAttribute('role', 'status'); s.append(...input.status); box.append(s); }
         if (input.asking) box.append(el('p', 'al-hint al-hint--ask', WELCOME_TEXT.asking));
         else if (m === 'back' && input.claimNew) {
@@ -175,14 +189,20 @@ export function createWelcomeView(mount: HTMLElement) {
           if (input.canStart && input.replaceOld) box.append(button('al-primary', w.replace, input.replaceOld, input.busy), el('p', 'al-hint', w.replaceHint), button('al-link', w.both, input.claimNew, input.busy), button('al-link', w.unlock, input.unlock, input.busy));
           else if (input.canStart) box.append(button('al-primary', w.primary, input.claimNew, input.busy), el('p', 'al-hint', w.hint), button('al-link', w.unlock, input.unlock, input.busy));
           box.append(button('al-link', WELCOME_TEXT.back.full, input.full));
-        } else if (m === 'gift' || m === 'new' || m === 'back') {
+        } else if (m === 'gift') {
+          // One button. With an intro song it is "Play": the music starts in that tap and the passkey is asked for with it.
+          const w = WELCOME_TEXT.gift;
+          if (input.canStart) { const b = button('al-primary' + (input.intro ? ' al-primary--play' : ''), input.intro ? w.play : w.primary, input.start, input.busy); box.append(b, el('p', 'al-hint', w.hint)); }
+          if (input.canStart) box.append(button('al-link', w.returning, input.returning, input.busy));
+          else box.append(button('al-link', w.full, input.full));
+        } else if (m === 'new' || m === 'back') {
           const w = WELCOME_TEXT[m];
           if (input.canStart) box.append(button('al-primary', w.primary, m === 'back' ? input.unlock : input.start, input.busy), el('p', 'al-hint', w.hint));
           if (input.canStart) box.append(button('al-link', w.returning, input.returning, input.busy));
           box.append(button('al-link', w.full, input.full));
         } else if (m === 'landed') {
-          box.append(button('al-primary', WELCOME_TEXT.landed.primary, input.full));
-          if (input.albums?.length) {
+          box.append(button('al-primary', input.now?.playing ? WELCOME_TEXT.landed.playing : WELCOME_TEXT.landed.primary, input.full));
+          if (input.albums?.length && !input.now) {
             box.append(el('p', 'al-hint', 'Or start with an album that comes with your player:'));
             for (const a of input.albums) { const b = button('al-album', '', a.run);
               // The album's own cover beside its name (art.ts finds it); a plain row until it is known.
