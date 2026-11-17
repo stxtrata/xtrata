@@ -877,7 +877,7 @@ d.setAttribute('data-skin','1');d.setAttribute('data-tab','listen');}catch(e){}}
   html[data-skin]:not([data-view])[data-tab=browse] .sk-h[data-for=browse],html[data-skin]:not([data-view])[data-tab=you] .sk-h[data-for=you]{display:block}
   html[data-skin]:not([data-view])[data-tab=browse] #findBox{order:0} html[data-skin]:not([data-view])[data-tab=browse] .sk-h{order:1} html[data-skin]:not([data-view])[data-tab=browse] #bands{order:2}
   html[data-skin]:not([data-view]) #albumList{order:1}
-  html[data-skin]:not([data-view]) .sk-h[data-for=you]{order:0} html[data-skin]:not([data-view]) .ppp{order:1;margin:0;border-radius:18px} html[data-skin]:not([data-view]) .radio-wallet{order:2} html[data-skin]:not([data-view]) .strap{order:3}
+  html[data-skin]:not([data-view]) .sk-h[data-for=you]{order:-1} html[data-skin]:not([data-view]) .ppp{order:1;margin:0;border-radius:18px} html[data-skin]:not([data-view]) .radio-wallet{order:2} html[data-skin]:not([data-view]) .strap{order:3}
   html[data-skin]:not([data-view]) .sk-h{margin:6px 0 -6px;font-size:13px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:#a9b2bf}
   html[data-skin]:not([data-view]) .sk-h--big{margin:6px 0 0;font-size:30px;font-weight:700;letter-spacing:-.4px;text-transform:none;color:#f2efe6}
 
@@ -962,6 +962,22 @@ d.setAttribute('data-skin','1');d.setAttribute('data-tab','listen');}catch(e){}}
   html[data-skin]:not([data-view]) #radio-wallet-address{font-family:inherit}
   /* The old footer line is written for people who already know Xtrata; "You" gets its own links in the next part. */
   html[data-skin]:not([data-view]) .strap{display:none}
+  .you-status{display:none}
+  html[data-skin]:not([data-view])[data-tab=you] .you-status{display:flex;align-items:center;gap:12px;order:0;margin:0;padding:14px;border-radius:16px;background:#171b23}
+  .you-status i{flex:none;width:12px;height:12px;border-radius:50%;background:#5d6672}
+  .you-status[data-on="1"] i{background:#7be0a4;box-shadow:0 0 10px rgba(123,224,164,.7)}
+  .you-status b{display:block;font-size:16px;font-weight:700;color:#f2efe6}
+  .you-status__t>span{display:block;font-size:13.5px;color:#a9b2bf}
+  /* You: the player panel in the new look. Same panel, same buttons; only how it is dressed. */
+  html[data-skin]:not([data-view]) .ppp{padding:16px;border-radius:18px;border-color:#2c3341;background:#12151c;box-shadow:none;font-size:15px}
+  html[data-skin]:not([data-view]) .ppp-head h3{font-size:13px;font-weight:600;letter-spacing:.06em;color:#a9b2bf}
+  html[data-skin]:not([data-view]) .ppp button:not(.tiny){min-height:46px;border-radius:14px;font-size:15px}
+  html[data-skin]:not([data-view]) .ppp button.primary{background:#8fe0f2;border-color:#8fe0f2;color:#0c1a20;font-weight:700;box-shadow:none}
+  html[data-skin]:not([data-view]) .ppp-fold{border-top:1px solid #1f2530;margin:0;padding:2px 0}
+  html[data-skin]:not([data-view]) .ppp-fold>summary{display:flex;align-items:center;min-height:48px;margin:0;font-size:15px;font-weight:600;letter-spacing:0;text-transform:none;color:#f2efe6}
+  html[data-skin]:not([data-view]) .ppp-fold[open]>summary{margin-bottom:6px}
+  html[data-skin]:not([data-view]) .ppp-frame-label{font-size:13px;color:#a9b2bf}
+  html[data-skin]:not([data-view]) .radio-wallet{justify-content:space-between}
   /* the tabs, and the small "now playing" bar on every screen but Listen */
   html[data-skin]:not([data-view]) .tabs{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));position:fixed;left:0;right:0;bottom:0;z-index:40;border-top:1px solid #1f2530;
     background:rgba(12,14,19,.96);-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px);
@@ -987,8 +1003,8 @@ d.setAttribute('data-skin','1');d.setAttribute('data-tab','listen');}catch(e){}}
   <button class="ppp-top" id="ppp-top" type="button" hidden></button>
   <button class="a2hs" id="a2hs" type="button" hidden><svg viewBox="0 0 20 20" aria-hidden="true"><rect x="3" y="3" width="14" height="14" rx="4"/><path d="M10 7v6M7 10h6"/></svg><span>Add to Home Screen</span></button>
   <div class="radio-wallet" aria-label="Wallet controls">
-    <span id="radio-wallet-address">Wallet not connected</span>
-    <button id="radio-wallet-connect" type="button">Connect wallet</button>
+    <span id="radio-wallet-address">Player not connected</span>
+    <button id="radio-wallet-connect" type="button">Connect your player</button>
     <button id="radio-wallet-disconnect" type="button" hidden>Disconnect</button>
     <span id="radio-wallet-message" role="status"></span>
   </div>
@@ -1081,6 +1097,8 @@ d.setAttribute('data-skin','1');d.setAttribute('data-tab','listen');}catch(e){}}
   </section>
   <aside class="side">
     <h2 class="sk-h sk-h--big" data-for="you">You</h2>
+    <!-- Whether this player is connected to Xtrata Music right now (src/radio-ppp/page.ts renderYou). -->
+    <p class="you-status" id="youStatus" data-on="0"><i aria-hidden="true"></i><span class="you-status__t"><b>Xtrata Music</b><span>Checking your player…</span></span></p>
     <div class="sheet-bar"><b id="sheetTitle"></b><button type="button" id="sheetClose" aria-label="Close">×</button></div>
     <div class="sheet-extra" id="sheetExtra"></div>
     <!-- Pay-per-play first: the wallet box (and its unlock) stays near the top, whatever the likes list holds. -->
@@ -1592,7 +1610,7 @@ d.setAttribute('data-skin','1');d.setAttribute('data-tab','listen');}catch(e){}}
 })();
 </script>
 <script src="/xtrata-radio.js?v=611164ac4d13" defer></script>
-<script type="module" src="/radio/wallet.js?v=8a27a580ad6c"></script>
+<script type="module" src="/radio/wallet.js?v=62e654b3fd1c"></script>
 <script>
 // On the pay-per-play radio host (radio.xtrata.xyz) only the radio's own pages run; everything
 // else there is sandboxed. Send links to the rest of Xtrata to the main site instead.
@@ -1616,7 +1634,7 @@ function showUnavailable(){
 fetch('/radio/listening-wallet/config',{cache:'no-store',signal:AbortSignal.timeout(15000)})
   .then(function(r){return r.ok?r.json():{}})
   .then(function(c){
-    if(c?.enabled && (!paidHost || c.here)) return import('/radio/ppp.js?v=dd8bb57c4544');
+    if(c?.enabled && (!paidHost || c.here)) return import('/radio/ppp.js?v=91548585c3af');
     showUnavailable();
   }).catch(showUnavailable);
 </script>

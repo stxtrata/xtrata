@@ -26,7 +26,7 @@ export interface MusicWalletOption {
   disabled?: boolean;
 }
 
-export const MUSIC_WALLET_NAME = 'Xtrata Music Wallet';
+export const MUSIC_WALLET_NAME = 'Xtrata Music player';
 
 type ChoiceInput = Pick<Snapshot, 'step' | 'solo' | 'main'> & {
   gate?: { passkeyOnly?: boolean; here?: boolean; enabled?: boolean } | null;
@@ -64,11 +64,11 @@ export function musicWalletOptions(s: ChoiceInput, nameOf: (address: string) => 
   if (s.gate?.passkeyOnly && s.solo) {
     switch (s.step) {
       case 'intro':
-        rows.push({ action: 'create', label: MUSIC_WALLET_NAME, detail: 'Make one with Face ID or your fingerprint. No app or seed phrase.' }); break;
+        rows.push({ action: 'create', label: MUSIC_WALLET_NAME, detail: 'Make one with Face ID or your fingerprint. Nothing to install.' }); break;
       case 'locked':
         rows.push({ action: 'unlock', label: MUSIC_WALLET_NAME, detail: 'Open the one on this device with Face ID or your fingerprint.' }); break;
       case 'loading':
-        rows.push({ action: 'show', label: MUSIC_WALLET_NAME, detail: 'Face ID or your fingerprint. No app or seed phrase.' }); break;
+        rows.push({ action: 'show', label: MUSIC_WALLET_NAME, detail: 'Face ID or your fingerprint. Nothing to install.' }); break;
       case 'connect': case 'not-invited':
         break;
       default:
