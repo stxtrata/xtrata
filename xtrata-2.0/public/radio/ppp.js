@@ -11841,7 +11841,7 @@ function L5(e) {
       linked: o == null ? void 0 : o.linked,
       award: J(),
       unproven: !!(o != null && o.unproven),
-      phrase: !!(o != null && o.phrase),
+      phrase: !!(o != null && o.hasBackup),
       backedUp: !!(o != null && o.backedUp),
       balance: i,
       balanceState: i === void 0 ? void 0 : ((p) => p === "over" && (o != null && o.backedUp) ? "ok" : p)(Q6(i, Oe())),
@@ -12382,7 +12382,7 @@ function L5(e) {
      * that it was done. For a player that has a phrase, while it is open.
      */
     backup: () => yt("Showing your backup words in the box…", async () => {
-      if (!(o != null && o.phrase)) throw new Error("This player was made before backup words existed, so it has none.");
+      if (!(o != null && o.hasBackup)) throw new Error("This player was made before backup words existed, so it has none.");
       const x = await yn();
       await x.request("listening.backup"), o = await wn(x), et("Backed up ✓ Keep those 24 words somewhere safe and private.");
     }),

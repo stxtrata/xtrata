@@ -53,7 +53,9 @@ function setup(opts: { handle?: string; store?: Record<string, string>; onPanel?
       idle: (v) => void idle.push(v)
     }
   });
-  const h = engine.handlers;
+  // Every reply goes through the same check the real bridge runs on it (bridge/host.ts): a reply it would block is a
+  // player that cannot be made or opened, however right the handler's answer is.
+  const h = new Proxy(engine.handlers, { get: (t, k) => { const f = (t as any)[k]; return typeof f !== 'function' ? f : async (...a: unknown[]) => { const r = await f(...a); assertNoSecrets(r); return r; }; } }) as typeof engine.handlers;
   const terms = (maxPlays = 3) => ({ fee: '300', maxPlays, budget: String(Math.min(350 * maxPlays, 1_000_000)), expires: time + 3600_000 });
   return { h, panels, map, idle, terms, handle: () => handle, evaluations: () => evaluations, tick: (ms: number) => { time += ms; }, now: () => time };
 }
@@ -428,7 +430,9 @@ describe('one listening wallet per main-wallet address', () => {
       now: () => time,
       ui: { act: async (panel, action) => { panels.push(panel); return action(); }, cancel: () => false, idle: () => {} }
     });
-    const h = engine.handlers;
+    // Every reply goes through the same check the real bridge runs on it (bridge/host.ts): a reply it would block is a
+  // player that cannot be made or opened, however right the handler's answer is.
+  const h = new Proxy(engine.handlers, { get: (t, k) => { const f = (t as any)[k]; return typeof f !== 'function' ? f : async (...a: unknown[]) => { const r = await f(...a); assertNoSecrets(r); return r; }; } }) as typeof engine.handlers;
     const link = async (main: string, key: string, listening: string) => {
       const issued = time++;
       await h['listening.link']({ main, issued, mainSignature: signMessageHashRsv({ messageHash: linkHash({ main, listening, issued }), privateKey: createStacksPrivateKey(key) }).data });
@@ -480,7 +484,7 @@ describe('one listening wallet per main-wallet address', () => {
       expect(panel.warnings!.join(' ')).toContain('This device already has a listening wallet');
       // both are remembered; the new one is the one this device opens next
       await b.h['listening.lock']();
-      expect(await b.h['listening.status']()).toMatchObject({ state: 'known', address: second, phrase: true });
+      expect(await b.h['listening.status']()).toMatchObject({ state: 'known', address: second, hasBackup: true });
       // the old player is untouched and still opens with its own passkey
       b.evaluated.length = 0;
       expect((await b.h['listening.unlock']({ mode: 'unlock', anyPasskey: true })).address).toBe(first);
@@ -570,7 +574,7 @@ describe('one listening wallet per main-wallet address', () => {
     it('the removed player is not gone: its passkey opens the very same address again (an old-style one included)', async () => {
       const d = device();
       const old = await d.makeOld();
-      expect((await d.h['listening.status']()).phrase).toBeUndefined();        // an old-style player: no backup words
+      expect((await d.h['listening.status']()).hasBackup).toBeUndefined();        // an old-style player: no backup words
       await d.h['listening.forget']();
       expect((await d.h['listening.unlock']({ mode: 'unlock', anyPasskey: true })).address).toBe(old);
     });
@@ -585,7 +589,7 @@ describe('one listening wallet per main-wallet address', () => {
       expect(d.creates.at(-1)!.name).toMatch(/^Xtrata player · [0-9A-F]{4}$/);
       expect(d.creates[0].name).toBeUndefined();                                // the old one has the plain default name
       const st = await d.h['listening.status']();
-      expect(st).toMatchObject({ address: fresh, phrase: true });              // and the new one has backup words
+      expect(st).toMatchObject({ address: fresh, hasBackup: true });              // and the new one has backup words
       expect(st.passkeyName).toBe(d.creates.at(-1)!.name);
     });
 
@@ -930,7 +934,7 @@ describe('players with a backup phrase, and the original players beside them', (
     expect((await s.h['listening.slotAddress']({ slot: 1 })).address).toBe(V1_SLOT1);
     expect((await s.h['listening.slotAddress']({ slot: 2 })).address).toBe(V1_SLOT2);
     const st = await s.h['listening.status']();
-    expect(st.phrase).toBeUndefined();
+    expect(st.hasBackup).toBeUndefined();
     expect(st.backedUp).toBeUndefined();
     await expect(s.h['listening.backup']()).rejects.toThrow(/made before backup words existed/);
     expect(JSON.parse(s.map.get(KEY)!).wallets[0].v).toBeUndefined();
@@ -940,7 +944,7 @@ describe('players with a backup phrase, and the original players beside them', (
     for (const handle of [undefined, 'WE0CAAAAAAAAAAAAAAAAAA']) {
       const s = setup({ handle });
       expect((await s.h['listening.unlock']({ mode: 'unlock', anyPasskey: true })).address).toBe(V1);
-      expect((await s.h['listening.status']()).phrase).toBeUndefined();
+      expect((await s.h['listening.status']()).hasBackup).toBeUndefined();
     }
   });
 
@@ -953,13 +957,13 @@ describe('players with a backup phrase, and the original players beside them', (
   it('a new player has a phrase, and its passkey opens the same player on a device with no record of it', async () => {
     const a = setup();
     await a.h['listening.unlock']({ mode: 'create' });
-    expect(await a.h['listening.status']()).toMatchObject({ address: ADDRESS, phrase: true });
+    expect(await a.h['listening.status']()).toMatchObject({ address: ADDRESS, hasBackup: true });
     expect(JSON.parse(a.map.get(KEY)!).wallets[0]).toMatchObject({ v: 2, address: ADDRESS });
     expect(ADDRESS).not.toBe(V1);
     // The same passkey, synced to a device with no record: only its public user id says which kind of player it is.
     const b = setup({ handle: a.handle() });
     expect((await b.h['listening.unlock']({ mode: 'unlock', anyPasskey: true })).address).toBe(ADDRESS);
-    expect(await b.h['listening.status']()).toMatchObject({ address: ADDRESS, phrase: true });
+    expect(await b.h['listening.status']()).toMatchObject({ address: ADDRESS, hasBackup: true });
     expect(JSON.parse(b.map.get(KEY)!).wallets[0]).toMatchObject({ v: 2 });
   });
 
@@ -982,9 +986,9 @@ describe('players with a backup phrase, and the original players beside them', (
     // Nothing of the phrase is stored, and the status says it is done.
     const stored = [...s.map.values()].join(' ');
     for (const w of ['orchard', 'biology', 'sadness', 'goose']) expect(stored).not.toContain(w);
-    expect(await s.h['listening.status']()).toMatchObject({ phrase: true, backedUp: true });
+    expect(await s.h['listening.status']()).toMatchObject({ hasBackup: true, backedUp: true });
     await s.h['listening.lock']();
-    expect(await s.h['listening.status']()).toMatchObject({ state: 'known', phrase: true, backedUp: true });
+    expect(await s.h['listening.status']()).toMatchObject({ state: 'known', hasBackup: true, backedUp: true });
   });
 
   it('a wrong answer is asked again and records nothing; closing the box part-way records nothing', async () => {

@@ -619,7 +619,7 @@ export function createPppController(deps: PppDeps) {
 
   const snapshot = (): Snapshot => ({
     step: step(), busy, message, error, notice: noticeText(), gate, main: creditMain(), mainConnected: !!deps.main(), standIn: standIn(),
-    listening: status?.address, linked: status?.linked, award: awardNow(), unproven: !!status?.unproven, phrase: !!status?.phrase, backedUp: !!status?.backedUp, balance,
+    listening: status?.address, linked: status?.linked, award: awardNow(), unproven: !!status?.unproven, phrase: !!status?.hasBackup, backedUp: !!status?.backedUp, balance,
     balanceState: balance === undefined ? undefined : ((b: BalanceState): BalanceState => (b === 'over' && status?.backedUp ? 'ok' : b))(balanceState(balance, fee())), // backed up: over 1 STX reads as a healthy balance
     aboveTarget: balance !== undefined && balance > TARGET && !!status?.backedUp,
     playsLeft: balance === undefined ? 0 : playsCovered(balance, fee()),
@@ -1350,7 +1350,7 @@ export function createPppController(deps: PppDeps) {
      * that it was done. For a player that has a phrase, while it is open.
      */
     backup: () => task('Showing your backup words in the box…', async () => {
-      if (!status?.phrase) throw new Error('This player was made before backup words existed, so it has none.');
+      if (!status?.hasBackup) throw new Error('This player was made before backup words existed, so it has none.');
       const b = await ensureBridge();
       await b.request('listening.backup');
       status = await readStatus(b);

@@ -273,8 +273,10 @@ export function createListeningEngine(deps: {
     return others.length ? { others } : {};
   };
   /** Version 2 players can write down backup words; whether that was done on this device. */
-  const backupOf = (w: WalletRecord | undefined): { phrase?: true; backedUp?: true; passkeyName?: string } =>
-    ({ ...(w?.v === 2 ? { phrase: true as const, ...(w.backedUp ? { backedUp: true as const } : {}) } : {}), ...(w?.name ? { passkeyName: w.name } : {}) });
+  // The field is `hasBackup`, never `phrase`: the bridge refuses any reply with a key that reads like key material
+  // (protocol.ts assertNoSecrets), and a reply it refuses is a player nobody can make or open.
+  const backupOf = (w: WalletRecord | undefined): { hasBackup?: true; backedUp?: true; passkeyName?: string } =>
+    ({ ...(w?.v === 2 ? { hasBackup: true as const, ...(w.backedUp ? { backedUp: true as const } : {}) } : {}), ...(w?.name ? { passkeyName: w.name } : {}) });
   /**
    * The open player's backup words were written down and checked on this device. Only then may it hold more than
    * 1 STX and keep paying: losing the passkey no longer loses the money. What one approval may spend is unchanged.

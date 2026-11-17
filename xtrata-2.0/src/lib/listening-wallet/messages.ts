@@ -27,8 +27,11 @@ export interface StatusResult {
   unproven?: true;
   /** The name the box gave this player's passkey when it made it (e.g. "Xtrata player · A1B2"), when it gave one: so the listener can tell passkeys apart in their device's list. */
   passkeyName?: string;
-  /** This player has backup words (a version 2 key): `listening.backup` lets the listener write them down in the box. */
-  phrase?: true;
+  /**
+   * This player has backup words (a version 2 key): `listening.backup` lets the listener write them down in the box.
+   * Named so that no key in a reply reads like key material: the bridge blocks any that does.
+   */
+  hasBackup?: true;
   /** The listener wrote the backup words down and checked them on this device. */
   backedUp?: true;
   /**

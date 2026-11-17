@@ -1,3 +1,4 @@
+import { assertNoSecrets } from '../../lib/wallet/passkey/bridge/protocol';
 import { buildRecord } from '../../lib/music-awards/record';
 import { describe, expect, it } from 'vitest';
 import {
@@ -85,6 +86,7 @@ function setup(over: Partial<GateConfig> = {}, opts: { tabLock?: boolean; hold?:
         if (opts.noMulti && (m === 'listening.status' || m === 'listening.unlock') && p) p = { ...(p as object), main: undefined };
         if (opts.oldWallet && ['listening.cancel', 'listening.signLike'].includes(m)) return new Promise(() => {});
         const r = await (engine.handlers as any)[m](p);
+        assertNoSecrets(r); // as the real bridge does to every reply
         if (opts.oldWallet && m === 'listening.status') { const { features: _f, ...rest } = r; return rest; }
         if (opts.noMulti && m === 'listening.status') return { ...r, features: (r.features ?? []).filter((f: string) => f !== 'multi') };
         // `noLikeFee`: a wallet box from before the like fee went up: it signs likes at 0.0002 STX only.
