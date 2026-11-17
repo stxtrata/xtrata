@@ -9,7 +9,7 @@ const h = vi.hoisted(() => ({ snap: {} as any, changed: () => {}, returnFunds: n
 vi.mock('../controller', () => ({
   TOP_UP_PLAYS: [100, 250, 500], ARRIVAL_GRACE_MS: 60_000, OUT_OF_LIKES: 'Your album keeps playing. Likes need a little STX in your main listener wallet, which is empty right now: top it up and your likes carry on.',
   createPppController: (deps: any) => {
-    h.changed = deps.changed;
+    h.changed = deps.changed; (h as any).deps = deps;
     return new Proxy({ snapshot: () => h.snap, refresh: async () => {}, returnFunds: (m: string) => h.returnFunds(m), topUpLikes: () => h.topUp(), topUpAlbum: (a: bigint) => h.topUpAlbum(a), openAlbum: (n: number) => h.openAlbum(n), bindAlbum: (n: number) => h.bind(n), albumArriving: (...a: unknown[]) => h.arriving(...a), onListened: async () => {}, giftSent: () => {} }, {
       get: (t: any, k) => t[k] ?? (async () => {})
     });
@@ -51,6 +51,23 @@ async function open(over: object = {}) {
 }
 const text = (root: Element) => root.textContent ?? '';
 beforeEach(() => { vi.unstubAllGlobals(); delete (window as any).XtrataRadio; h.session = { isConnected: false }; h.signed = []; });
+
+describe('what the page tells the player about its gift', () => {
+  it('carries the server\'s word on whether it is a numbered wall player: that is what gives it its class', async () => {
+    const gift = { returnTo: 'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X', from: 'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X', source: 'friend', amount: '20500', treasury: 'SP1RKMSSGS3TCZW6HXFYXAM0DGHS2VNKSBTB4G183', state: 'arrived', player: null };
+    let answer: any = { gift: { ...gift, drop: 'players' } };
+    h.route = (url) => (url.includes('/radio/gift/for') ? new Response(JSON.stringify(answer)) : undefined);
+    await open();
+    const info = (h as any).deps.giftInfo as (a: string) => Promise<any>;
+    expect(await info('SP24D9T3YFKYGC944S8JTZ7FC7EM95T7G79CDR4RT')).toMatchObject({ drop: 'players', amount: '20500' });
+    answer = { gift: { ...gift, drop: null } };
+    expect(await info('SP24D9T3YFKYGC944S8JTZ7FC7EM95T7G79CDR4RT')).toMatchObject({ drop: null });
+    answer = { gift };                                       // the server could not say: left unknown, never "no"
+    expect('drop' in (await info('SP24D9T3YFKYGC944S8JTZ7FC7EM95T7G79CDR4RT'))).toBe(false);
+    answer = { gift: null };
+    expect(await info('SP24D9T3YFKYGC944S8JTZ7FC7EM95T7G79CDR4RT')).toBeNull();
+  });
+});
 
 describe('Gift Edition panel', () => {
   it('names the player, counts plays (not STX) and hands the album to the radio', async () => {

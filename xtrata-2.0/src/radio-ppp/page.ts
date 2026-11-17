@@ -130,7 +130,9 @@ function start(root: HTMLElement) {
       const g = r?.gift;
       if (!g) return null;
       if (typeof g.returnTo !== 'string' || typeof g.treasury !== 'string') throw new Error('Unreadable gift record.');
-      return { returnTo: g.returnTo, from: typeof g.from === 'string' ? g.from : null, source: String(g.source ?? ''), amount: String(g.amount ?? '0'), treasury: g.treasury, state: g.state === 'sending' ? 'sending' : 'arrived', player: g.player ?? null };
+      // `drop` is what gives a player from the giveaway wall its class: carried through as the server said it (absent = not known).
+      return { returnTo: g.returnTo, from: typeof g.from === 'string' ? g.from : null, source: String(g.source ?? ''), amount: String(g.amount ?? '0'), treasury: g.treasury, state: g.state === 'sending' ? 'sending' : 'arrived', player: g.player ?? null,
+        ...(g.drop === 'players' || g.drop === null ? { drop: g.drop } : {}) };
     },
     // Music Hero awards: a failed request throws (shown as "can't check"), it is never read as "no award" or "no plays".
     awardStatus: async (player) => {

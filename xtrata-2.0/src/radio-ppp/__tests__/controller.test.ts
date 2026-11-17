@@ -1758,6 +1758,34 @@ describe('the Music Hero award', () => {
     for (const view of [{ state: 'off' }, { state: 'not-a-player' }]) expect((await player(view)).ppp.snapshot().award).toBeNull();
   });
 
+  it('a player straight off the wall is asked about again within seconds, so its record shows on the first visit', async () => {
+    const s = await player({ state: 'not-a-player' });            // its plays have not landed yet
+    expect(s.ppp.snapshot().award).toBeNull();
+    s.gift.info = { returnTo: 'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X', from: null, source: 'friend', amount: '20500', treasury: 'SP1RKMSSGS3TCZW6HXFYXAM0DGHS2VNKSBTB4G183', state: 'arrived', player: null, drop: 'players' };
+    s.ppp.giftSent('0x' + 'a'.repeat(64), 20_500n);
+    s.awards.view = { state: 'earning', cls: 'classic', number: 333, need: 25, have: 0 };
+    await s.ppp.forceRefresh();
+    expect(s.ppp.snapshot().award).toMatchObject({ state: 'earning', cls: 'classic', number: 333, need: 25 });
+    // And without that nudge: a wall player still reading "not a player" is asked again after 20 seconds, not 30 minutes.
+    const t = setup({ passkeyOnly: true, gifts: { enabled: true, treasury: 'SP1RKMSSGS3TCZW6HXFYXAM0DGHS2VNKSBTB4G183', turnstileSiteKey: null, admin: false, fee: '3000' } } as any); t.setMain(undefined);
+    t.awards.view = { state: 'not-a-player' };
+    t.gift.info = s.gift.info;
+    await t.ppp.forceRefresh(); await t.ppp.create();
+    t.chain.balance = 20_500n;
+    await t.ppp.forceRefresh();
+    expect(t.ppp.snapshot().award).toBeNull();
+    const asked = t.awards.statusCalls;
+    t.awards.view = { state: 'earning', cls: 'classic', number: 334, need: 25, have: 0 };
+    t.tick(21_000); await t.ppp.forceRefresh();
+    expect(t.awards.statusCalls).toBeGreaterThan(asked);
+    expect(t.ppp.snapshot().award).toMatchObject({ state: 'earning', number: 334 });
+    // A player that is not from the wall is left alone for half an hour, as before.
+    const u = await player({ state: 'not-a-player' });
+    const before = u.awards.statusCalls;
+    u.tick(5 * 60_000); await u.ppp.forceRefresh();
+    expect(u.awards.statusCalls).toBe(before);
+  });
+
   it('shows progress as the server reports it, and a failed check is "unavailable", never zero plays', async () => {
     const s = await player({ state: 'earning', cls: 'gold', number: 412, need: 50, have: 12 });
     expect(s.ppp.snapshot().award).toEqual({ state: 'earning', cls: 'gold', number: 412, need: 50, have: 12 });
