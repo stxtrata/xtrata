@@ -221,9 +221,26 @@ function start(root: HTMLElement) {
     now: Date.now
   });
 
+  // An album (or My player, slot 0) picked from the shelf or the search box. If it opened, the new look goes to Listen, where
+  // the radio has already started it at its first song, or is still on it if it was open; if it could not (the player is
+  // locked, say), the You screen is where the reason and the unlock are.
+  const openFromShelf = (slot: number) => {
+    void Promise.resolve(ppp.openAlbum(slot)).then(() => {
+      if (!shelfInBrowse()) return;   // only the new look's Browse tab sends the listener on; the old panel stays where it is
+      const s = ppp.snapshot();
+      window.dispatchEvent(new CustomEvent(s.slot === slot && !s.error ? 'xtrata:radio-listen' : 'xtrata:radio-panel'));
+    });
+  };
+  /** Tell the page whether there are albums to show, so Browse can offer "My albums" (only when it changes). */
+  let albumsAnnounced: boolean | undefined;
+  const announceAlbums = (has: boolean) => {
+    if (has === albumsAnnounced) return;
+    albumsAnnounced = has;
+    window.dispatchEvent(new CustomEvent('xtrata:radio-albums', { detail: { has } }));
+  };
   const shelf = createShelf({
     json,
-    open: (slot) => { void ppp.openAlbum(slot); },
+    open: openFromShelf,
     store: {
       get: (k) => { try { return localStorage.getItem(k); } catch { return null; } },
       set: (k, v) => { try { if (v === null) localStorage.removeItem(k); else localStorage.setItem(k, v); } catch { /* best effort */ } }
@@ -1472,6 +1489,8 @@ function start(root: HTMLElement) {
         const albumTitle = inAlbum ? s.gift?.player?.title ?? 'Album' : latestAlbum!.title;
         // "View all albums" opens the "My albums" fold: every album on this device, one tap to open.
         const all = button('View all albums' + (shelf.count() > 1 ? ` (${shelf.count()})` : ''), () => {
+          // The new look keeps the albums on Browse.
+          if (shelfInBrowse()) { window.dispatchEvent(new CustomEvent('xtrata:radio-browse', { detail: { tab: 'albums' } })); return; }
           const fold = document.querySelector('.ppp-shelf') as HTMLDetailsElement | null;
           if (!fold) return;
           fold.hidden = false;
@@ -1489,7 +1508,13 @@ function start(root: HTMLElement) {
     }
     const shelfBox = shelf.render(s);
     const shelfFold = document.querySelector('.ppp-shelf') as HTMLDetailsElement | null;
-    if (shelfFold) {
+    const browseMount = shelfInBrowse() ? document.getElementById('shelfBox') : null;
+    if (browseMount) {
+      // The new look: the albums are a tab of Browse. (The album page's own sheet keeps the fold below.)
+      if (shelfBox) { if (browseMount.firstChild !== shelfBox) browseMount.replaceChildren(shelfBox); } else browseMount.replaceChildren();
+      if (shelfFold) shelfFold.hidden = true;
+      announceAlbums(!!shelfBox);
+    } else if (shelfFold) {
       shelfFold.hidden = !shelfBox;
       const shelfSummary = shelfFold.querySelector('summary');
       if (shelfSummary) shelfSummary.textContent = shelf.count() > 0 ? `♪ My albums (${shelf.count()})` : '♪ My albums';
@@ -1615,6 +1640,12 @@ function start(root: HTMLElement) {
     const loaded = albumNow?.mode === 'open' ? null : featuredFor(s);
     albumList?.render(albumNow?.mode === 'open' ? albumInput(s, albumNow, [])
       : loaded ? { ...albumInput(s, { mode: 'open', player: loaded }, []), plays: s.balance === undefined ? null : s.playsLeft } : null);
+  }
+
+  /** Is the new look on, with a place for the albums on Browse? (Not in the arcade dock, ?classic=1 or the album page.) */
+  function shelfInBrowse() {
+    const root = document.documentElement;
+    return root.hasAttribute('data-skin') && !root.hasAttribute('data-view') && !!document.getElementById('shelfBox');
   }
 
   type AlbumState = { mode: 'arrive' | 'locked' | 'open'; player: PlayerView; from?: string | null; offered?: number };
@@ -1841,7 +1872,8 @@ function start(root: HTMLElement) {
     locked: () => !!ppp.snapshot().albumLock?.locked,
     explicit: (id) => !!(window as any).XtrataRadio?.isExplicit?.(id),
     liked: (id) => likedNow().has(id),
-    grid: document.documentElement.hasAttribute('data-skin')   // the new look lists artist names three across
+    grid: document.documentElement.hasAttribute('data-skin'),   // the new look lists artist names three across
+    leaveAlbum: () => openFromShelf(0)
   }) : null;
   findBox?.addEventListener('toggle', () => { if (findBox.open) find?.load(); });
   let findSeen = '';

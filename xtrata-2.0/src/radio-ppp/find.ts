@@ -81,6 +81,8 @@ export interface FindDeps {
   locked(): boolean;
   /** The new look: artists whose names fit a column sit three across, and the longer names wait behind one button. */
   grid?: boolean;
+  /** Leave the open album and go back to the listener's own player. When given, the "an album is open" note carries a button for it. */
+  leaveAlbum?(): void;
 }
 
 const el = (tag: string, cls = '', text = '') => { const n = document.createElement(tag); if (cls) n.className = cls; if (text) n.textContent = text; return n; };
@@ -109,7 +111,15 @@ export function createFindBox(mount: HTMLElement, deps: FindDeps) {
   function paint() {
     const locked = deps.locked();
     input.disabled = locked;
-    if (locked) { status.textContent = 'An album is open and plays only its own songs. Go back to My player to find other music.'; chips.replaceChildren(); list.replaceChildren(); return; }
+    if (locked) {
+      status.textContent = 'An album is open and plays only its own songs. Go back to My player to find other music.';
+      if (deps.leaveAlbum) {
+        const back = el('button', 'find-back', 'Back to My player') as HTMLButtonElement;
+        back.type = 'button'; back.onclick = () => deps.leaveAlbum!();
+        status.append(' ', back);
+      }
+      chips.replaceChildren(); list.replaceChildren(); return;
+    }
     if (state === 'idle') { status.textContent = ''; return; }
     if (state === 'loading') { status.textContent = 'Loading the catalogue…'; return; }
     if (state === 'failed' || !songs) {

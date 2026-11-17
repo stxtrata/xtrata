@@ -122,6 +122,7 @@ export function createShelf(deps: ShelfDeps) {
           deps.open(a.slot);
         }, playing ? 'tiny ppp-pick' : 'tiny primary ppp-pick');
         pick.disabled = playing;
+        pick.setAttribute('aria-label', playing ? `${a.player!.title}, playing now` : `Open ${a.player!.title}`);
         // The album's cover when it has one, else its first song's own artwork; a disc until it is found (or if there is none).
         const first = listedTracks(a.player!)[0];
         const artId = a.player!.cover ?? first?.id;

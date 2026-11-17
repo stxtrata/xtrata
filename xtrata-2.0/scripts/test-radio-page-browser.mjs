@@ -17,6 +17,9 @@ const type = (p) => types[p.split('.').pop()] || 'application/octet-stream';
 const tracks = Array.from({ length: 40 }, (_, i) => ({ id: 2900 + i * 3, title: ['Night Drive', 'SuperUser', 'Liquidez', 'Smalltalk', 'Entertainment'][i % 5] + ' ' + (i + 1), artist: ['Audionals', 'melophonic', '3ai3'][i % 3] }));
 // The real "Find music" code (src/radio-ppp/find.ts), bundled here and run inside the real page, because the stand-in setup below never loads the panel (ppp.js).
 const findJs = (await build({ entryPoints: [new URL('../src/radio-ppp/find.ts', import.meta.url).pathname], bundle: true, format: 'iife', globalName: 'FindMod', write: false })).outputFiles[0].text;
+const shelfJs = (await build({ entryPoints: [new URL('../src/radio-ppp/shelf.ts', import.meta.url).pathname], bundle: true, format: 'iife', globalName: 'ShelfMod', write: false })).outputFiles[0].text;
+const albums = [['Proof of Sound', 'Ada', 7], ['Night Drive', 'Bo', 12], ['Zero Hour', 'Cy', 3], ['A much longer album name that has to wrap onto two lines', 'Dee', 20]]
+  .map(([title, subtitle, n], i) => ({ slot: i + 1, address: 'SPALBUM' + (i + 1), state: 'arrived', amount: '100000', label: '', from: null, source: 'campaign', player: { id: String(i + 1).padStart(16, '0'), title, subtitle, cover: null, tracks: Array.from({ length: n }, (_, k) => ({ id: 500 + i * 30 + k, title: 'Song ' + k, artist: subtitle })) } }));
 const artistSongs = ['melophonic', 'melophonic', 'melophonic', 'Audionals', '3ai3', 'Cicada', 'Xtrata Arcade', 'Hundred Little Reasons', 'Rex Speedway and The Denim Avengers']
   .map((artist, i) => ({ id: 100 + i, title: `Song ${i + 1}`, artist }));
 const cover = 'data:image/svg+xml;base64,' + Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64"><rect width="64" height="64" fill="#b0306a"/><circle cx="32" cy="32" r="18" fill="#ffb547"/></svg>').toString('base64');
@@ -216,7 +219,7 @@ for (const viewport of [{ width: 1280, height: 900 }, { width: 390, height: 844 
   assert.equal(await tab(), 'browse');
   assert.equal(await page.locator('#tabs button[aria-current="page"]').innerText(), 'Browse');
   assert.equal(await page.locator('#bands').isVisible(), false);
-  assert.equal(await page.locator('.sk-h:visible').count(), 0);
+  assert.deepEqual(await page.locator('.sk-h:visible').allInnerTexts(), ['Browse']);
   assert.equal(await page.locator('#art').isVisible(), false);
   assert.equal(await page.locator('#findBox').evaluate((d) => d.open), true);
   assert.equal(await page.locator('#mini').isVisible(), true);
@@ -241,6 +244,52 @@ for (const viewport of [{ width: 1280, height: 900 }, { width: 390, height: 844 
   assert.deepEqual(await page.locator('#findBody li .lt').allInnerTexts(), ['Song 9']);
   await page.locator('#findBody li .lt').click();
   assert.deepEqual((await calls()).at(-1), ['playToken', 108]);
+
+  // Browse with albums: two tabs, covers in two columns, and a tap opens the album and goes to Listen.
+  // (The real shelf code runs here; page.ts, which wires it to the player, is covered by page-browse-albums.test.ts.)
+  assert.equal(await page.locator('#browseTabs').isVisible(), false, 'no tabs until there are albums');
+  await page.addScriptTag({ content: shelfJs });
+  await page.evaluate(([shelf]) => {
+    const snap = { step: 'ready', root: 'SP3X2F7FQH7GQS0YRBWH0H5W6RM2PB1B0WPD1XA2V', slot: 0, walletCannotAlbums: false };
+    window.__snap = snap;
+    const box = window.ShelfMod.createShelf({
+      json: async () => ({ total: shelf.length, next: null, shelf }),
+      open: (slot) => { window.__calls.push(['openAlbum', slot]); window.__snap = { ...window.__snap, slot }; draw(); window.dispatchEvent(new CustomEvent('xtrata:radio-listen')); },
+      store: { get: (k) => localStorage.getItem(k), set: (k, v) => (v === null ? localStorage.removeItem(k) : localStorage.setItem(k, v)) },
+      now: Date.now, changed: () => draw()
+    });
+    const draw = () => { const b = box.render(window.__snap); const m = document.getElementById('shelfBox'); if (b) { if (m.firstChild !== b) m.replaceChildren(b); } else m.replaceChildren(); window.dispatchEvent(new CustomEvent('xtrata:radio-albums', { detail: { has: !!b } })); };
+    draw();
+  }, [albums]);
+  await page.locator('#shelfBox .ppp-shelf-list li').first().waitFor();
+  assert.equal(await page.locator('#browseTabs').isVisible(), true);
+  assert.deepEqual(await page.locator('#browseTabs button').allInnerTexts(), ['My albums', 'Search']);
+  assert.equal(await page.locator('#browseTabs button[aria-selected="true"]').innerText(), 'My albums', 'albums first when there are some');
+  assert.equal(await page.locator('#findBox').isVisible(), false);
+  assert.equal(await page.locator('#shelfBox').isVisible(), true);
+  assert.equal(await page.locator('.sk-h[data-for=browse]').innerText(), 'Browse');
+  { const lis = page.locator('#shelfBox .ppp-shelf-list li'); assert.equal(await lis.count(), 4);
+    const a = await lis.nth(0).boundingBox(), b = await lis.nth(1).boundingBox(), c = await lis.nth(2).boundingBox();
+    assert.ok(a.y === b.y && c.y > a.y && c.x === a.x, 'albums sit two across');
+    const art = await page.locator('#shelfBox .ppp-shelf-art').first().boundingBox(); assert.ok(Math.abs(art.width - art.height) < 2 && art.width >= 120, 'a cover is a big square (' + art.width + 'x' + art.height + ')');
+    assert.ok(await page.locator('#shelfBox .ppp-shelf-list .t').last().evaluate((n) => n.scrollHeight <= 2.6 * parseFloat(getComputedStyle(n).lineHeight || '20') + 4), 'a long title stays within two lines'); }
+  await noSideScroll('Browse, My albums');
+  await shot('browse-albums');
+  await page.locator('#browseTabs button[data-bt="search"]').click();
+  assert.equal(await page.locator('#findBox').isVisible(), true);
+  assert.equal(await page.locator('#shelfBox').isVisible(), false);
+  await page.locator('#browseTabs button[data-bt="albums"]').click();
+  await page.locator('#shelfBox .ppp-shelf-list li').nth(1).click();
+  assert.deepEqual((await calls()).at(-1), ['openAlbum', await page.evaluate(() => window.__snap.slot)]);
+  assert.equal(await tab(), 'listen', 'an album tapped on Browse opens on Listen');
+  await page.evaluate(() => window.dispatchEvent(new CustomEvent('xtrata:radio-browse', { detail: { tab: 'albums' } })));
+  assert.equal(await tab(), 'browse');
+  assert.equal(await page.locator('#browseTabs button[aria-selected="true"]').innerText(), 'My albums');
+  assert.equal(await page.locator('#shelfBox .ppp-shelf-list li.now').count(), 1, 'the open album is marked');
+  await page.evaluate(() => window.dispatchEvent(new CustomEvent('xtrata:radio-albums', { detail: { has: false } })));
+  assert.equal(await page.locator('#browseTabs').isVisible(), false, 'no albums: back to plain search');
+  assert.equal(await page.locator('#findBox').isVisible(), true);
+  await page.evaluate(() => window.dispatchEvent(new CustomEvent('xtrata:radio-albums', { detail: { has: true } })));
 
   // Stations: picked on Listen, and the listener stays on Listen. Each of the two "Everything" stations sets the order.
   await page.locator('#tabs button[data-t="listen"]').click();

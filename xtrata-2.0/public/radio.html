@@ -874,7 +874,7 @@ d.setAttribute('data-skin','1');d.setAttribute('data-tab','listen');}catch(e){}}
   html[data-skin]:not([data-view]):not([data-tab=listen]) #albumList,html[data-skin]:not([data-view]):not([data-tab=listen]) .rx>*:not(#bands):not(.sk-h),
   html[data-skin]:not([data-view])[data-tab=liked] .rx,html[data-skin]:not([data-view])[data-tab=you] .rx{display:none}
   html[data-skin]:not([data-view])[data-tab=browse] .rx{display:contents}
-  html[data-skin]:not([data-view])[data-tab=listen] .sk-h[data-for=listen],html[data-skin]:not([data-view])[data-tab=you] .sk-h[data-for=you]{display:block}
+  html[data-skin]:not([data-view])[data-tab=listen] .sk-h[data-for=listen],html[data-skin]:not([data-view])[data-tab=browse] .sk-h[data-for=browse],html[data-skin]:not([data-view])[data-tab=you] .sk-h[data-for=you]{display:block}
   html[data-skin]:not([data-view]) #albumList{order:1}
   html[data-skin]:not([data-view]) .sk-h[data-for=you]{order:-1} html[data-skin]:not([data-view]) .ppp{order:1;margin:0;border-radius:18px} html[data-skin]:not([data-view]) .radio-wallet{order:2} html[data-skin]:not([data-view]) .strap{order:3}
   html[data-skin]:not([data-view]) .sk-h{margin:6px 0 -6px;font-size:13px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:#a9b2bf}
@@ -927,6 +927,9 @@ d.setAttribute('data-skin','1');d.setAttribute('data-tab','listen');}catch(e){}}
 
   /* Listen: what to play, under the player and smaller than before (the one-line descriptions show as a tooltip). Picking one stays on this screen. */
   html[data-skin]:not([data-view]) .sk-h[data-for=listen]{order:4;margin:8px 0 -8px}
+  html[data-skin]:not([data-view]) .sk-h[data-for=browse]{order:-3}
+  /* An open album plays only its own songs: the stations have nothing to pick from, so they step aside. */
+  html[data-skin][data-album-lock]:not([data-view]) #bands,html[data-skin][data-album-lock]:not([data-view]) .sk-h[data-for=listen]{display:none}
   html[data-skin]:not([data-view]) .stations{order:5;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin:0}
   html[data-skin]:not([data-view]) .stations button,html[data-skin]:not([data-view]) .stations [data-sh="1"]{display:flex;justify-content:center;gap:2px;min-height:50px;padding:8px 12px;border:0;border-radius:14px;background:#171b23;color:#f2efe6}
   html[data-skin]:not([data-view]) .stations button b{font-family:inherit;font-size:14px;font-weight:600;letter-spacing:0;color:#f2efe6}
@@ -955,6 +958,35 @@ d.setAttribute('data-skin','1');d.setAttribute('data-tab','listen');}catch(e){}}
   html[data-skin]:not([data-view]) .find-chip{min-height:44px;padding:0 16px;font-size:14px;border-color:#2c3341;background:#171b23}
   html[data-skin]:not([data-view]) .find-chip.is-on{border-color:#8fe0f2;color:#8fe0f2;background:#171b23}
   html[data-skin]:not([data-view]) .likesFoot{font-size:13px}
+  /* Browse: "My albums" (covers) and "Search" are tabs when the listener has albums. */
+  .btabs,.shelfbox{display:none}
+  html[data-skin]:not([data-view])[data-tab=browse][data-albums="1"] .btabs{display:grid;grid-template-columns:1fr 1fr;gap:4px;order:-2;padding:4px;border-radius:14px;background:#171b23}
+  .btabs button{min-height:44px;border:0;border-radius:11px;background:none;color:#a9b2bf;font:inherit;font-size:15px;font-weight:600;cursor:pointer}
+  .btabs button[aria-selected=true]{background:#2a3140;color:#f2efe6}
+  .btabs button:focus-visible{outline:2px solid #8fe0f2;outline-offset:2px}
+  html[data-skin]:not([data-view])[data-tab=browse][data-albums="1"][data-btab=albums] .shelfbox{display:block;order:-1}
+  html[data-skin]:not([data-view])[data-albums="1"][data-btab=albums] #findBox{display:none}
+  html[data-skin]:not([data-view]) #findBox>summary{display:none}
+  html[data-skin]:not([data-view]) .find-back{min-height:44px;margin-top:8px;padding:0 16px;border:1px solid #2c3341;border-radius:12px;background:#171b23;color:#8fe0f2;font:inherit;font-size:14px;font-weight:600;cursor:pointer;display:block}
+  html[data-skin]:not([data-view]) .shelfbox .ppp-shelf-tools{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;margin:0 0 14px}
+  html[data-skin]:not([data-view]) .shelfbox .ppp-shelf-tools input{grid-column:1/-1;min-height:48px;padding:0 14px;border:1px solid #2c3341;border-radius:14px;background:#171b23;color:#f2efe6;font-size:16px}
+  html[data-skin]:not([data-view]) .shelfbox .ppp-shelf-tools select,html[data-skin]:not([data-view]) .shelfbox .ppp-shelf-tools button{min-height:44px;padding:0 12px;border:1px solid #2c3341;border-radius:12px;background:#171b23;color:#f2efe6;font-size:14px}
+  html[data-skin]:not([data-view]) .shelfbox button.quiet{display:block;width:100%;min-height:48px;margin:0 0 14px;padding:0 14px;border:1px solid #2c3341;border-radius:14px;background:#171b23;color:#f2efe6;font:inherit;font-size:15px;font-weight:600;text-align:left}
+  html[data-skin]:not([data-view]) .shelfbox .ppp-shelf-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px 12px;margin:0 0 14px;padding:0;list-style:none}
+  html[data-skin]:not([data-view]) .shelfbox .ppp-shelf-list li{position:relative;display:flex;flex-direction:column;align-items:stretch;gap:8px;padding:0;border:0;border-radius:16px;background:none;color:#f2efe6}
+  html[data-skin]:not([data-view]) .shelfbox .ppp-shelf-list li:hover,html[data-skin]:not([data-view]) .shelfbox .ppp-shelf-list li.now,html[data-skin]:not([data-view]) .shelfbox .ppp-shelf-list li:focus-within{background:none}
+  html[data-skin]:not([data-view]) .shelfbox .ppp-shelf-list li:has(.ppp-pick:focus-visible){outline:2px solid #8fe0f2;outline-offset:3px}
+  html[data-skin]:not([data-view]) .shelfbox .ppp-shelf-art{flex:none;width:100%;height:auto;aspect-ratio:1;border-radius:16px;background:#171b23;font-size:44px}
+  html[data-skin]:not([data-view]) .shelfbox .ppp-shelf-list li.now .ppp-shelf-art{outline:2px solid #8fe0f2;outline-offset:2px}
+  html[data-skin]:not([data-view]) .shelfbox .ppp-shelf-txt{display:flex;flex-direction:column;gap:2px}
+  html[data-skin]:not([data-view]) .shelfbox .ppp-shelf-list .t{font-size:15px;font-weight:600;color:#f2efe6;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+  html[data-skin]:not([data-view]) .shelfbox .ppp-shelf-list li.now .t{color:#8fe0f2}
+  html[data-skin]:not([data-view]) .shelfbox .ppp-shelf-list .ppp-mute{font-size:13px;color:#a9b2bf}
+  html[data-skin]:not([data-view]) .shelfbox .ppp-shelf-list li>button:not(.ppp-pick){position:absolute;top:8px;right:8px;z-index:2;width:40px;height:40px;min-height:0;padding:0;border:0;border-radius:50%;background:rgba(12,14,19,.72);color:#f2efe6;font-size:18px;margin:0}
+  html[data-skin]:not([data-view]) .shelfbox .ppp-pick{position:static;width:0;height:0;min-height:0;margin:0;padding:0;border:0;overflow:hidden;font-size:0;background:none;box-shadow:none}
+  html[data-skin]:not([data-view]) .shelfbox .ppp-pick::after{content:"";position:absolute;inset:0;border-radius:16px}
+  html[data-skin]:not([data-view]) .shelfbox .ppp-pick:disabled::after{content:none}
+  html[data-skin]:not([data-view]) .shelfbox .ppp-shelf-list li.now::after{content:"Playing";position:absolute;left:8px;top:8px;z-index:1;padding:4px 9px;border-radius:999px;background:#8fe0f2;color:#0c1a20;font-size:12px;font-weight:700}
   /* Artists whose names fit a column sit three across; "more artists" opens the longer names underneath. */
   html[data-skin]:not([data-view]) .find-artists--grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
   html[data-skin]:not([data-view]) .find-artists--grid .find-chip{min-width:0;min-height:44px;padding:0 8px;font-size:13px;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -1142,6 +1174,10 @@ d.setAttribute('data-skin','1');d.setAttribute('data-tab','listen');}catch(e){}}
     </section>
     <!-- An open album's songs, with their artwork and plays left (src/radio-ppp/album.ts, list mode). Stands in for Your Station. -->
     <section class="albumlist" id="albumList" hidden aria-label="Album songs"></section>
+    <h2 class="sk-h sk-h--big" data-for="browse">Browse</h2>
+    <!-- The new look: Browse has two tabs when the listener has albums (src/radio-ppp/page.ts announces them). -->
+    <div class="btabs" id="browseTabs" role="tablist" aria-label="Browse"><button type="button" role="tab" data-bt="albums" aria-selected="false">My albums</button><button type="button" role="tab" data-bt="search" aria-selected="true">Search</button></div>
+    <section class="shelfbox" id="shelfBox" aria-label="My albums"></section>
     <details class="likes" id="findBox">
       <summary title="Search every song on Xtrata by title, artist or number, or browse by artist"><span>🔎 FIND MUSIC</span></summary>
       <div id="findBody"></div>
@@ -1207,6 +1243,29 @@ d.setAttribute('data-skin','1');d.setAttribute('data-tab','listen');}catch(e){}}
     $('upNext').addEventListener('click',function(){if(api)api.next()});
     // The player panel asks to be seen (set up, unlock, add plays): it lives under "You".
     window.addEventListener('xtrata:radio-panel',function(){setTab('you')});
+    // Browse has two tabs once the listener has albums: "My albums" (covers) and "Search". The panel says when there are albums.
+    var bChosen=false;
+    function setBtab(t,byUser){
+      if(!/^(albums|search)$/.test(t))return;
+      if(byUser)bChosen=true;
+      ROOT.setAttribute('data-btab',t);
+      Array.prototype.forEach.call($('browseTabs').children,function(b){b.setAttribute('aria-selected',String(b.dataset.bt===t))});
+      if(t==='search')$('findBox').open=true;
+    }
+    ROOT.setAttribute('data-btab','search');
+    Array.prototype.forEach.call($('browseTabs').children,function(b){b.addEventListener('click',function(){setBtab(b.dataset.bt,true)})});
+    window.addEventListener('xtrata:radio-albums',function(e){
+      var has=!!(e.detail&&e.detail.has);
+      if(has)ROOT.setAttribute('data-albums','1');else ROOT.removeAttribute('data-albums');
+      if(!has)setBtab('search');else if(!bChosen)setBtab('albums');
+    });
+    window.addEventListener('xtrata:radio-browse',function(e){setTab('browse');if(e.detail&&e.detail.tab)setBtab(e.detail.tab,true)});
+    // An album was picked and opened: Listen shows it (the radio starts it at its first song, or keeps going if it was already open).
+    window.addEventListener('xtrata:radio-listen',function(){
+      if(ROOT.hasAttribute('data-view'))return;
+      setTab('listen');
+      try{if(api&&api.isOn&&!api.isOn()&&api.switchOn)api.switchOn()}catch(e){}
+    });
   }
   var api=null, state=null;
   function store(k,v){try{if(v===undefined)return localStorage.getItem(k);localStorage.setItem(k,v)}catch(e){return null}}
@@ -1404,6 +1463,7 @@ d.setAttribute('data-skin','1');d.setAttribute('data-tab','listen');}catch(e){}}
     var np=s.nowPlaying, stage=$('stage');
     // Plays on their way: every control rests (greyed out, not clickable) until they land. Nothing is wrong.
     var gw=!!s.giftWait;
+    if(SKIN){if(s.giftLocked)ROOT.setAttribute('data-album-lock','1');else ROOT.removeAttribute('data-album-lock')}
     ['power','prev','pp','next','heart','presetBtn'].forEach(function(id){var b=$(id);if(b)b.disabled=gw});
     Array.prototype.forEach.call($('bands').children,function(b){b.disabled=gw});
     $('tuner').classList.toggle('waiting',gw);
@@ -1641,7 +1701,7 @@ function showUnavailable(){
 fetch('/radio/listening-wallet/config',{cache:'no-store',signal:AbortSignal.timeout(15000)})
   .then(function(r){return r.ok?r.json():{}})
   .then(function(c){
-    if(c?.enabled && (!paidHost || c.here)) return import('/radio/ppp.js?v=de51c20c6d1b');
+    if(c?.enabled && (!paidHost || c.here)) return import('/radio/ppp.js?v=8b728d78c30a');
     showUnavailable();
   }).catch(showUnavailable);
 </script>
