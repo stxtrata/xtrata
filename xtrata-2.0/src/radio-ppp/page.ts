@@ -867,8 +867,11 @@ function start(root: HTMLElement) {
     const on = s.step === 'ready' && s.payingOn && left > 0 && !s.giftStop;
     const none = s.step === 'intro' || s.step === 'connect' || s.step === 'elsewhere';
     youStatus.dataset.on = on ? '1' : '0';
-    youStatus.querySelector('b')!.textContent = on ? 'Connected to Xtrata Music' : none ? 'No player connected' : 'Your player is not connected';
-    youStatus.querySelector('span')!.textContent = on ? 'Every play goes to the artist, and your likes are saved.'
+    // (The two lines are a <b> and a <span> side by side: never a span that wraps the <b>, which this would wipe.)
+    const line1 = youStatus.querySelector('b'), line2 = youStatus.querySelector('.you-status__t > span');
+    if (!line1 || !line2) return;
+    line1.textContent = on ? 'Connected to Xtrata Music' : none ? 'No player connected' : 'Your player is not connected';
+    line2.textContent = on ? 'Every play goes to the artist, and your likes are saved.'
       : none ? 'Connect a player to play songs and pay the artists you listen to.'
       : s.step === 'locked' ? 'Unlock it below to carry on listening.' : 'See below for what it needs.';
   }
