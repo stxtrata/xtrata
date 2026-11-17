@@ -72,7 +72,7 @@ the summary; the return-address confirm and return review keep the full address 
 
 - **Likes from the listening wallet.** Once a listener has a listening wallet on the radio, every tap
   on the heart toggles the like from it, straight on `xtrata-radio-likes-v1-0` (`set-liked`), for a
-  fixed 0.0002 STX network fee (`LIKE_FEE`) from the same 1 STX approval, at most one every 3 s.
+  fixed 0.0003 STX network fee (`LIKE_FEE`, the same as a play so a like can never stall the plays behind it; it was 0.0002) from the same 1 STX approval, at most one every 3 s.
   No wallet popup, and it never opens the main-wallet endorse page. The tap reads the song's
   current state first (`/radio/chain-likes`), so it likes or unlikes correctly even if the radio's
   list is still loading. If something is missing the panel says what (unlock — the like is sent

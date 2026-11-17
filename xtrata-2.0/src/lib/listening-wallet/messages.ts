@@ -27,8 +27,11 @@ export interface StatusResult {
   unproven?: true;
   /** The name the box gave this player's passkey when it made it (e.g. "Xtrata player · A1B2"), when it gave one: so the listener can tell passkeys apart in their device's list. */
   passkeyName?: string;
-  /** This player has backup words (a version 2 key): `listening.backup` lets the listener write them down in the box. */
-  phrase?: true;
+  /**
+   * This player has backup words (a version 2 key): `listening.backup` lets the listener write them down in the box.
+   * Named so that no key in a reply reads like key material: the bridge blocks any that does.
+   */
+  hasBackup?: true;
   /** The listener wrote the backup words down and checked them on this device. */
   backedUp?: true;
   /**
@@ -59,9 +62,10 @@ export interface StatusResult {
  * `award` (listening.signAward: claim a Music Hero record from the one award contract the box knows),
  * `sendRecord` (listening.signSendRecord: send an inscription the player holds to an address confirmed in the box),
  * `shelf` (listening.signShelf: sign a request about the albums this player keeps; no panel, moves nothing),
+ * `likeFee` (listening.signLike accepts the 0.0003 STX like fee; a box without it signs likes at 0.0002 only),
  * `phrase` (new players have a 24-word backup phrase that opens in other Stacks wallets; listening.backup shows it in the box).
  */
-export const LISTENING_FEATURES = ['cancel', 'like', 'standalone', 'multi', 'partial', 'slots', 'rootLike', 'move', 'phrase', 'award', 'sendRecord', 'shelf', 'another', 'forget'] as const;
+export const LISTENING_FEATURES = ['cancel', 'like', 'standalone', 'multi', 'partial', 'slots', 'rootLike', 'move', 'phrase', 'award', 'sendRecord', 'shelf', 'another', 'forget', 'likeFee'] as const;
 
 /** `listening.status`: the connected main wallet, if any, so the box answers for that address's listening wallet. */
 export interface StatusParams {

@@ -12,7 +12,7 @@ import { type FunderResult } from '../lib/listening-wallet/funder';
 import { buildLedger, excessTarget, planReturns, type History, type LedgerPart, type ReturnStep } from '../lib/listening-wallet/ledger';
 import type { PlayerView } from '../lib/listening-wallet/gift-players';
 import {
-  balanceState, costPerPlay, DEFAULT_PLAY_FEE, DEFAULT_RETURN_FEE, fundingAllowance, LIKE_FEE, LIKES_FLOAT, playsCovered, RESERVE, TARGET,
+  balanceState, costPerPlay, DEFAULT_PLAY_FEE, DEFAULT_RETURN_FEE, fundingAllowance, LIKE_FEE, LIKE_FEE_OLD, LIKES_FLOAT, playsCovered, RESERVE, TARGET,
   type BalanceState, type ReturnMode
 } from '../lib/listening-wallet/policy';
 import { AWARDS_CONTRACT, RADIO_CORE_INDEX } from '../lib/listening-wallet/tx';
@@ -405,7 +405,9 @@ export function createPppController(deps: PppDeps) {
     if (!albumOpen()) return balance;
     return rootBalance && rootBalance.for === likeAddr() ? rootBalance.value : undefined;
   };
-  const likeLow = (b: bigint | undefined) => b !== undefined && b < RESERVE + LIKE_FEE;
+  /** What a like pays: the current fee, or the old one while the wallet box is a build that only signs that. */
+  const likeFee = () => (walletLacks('likeFee') ? LIKE_FEE_OLD : LIKE_FEE);
+  const likeLow = (b: bigint | undefined) => b !== undefined && b < RESERVE + likeFee();
   const stuck = () => unresolved().filter((e) => deps.now() - e.created > STUCK_AFTER_MS && notSeen.has(e.txid!));
 
   /**
@@ -617,7 +619,7 @@ export function createPppController(deps: PppDeps) {
 
   const snapshot = (): Snapshot => ({
     step: step(), busy, message, error, notice: noticeText(), gate, main: creditMain(), mainConnected: !!deps.main(), standIn: standIn(),
-    listening: status?.address, linked: status?.linked, award: awardNow(), unproven: !!status?.unproven, phrase: !!status?.phrase, backedUp: !!status?.backedUp, balance,
+    listening: status?.address, linked: status?.linked, award: awardNow(), unproven: !!status?.unproven, phrase: !!status?.hasBackup, backedUp: !!status?.backedUp, balance,
     balanceState: balance === undefined ? undefined : ((b: BalanceState): BalanceState => (b === 'over' && status?.backedUp ? 'ok' : b))(balanceState(balance, fee())), // backed up: over 1 STX reads as a healthy balance
     aboveTarget: balance !== undefined && balance > TARGET && !!status?.backedUp,
     playsLeft: balance === undefined ? 0 : playsCovered(balance, fee()),
@@ -1348,7 +1350,7 @@ export function createPppController(deps: PppDeps) {
      * that it was done. For a player that has a phrase, while it is open.
      */
     backup: () => task('Showing your backup words in the box…', async () => {
-      if (!status?.phrase) throw new Error('This player was made before backup words existed, so it has none.');
+      if (!status?.hasBackup) throw new Error('This player was made before backup words existed, so it has none.');
       const b = await ensureBridge();
       await b.request('listening.backup');
       status = await readStatus(b);
@@ -1563,7 +1565,7 @@ export function createPppController(deps: PppDeps) {
 
   /**
    * The radio's heart on the pay-per-play radio: once a listener has a listening wallet, every tap
-   * toggles the like from it, straight on the likes contract (0.0002 STX). It never opens the
+   * toggles the like from it, straight on the likes contract (0.0003 STX). It never opens the
    * main-wallet page; anything missing (locked, not linked, no funds) is said in the panel instead.
    */
   function heart(d: { song: number; title?: string; artist?: string; likedBy?: string[] }): boolean {
@@ -1591,7 +1593,7 @@ export function createPppController(deps: PppDeps) {
     if (s === 'wrong-wallet') return fail(wrongWalletMessage());
     if (s === 'link') return fail('Link the listening wallet to your main wallet first, so your likes count for it.');
     if (solo() && walletLacks('standalone')) return fail('The listening wallet box needs an update before it can like on its own. Try again shortly.');
-    if (s === 'fund') return fail('Top up the listening wallet to like: each like or unlike costs 0.0002 STX.');
+    if (s === 'fund') return fail('Top up the listening wallet to like: each like or unlike costs 0.0003 STX.');
     if (s === 'over') return fail('Return the excess first: the listening wallet holds more than 1 STX.');
     if (album) {
       await refreshRootBalance(true);
@@ -1649,11 +1651,11 @@ export function createPppController(deps: PppDeps) {
       else { balance = b; balanceAt = deps.now(); }
       if (likeLow(b)) throw new Error(OUT_OF_LIKES);
       const signed = await bridge!.request<SignedResult>('listening.signLike', {
-        song: d.song, liked: d.liked, fee: LIKE_FEE.toString(), nonce: nonce.toString(), balance: b.toString()
+        song: d.song, liked: d.liked, fee: likeFee().toString(), nonce: nonce.toString(), balance: b.toString()
       });
       const entry = {
         id: randomId(), address: listening, kind: 'like', core: 0, song: d.song, liked: d.liked, recipient: '', amount: '0',
-        fee: LIKE_FEE.toString(), nonce: nonce.toString(), created: deps.now(), status: 'signed', raw: signed.raw, txid: signed.txid,
+        fee: likeFee().toString(), nonce: nonce.toString(), created: deps.now(), status: 'signed', raw: signed.raw, txid: signed.txid,
         ...(d.title ? { title: String(d.title).slice(0, 120) } : {}),
         ...(d.artist ? { artist: String(d.artist).slice(0, 120) } : {})
       } as Entry;
