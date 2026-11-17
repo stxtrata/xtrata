@@ -6,6 +6,14 @@
 <title>Xtrata Radio — inscribed music, live from the chain</title>
 <meta name="description" content="A radio station whose entire catalogue lives on-chain. Every song is an inscription. Tune between curated, liked and full-chain bands." />
 <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+<!-- "Add to Home Screen" (src/radio-ppp/install.ts): the player on a phone like an app. -->
+<link rel="manifest" href="/radio/app.webmanifest" />
+<link rel="apple-touch-icon" href="/radio/icons/apple-touch-180.png" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-title" content="Xtrata Music" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="theme-color" content="#0c0e13" />
 <script>
 // Set before the audio engine loads so a slow or unavailable wallet check cannot open playback.
 if (location.hostname === 'radio.xtrata.xyz') document.documentElement.dataset.radioPaidOnly = 'true';
@@ -529,6 +537,22 @@ history.replaceState(null,'',location.pathname+location.search);}catch(e){}})();
   .al-welcome .al-welcome-note{font-size:13px;color:#8f97a3}
   .al-welcome .al-welcome-wait{font-size:14px;color:#8f97a3}
   .al-welcome .al-primary{margin-top:28px}
+  /* Add to Home Screen (install.ts): the button in the top bar, and the iPhone sheet with its three taps. */
+  .a2hs{display:inline-flex;align-items:center;gap:7px;min-height:36px;padding:0 12px;border-radius:999px;border:1px solid #2c3341;background:#171b23;color:#f2f0ea;font:600 12.5px/1 inherit;cursor:pointer}
+  .a2hs[hidden]{display:none}
+  .a2hs svg{width:18px;height:18px;fill:none;stroke:#7fe3f5;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;flex:none}
+  @media (max-width:560px){.a2hs span{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)}.a2hs{width:40px;min-height:40px;padding:0;justify-content:center}}
+  .a2hs-sheet{position:fixed;inset:0;z-index:200;background:rgba(4,5,8,.72);display:flex;align-items:flex-end;justify-content:center}
+  .a2hs-card{width:100%;max-width:460px;background:#151920;border-radius:26px 26px 0 0;padding:22px 22px calc(26px + env(safe-area-inset-bottom,0px));display:grid;gap:18px;color:#f2f0ea}
+  .a2hs-head{display:flex;align-items:center;gap:16px}
+  .a2hs-icon{width:64px;height:64px;border-radius:16px;flex:none}
+  .a2hs-head h2{margin:0;font-size:23px;letter-spacing:-.01em}.a2hs-head p{margin:4px 0 0;color:#a3aab5;font-size:15px}
+  .a2hs-steps{list-style:none;margin:0;padding:0;display:grid;gap:10px}
+  .a2hs-steps li{display:flex;align-items:center;gap:14px;background:#1c212a;border-radius:16px;padding:13px 16px;font-size:16px;font-weight:600}
+  .a2hs-steps i{width:30px;height:30px;border-radius:50%;background:#7fe3f5;color:#0c1a20;font-style:normal;font-weight:700;font-size:15px;display:flex;align-items:center;justify-content:center;flex:none}
+  .a2hs-steps span{flex:1}
+  .a2hs-steps svg{width:26px;height:26px;fill:none;stroke:#7fe3f5;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;flex:none}
+  .a2hs-close{min-height:52px;border-radius:16px;border:1px solid #3a4352;background:none;color:#f2f0ea;font:600 16px/1 inherit;cursor:pointer}
   /* The intro song during a claim (welcome.ts nowPlaying): artwork, name and artist where the explanation used to be. */
   .al-primary--play{display:flex;align-items:center;justify-content:center;gap:12px;min-height:64px;font-size:21px;font-weight:700}
   .al-primary--play::before{content:"";width:0;height:0;border-style:solid;border-width:10px 0 10px 17px;border-color:transparent transparent transparent currentColor}
@@ -802,6 +826,7 @@ history.replaceState(null,'',location.pathname+location.search);}catch(e){}})();
   <div class="live"><b>●</b> ON AIR FROM THE CHAIN</div>
   <!-- Pay-per-play's next step, always in reach: set up, unlock, or its live state (src/radio-ppp). -->
   <button class="ppp-top" id="ppp-top" type="button" hidden></button>
+  <button class="a2hs" id="a2hs" type="button" hidden><svg viewBox="0 0 20 20" aria-hidden="true"><rect x="3" y="3" width="14" height="14" rx="4"/><path d="M10 7v6M7 10h6"/></svg><span>Add to Home Screen</span></button>
   <div class="radio-wallet" aria-label="Wallet controls">
     <span id="radio-wallet-address">Wallet not connected</span>
     <button id="radio-wallet-connect" type="button">Connect wallet</button>
@@ -1368,7 +1393,7 @@ function showUnavailable(){
 fetch('/radio/listening-wallet/config',{cache:'no-store',signal:AbortSignal.timeout(15000)})
   .then(function(r){return r.ok?r.json():{}})
   .then(function(c){
-    if(c?.enabled && (!paidHost || c.here)) return import('/radio/ppp.js?v=47bb0143d9c2');
+    if(c?.enabled && (!paidHost || c.here)) return import('/radio/ppp.js?v=eff28d5b51aa');
     showUnavailable();
   }).catch(showUnavailable);
 </script>

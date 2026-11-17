@@ -260,6 +260,34 @@ describe('radio gift wallets', () => {
     expect((await giftStatus(s.env, { code })).status).toBe('live');
   });
 
+  it('free players from the giveaway wall: two per connection a day, so a private window is not a way to keep drawing until a Diamond turns up', async () => {
+    const s = setup();
+    const codes = (await s.campaign(6, '20500')).codes;
+    const { ensureGiveawayTables } = await import('../radio-giveaway');
+    const { giftCodeHash: hashOf } = await import('../../../src/lib/listening-wallet/gifts');
+    await ensureGiveawayTables(s.env as any);
+    // Four of them are on the wall; the last two are ordinary gifts someone was handed.
+    for (const c of codes.slice(0, 4)) s.db.sql.prepare("INSERT INTO radio_giveaway_links(code, code_hash, added_at, list) VALUES(?, ?, ?, 'players')").run(c, hashOf(c), 1);
+    const A = '203.0.113.7', B = '203.0.113.8';
+    await s.claim(codes[0], wallet(), A); await s.land();
+    await s.claim(codes[1], wallet(), A); await s.land();
+    await expect(s.claim(codes[2], wallet(), A)).rejects.toMatchObject({ status: 429, message: expect.stringMatching(/2 free players have already been claimed on this connection today/) });
+    expect((await giftStatus(s.env, { code: codes[2] })).status).toBe('live');      // refused, not used up
+    await s.claim(codes[4], wallet(), A); await s.land();                           // a gift that is not from the wall is never held back
+    await s.claim(codes[2], wallet(), B); await s.land();                           // another connection is another household
+    s.tick((24 * 3600 + 60) * 1000);
+    await s.claim(codes[3], wallet(), A);                                           // and tomorrow is another day
+  });
+
+  it('the wall limit is the deployment\'s to set, and 0 switches it off', async () => {
+    const { wallClaimsPerIp, WALL_CLAIMS_PER_IP } = await import('../radio-gifts');
+    expect(WALL_CLAIMS_PER_IP).toBe(2);
+    expect(wallClaimsPerIp({} as any)).toBe(2);
+    expect(wallClaimsPerIp({ RADIO_WALL_CLAIMS_PER_IP: '1' } as any)).toBe(1);
+    expect(wallClaimsPerIp({ RADIO_WALL_CLAIMS_PER_IP: '0' } as any)).toBe(0);
+    for (const bad of ['', 'two', '-1', '1.5', '5000']) expect(wallClaimsPerIp({ RADIO_WALL_CLAIMS_PER_IP: bad } as any)).toBe(2);
+  });
+
   it('refuses used wallets, failed checks and an empty treasury, leaves the gift claimable, and has no daily cap', async () => {
     const s = setup(); // no daily total: links an admin made are not held back "for today"
     const codes = (await s.campaign(4)).codes;
