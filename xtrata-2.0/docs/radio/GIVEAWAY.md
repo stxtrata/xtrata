@@ -56,11 +56,14 @@ action below works on the album drop unless it says `"list":"players"`, for exam
   returns its link. Nobody else can pick it meanwhile; unclaimed, it goes back on the wall.
 - `GET /radio/giveaway/players/spot/<n>`: a claimed spot's class, plays, player address and time.
 - Limits: a connection holds one spot at a time and can pick 6 in 24 hours (`PICKS_PER_IP`). The hold is 3 minutes (`HOLD_MS`).
-- **Two claimed players per connection in 24 hours** (`WALL_CLAIMS_PER_IP`; set `RADIO_WALL_CLAIMS_PER_IP` to change it,
-  `0` for no limit, then redeploy). A private window looks like a new person each time, so without this one person could
-  claim until a Diamond turned up. It is checked when a disc is picked (so nobody makes a passkey for nothing) and again
-  when the claim is made. Two, not one, so two people on one home connection can both claim the same day. It is a
-  brake, not a lock: another connection (mobile data, a VPN) is another allowance.
+- **One claimed player per connection, remembered for 30 days** (`WALL_CLAIMS_PER_IP`, `WALL_CLAIMS_DAYS`; set
+  `RADIO_WALL_CLAIMS_PER_IP` (0 = no limit) or `RADIO_WALL_CLAIMS_DAYS` to change them, then redeploy). A private window
+  looks like a new person each time, so without this one person could claim until a Diamond turned up. It is checked when
+  a disc is picked (so nobody makes a passkey for nothing) and again when the claim is made. The refusal says only "A
+  player has already been claimed on this connection." It never says when that lifts, so nobody is told to come back and
+  try again. It is not for ever on purpose: a connection's address is shared (a home, an office, a whole mobile network)
+  and handed on to other people, so a block that never lifted would end up refusing strangers. It is a brake, not a
+  lock: another connection (mobile data, a VPN) is another allowance. While testing, set `RADIO_WALL_CLAIMS_PER_IP=0`.
 - Operator actions that apply: `add` (use `shuffle:true`), `pause`, `resume`, `archive`, `status`. `gap`, `skip`,
   `now` and `held` belong to the one-at-a-time drop and do nothing useful here.
 - Spot numbers follow the order the links were loaded in. Load the whole drop shuffled in one go where you can;

@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
-import { createInstall, INSTALL_TEXT, installKind, isIos } from '../install';
+import { createInstall, INSTALL_TEXT, installKind, installSteps, iosBrowser, isIos } from '../install';
 
 const IPHONE = 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.1 Mobile/15E148 Safari/604.1';
 const IPAD = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.1 Safari/605.1.15';
@@ -39,6 +39,30 @@ describe('who is offered "Add to Home Screen"', () => {
   });
 });
 
+describe('the steps are the ones for the browser in hand', () => {
+  const SAFARI26 = IPHONE.replace('Version/18.1', 'Version/26.1');
+  const CHROME = IPHONE.replace('Version/18.1 Mobile', 'CriOS/130.0.6723.90 Mobile');
+  it('tells Safari with the three-dots menu from older Safari and from other iPhone browsers', () => {
+    expect(iosBrowser(SAFARI26)).toBe('safari-dots');
+    expect(iosBrowser(IPHONE)).toBe('safari');
+    expect(iosBrowser(CHROME)).toBe('other');
+  });
+  it('newer Safari starts at the three dots, bottom right; older Safari at Share; each ends with Add', () => {
+    expect(installSteps('safari-dots')).toMatchObject({ where: 'bottom-right' });
+    expect(installSteps('safari-dots').steps).toEqual(['Tap ••• at the bottom right of your screen', 'Tap Share', 'Scroll down and tap “Add to Home Screen”', 'Tap Add']);
+    expect(installSteps('safari')).toMatchObject({ where: 'bottom' });
+    expect(installSteps('safari').steps[0]).toMatch(/Share button at the bottom/);
+    expect(installSteps('other')).toMatchObject({ where: 'top-right' });
+    for (const b of ['safari-dots', 'safari', 'other'] as const) expect(installSteps(b).steps.at(-1)).toBe('Tap Add');
+  });
+  it('on newer Safari the sheet points at the bottom right corner', () => {
+    const s = setup({ userAgent: SAFARI26, maxTouchPoints: 5 });
+    s.button.click();
+    expect(s.sheet()!.className).toContain('a2hs-sheet--bottom-right');
+    expect(s.sheet()!.querySelector('.a2hs-steps li span')!.textContent).toBe('Tap ••• at the bottom right of your screen');
+  });
+});
+
 describe('the button at the top of the radio', () => {
   it('on Android it appears when the browser offers to install, and one tap shows the browser\'s own prompt', () => {
     const s = setup({ userAgent: ANDROID, maxTouchPoints: 5 });
@@ -61,7 +85,11 @@ describe('the button at the top of the radio', () => {
     s.button.click();
     const sheet = s.sheet()!;
     expect(sheet.getAttribute('role')).toBe('dialog');
-    expect([...sheet.querySelectorAll('.a2hs-steps li span')].map((n) => n.textContent)).toEqual(['Tap Share', 'Add to Home Screen', 'Tap Add']);
+    expect([...sheet.querySelectorAll('.a2hs-steps li span')].map((n) => n.textContent)).toEqual(installSteps('safari').steps);
+    expect(sheet.querySelectorAll('.a2hs-steps button, .a2hs-steps a, .a2hs-steps svg')).toHaveLength(0);   // nothing in the steps looks tappable
+    expect([...sheet.querySelectorAll('button')].map((b) => b.textContent)).toEqual(['Got it']);
+    expect(sheet.className).toContain('a2hs-sheet--bottom');
+    expect(sheet.querySelector('.a2hs-arrow')).not.toBeNull();
     expect(sheet.textContent).toContain(INSTALL_TEXT.title);
     expect((sheet.querySelector('img') as HTMLImageElement).getAttribute('src')).toBe('/radio/icons/app-192.png');
     s.button.click();

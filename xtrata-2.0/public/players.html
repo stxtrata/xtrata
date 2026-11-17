@@ -253,7 +253,7 @@ footer{margin-top:44px;padding-top:16px;border-top:1px solid var(--line);font-si
       var left=Math.max(0,Math.ceil((m.holdUntil-(Date.now()+skew))/1000));
       $('bar-title').textContent='Disc '+pad(m.spot)+' is held for you';
       $('bar-text').className='';$('bar-text').textContent='Finish claiming it in the next '+Math.floor(left/60)+':'+String(left%60).padStart(2,'0')+', or it goes back on the wall.';
-      $('bar-go').textContent='Carry on';$('bar-go').disabled=false;$('bar-cancel').hidden=true;
+      $('bar-go').textContent='Carry on';$('bar-go').disabled=false;$('bar-go').hidden=false;$('bar-cancel').hidden=true;
       return;
     }
     if(!sel){box.hidden=true;return;}
@@ -261,6 +261,9 @@ footer{margin-top:44px;padding-top:16px;border-top:1px solid var(--line);font-si
     $('bar-title').textContent='Disc '+pad(sel);
     $('bar-text').className=barMsg?'warn':'';
     $('bar-text').textContent=barMsg||(busy?'One moment…':'');
+    // A connection that has had its player is not offered another try: the message stands, with only a way to close it.
+    var had=/already been claimed on this connection/.test(barMsg);
+    $('bar-go').hidden=had;$('bar-cancel').textContent=had?'OK':'Not this one';
     $('bar-go').textContent=busy?'Opening your player…':barMsg?'Try again':'Play this disc';$('bar-go').disabled=busy;
   }
   setInterval(function(){if(mine())bar();},1000);

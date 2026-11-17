@@ -17,7 +17,7 @@
  */
 import { DEFAULT_INTRO_SONG, isSongId } from '../../src/lib/listening-wallet/intro';
 import type { GiftEnv } from './radio-gifts';
-import { GiftError, ipHash, playerView, wallClaimsPerIp } from './radio-gifts';
+import { GiftError, ipHash, playerView, WALL_CLAIMED_TEXT, wallClaimsPerIp, wallClaimsWindowMs } from './radio-gifts';
 import { giftCodeHash, giftPlays, isGiftCode } from '../../src/lib/listening-wallet/gifts';
 import { listedTracks } from '../../src/lib/listening-wallet/gift-players';
 import { tierOfPlays, type TierId } from '../../src/lib/listening-wallet/tiers';
@@ -502,8 +502,8 @@ export async function pickSpot(env: GiveawayEnv, body: { spot?: unknown }, now: 
     const max = ip ? wallClaimsPerIp(env) : 0;
     if (max > 0) {
       const had = await first<{ n: number }>(env, `SELECT COUNT(*) AS n FROM radio_gifts g JOIN radio_giveaway_links l ON l.code_hash=g.code_hash
-        WHERE l.list=? AND g.ip_hash=? AND g.claimed_at>? AND g.status IN ('claiming','claimed')`, [list, me, now - 86_400_000]);
-      if (Number(had?.n ?? 0) >= max) throw new GiftError(`${max === 1 ? 'A free player has' : `${max} free players have`} already been claimed on this connection today. Come back tomorrow, or send a friend this page.`, 429);
+        WHERE l.list=? AND g.ip_hash=? AND g.claimed_at>? AND g.status IN ('claiming','claimed')`, [list, me, now - wallClaimsWindowMs(env)]);
+      if (Number(had?.n ?? 0) >= max) throw new GiftError(`${WALL_CLAIMED_TEXT} Know someone who would love one? Send them this page.`, 429);
     }
     const today = await first<{ n: number }>(env, 'SELECT COUNT(*) AS n FROM radio_giveaway_picks WHERE ip_hash=? AND at>?', [me, now - 86_400_000]);
     if (Number(today?.n ?? 0) >= PICKS_PER_IP) throw new GiftError('A few players have been picked on this connection today. Finish claiming one, or come back tomorrow.', 429);
