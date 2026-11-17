@@ -654,6 +654,17 @@ function start(root: HTMLElement) {
   const button = (label: string, run: () => void, cls = '') => { const b = el('button', label, cls) as HTMLButtonElement; b.type = 'button'; b.onclick = run; return b; };
   const link = (label: string, href: string) => { const a = el('a', label) as HTMLAnchorElement; a.href = href; a.target = '_blank'; a.rel = 'noopener'; return a; };
 
+  // The new look's You screen: who this player has paid lately, a receipt on each row. Plain words, no amounts.
+  const PAID_FIRST = 6, PAID_MAX = 20;
+  let paidMore = false, paidShowing = false;
+  /** "just now", "5 min ago", "3 h ago", "2 days ago" (the old log says 5m, 3h, 2d). */
+  const whenPlain = (t: number) => {
+    const m = Math.round((Date.now() - t) / 60_000);
+    return m < 1 ? 'just now' : m < 60 ? `${m} min ago` : m < 1440 ? `${Math.round(m / 60)} h ago` : `${Math.round(m / 1440)} ${Math.round(m / 1440) === 1 ? 'day' : 'days'} ago`;
+  };
+  // Song artwork turns up in the background, one at a time: draw the list again when it does.
+  onArt(() => { if (paidShowing) render(ppp.snapshot()); });
+
   let lastStage: StageView | null = null;
   // radio.xtrata.xyz/radio#give (the homepage's "Send someone a wallet") opens the gift section once it is there.
   let wantGive = location.hash === '#give';
@@ -1613,6 +1624,7 @@ function start(root: HTMLElement) {
       if (e.txid) li.append(link('tx', explorer(e.txid)));
       return li;
     }));
+    renderPaid(s);
     $('.ppp-wallets').hidden = !(facts.childElementCount || more.length);
     $('.ppp-more').hidden = !lines.length;
     const history = $('.ppp-history');
@@ -1710,6 +1722,42 @@ function start(root: HTMLElement) {
    * exactly what will be made, and the name it would carry), and the record itself once it is theirs. Nothing here
    * decides anything: the server says where the player stands and the wallet box checks the claim.
    */
+  function renderPaid(s: Snapshot) {
+    const box = document.querySelector('#ppp .ppp-paid') as HTMLElement | null;
+    if (!box) return;
+    const root = document.documentElement;
+    // A play that failed or was cancelled paid nobody, so it is not listed.
+    const plays = (s.entries as Shown[]).filter((e) => e.kind === 'play' && !['failed', 'cancelled'].includes(e.status));
+    const on = root.hasAttribute('data-skin') && !root.hasAttribute('data-view') && plays.length > 0;
+    paidShowing = on;
+    box.hidden = !on;
+    if (!on) { box.replaceChildren(); return; }
+    loadCatalogue();
+    const list = el('ol');
+    for (const e of plays.slice(0, paidMore ? PAID_MAX : PAID_FIRST)) {
+      const { title, artist } = songName(e.song, e);
+      const name = title || `Song #${e.song}`;
+      const li = el('li', '', 'ppp-paid__row');
+      const art = el('span', '', 'ppp-paid__art');
+      const url = thumb(String(e.song));
+      if (url) { const img = document.createElement('img'); img.src = url; img.alt = ''; img.decoding = 'async'; art.append(img); } else { art.textContent = '♪'; art.setAttribute('aria-hidden', 'true'); }
+      const txt = el('span', '', 'ppp-paid__t');
+      txt.append(el('b', name), el('span', [artist, whenPlain(e.created)].filter(Boolean).join(' · ')));
+      li.append(art, txt);
+      if (e.status === 'confirmed' && e.txid) {
+        const r = link('Receipt', explorer(e.txid)); r.className = 'ppp-paid__r'; r.setAttribute('aria-label', `Receipt for ${name}`);
+        li.append(r);
+      } else li.append(el('span', e.status === 'unknown' ? 'Checking…' : 'Paying…', 'ppp-paid__r ppp-mute'));
+      list.append(li);
+    }
+    const kids: HTMLElement[] = [el('h4', 'Who you have paid'), list];
+    if (plays.length > PAID_FIRST) {
+      const more = button(paidMore ? 'Show fewer' : `Show more (${Math.min(plays.length, PAID_MAX) - PAID_FIRST})`, () => { paidMore = !paidMore; render(ppp.snapshot()); }, 'ppp-paid__more');
+      kids.push(more);
+    }
+    kids.push(el('p', 'Every play pays the artist, and anyone can check it.', 'ppp-paid__note'));
+    box.replaceChildren(...kids);
+  }
   function renderAward(s: Snapshot) {
     const box = document.querySelector('#ppp .ppp-award') as HTMLElement | null;
     if (!box) return;

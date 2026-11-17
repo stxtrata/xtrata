@@ -323,6 +323,19 @@ for (const viewport of [{ width: 1280, height: 900 }, { width: 390, height: 844 
   assert.equal(await page.locator('.topbar #radio-wallet-connect').count(), 0);
   assert.equal(await page.locator('#likesBox').isVisible(), false);
   await noSideScroll('You');
+  // "Who you have paid": the markup page.ts draws (src/radio-ppp/__tests__/page-you-paid.test.ts checks the code), put into the real page.
+  const paidRows = Array.from({ length: 7 }, (_, i) => `<li class="ppp-paid__row"><span class="ppp-paid__art"><img src="${cover}" alt=""></span><span class="ppp-paid__t"><b>${i === 2 ? 'A song with a really quite long title that cannot possibly fit on one line' : 'Song ' + i}</b><span>Ada · ${i + 1} min ago</span></span>${i === 3 ? '<span class="ppp-paid__r ppp-mute">Paying…</span>' : `<a class="ppp-paid__r" href="https://explorer.hiro.so/txid/0x${i}?chain=mainnet" target="_blank" rel="noopener" aria-label="Receipt for Song ${i}">Receipt</a>`}</li>`).join('');
+  await page.evaluate((rows) => { const b = document.querySelector('#ppp .ppp-paid'); b.innerHTML = `<h4>Who you have paid</h4><ol>${rows}</ol><p class="ppp-paid__note">Every play pays the artist, and anyone can check it.</p>`; b.hidden = false; }, paidRows);
+  assert.equal(await page.locator('.ppp-paid').isVisible(), true, 'the paid list shows on You');
+  assert.equal(await page.locator('.ppp-paid__row').count(), 7);
+  for (const r of await page.locator('a.ppp-paid__r').all()) { const b = await r.boundingBox(); assert.ok(b.height >= 44, 'a receipt link is easy to tap (' + b.height + 'px)'); }
+  const rowBox = await page.locator('.ppp-paid__row').nth(2).boundingBox();
+  assert.ok(rowBox.height <= 72, 'a long title stays on one line (' + rowBox.height + 'px)');
+  const rrs = await page.locator('.ppp-paid__row').nth(2).locator('.ppp-paid__r').boundingBox();
+  assert.ok(rrs.x + rrs.width <= viewport.width + 1, 'the receipt link stays on screen');
+  await noSideScroll('You with the paid list');
+  await shot('you-paid');
+  await page.evaluate(() => { document.querySelector('#ppp .ppp-paid').hidden = true; });
   await shot('you');
   await page.locator('#tabs button[data-t="listen"]').click();
   await page.evaluate(() => window.dispatchEvent(new CustomEvent('xtrata:radio-panel')));
