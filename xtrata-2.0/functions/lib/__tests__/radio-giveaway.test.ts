@@ -359,6 +359,22 @@ describe('radio giveaway', () => {
     expect((await call(['nothing'])).status).toBe(404);
     expect((await call([], {}, setup({ RADIO_GIFT_ENABLED: '0' }).env)).status).toBe(404);
   });
+  it('the wall will not hold a disc for a connection that has already claimed two players today', async () => {
+    const { ipHash } = await import('../radio-gifts');
+    const s = setup();
+    const codes = await s.gifts(5);
+    await giveawayAdmin(s.env, { action: 'add', list: 'players', text: s.list(codes) }, T0);
+    const IP = '203.0.113.7', h = ipHash(s.env as any, IP);
+    const claimed = (code: string, at: number) => s.sql.prepare("UPDATE radio_gifts SET status='claimed', claimed_at=?, claimed_by=?, ip_hash=? WHERE code_hash=?").run(at, 'SP' + code.slice(0, 8), h, giftCodeHash(code));
+    claimed(codes[0], T0 + 1000);
+    expect((await pickSpot(s.env, { spot: 3 }, T0 + 2000, IP, 'players')).code).toBe(codes[2]);   // one claimed: still welcome
+    claimed(codes[1], T0 + 3000);
+    await expect(pickSpot(s.env, { spot: 4 }, T0 + 4000, IP, 'players')).rejects.toMatchObject({ status: 429, message: expect.stringMatching(/2 free players have already been claimed on this connection today/) });
+    expect((await pickSpot(s.env, { spot: 4 }, T0 + 4000, '203.0.113.8', 'players')).code).toBe(codes[3]); // someone else is not held back
+    expect((await pickSpot(s.env, { spot: 5 }, T0 + 25 * 3600_000, IP, 'players')).code).toBe(codes[4]);   // nor is the same connection a day later
+    await expect(pickSpot({ ...s.env, RADIO_WALL_CLAIMS_PER_IP: '1' } as any, { spot: 3 }, T0 + 26 * 3600_000 + HOLD_MS, IP, 'players')).resolves.toBeTruthy(); // nothing claimed in the last day
+  });
+
   it('the intro song: a default until the operator sets one, changed or switched off with one command, read by anyone', async () => {
     const { onRequest } = await import('../../radio/giveaway/[[path]]');
     const { DEFAULT_INTRO_SONG } = await import('../../../src/lib/listening-wallet/intro');
