@@ -16,26 +16,27 @@
 <meta name="twitter:card" content="summary" />
 <style>
 /* The free-player wall: every player on show at once, pick any free one. Server: functions/lib/radio-giveaway.ts ("the wall"). */
-:root{color-scheme:dark;--bg:#07080b;--panel:#10131a;--panel2:#161a23;--line:#242a37;--ink:#f4f6fa;--muted:#9aa3b2;--violet:#b9a6ff;--pink:#f2a6d8;--teal:#6fe3c4;--amber:#ffc46b;--radius:12px}
+/* Same look as the player (public/radio.html, the new look): its colours, its mark and name, one accent. */
+:root{color-scheme:dark;--bg:#0c0e13;--panel:#12151c;--panel2:#171b23;--line:#2c3341;--ink:#f2efe6;--muted:#a9b2bf;--violet:#8fe0f2;--pink:#8fe0f2;--teal:#8fe0f2;--amber:#ffc46b;--radius:14px}
 *{box-sizing:border-box}
 html{background:var(--bg)}
-body{margin:0;background:radial-gradient(1200px 600px at 80% -10%,rgba(185,166,255,.10),transparent 60%),var(--bg);color:var(--ink);font:16px/1.5 ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;-webkit-font-smoothing:antialiased}
+body{margin:0;background:radial-gradient(900px 500px at 50% -10%,rgba(143,224,242,.08),transparent 65%),var(--bg);color:var(--ink);font:16px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Roboto,"Helvetica Neue",sans-serif;-webkit-font-smoothing:antialiased}
 a{color:inherit}
 .wrap{max-width:1180px;margin:0 auto;padding:22px 16px 80px}
-header.top{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;padding-bottom:16px;border-bottom:1px solid var(--line)}
-.brand{display:flex;align-items:center;gap:12px;text-decoration:none}
-.brand img{width:44px;height:44px;border-radius:8px}
-.brand b{display:block;font-size:18px;letter-spacing:.02em}
-.brand span{display:block;font-size:12px;color:var(--muted)}
+header.top{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.brand{display:flex;align-items:center;gap:10px;text-decoration:none}
+.brand img{width:32px;height:32px;border-radius:7px}
+.brand b{font-size:17px;font-weight:700;letter-spacing:-.2px}
+.brand b em{font-style:normal;color:#8fe0f2}
 nav{display:flex;gap:8px;flex-wrap:wrap}
-nav a{padding:8px 12px;border:1px solid var(--line);border-radius:8px;font-size:13px;font-weight:600;text-decoration:none}
+nav a{display:flex;align-items:center;min-height:40px;padding:0 14px;border:1px solid var(--line);border-radius:999px;background:var(--panel2);font-size:13px;font-weight:600;text-decoration:none}
 nav a:hover{background:var(--panel2)}
 .hero{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,1fr);gap:28px;align-items:end;margin:34px 0 22px}
 .hero--short{grid-template-columns:1fr;margin:26px 0 16px}
 .wall #prize-box{margin-top:18px}
 .kicker{margin:0 0 10px;font-size:11px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:var(--muted)}
 h1{margin:0;font-size:clamp(36px,6.4vw,64px);line-height:1.02;letter-spacing:-.03em}
-h1 em{font-style:normal;background:linear-gradient(90deg,var(--violet),var(--pink));-webkit-background-clip:text;background-clip:text;color:transparent}
+h1 em{font-style:normal;color:#8fe0f2}
 .lead{margin:16px 0 0;max-width:560px;font-size:17px;color:#d5dae3}
 .lead strong{color:#fff}
 .steps{display:flex;gap:8px;flex-wrap:wrap;margin:18px 0 0;padding:0;list-style:none}
@@ -55,15 +56,15 @@ h1 em{font-style:normal;background:linear-gradient(90deg,var(--violet),var(--pin
 .wall-head p b{font-size:22px;color:var(--teal);font-variant-numeric:tabular-nums}
 .btn{appearance:none;border:1px solid var(--line);border-radius:999px;background:transparent;color:var(--ink);font:inherit;font-size:14px;font-weight:700;padding:10px 16px;cursor:pointer;text-decoration:none;display:inline-block}
 .btn:hover{background:var(--panel2)}
-.btn.primary{border:0;background:linear-gradient(90deg,var(--violet),var(--pink));color:#17111f;padding:13px 22px;font-size:16px}
+.btn.primary{border:0;background:#8fe0f2;color:#0c1a20;padding:13px 22px;font-size:16px}
 .btn.primary:hover{filter:brightness(1.06)}
 .btn[disabled]{opacity:.55;cursor:default}
 .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(20px,1fr));gap:6px}
 .d{position:relative;appearance:none;padding:0;aspect-ratio:1;width:100%;border-radius:50%;border:1.5px solid #3a4253;background:radial-gradient(circle,#2b3140 0 18%,#0c0e13 20% 100%);cursor:pointer;transition:transform .12s,box-shadow .12s}
-.d.free:hover,.d.free:focus-visible{transform:scale(1.5);z-index:2;border-color:var(--teal);box-shadow:0 0 12px rgba(111,227,196,.8);outline:0}
-.d.sel{transform:scale(1.6);z-index:3;border-color:#fff;box-shadow:0 0 0 3px rgba(185,166,255,.55),0 0 16px rgba(242,166,216,.9)}
+.d.free:hover,.d.free:focus-visible{transform:scale(1.5);z-index:2;border-color:var(--teal);box-shadow:0 0 12px rgba(143,224,242,.8);outline:0}
+.d.sel{transform:scale(1.6);z-index:3;border-color:#fff;box-shadow:0 0 0 3px rgba(143,224,242,.5),0 0 16px rgba(143,224,242,.9)}
 .d.held{border-color:var(--amber);animation:pulse 1.2s ease-in-out infinite;cursor:default}
-.d.mine{border-color:var(--teal);box-shadow:0 0 10px rgba(111,227,196,.9);animation:pulse 1.2s ease-in-out infinite}
+.d.mine{border-color:var(--teal);box-shadow:0 0 10px rgba(143,224,242,.9);animation:pulse 1.2s ease-in-out infinite}
 .d.gone{opacity:.18;cursor:default}
 .d.t-diamond{border-color:#e8fbff;background:conic-gradient(#8fd8ff,#fff,#ffc9f3,#b9ffe0,#8fd8ff);box-shadow:0 0 10px rgba(143,216,255,.9)}
 .d.t-gold{border-color:#ffe9a3;background:conic-gradient(#c8922a,#ffe9a3,#c8922a,#ffe9a3,#c8922a);box-shadow:0 0 8px rgba(255,214,102,.7)}
@@ -114,14 +115,14 @@ footer{margin-top:44px;padding-top:16px;border-top:1px solid var(--line);font-si
 <body>
 <div class="wrap">
   <header class="top">
-    <a class="brand" href="/music/lounge"><img src="/favicons/xtrata-apple-touch-icon.png" alt="" /><span><b>XTRATA MUSIC</b><span>Every play pays the artist</span></span></a>
-    <nav><a href="https://radio.xtrata.xyz/radio.html">Free radio</a><a href="/giveaway">Free album drop</a><a href="/">Xtrata home</a></nav>
+    <a class="brand" href="/players"><img src="/radio/icons/app-192.png" alt="" width="32" height="32" /><b>Xtrata <em>Music</em></b></a>
+    <nav><a href="https://radio.xtrata.xyz/radio.html">I have a player</a></nav>
   </header>
 
   <div class="hero hero--short">
     <div>
       <h1>Pick a disc.<br /><em>Press play.</em></h1>
-      <p class="lead"><span id="k-total">1,000</span> free players. One each. <span id="range" hidden></span></p>
+      <p class="lead"><span id="k-total">1,000</span> free music players. One each. Every play pays the artist. <span id="range" hidden></span></p>
     </div>
   </div>
 
@@ -153,7 +154,7 @@ footer{margin-top:44px;padding-top:16px;border-top:1px solid var(--line);font-si
     </div>
   </section>
 
-  <footer>Your player lives on your device and opens with your face or fingerprint. No app, no account, no password. Already have a wallet? Use the <a href="https://radio.xtrata.xyz/radio.html">radio</a>.</footer>
+  <footer>Your player lives on your device and opens with your face or fingerprint. No app, no account, no password. Already have a player? <a href="https://radio.xtrata.xyz/radio.html">Open it</a>.</footer>
 </div>
 
 <div class="bar" id="bar" hidden>
@@ -169,7 +170,7 @@ footer{margin-top:44px;padding-top:16px;border-top:1px solid var(--line);font-si
     <h2 id="dt-title"></h2>
     <p class="sub" id="dt-sub"></p>
     <ul class="facts" id="dt-facts"></ul>
-    <div class="row"><a class="btn" id="dt-chain" target="_blank" rel="noopener">See its plays and likes</a><button class="btn" id="dt-close" type="button">Close</button></div>
+    <div class="row"><button class="btn" id="dt-close" type="button">Close</button></div>
   </div>
 </dialog>
 
@@ -314,7 +315,6 @@ footer{margin-top:44px;padding-top:16px;border-top:1px solid var(--line);font-si
     $('dt-title').textContent='Player No. '+pad(n);
     $('dt-sub').textContent=NAME[tier]+' player · claimed';
     var ul=$('dt-facts');ul.textContent='';ul.appendChild(fact('Details','Loading…'));
-    $('dt-chain').hidden=true;
     if(dlg.showModal)dlg.showModal();else dlg.setAttribute('open','');
     fetch(API+'/spot/'+n).then(function(r){if(!r.ok)throw 0;return r.json();}).then(function(s){
       ul.textContent='';
@@ -322,10 +322,8 @@ footer{margin-top:44px;padding-top:16px;border-top:1px solid var(--line);font-si
       if(s.plays)ul.appendChild(fact('Came with',s.plays.toLocaleString()+' plays'));
       if(s.claimedAt)ul.appendChild(fact('Claimed',new Date(s.claimedAt).toLocaleString([], {day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})));
       if(typeof s.wallet==='string'&&/^S[PM][0-9A-Z]{20,60}$/.test(s.wallet)){
-        ul.appendChild(fact('Player address',s.wallet.slice(0,6)+'…'+s.wallet.slice(-6)));
-        var paid=fact('Plays and likes paid for','Checking…');ul.appendChild(paid);
-        $('dt-chain').href='https://explorer.hiro.so/address/'+s.wallet+'?chain=mainnet';$('dt-chain').hidden=false;
-        // Read from the chain itself. If it cannot be read it says so: never a made-up zero.
+        var paid=fact('Songs played and liked','Checking…');ul.appendChild(paid);
+        // Read from the public record itself. If it cannot be read it says so: never a made-up zero.
         fetch('https://api.hiro.so/extended/v1/address/'+s.wallet+'/nonces').then(function(r){if(!r.ok)throw 0;return r.json();}).then(function(j){
           var last=j.last_executed_tx_nonce;
           paid.lastChild.textContent=last===null||last===undefined?'None yet':typeof last==='number'?(last+1).toLocaleString():'Unavailable';
@@ -337,12 +335,12 @@ footer{margin-top:44px;padding-top:16px;border-top:1px solid var(--line);font-si
         if($('dt-title').textContent!=='Player No. '+pad(n))return; // another disc was opened meanwhile
         if(a&&a.state==='claimed'&&typeof a.inscription==='number'&&a.inscription>=0){
           award.src='/i/'+a.inscription;
-          var row=fact('Music Hero record','Claimed · ');
-          var open=document.createElement('a');open.href='/i/'+a.inscription;open.target='_blank';open.rel='noopener';open.textContent='Xtrata inscription #'+a.inscription+' ↗';
+          var row=fact('Music Hero record','Earned · ');
+          var open=document.createElement('a');open.href='/i/'+a.inscription;open.target='_blank';open.rel='noopener';open.textContent='See it ↗';
           row.lastChild.appendChild(open);ul.appendChild(row);
           $('dt-sub').textContent=NAME[tier]+' player · Music Hero';
         }else if(a&&a.state==='none'){
-          ul.appendChild(fact('Music Hero record','Not claimed yet · this is what it will look like'));
+          ul.appendChild(fact('Music Hero record','Not earned yet · this is what it will look like'));
         }
       }).catch(function(){});
       if(!ul.children.length)ul.appendChild(fact('Details','Unavailable'));

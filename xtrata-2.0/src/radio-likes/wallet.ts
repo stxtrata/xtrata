@@ -19,17 +19,17 @@ function render(){
  const solo=connected?undefined:soloMark();
  // A linked Xtrata Music Wallet open without its Stacks wallet (src/radio-ppp): named by the wallet it counts for.
  const as=connected?undefined:document.documentElement.dataset.pppAs;
- address.textContent=connected?(names.get(session.network==='mainnet'?session.address:undefined)??session.address!):as?'♪ '+as:solo?(solo==='new'?'No wallet needed':'Listening wallet · '+solo):'Wallet not connected';
- address.title=connected?'Connected wallet · '+session.network+' · '+session.address:as?'A passkey listening wallet on this device. Plays and likes count for '+as+'.':solo?'A passkey listening wallet on this device. A Stacks wallet is optional.':'';
+ address.textContent=connected?(names.get(session.network==='mainnet'?session.address:undefined)??session.address!):as?'♪ '+as:solo?(solo==='new'?'Your player is all you need':'Your player'):'Player not connected';
+ address.title=connected?'Connected to Xtrata Music · '+session.network+' · '+session.address:as?'Your player on this device. Plays and likes count for '+as+'.':solo?'Your player on this device'+(solo==='new'?'':' · '+solo)+'.':'';
  if(lastAddress!==session.address){lastAddress=session.address;window.dispatchEvent(new Event('xtrata:wallet-changed'));}
  // No wallet yet on a passkey-only radio: "Connect wallet" opens the pop-up with Xtrata Music Wallet first.
  // An Xtrata Music Wallet already in use here: the button is only for adding a Stacks wallet.
- connect.textContent=busy?'Please wait…':connected?'Switch wallet':solo&&solo!=='new'?(document.documentElement.dataset.pppWalletInstalled==='1'?'Use a Stacks wallet instead':'I have a Stacks wallet'):'Connect wallet';
+ connect.textContent=busy?'Please wait…':connected?'Switch':solo&&solo!=='new'?'More ways to connect':'Connect your player';
  connect.disabled=busy;disconnect.hidden=!connected;disconnect.disabled=busy;
 }
 async function act(action:()=>Promise<unknown>){
  if(busy)return;busy=true;message.textContent='';render();
- try{await action();}catch(error){message.textContent=error instanceof Error?error.message:'Wallet action failed. Please try again.';}
+ try{await action();}catch(error){message.textContent=error instanceof Error?error.message:'That did not work. Please try again.';}
  finally{busy=false;render();}
 }
 const connectStacks=()=>void act(()=>adapter.connect());

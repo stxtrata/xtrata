@@ -737,6 +737,8 @@ export const initXtrataRadio = ({ tokenIds = [], mount = null, resumePlayback = 
 
   // Set once the like tracking below exists: { liked, pending, locked } for the playing song.
   let heartView = () => null;
+  // Set once the cue queue below exists: the song cued to follow this one, or null.
+  let upNextView = () => null;
   const stateSnapshot = () => ({
     on,
     playing: on && !player.paused && !player.ended,
@@ -744,6 +746,8 @@ export const initXtrataRadio = ({ tokenIds = [], mount = null, resumePlayback = 
     albumCover: giftPlayer && albumCoverUrl ? { url: albumCoverUrl, tokenId: giftPlayer.cover } : null,
     likesStatus: chainState?.snapshot().status || 'disconnected', likesRetryAt: chainState?.snapshot().retryAt, likesCheckedAt: chainState?.snapshot().checkedAt, band, preset, nowPlaying, likes: chainState ? chainState.snapshot().likes.slice() : [], volumeStep,
     shuffle: shuffleMode,
+    // What is cued to follow this song (the radio page's "Up next"); null while nothing is cued.
+    upNext: upNextView(),
     loop: player.loop,
     relatives: relatives.slice(),
     heart: heartView()
@@ -1389,6 +1393,7 @@ export const initXtrataRadio = ({ tokenIds = [], mount = null, resumePlayback = 
   // first switch-on AND skip-button retunes land instantly.
   const PRELOAD_TARGET = 3;
   const preloadQueue = [];
+  upNextView = () => (preloadQueue[0] ? { tokenId: preloadQueue[0].tokenId, title: preloadQueue[0].title || '', artist: preloadQueue[0].artist || '', cover: preloadQueue[0].cover || '' } : null);
   let preloading = false;
 
   const WARM_MAX_BYTES = 6 * 1024 * 1024;
@@ -1447,6 +1452,7 @@ export const initXtrataRadio = ({ tokenIds = [], mount = null, resumePlayback = 
         await warmHttpCache(track.src);
         radioLog(`preloaded #${tokenId}`, { queue: preloadQueue.length + 1 }, tokenId);
         preloadQueue.push({ ...track, tokenId });
+        if (preloadQueue.length === 1) emit(); // "Up next" has something to show
         // Stage the head of the queue in the element while idle so it decodes now.
         if (!on && preloadQueue.length === 1) {
           player.src = preloadQueue[0].src;

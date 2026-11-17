@@ -25,8 +25,8 @@ describe('musicWalletOptions (radio connect pop-up)', () => {
   it('gives each linked wallet on the device its own row, named by the Stacks wallet it counts for', () => {
     const rows = musicWalletOptions({ ...base, step: 'connect', solo: false, linked: JIM, others: [AUD] }, names);
     expect(rows.map((r) => [r.action, r.main, r.label])).toEqual([
-      ['linked', JIM, 'Xtrata Music Wallet · jim.btc'],
-      ['linked', AUD, 'Xtrata Music Wallet · audionals.btc']
+      ['linked', JIM, 'Xtrata Music player · jim.btc'],
+      ['linked', AUD, 'Xtrata Music player · audionals.btc']
     ]);
     expect(rows[0].detail).toMatch(/count for jim\.btc/);
   });

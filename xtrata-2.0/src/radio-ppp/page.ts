@@ -716,6 +716,8 @@ function start(root: HTMLElement) {
   // the passkey from a tap inside the wallet box, so it brings that box into view, ready to tap.
   const top = document.getElementById('ppp-top') as HTMLButtonElement | null;
   const focusPanel = () => {
+    // The radio page's tabs (public/radio.html) show the panel first: it lives under "You".
+    window.dispatchEvent(new CustomEvent('xtrata:radio-panel'));
     const target = frameWrap.hidden || frameWrap.classList.contains('ppp-frame--rest') ? root : frameWrap;
     target.scrollIntoView({ behavior: 'smooth', block: 'center' });
     root.classList.remove('ppp-flash'); void root.offsetWidth; root.classList.add('ppp-flash');
@@ -770,7 +772,7 @@ function start(root: HTMLElement) {
         b.append(el('b', title), el('span', detail));
         return b;
       };
-      const head = el('h2', 'Connect', 'ppp-connect__title'); head.id = 'ppp-connect-title';
+      const head = el('h2', 'Connect to Xtrata Music', 'ppp-connect__title'); head.id = 'ppp-connect-title';
       const rows = options.map((option) => row(option.label, option.detail, 'is-music', () => {
         close('music');
         if (option.action === 'linked' && option.main) { openLinked(option.main); return; }
@@ -781,7 +783,7 @@ function start(root: HTMLElement) {
         // The passkey prompt is a tap inside the wallet box, so bring it into view.
         focusPanel();
       }, !!option.disabled));
-      const stacks = row('Xverse or Leather', 'A Stacks wallet you already have.', 'is-stacks', () => close('stacks'));
+      const stacks = row('Xverse or Leather', 'If you already use one.', 'is-stacks', () => close('stacks'));
       const cancel = button('Cancel', () => close(null), 'quiet ppp-connect__cancel');
       dialog.append(head, ...rows, stacks, cancel);
       document.body.appendChild(dialog);
@@ -825,7 +827,7 @@ function start(root: HTMLElement) {
   const onair = document.getElementById('onair');
   nudge?.querySelector('button')?.addEventListener('click', () => go());
   const NOT_PAYING: Partial<Record<Snapshot['step'], string>> = {
-    connect: 'Connect your wallet to listen',
+    connect: 'Connect your player to listen',
     intro: 'Set up your player to listen',
     locked: 'Unlock your player to listen',
     'wrong-wallet': 'Switch wallets to listen',
@@ -838,6 +840,38 @@ function start(root: HTMLElement) {
     elsewhere: 'Open', connect: 'Connect', 'wrong-wallet': 'Switch wallet', intro: 'Set up', locked: 'Unlock',
     link: 'Finish setup', fund: 'Add plays', over: 'Fix it', ready: 'Switch on'
   };
+  // Someone here with no player at all (they followed a link to the radio): while free players are being given
+  // away, one card leads straight to them (public/players.html). Asked once; if the answer cannot be read the card
+  // stays hidden rather than promise players that may not be there.
+  const claim = document.getElementById('claimCard');
+  let wallAsked = false, wallFree = 0, wallTotal = 0;
+  function renderClaim(s: Snapshot) {
+    if (!claim) return;
+    const cold = (s.step === 'intro' || s.step === 'connect' || s.step === 'elsewhere') && !s.gift;
+    if (cold && !wallAsked) {
+      wallAsked = true;
+      void json('/radio/giveaway/players').then((w) => {
+        if (w?.state !== 'open' || typeof w.free !== 'number' || typeof w.total !== 'number' || w.free <= 0) return;
+        wallFree = w.free; wallTotal = w.total; renderClaim(ppp.snapshot());
+      }).catch(() => undefined);
+    }
+    claim.hidden = !(cold && wallFree > 0);
+    const count = claim.querySelector('.claim-n');
+    if (count && wallFree > 0) count.textContent = `${wallFree.toLocaleString()} of ${wallTotal.toLocaleString()} left`;
+  }
+  // The "You" screen of the radio page: one line on whether this player is connected to Xtrata Music right now.
+  const youStatus = document.getElementById('youStatus');
+  function renderYou(s: Snapshot) {
+    if (!youStatus || s.step === 'loading') return;
+    const left = s.session ? Math.min(s.session.playsLeft, s.playsLeft) : 0;
+    const on = s.step === 'ready' && s.payingOn && left > 0 && !s.giftStop;
+    const none = s.step === 'intro' || s.step === 'connect' || s.step === 'elsewhere';
+    youStatus.dataset.on = on ? '1' : '0';
+    youStatus.querySelector('b')!.textContent = on ? 'Connected to Xtrata Music' : none ? 'No player connected' : 'Your player is not connected';
+    youStatus.querySelector('span')!.textContent = on ? 'Every play goes to the artist, and your likes are saved.'
+      : none ? 'Connect a player to play songs and pay the artists you listen to.'
+      : s.step === 'locked' ? 'Unlock it below to carry on listening.' : 'See below for what it needs.';
+  }
   function renderMode(s: Snapshot) {
     if (s.step === 'loading') return; // keep the last look while it checks
     const left = s.session ? Math.min(s.session.playsLeft, s.playsLeft) : 0;
@@ -1059,6 +1093,8 @@ function start(root: HTMLElement) {
     if (!giftWait && gifts.inProgress(raw)) return;
     renderTop(s);
     renderMode(s);
+    renderClaim(s);
+    renderYou(s);
     if (paidHost && paidStatus) {
       paidStatus.hidden = !['off', 'elsewhere', 'loading'].includes(s.step);
       paidStatus.textContent = s.step === 'loading' || !s.gate ? (novice.on ? PLAIN_CHECKING : 'Checking your listening wallet…') : novice.on ? 'Xtrata Music is unavailable here. Reload to check again.' : 'Paid radio is unavailable. Reload to check again.';

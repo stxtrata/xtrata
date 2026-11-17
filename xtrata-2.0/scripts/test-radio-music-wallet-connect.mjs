@@ -24,14 +24,14 @@ async function run(device) {
     await page.waitForFunction(() => typeof window.XtrataRadioConnectChooser === 'function', null, { timeout: 15000 });
     // Wait for the wallet box to answer, so the pop-up knows this device has no passkey yet.
     await page.waitForFunction(() => /Start listening/.test(document.querySelector('#ppp')?.textContent ?? ''), null, { timeout: 15000 });
-    assert.equal(await connect.textContent(), 'Connect wallet', `${device}: top bar button`);
+    assert.equal(await connect.textContent(), 'Connect your player', `${device}: top bar button`);
 
     // 1. Cancel closes it and opens nothing else.
     await connect.click();
     const dialog = page.locator('dialog.ppp-connect');
     await dialog.waitFor({ timeout: 5000 });
     const rows = await dialog.locator('.ppp-connect__opt b').allTextContents();
-    assert.deepEqual(rows, ['Xtrata Music Wallet', 'Xverse or Leather'], `${device}: rows in order`);
+    assert.deepEqual(rows, ['Xtrata Music player', 'Xverse or Leather'], `${device}: rows in order`);
     if (shots) await page.screenshot({ path: `${shots}/connect-${device}.png` });
     await dialog.getByRole('button', { name: 'Cancel' }).click();
     await dialog.waitFor({ state: 'detached', timeout: 3000 });
@@ -46,7 +46,7 @@ async function run(device) {
 
     // 3. Xtrata Music Wallet makes the passkey wallet on this device.
     await connect.click();
-    await dialog.getByRole('button', { name: /Xtrata Music Wallet/ }).click();
+    await dialog.getByRole('button', { name: /Xtrata Music player/ }).click();
     const t0 = Date.now();
     let made = false;
     while (Date.now() - t0 < 30000 && !made) {
@@ -67,7 +67,7 @@ async function run(device) {
     assert.ok(made, `${device}: Xtrata Music Wallet made`);
     assert.equal((await auth.credentials()).length, 1, `${device}: exactly one passkey`);
     // Now in use: the top bar button only adds a Stacks wallet, with no pop-up.
-    await page.waitForFunction(() => document.getElementById('radio-wallet-connect')?.textContent === 'I have a Stacks wallet', null, { timeout: 5000 });
+    await page.waitForFunction(() => document.getElementById('radio-wallet-connect')?.textContent === 'More ways to connect', null, { timeout: 5000 });
     await connect.click();
     await page.locator('connect-modal').waitFor({ state: 'attached', timeout: 5000 });
     assert.equal(await dialog.count(), 0, `${device}: no pop-up once the music wallet is in use`);
@@ -140,7 +140,7 @@ async function runLinked(device) {
     // Later visit, no Stacks wallet connected.
     await page.reload();
     await page.waitForFunction(() => /This device has a listening wallet for/.test(document.querySelector('#ppp')?.textContent ?? ''), null, { timeout: 15000 });
-    assert.equal(await connect.textContent(), 'Connect wallet');
+    assert.equal(await connect.textContent(), 'Connect your player');
     await connect.click();
     await dialog.waitFor({ timeout: 5000 });
     const rows = await dialog.locator('.ppp-connect__opt b').allTextContents();

@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <title>Xtrata Radio — inscribed music, live from the chain</title>
 <meta name="description" content="A radio station whose entire catalogue lives on-chain. Every song is an inscription. Tune between curated, liked and full-chain bands." />
 <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
@@ -39,6 +39,12 @@ history.replaceState(null,'',location.pathname+location.search);}catch(e){}})();
 // Compact "dock" layout: only when the address carries ?dock=1 (the arcade's corner panel and its pop-out window).
 // Without it nothing below changes: every dock rule is scoped to html[data-dock].
 (function(){try{if(/[?&]dock=1(?:&|$)/.test(location.search))document.documentElement.setAttribute('data-dock','1');}catch(e){}})();
+</script>
+<script>
+// The new look: Listen, Browse, Liked and You, with tabs along the bottom (the rules are at the end of the style block).
+// Not in the arcade dock. Add ?classic=1 to the address to see the old receiver and tuning strip instead.
+(function(){try{var d=document.documentElement;if(d.hasAttribute('data-dock')||/[?&]classic=1(?:&|$)/.test(location.search))return;
+d.setAttribute('data-skin','1');d.setAttribute('data-tab','listen');}catch(e){}})();
 </script>
 <style>
   /* Xtrata Radio — a late-night FM receiver: dark glass, cyan display light, amber accents. */
@@ -828,18 +834,177 @@ history.replaceState(null,'',location.pathname+location.search);}catch(e){}})();
   html[data-dock] .stations button span{display:none}
   /* an album as the music: the same player, the same window (its own rules already fit the window height) */
   html[data-dock][data-view=album] main{padding:0 12px 16px;max-width:none}
+
+  /* ===== The new look (html[data-skin], set in the head): Listen, Browse, Liked and You, with tabs along the bottom.
+     A skin over the same page: every id and script is unchanged, the wallet box is never moved, and nothing here
+     applies in the arcade dock, on the album and claim screens (html[data-view]) or with ?classic=1. ===== */
+  .claim{display:flex;align-items:center;gap:12px;margin:0 0 16px;padding:12px 14px;border:1px solid #2a6f7c;border-radius:16px;background:#10323a;color:#f2efe6;text-decoration:none;order:-1}
+  .claim[hidden]{display:none}
+  .claim-disc{flex:none;width:40px;height:40px;border-radius:50%;background:radial-gradient(circle,#10323a 0 18%,transparent 19%),conic-gradient(#e9c46a,#8fd8e8,#e39b6c,#c9d3e0,#e9c46a)}
+  .claim-txt{flex:1;min-width:0}
+  .claim b{display:block;font-size:16px;font-weight:700}
+  .claim small{display:block;font-size:13px;color:#b8d7dd}
+  .claim-go{flex:none;display:flex;align-items:center;min-height:40px;padding:0 14px;border-radius:999px;background:#8fe0f2;color:#0c1a20;font-size:14px;font-weight:700;white-space:nowrap}
+  html[data-skin]:not([data-view]) .claim{margin:0}
+  .tabs,.upnext,.mini,.sk-h,.logo-mark,.logo-name,.stations [data-sh="1"]{display:none}
+  body{padding-left:env(safe-area-inset-left,0px);padding-right:env(safe-area-inset-right,0px)}
+  html[data-view=album] main{padding-top:env(safe-area-inset-top,0px)}
+  html[data-skin]:not([data-view]) body{background:radial-gradient(520px 420px at 50% 150px,rgba(var(--glow),.13),transparent 70%),#0c0e13;color:#f2efe6;
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Roboto,"Helvetica Neue",sans-serif}
+  html[data-skin]:not([data-view]) .topbar{border:0;background:rgba(12,14,19,.9);flex-wrap:nowrap;gap:8px;
+    padding:calc(10px + env(safe-area-inset-top,0px)) max(20px,calc(50% - 240px)) 10px}
+  html[data-skin]:not([data-view]) .logo{display:flex;align-items:center;gap:10px;margin-right:auto;min-width:0}
+  html[data-skin]:not([data-view]) .logo>b,html[data-skin]:not([data-view]) .logo>i,html[data-skin]:not([data-view]) .live{display:none}
+  html[data-skin]:not([data-view]) .logo-mark{display:block;width:32px;height:32px;border-radius:7px;flex:none}
+  html[data-skin]:not([data-view]) .logo-name{display:block;font-size:17px;font-weight:700;letter-spacing:-.2px;color:#f2efe6;white-space:nowrap}
+  html[data-skin]:not([data-view]) .logo-name em{font-style:normal;color:#8fe0f2}
+  html[data-skin]:not([data-view]) .ppp-top{margin:0;min-height:40px;padding:0 13px;font-size:13px;font-weight:600;letter-spacing:0;background:#8fe0f2;border:1px solid #8fe0f2;color:#0c1a20}
+  html[data-skin]:not([data-view]) .ppp-top .dot{display:none}
+  html[data-skin]:not([data-view]) .ppp-top.is-on,html[data-skin]:not([data-view]) .ppp-top.is-quiet{background:#171b23;border-color:#2c3341;color:#f2efe6}
+  html[data-skin]:not([data-view]) .ppp-top.is-off,html[data-skin]:not([data-view]) .ppp-top.is-warn{background:#171b23;border-color:#7a5a2a;color:#ffcf8a}
+  html[data-skin]:not([data-view]) .a2hs{width:40px;min-height:40px;padding:0;justify-content:center;border-radius:50%;flex:none}
+  html[data-skin]:not([data-view]) .a2hs span{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)}
+
+  html[data-skin]:not([data-view]) #stage{display:flex;flex-direction:column;align-items:stretch;gap:16px;max-width:520px;margin:0 auto;padding:6px 20px calc(150px + env(safe-area-inset-bottom,0px))}
+  html[data-skin]:not([data-view]) .side{display:contents}
+  html[data-skin]:not([data-view]) .rx{display:flex;flex-direction:column;gap:16px;min-width:0;order:0}
+  /* one screen at a time */
+  html[data-skin]:not([data-view]):not([data-tab=you]) .ppp,html[data-skin]:not([data-view]):not([data-tab=you]) .strap,html[data-skin]:not([data-view]):not([data-tab=you]) .radio-wallet,
+  html[data-skin]:not([data-view]):not([data-tab=liked]) #likesBox,html[data-skin]:not([data-view]):not([data-tab=browse]) #findBox,html[data-skin]:not([data-view]):not([data-tab=browse]) #bands,
+  html[data-skin]:not([data-view]):not([data-tab=listen]) #albumList,html[data-skin]:not([data-view]):not([data-tab=listen]) .rx>*:not(#bands):not(.sk-h),
+  html[data-skin]:not([data-view])[data-tab=liked] .rx,html[data-skin]:not([data-view])[data-tab=you] .rx{display:none}
+  html[data-skin]:not([data-view])[data-tab=browse] .rx{display:contents}
+  html[data-skin]:not([data-view])[data-tab=browse] .sk-h[data-for=browse],html[data-skin]:not([data-view])[data-tab=you] .sk-h[data-for=you]{display:block}
+  html[data-skin]:not([data-view])[data-tab=browse] #findBox{order:0} html[data-skin]:not([data-view])[data-tab=browse] .sk-h{order:1} html[data-skin]:not([data-view])[data-tab=browse] #bands{order:2}
+  html[data-skin]:not([data-view]) #albumList{order:1}
+  html[data-skin]:not([data-view]) .sk-h[data-for=you]{order:-1} html[data-skin]:not([data-view]) .ppp{order:1;margin:0;border-radius:18px} html[data-skin]:not([data-view]) .radio-wallet{order:2} html[data-skin]:not([data-view]) .strap{order:3}
+  html[data-skin]:not([data-view]) .sk-h{margin:6px 0 -6px;font-size:13px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:#a9b2bf}
+  html[data-skin]:not([data-view]) .sk-h--big{margin:6px 0 0;font-size:30px;font-weight:700;letter-spacing:-.4px;text-transform:none;color:#f2efe6}
+
+  /* Listen */
+  html[data-skin]:not([data-view]) .receiver{display:flex;flex-direction:column;gap:16px;padding:0;border:0;border-radius:0;background:none;box-shadow:none;position:static}
+  html[data-skin]:not([data-view]) .receiver::before,html[data-skin]:not([data-view]) .receiver::after{content:none}
+  html[data-skin]:not([data-view]) .art{width:min(100%,44vh);margin:0 auto;border:0;border-radius:22px;background:#171b23;box-shadow:0 24px 60px rgba(0,0,0,.45)}
+  html[data-skin]:not([data-view]) .art .fallback .fnote{display:block;font-family:inherit;font-size:14px;letter-spacing:0;color:#a9b2bf;max-width:26ch}
+  html[data-skin]:not([data-view]) .art .fallback .fnote:empty,html[data-skin]:not([data-view]) .chainlink{display:none!important}
+  html[data-skin]:not([data-view]) .artpaused{font-family:inherit;letter-spacing:.04em}
+  html[data-skin]:not([data-view]) .display{flex-direction:row;align-items:center;gap:12px}
+  html[data-skin]:not([data-view]) .vfd{flex:1;border:0;border-radius:0;padding:0;background:none;box-shadow:none;overflow:visible}
+  html[data-skin]:not([data-view]) .vfd::after{content:none}
+  html[data-skin]:not([data-view]) .onair,html[data-skin]:not([data-view]) .spectrum,html[data-skin]:not([data-view]) .idpill,html[data-skin]:not([data-view]) .viewbtn,html[data-skin]:not([data-view]) .viewbtn.show{display:none}
+  html[data-skin]:not([data-view]) .vfd .stn{padding:0;font-family:inherit;font-size:12px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:#a9b2bf;opacity:1}
+  html[data-skin]:not([data-view]) .vfd .ttl{margin:4px 0 3px;font-family:inherit;font-size:24px;line-height:1.15;font-weight:700;letter-spacing:-.3px;color:#f2efe6;text-shadow:none}
+  html[data-skin]:not([data-view]) .vfd .artst{min-height:0;font-family:inherit;font-size:15px;color:#a9b2bf}
+  html[data-skin]:not([data-view]) .idrow{margin-top:6px;min-height:0}
+  html[data-skin]:not([data-view]) .counts{gap:14px;font-family:inherit;font-size:12.5px}
+  html[data-skin]:not([data-view]) .counts>span{border:0;padding:0;color:#a9b2bf}
+  html[data-skin]:not([data-view]) .counts b{color:#a9b2bf;font-weight:600}
+  html[data-skin]:not([data-view]) .timeline{display:grid;grid-template-columns:1fr 1fr;gap:0;margin:0}
+  html[data-skin]:not([data-view]) .tl-wave{grid-column:1/-1;grid-row:1;height:24px;border:0;border-radius:0;background:none}
+  html[data-skin]:not([data-view]) .tl-t{grid-row:2;min-width:0;font-family:inherit;font-size:12px;color:#a9b2bf;text-align:left}
+  html[data-skin]:not([data-view]) #tDur{text-align:right}
+  html[data-skin]:not([data-view]) .ctl{justify-content:center;gap:30px;margin:0;flex-wrap:nowrap}
+  html[data-skin]:not([data-view]) .ctl .power,html[data-skin]:not([data-view]) .ctl .grow,html[data-skin]:not([data-view]) #presetBtn,html[data-skin]:not([data-view]) .tuner,html[data-skin]:not([data-view]) .tuner-undo,html[data-skin]:not([data-view]) .howto,html[data-skin]:not([data-view]) .relwrap{display:none!important}
+  html[data-skin]:not([data-view]) .cbtn{width:54px;height:54px;border:0;background:none;box-shadow:none;color:#f2efe6;font-size:0;padding:0;flex:none;animation:none}
+  html[data-skin]:not([data-view]) .cbtn::before{content:"";display:block;width:26px;height:26px;margin:auto;background:currentColor;
+    -webkit-mask:var(--i) center/contain no-repeat;mask:var(--i) center/contain no-repeat}
+  html[data-skin]:not([data-view]) #prev{--i:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 22 22'%3E%3Cpath d='M19 4v14L9 11zM3 4h3v14H3z'/%3E%3C/svg%3E")} html[data-skin]:not([data-view]) #next{--i:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 22 22'%3E%3Cpath d='M3 4v14l10-7zM16 4h3v14h-3z'/%3E%3C/svg%3E")}
+  html[data-skin]:not([data-view]) .cbtn.big{width:76px;height:76px;border:0;background:#8fe0f2;box-shadow:none;color:#0c1a20}
+  html[data-skin]:not([data-view]) #pp{--i:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 28 28'%3E%3Cpath d='M7 5h5v18H7zM16 5h5v18h-5z'/%3E%3C/svg%3E")} html[data-skin]:not([data-view]) #stage.paused #pp{--i:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 28 28'%3E%3Cpath d='M9 5l14 9-14 9z'/%3E%3C/svg%3E")}
+  html[data-skin]:not([data-view]) .cbtn.heart,html[data-skin]:not([data-view]) .cbtn.heart.on,html[data-skin]:not([data-view]) .cbtn.heart.pending{width:48px;height:48px;background:#171b23;box-shadow:none;--i:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 22 22'%3E%3Cpath fill='none' stroke='%23000' stroke-width='2' stroke-linejoin='round' d='M11 19S3 14 3 8.5A4.5 4.5 0 0111 6a4.5 4.5 0 018 2.5C19 14 11 19 11 19z'/%3E%3C/svg%3E")}
+  html[data-skin]:not([data-view]) .cbtn.heart::before{width:22px;height:22px}
+  html[data-skin]:not([data-view]) .cbtn.heart.on{color:#8fe0f2;--i:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 22 22'%3E%3Cpath d='M11 19S3 14 3 8.5A4.5 4.5 0 0111 6a4.5 4.5 0 018 2.5C19 14 11 19 11 19z'/%3E%3C/svg%3E")}
+  html[data-skin]:not([data-view]) .cbtn.heart.pending{color:#ffb15c;--i:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 22 22'%3E%3Cpath d='M11 19S3 14 3 8.5A4.5 4.5 0 0111 6a4.5 4.5 0 018 2.5C19 14 11 19 11 19z'/%3E%3C/svg%3E");animation:likepend 1.2s ease-in-out infinite}
+  html[data-skin]:not([data-view]) .cbtn:disabled{opacity:.35;filter:none}
+  html[data-skin]:not([data-view]) .cbtn:focus-visible,.tabs button:focus-visible,.upnext:focus-visible,.mini button:focus-visible{outline:2px solid #8fe0f2;outline-offset:2px}
+  html[data-skin]:not([data-view]) .nudge{order:2;margin:0;border:1px solid #2c3341;border-radius:14px;background:#171b23;color:#a9b2bf;font-size:13.5px}
+  html[data-skin]:not([data-view]) .nudge-t{font-family:inherit;font-size:14px;font-weight:600;letter-spacing:0;text-transform:none;color:#f2efe6;animation:none}
+  html[data-skin]:not([data-view]) .nudge button{min-height:40px;font-weight:600;color:#0c1a20;background:#8fe0f2;box-shadow:none}
+  html[data-skin]:not([data-view]) .upnext:not([hidden]){order:3;display:flex;align-items:center;gap:12px;width:100%;padding:10px 12px;border:0;border-radius:14px;background:#171b23;color:inherit;font:inherit;text-align:left;cursor:pointer}
+  .upnext img,.mini img{width:40px;height:40px;border-radius:8px;object-fit:cover;flex:none;background:#232936}
+  .upnext span,.mini-open span{flex:1;min-width:0}
+  .upnext small,.mini small{display:block;font-size:12px;color:#a9b2bf;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .upnext b,.mini b{display:block;font-size:14px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+  /* Browse: the stations, then every song and artist */
+  html[data-skin]:not([data-view]) .stations{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin:0}
+  html[data-skin]:not([data-view]) .stations button,html[data-skin]:not([data-view]) .stations [data-sh="1"]{display:flex;justify-content:space-between;gap:10px;min-height:92px;padding:12px;border:0;border-radius:16px;background:#171b23;color:#f2efe6}
+  html[data-skin]:not([data-view]) .stations button b{font-family:inherit;font-size:15px;font-weight:600;letter-spacing:0;color:#f2efe6}
+  html[data-skin]:not([data-view]) .stations button span{display:block;max-width:100%;font-size:12.5px;line-height:1.3;color:rgba(242,239,230,.72);white-space:normal}
+  html[data-skin]:not([data-view]) .stations [data-b=fm]{background:#134a54} html[data-skin]:not([data-view]) .stations [data-b=liked]{background:#3a2b6b}
+  html[data-skin]:not([data-view]) .stations [data-b=chain]{background:#5a3418} html[data-skin]:not([data-view]) .stations [data-b=chain][data-sh="1"]{background:#4b2444}
+  html[data-skin]:not([data-view]) .stations button.on{outline:2px solid #8fe0f2;outline-offset:2px}
+  html[data-skin]:not([data-view]) .stations .lamp{display:none} html[data-skin]:not([data-view]) .stations button.on .lamp{display:block;background:#8fe0f2;box-shadow:none}
+  html[data-skin]:not([data-view]) .stations button:disabled{opacity:.4;filter:none}
+  html[data-skin]:not([data-view]) .likes{border:0;border-radius:0;background:none;padding:0}
+  html[data-skin]:not([data-view]) .likes>summary{margin:6px 0 4px;font-size:30px;font-weight:700;letter-spacing:-.4px;pointer-events:none}
+  html[data-skin]:not([data-view]) .likes>summary::after{content:none}
+  html[data-skin]:not([data-view]) .likes .count{font-family:inherit;font-size:14px}
+  html[data-skin]:not([data-view]) .likes .hint{font-size:14px}
+  html[data-skin]:not([data-view]) .likesList,html[data-skin]:not([data-view]) .find-list{max-height:none}
+  html[data-skin]:not([data-view]) .likesTools input{min-height:48px;padding:0 14px;border-radius:14px;border-color:#2c3341;background:#171b23;font-size:16px}
+  html[data-skin]:not([data-view]) .likesTools button,html[data-skin]:not([data-view]) .likesFoot button{min-height:44px;padding:0 14px;border-radius:12px;border-color:#2c3341;color:#f2efe6;font-size:14px}
+  html[data-skin]:not([data-view]) .lrow{min-height:54px;gap:10px;font-size:15px;border-bottom-color:#1f2530}
+  html[data-skin]:not([data-view]) .lrow .lt{font-size:15px;font-weight:500;min-height:44px}
+  html[data-skin]:not([data-view]) .lrow.now .lt{color:#8fe0f2}
+  html[data-skin]:not([data-view]) .lrow .la,html[data-skin]:not([data-view]) .find-by{font-size:13px}
+  html[data-skin]:not([data-view]) .lrow .grip{display:none}
+  html[data-skin]:not([data-view]) .lrow .mv{width:36px;height:36px;border-radius:10px;border-color:#2c3341;font-size:13px;flex:none}
+  html[data-skin]:not([data-view]) .find-artists{gap:8px;margin:10px 0}
+  html[data-skin]:not([data-view]) .find-chip{min-height:44px;padding:0 16px;font-size:14px;border-color:#2c3341;background:#171b23}
+  html[data-skin]:not([data-view]) .find-chip.is-on{border-color:#8fe0f2;color:#8fe0f2;background:#171b23}
+  html[data-skin]:not([data-view]) .likesFoot{font-size:13px}
+  /* You: the player panel as it is for now, with the other-wallet controls under it */
+  html[data-skin]:not([data-view]) .radio-wallet{padding:12px 14px;border-radius:14px;background:#171b23;font-size:13px}
+  html[data-skin]:not([data-view]) #radio-wallet-address{display:inline;max-width:60%}
+  html[data-skin]:not([data-view]) .radio-wallet button{min-height:40px;padding:0 14px;border-radius:10px;border-color:#2c3341;background:none}
+
+  html[data-skin]:not([data-view]) #radio-wallet-address{font-family:inherit}
+  /* The old footer line is written for people who already know Xtrata; "You" gets its own links in the next part. */
+  html[data-skin]:not([data-view]) .strap{display:none}
+  .you-status{display:none}
+  html[data-skin]:not([data-view])[data-tab=you] .you-status{display:flex;align-items:center;gap:12px;order:0;margin:0;padding:14px;border-radius:16px;background:#171b23}
+  .you-status i{flex:none;width:12px;height:12px;border-radius:50%;background:#5d6672}
+  .you-status[data-on="1"] i{background:#7be0a4;box-shadow:0 0 10px rgba(123,224,164,.7)}
+  .you-status b{display:block;font-size:16px;font-weight:700;color:#f2efe6}
+  .you-status__t>span{display:block;font-size:13.5px;color:#a9b2bf}
+  /* You: the player panel in the new look. Same panel, same buttons; only how it is dressed. */
+  html[data-skin]:not([data-view]) .ppp{padding:16px;border-radius:18px;border-color:#2c3341;background:#12151c;box-shadow:none;font-size:15px}
+  html[data-skin]:not([data-view]) .ppp-head h3{font-size:13px;font-weight:600;letter-spacing:.06em;color:#a9b2bf}
+  html[data-skin]:not([data-view]) .ppp button:not(.tiny){min-height:46px;border-radius:14px;font-size:15px}
+  html[data-skin]:not([data-view]) .ppp button.primary{background:#8fe0f2;border-color:#8fe0f2;color:#0c1a20;font-weight:700;box-shadow:none}
+  html[data-skin]:not([data-view]) .ppp-fold{border-top:1px solid #1f2530;margin:0;padding:2px 0}
+  html[data-skin]:not([data-view]) .ppp-fold>summary{display:flex;align-items:center;min-height:48px;margin:0;font-size:15px;font-weight:600;letter-spacing:0;text-transform:none;color:#f2efe6}
+  html[data-skin]:not([data-view]) .ppp-fold[open]>summary{margin-bottom:6px}
+  html[data-skin]:not([data-view]) .ppp-frame-label{font-size:13px;color:#a9b2bf}
+  html[data-skin]:not([data-view]) .radio-wallet{justify-content:space-between}
+  /* the tabs, and the small "now playing" bar on every screen but Listen */
+  html[data-skin]:not([data-view]) .tabs{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));position:fixed;left:0;right:0;bottom:0;z-index:40;border-top:1px solid #1f2530;
+    background:rgba(12,14,19,.96);-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px);
+    padding:6px max(10px,calc(50% - 250px)) calc(8px + env(safe-area-inset-bottom,0px))}
+  .tabs button{position:relative;display:flex;flex-direction:column;align-items:center;gap:4px;min-height:52px;padding:6px 0;border:0;border-radius:12px;background:none;color:#a9b2bf;font-size:12px;cursor:pointer}
+  .tabs button[aria-current=page]{color:#8fe0f2;font-weight:600}
+  .tabs svg{width:22px;height:22px}
+  html[data-ppp-first] .tabs button[data-t=you]:not([aria-current=page])::after{content:"";position:absolute;top:6px;left:calc(50% + 9px);width:8px;height:8px;border-radius:50%;background:#ffb15c}
+  html[data-skin]:not([data-view]):not([data-tab=listen]) .mini:not([hidden]){display:flex;align-items:center;gap:8px;position:fixed;z-index:39;left:max(10px,calc(50% - 250px));right:max(10px,calc(50% - 250px));
+    bottom:calc(74px + env(safe-area-inset-bottom,0px));padding:8px 8px 8px 10px;border:1px solid #2c3341;border-radius:14px;background:#1c212a;color:#f2efe6;box-shadow:0 10px 30px rgba(0,0,0,.5)}
+  .mini-open{flex:1;min-width:0;min-height:44px;display:flex;align-items:center;gap:10px;padding:0;border:0;background:none;color:inherit;font:inherit;text-align:left;cursor:pointer}
+  .mini-pp{flex:none;width:44px;height:44px;border:0;border-radius:50%;background:#8fe0f2;color:#0c1a20;cursor:pointer;--i:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 28 28'%3E%3Cpath d='M7 5h5v18H7zM16 5h5v18h-5z'/%3E%3C/svg%3E")}
+  .mini.is-paused .mini-pp{--i:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 28 28'%3E%3Cpath d='M9 5l14 9-14 9z'/%3E%3C/svg%3E")}
+  .mini-pp::before{content:"";display:block;width:20px;height:20px;margin:auto;background:currentColor;-webkit-mask:var(--i) center/contain no-repeat;mask:var(--i) center/contain no-repeat}
+  @media (prefers-reduced-motion:reduce){html[data-skin]:not([data-view]) .cbtn.heart.pending{animation:none}}
 </style>
 </head>
 <body>
 <header class="topbar">
-  <a class="logo" href="/radio"><b>XTRATA</b> <i>RADIO</i></a>
+  <a class="logo" href="/radio"><img class="logo-mark" src="/radio/icons/app-192.png" alt="" width="32" height="32" /><b>XTRATA</b> <i>RADIO</i><span class="logo-name">Xtrata <em>Music</em></span></a>
   <div class="live"><b>●</b> ON AIR FROM THE CHAIN</div>
   <!-- Pay-per-play's next step, always in reach: set up, unlock, or its live state (src/radio-ppp). -->
   <button class="ppp-top" id="ppp-top" type="button" hidden></button>
   <button class="a2hs" id="a2hs" type="button" hidden><svg viewBox="0 0 20 20" aria-hidden="true"><rect x="3" y="3" width="14" height="14" rx="4"/><path d="M10 7v6M7 10h6"/></svg><span>Add to Home Screen</span></button>
   <div class="radio-wallet" aria-label="Wallet controls">
-    <span id="radio-wallet-address">Wallet not connected</span>
-    <button id="radio-wallet-connect" type="button">Connect wallet</button>
+    <span id="radio-wallet-address">Player not connected</span>
+    <button id="radio-wallet-connect" type="button">Connect your player</button>
     <button id="radio-wallet-disconnect" type="button" hidden>Disconnect</button>
     <span id="radio-wallet-message" role="status"></span>
   </div>
@@ -849,6 +1014,8 @@ history.replaceState(null,'',location.pathname+location.search);}catch(e){}})();
   <!-- Album First (src/radio-ppp/album.ts): shown instead of the receiver and panel while an album is the music. -->
   <section class="album" id="album" hidden aria-label="Album"></section>
   <section class="rx" aria-label="Receiver">
+    <!-- No player here yet, and free players are being given away (src/radio-ppp/page.ts renderClaim): the way to one. -->
+    <a class="claim" id="claimCard" href="https://xtrata.xyz/players" hidden><span class="claim-disc" aria-hidden="true"></span><span class="claim-txt"><b>Get a free player</b><small>Pick a disc. Press play. <span class="claim-n"></span></small></span><span class="claim-go">Pick mine</span></a>
     <div class="receiver" id="receiver">
       <div class="art" id="art">
         <img id="cover" alt="Inscription artwork" />
@@ -895,6 +1062,8 @@ history.replaceState(null,'',location.pathname+location.search);}catch(e){}})();
       <span class="grow"></span>
       <button class="chip" id="presetBtn" type="button" title="What FM plays. ALL: hand-picked songs plus everything new. CURATED: hand-picked songs only. Tap to switch.">FM: ALL</button>
     </div>
+    <!-- The new look: what is cued to follow this song. A tap skips to it. -->
+    <button class="upnext" id="upNext" type="button" hidden><img id="upNextArt" alt="" /><span><small>Up next</small><b id="upNextT"></b></span></button>
     <div class="tuner" id="tuner" role="slider" tabindex="0" aria-label="Tuning strip: every song by inscription number" aria-valuemin="0" aria-valuemax="0" aria-valuenow="0" hidden>
       <div class="ticks" id="ticks"></div>
       <div class="needle" id="needle"></div>
@@ -902,10 +1071,12 @@ history.replaceState(null,'',location.pathname+location.search);}catch(e){}})();
     </div>
     <!-- After the strip changes the song: one tap back to where you were. -->
     <div class="tuner-undo" id="tunerUndoRow" hidden><button class="chip" id="tunerUndo" type="button"></button></div>
+    <h3 class="sk-h" data-for="browse">Stations</h3>
     <div class="stations" id="bands" role="group" aria-label="Stations">
       <button type="button" data-b="fm" title="Xtrata’s own mix: hand-picked songs and new arrivals. The place to discover music."><b><i class="lamp"></i>FM</b><span>Curated + new on-chain</span></button>
       <button type="button" data-b="liked" title="Your own station: only the songs you have liked, in your order."><b><i class="lamp"></i>LIKED</b><span>Your likes, your order</span></button>
-      <button type="button" data-b="chain" title="The whole catalogue: every song ever added, in the order it was added."><b><i class="lamp"></i>CHAIN</b><span>Every song by number</span></button>
+      <button type="button" data-b="chain" data-sh="0" title="The whole catalogue: every song ever added, in the order it was added."><b><i class="lamp"></i>CHAIN</b><span>Every song by number</span></button>
+      <button type="button" data-b="chain" data-sh="1" title="The whole catalogue, mixed up."><b><i class="lamp"></i>CHAIN MIX</b><span>Every song, shuffled</span></button>
     </div>
     <details class="howto" id="howto">
       <summary>What do these do?</summary>
@@ -925,6 +1096,9 @@ history.replaceState(null,'',location.pathname+location.search);}catch(e){}})();
     </div>
   </section>
   <aside class="side">
+    <h2 class="sk-h sk-h--big" data-for="you">You</h2>
+    <!-- Whether this player is connected to Xtrata Music right now (src/radio-ppp/page.ts renderYou). -->
+    <p class="you-status" id="youStatus" data-on="0"><i aria-hidden="true"></i><span class="you-status__t"><b>Xtrata Music</b><span>Checking your player…</span></span></p>
     <div class="sheet-bar"><b id="sheetTitle"></b><button type="button" id="sheetClose" aria-label="Close">×</button></div>
     <div class="sheet-extra" id="sheetExtra"></div>
     <!-- Pay-per-play first: the wallet box (and its unlock) stays near the top, whatever the likes list holds. -->
@@ -983,9 +1157,50 @@ history.replaceState(null,'',location.pathname+location.search);}catch(e){}})();
       <span class="free-radio-share"> · <a href="/radio/share.html" target="_blank" rel="noopener">Embed the radio →</a></span></p>
   </aside>
 </main>
+<!-- The new look: a small "now playing" bar on Browse, Liked and You, and the tabs. Both stay hidden without it. -->
+<div class="mini" id="mini" hidden><button class="mini-open" id="miniOpen" type="button" aria-label="Open the player"><img id="miniArt" alt="" /><span><b id="miniT"></b><small id="miniA"></small></span></button><button class="mini-pp" id="miniPp" type="button" aria-label="Play or pause"></button></div>
+<nav class="tabs" id="tabs" aria-label="Sections">
+  <button type="button" data-t="listen" aria-current="page"><svg viewBox="0 0 22 22" fill="currentColor" aria-hidden="true"><path d="M6 4l12 7-12 7z"/></svg>Listen</button>
+  <button type="button" data-t="browse"><svg viewBox="0 0 22 22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="10" cy="10" r="6"/><path d="M15 15l4 4"/></svg>Browse</button>
+  <button type="button" data-t="liked"><svg viewBox="0 0 22 22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" aria-hidden="true"><path d="M11 19S3 14 3 8.5A4.5 4.5 0 0111 6a4.5 4.5 0 018 2.5C19 14 11 19 11 19z"/></svg>Liked</button>
+  <button type="button" data-t="you"><svg viewBox="0 0 22 22" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="11" cy="11" r="8"/><circle cx="11" cy="11" r="2.5"/></svg>You</button>
+</nav>
 <script>
 (function(){
   var $=function(id){return document.getElementById(id)};
+  /* ---- the new look (html[data-skin]): tabs, plain station names, and a few controls in new places ---- */
+  var ROOT=document.documentElement, SKIN=ROOT.hasAttribute('data-skin');
+  var STATIONS={fm:['All music','Hand-picked songs and new arrivals'],liked:['Your likes','Only the songs you have liked'],chain0:['Everything, in order','Every song, in the order it arrived'],chain1:['Everything, shuffled','Every song, mixed up']};
+  function stationKey(band,sh){return band==='chain'?'chain'+(sh?'1':'0'):band}
+  function stationName(s){return s.band==='gift'&&s.gift?(s.gift.title||'Your album'):(STATIONS[stationKey(s.band,s.shuffle)]||STATIONS.fm)[0]}
+  function plain(t){t=String(t||'').toLowerCase();return t?t.charAt(0).toUpperCase()+t.slice(1):''}
+  function setTab(t){
+    if(!SKIN||!/^(listen|browse|liked|you)$/.test(t))return;
+    ROOT.setAttribute('data-tab',t);
+    Array.prototype.forEach.call($('tabs').children,function(b){if(b.dataset.t===t)b.setAttribute('aria-current','page');else b.removeAttribute('aria-current')});
+    if(t==='liked')$('likesBox').open=true;
+    if(t==='browse')$('findBox').open=true;
+    window.scrollTo(0,0);
+    if(typeof kickTimeline==='function'&&t==='listen'&&state)kickTimeline();
+  }
+  if(SKIN){
+    // Only plain buttons move: the heart beside the title, the other-wallet controls under "You". The wallet box stays put.
+    $('heart').setAttribute('aria-label','Like this song');
+    $('ttl').textContent='Press play';$('fnote').textContent='';$('stn').textContent=STATIONS.fm[0];
+    document.querySelector('.display').appendChild($('heart'));
+    var rw=document.querySelector('.radio-wallet'),strap=document.querySelector('.strap');if(rw&&strap)strap.parentNode.insertBefore(rw,strap);
+    Array.prototype.forEach.call($('bands').children,function(b){var n=STATIONS[stationKey(b.dataset.b,b.dataset.sh==='1')];if(!n)return;
+      var lamp=b.querySelector('.lamp');b.querySelector('b').textContent='';b.querySelector('b').append(lamp,n[0]);b.querySelector('span').textContent=n[1];b.title=n[1]});
+    $('likesBox').querySelector('summary span').textContent='Liked';$('likesFilter').placeholder='Filter';
+    $('findBox').querySelector('summary span').textContent='Browse';
+    Array.prototype.forEach.call(document.querySelectorAll('#likesBox>summary,#findBox>summary'),function(x){x.tabIndex=-1;x.addEventListener('click',function(e){e.preventDefault()})});
+    Array.prototype.forEach.call($('tabs').children,function(b){b.addEventListener('click',function(){setTab(b.dataset.t)})});
+    $('miniOpen').addEventListener('click',function(){setTab('listen')});
+    $('miniPp').addEventListener('click',function(){if(api)api.playPause()});
+    $('upNext').addEventListener('click',function(){if(api)api.next()});
+    // The player panel asks to be seen (set up, unlock, add plays): it lives under "You".
+    window.addEventListener('xtrata:radio-panel',function(){setTab('you')});
+  }
   var api=null, state=null;
   function store(k,v){try{if(v===undefined)return localStorage.getItem(k);localStorage.setItem(k,v)}catch(e){return null}}
   function wallet(){try{var s=JSON.parse(localStorage.getItem('xtrata.v15.1.wallet.session')||'null');return s&&s.isConnected&&s.address||''}catch(e){return ''}}
@@ -1105,7 +1320,7 @@ history.replaceState(null,'',location.pathname+location.search);}catch(e){}})();
     var moving=live||levels.some(function(v){return v>0.01});
     if((playing||moving)&&!document.hidden)frame=requestAnimationFrame(drawSpectrum);
   }
-  function kickSpectrum(){if(!frame)frame=requestAnimationFrame(drawSpectrum)}
+  function kickSpectrum(){if(SKIN)return;if(!frame)frame=requestAnimationFrame(drawSpectrum)}
   window.addEventListener('resize',function(){sizeCanvas();kickSpectrum()});
   document.addEventListener('visibilitychange',kickSpectrum);
 
@@ -1145,7 +1360,7 @@ history.replaceState(null,'',location.pathname+location.search);}catch(e){}})();
     $('likesBox').classList.toggle('filtering',!!q);
     $('likesFoot').hidden=likes.length<2;
     $('likesReset').hidden=!savedOrder().length;
-    $('likesNote').textContent=q?'Clear the filter to change the order.':'Drag ⋮⋮ or use ↑ ↓ to set the LIKED station’s order.';
+    $('likesNote').textContent=q?'Clear the filter to change the order.':SKIN?'Use ↑ ↓ to set the order your likes play in.':'Drag ⋮⋮ or use ↑ ↓ to set the LIKED station’s order.';
     if(sig===lastLikesSig)return;lastLikesSig=sig;
     var list=$('likesList');list.innerHTML='';
     shown.forEach(function(l){
@@ -1188,8 +1403,8 @@ history.replaceState(null,'',location.pathname+location.search);}catch(e){}})();
     stage.classList.toggle('arriving',gw);
     $('tuner').classList.toggle('locked',!!s.giftLocked);
     $('tuner').title=s.giftLocked?'This album plays only its own songs':'';
-    $('stn').textContent=(s.band==='liked'?'XTRATA · YOUR STATION':s.band==='chain'?'XTRATA · CHAIN BAND':'XTRATA FM');
-    $('ttl').textContent=np?np.title:(s.on?'TUNING…':'— OFF AIR —');
+    $('stn').textContent=SKIN?stationName(s):(s.band==='liked'?'XTRATA · YOUR STATION':s.band==='chain'?'XTRATA · CHAIN BAND':'XTRATA FM');
+    $('ttl').textContent=np?np.title:(s.on?(SKIN?'Finding a song…':'TUNING…'):(SKIN?'Press play':'— OFF AIR —'));
     $('artst').textContent=np&&np.artist?np.artist:'';
     $('albumName').textContent=np&&np.album?'Album: '+np.album:'';
     $('albumName').title=np&&np.album?np.album:'';
@@ -1199,7 +1414,14 @@ history.replaceState(null,'',location.pathname+location.search);}catch(e){}})();
     $('pp').textContent=playing?'⏸':'▶';
     $('pp').title=playing?'Pause':'Play';
     stage.classList.toggle('paused',!playing);
-    $('fnote').textContent=s.giftStop||(s.on?(np?'NO ARTWORK':'TUNING…'):'PRESS POWER TO TUNE IN');
+    $('fnote').textContent=SKIN?plain(s.giftStop):s.giftStop||(s.on?(np?'NO ARTWORK':'TUNING…'):'PRESS POWER TO TUNE IN');
+    if(SKIN){
+      var un=s.upNext&&(!np||String(s.upNext.tokenId)!==String(np.tokenId))?s.upNext:null,ub=$('upNext');
+      ub.hidden=!un||!!s.giftWait;
+      if(un){$('upNextT').textContent=(un.title||nameOf(un.tokenId))+(un.artist?' · '+un.artist:'');if(un.cover){if($('upNextArt').getAttribute('src')!==un.cover)$('upNextArt').src=un.cover}else $('upNextArt').removeAttribute('src')}
+      var mini=$('mini');mini.hidden=!np;mini.classList.toggle('is-paused',!playing);$('miniPp').disabled=gw;
+      if(np){$('miniT').textContent=np.title;$('miniA').textContent=np.artist||'';var mc=np.cover||(s.albumCover?s.albumCover.url:'');if(mc){if($('miniArt').getAttribute('src')!==mc)$('miniArt').src=mc}else $('miniArt').removeAttribute('src')}
+    }
     var art=$('art');
     // An album: its cover until something has played, then each song's own artwork (kept while paused, so you can see
     // which song you are on). A tap on the flip button swaps the song's artwork and the album cover; the next song puts it back.
@@ -1224,7 +1446,7 @@ history.replaceState(null,'',location.pathname+location.search);}catch(e){}})();
     $('heart').classList.toggle('on',liked&&!(hv&&hv.pending));
     $('heart').classList.toggle('pending',!!(hv&&hv.pending));
     $('heart').title=hv&&hv.pending?'On its way to the chain — waiting to confirm':hv&&hv.locked?'Confirmed on-chain':liked?'Liked on-chain — tap to unlike':'Like on-chain';
-    Array.prototype.forEach.call($('bands').children,function(b){b.classList.toggle('on',b.dataset.b===s.band);b.setAttribute('aria-pressed',String(b.dataset.b===s.band))});
+    Array.prototype.forEach.call($('bands').children,function(b){var onb=b.dataset.b===s.band&&(!SKIN||b.dataset.sh===undefined||(b.dataset.sh==='1')===!!s.shuffle);b.classList.toggle('on',onb);b.setAttribute('aria-pressed',String(onb))});
     $('presetBtn').textContent='FM: '+(s.preset==='music'?'CURATED':'ALL');
     $('presetBtn').classList.toggle('on',s.preset==='music');
     // tuning strip: needle on the playing song, likes marked
@@ -1278,7 +1500,7 @@ history.replaceState(null,'',location.pathname+location.search);}catch(e){}})();
     if(box.hidden)return;
     var id=String(np.tokenId);
     if(peaksFor!==id){peaksFor=id;peaks=waveCache[id]||null}
-    if(!peaks&&pos.current>1.5)loadPeaks(id); // once the song is really going, not mid-tune
+    if(!SKIN&&!peaks&&pos.current>1.5)loadPeaks(id); // once the song is really going, not mid-tune
     var wr=wave.getBoundingClientRect(),dpr=window.devicePixelRatio||1;if(Math.abs(wave.width-Math.round(wr.width*dpr))>1||Math.abs(wave.height-Math.round(wr.height*dpr))>1)sizeWave();
     var shown=seekPreview!=null?seekPreview:pos.current,frac=Math.max(0,Math.min(1,shown/pos.duration));
     $('tCur').textContent=clock(shown);$('tDur').textContent=clock(pos.duration);
@@ -1286,6 +1508,13 @@ history.replaceState(null,'',location.pathname+location.search);}catch(e){}})();
     var W=wave.width,H=wave.height,mode=document.documentElement.dataset.ppp,
       lit=mode==='on'?'255,196,84':mode==='off'?'150,160,172':'94,233,255',dim=mode==='on'?'120,92,40':mode==='off'?'52,58,66':'44,62,84';
     wctx.clearRect(0,0,W,H);
+    if(SKIN){ // the new look: one thin bar with a round handle
+      var bh=Math.max(2,Math.round(6*dpr)),by=Math.round((H-bh)/2),br=bh/2,fx=frac*W,kr=br*1.7;
+      var slab=function(w,c){wctx.fillStyle=c;wctx.beginPath();if(wctx.roundRect)wctx.roundRect(0,by,w,bh,br);else wctx.rect(0,by,w,bh);wctx.fill()};
+      slab(W,'#232936');if(fx>0)slab(Math.max(bh,fx),'#f2efe6');
+      wctx.beginPath();wctx.arc(Math.max(kr,Math.min(W-kr,fx)),H/2,kr,0,Math.PI*2);wctx.fill();
+      return;
+    }
     var gap=Math.max(1,Math.round(W/BARS*0.3)),bw=Math.max(1,(W-gap*(BARS+1))/BARS),mid=H/2,px=frac*W;
     for(var i=0;i<BARS;i++){
       var x=gap+i*(bw+gap),h=peaks?Math.max(2,peaks[i]*(H-8)):Math.max(2,H*0.12);
@@ -1365,7 +1594,9 @@ history.replaceState(null,'',location.pathname+location.search);}catch(e){}})();
     $('next').addEventListener('click',function(){api.next()});
     $('heart').addEventListener('click',function(){api.toggleLike()});
     Array.prototype.forEach.call($('bands').children,function(b){b.addEventListener('click',function(){
+      if(SKIN&&api.setShuffle)api.setShuffle(b.dataset.sh==='1');
       api.setBand(b.dataset.b);
+      if(SKIN){if(!api.isOn())api.switchOn();setTab('listen');return}
       // LIKED is your playlist: open it and, where it is off screen (a phone), bring it up into view.
       if(b.dataset.b==='liked'){var box=$('likesBox');box.open=true;var r=box.getBoundingClientRect();
         if(r.top<0||r.top>window.innerHeight*.55)box.scrollIntoView({behavior:window.matchMedia('(prefers-reduced-motion:reduce)').matches?'auto':'smooth',block:'start'})}
@@ -1378,8 +1609,8 @@ history.replaceState(null,'',location.pathname+location.search);}catch(e){}})();
   },120);
 })();
 </script>
-<script src="/xtrata-radio.js?v=bd7e9d8df19c" defer></script>
-<script type="module" src="/radio/wallet.js?v=8a27a580ad6c"></script>
+<script src="/xtrata-radio.js?v=611164ac4d13" defer></script>
+<script type="module" src="/radio/wallet.js?v=62e654b3fd1c"></script>
 <script>
 // On the pay-per-play radio host (radio.xtrata.xyz) only the radio's own pages run; everything
 // else there is sandboxed. Send links to the rest of Xtrata to the main site instead.
@@ -1403,7 +1634,7 @@ function showUnavailable(){
 fetch('/radio/listening-wallet/config',{cache:'no-store',signal:AbortSignal.timeout(15000)})
   .then(function(r){return r.ok?r.json():{}})
   .then(function(c){
-    if(c?.enabled && (!paidHost || c.here)) return import('/radio/ppp.js?v=8c9a35e5e72f');
+    if(c?.enabled && (!paidHost || c.here)) return import('/radio/ppp.js?v=91548585c3af');
     showUnavailable();
   }).catch(showUnavailable);
 </script>

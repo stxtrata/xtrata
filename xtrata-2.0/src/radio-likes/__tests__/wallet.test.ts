@@ -12,7 +12,7 @@ it('connects and disconnects through the shared adapter and refreshes the radio'
  await vi.waitFor(()=>expect(document.getElementById('radio-wallet-address')?.textContent).toBe('SP-test'));
  expect(changed).toHaveBeenCalledTimes(1);expect(document.getElementById('radio-wallet-disconnect')?.hidden).toBe(false);
  (document.getElementById('radio-wallet-disconnect') as HTMLButtonElement).click();
- await vi.waitFor(()=>expect(document.getElementById('radio-wallet-address')?.textContent).toBe('Wallet not connected'));
+ await vi.waitFor(()=>expect(document.getElementById('radio-wallet-address')?.textContent).toBe('Player not connected'));
  window.removeEventListener('xtrata:wallet-changed',changed);
 });
 it('restores the connected wallet and shows connection errors without losing it',async()=>{
@@ -49,7 +49,7 @@ it('asks the radio connect pop-up first, and opens the Stacks chooser only when 
  document.documentElement.dataset.pppSolo='new';
  try{
   await import('../wallet');const btn=document.getElementById('radio-wallet-connect') as HTMLButtonElement;
-  expect(btn.textContent).toBe('Connect wallet');
+  expect(btn.textContent).toBe('Connect your player');
   btn.click();await vi.waitFor(()=>expect(chooser).toHaveBeenCalledTimes(1));await new Promise(r=>setTimeout(r,0));
   expect(mock.connect).not.toHaveBeenCalled(); // Xtrata Music Wallet picked: the page takes it from there
   btn.click();await vi.waitFor(()=>expect(chooser).toHaveBeenCalledTimes(2));await new Promise(r=>setTimeout(r,0));
@@ -65,7 +65,7 @@ it('skips the pop-up once an Xtrata Music Wallet is in use: the button only adds
  const chooser=vi.fn(async()=>'music');w.XtrataRadioConnectChooser=chooser;document.documentElement.dataset.pppSolo='SP12…ABCD';
  try{
   await import('../wallet');const btn=document.getElementById('radio-wallet-connect') as HTMLButtonElement;
-  expect(btn.textContent).toBe('I have a Stacks wallet');
+  expect(btn.textContent).toBe('More ways to connect');
   btn.click();await vi.waitFor(()=>expect(mock.connect).toHaveBeenCalledTimes(1));expect(chooser).not.toHaveBeenCalled();
  }finally{delete w.XtrataRadioConnectChooser;delete document.documentElement.dataset.pppSolo;}
 });
