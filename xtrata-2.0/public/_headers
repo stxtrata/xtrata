@@ -149,6 +149,24 @@
 /audionaut/daw/js/*
   Cache-Control: no-cache
 
+# AudioNaut beta: do not retain old test code after a deployment.
+/audionaut-beta
+  Cache-Control: no-cache
+  X-Robots-Tag: noindex, nofollow
+/audionaut-beta/
+  Cache-Control: no-cache
+  X-Robots-Tag: noindex, nofollow
+/audionaut-beta/index.html
+  Cache-Control: no-cache
+  X-Robots-Tag: noindex, nofollow
+/audionaut-beta/daw.html
+  Cache-Control: no-cache
+  X-Robots-Tag: noindex, nofollow
+/audionaut-beta/daw/css/*
+  Cache-Control: no-cache
+/audionaut-beta/daw/js/*
+  Cache-Control: no-cache
+
 # ParallaX Casino (/casino): one self-contained page under a stable filename. Force revalidation so a
 # redeploy is never served from a stale CDN/browser cache.
 /casino

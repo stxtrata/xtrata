@@ -1,0 +1,1210 @@
+import { sustainDuration, sampleLoop } from "./onboard-library.js";
+// engine.js — Web Audio playback engine with sample-accurate lookahead scheduling.
+
+import {
+  store,
+  NUM_CHANNELS,
+  NUM_STEPS,
+  NUM_INSTRUMENTS,
+  stepVal,
+  stepObj,
+  stepOff,
+} from "./state.js";
+import { SYNTH_BANK, synthDefaults } from "./synths.js";
+import { createVoice } from "./synths/voice-lifecycle.js";
+import { PLUGIN_TYPES, pluginDefaults, normalizeOwner, returnsOf, BEAT_DIVS } from "./plugins.js";
+
+const LOOKAHEAD_MS = 25; // scheduler tick
+const SCHEDULE_AHEAD = 0.12; // seconds scheduled in advance
+
+// Strip sends are addressed like slots, as "send:delay" / "send:reverb".
+const sendBusId = (id) => (typeof id === "string" && id.startsWith("send:") ? id.slice(5) : null);
+
+export class Engine {
+  constructor({ store: projectStore = store, contextFactory = null, offline = false } = {}) {
+    this.store = projectStore;
+    this.contextFactory = contextFactory;
+    this.offline = offline;
+    this._synthVoices = new Map();
+    this._live = new Map();
+    this._voiceSeq = 0;
+    this._visualCounts = new Map();
+    this._transportTimers = new Set();
+    this._transportGeneration = 0;
+    this._timeline = [];
+    this._elapsedSteps = 0;
+    this.maxSynthVoices = 64;
+    this.maxInstrumentVoices = 16;
+    this.ctx = null;
+    this.masterGain = null;
+    this.channelGains = [];
+    this.buffers = new Array(NUM_CHANNELS).fill(null); // decoded AudioBuffers
+    this.reverseBuffers = new Array(NUM_CHANNELS).fill(null); // lazily built
+    this.isPlaying = false;
+    this.currentStep = 0;
+    this.playingSequence = 0;
+    this.nextStepTime = 0;
+    this.timer = null;
+    this.onStep = null; // UI callback (step, sequence, time)
+  }
+
+  ensureContext() {
+    if (!this.ctx) {
+      this.ctx = this.contextFactory ? this.contextFactory() : new (window.AudioContext || window.webkitAudioContext)();
+      this.masterGain = this.ctx.createGain();
+      this.masterGain.gain.value = this.store.project.masterVolume;
+      this.masterGain.connect(this.ctx.destination);
+
+      this._createReturns();
+      if (!this._returnsHooked) {
+        this._returnsHooked = true;
+        if (!this.offline) this.store.on("load", ({ restore } = {}) => {
+          if (!restore) this.resetProjectAudio();
+          else { this.ensureChannelChains(); this.ensureInstrumentChains(); this.applyReturns(); }
+        });
+      }
+
+      // --- per-channel chains: fader gain → inserts → FX → master ---
+      // Both chains are lists of plugins from plugins.js. Delay/reverb are "send"
+      // plugins inside the FX chain that tap into the shared buses above.
+      this.chains = new Map(); // "c3" | "i0" → { input, out, slots: Map(id → instance), sig }
+      this.ensureChannelChains();
+
+      this.instrumentGains = [];
+      this.ensureInstrumentChains();
+    }
+    if (!this.offline && this.ctx.state === "suspended") this.ctx.resume();
+    this.ensureChannelChains();
+    this.ensureInstrumentChains();
+    return this.ctx;
+  }
+
+  _createReturns() {
+    // --- master FX buses (settings live in project.returns, see applyReturns) ---
+    // Delay bus: BPM-synced echo, two lines (L and R) so the feedback can ping-pong.
+    // Ping-pong 0 leaves line R silent and line L exactly the original single echo
+    // (filtered feedback, centre output); at 1 the echoes alternate hard left and right.
+    this.delayNode = this.ctx.createDelay(10); // line L: the bus the sends feed
+    this.delayR = this.ctx.createDelay(10);
+    const dfx = (this.delayFx = {});
+    dfx.toneL = this.ctx.createBiquadFilter();
+    dfx.toneR = this.ctx.createBiquadFilter();
+    dfx.toneL.type = dfx.toneR.type = "lowpass";
+    dfx.selfL = this.ctx.createGain();
+    dfx.selfR = this.ctx.createGain();
+    dfx.crossLR = this.ctx.createGain();
+    dfx.crossRL = this.ctx.createGain();
+    this.delayNode.connect(dfx.toneL);
+    this.delayR.connect(dfx.toneR);
+    dfx.toneL.connect(dfx.selfL).connect(this.delayNode);
+    dfx.toneR.connect(dfx.selfR).connect(this.delayR);
+    dfx.toneL.connect(dfx.crossLR).connect(this.delayR);
+    dfx.toneR.connect(dfx.crossRL).connect(this.delayNode);
+    dfx.ret = this.ctx.createGain(); // return level into the master
+    dfx.centerL = this.ctx.createGain(); // (1 - spread): the stereo-preserving original path
+    dfx.centerR = this.ctx.createGain();
+    dfx.hardL = this.ctx.createGain(); // spread: collapsed to one side
+    dfx.hardR = this.ctx.createGain();
+    const pan = (dfx.pan = this.ctx.createChannelMerger(2));
+    this.delayNode.connect(dfx.centerL).connect(dfx.ret);
+    this.delayR.connect(dfx.centerR).connect(dfx.ret);
+    this.delayNode.connect(dfx.hardL).connect(pan, 0, 0);
+    this.delayR.connect(dfx.hardR).connect(pan, 0, 1);
+    pan.connect(dfx.ret);
+    dfx.ret.connect(this.masterGain);
+    // Reverb bus: generated noise impulse (fully on-board, no external files). The impulse
+    // is rebuilt when decay, shape, damping or width change; two convolvers crossfade so a
+    // new tail never clicks in.
+    this.reverbNode = this.ctx.createGain(); // the bus the sends feed
+    const rfx = (this.reverbFx = {});
+    rfx.pre = this.ctx.createDelay(0.5);
+    rfx.ret = this.ctx.createGain();
+    rfx.convs = [0, 1].map(() => {
+      const conv = this.ctx.createConvolver();
+      const gain = this.ctx.createGain();
+      gain.gain.value = 0;
+      this.reverbNode.connect(rfx.pre);
+      rfx.pre.connect(conv);
+      conv.connect(gain).connect(rfx.ret);
+      return { conv, gain };
+    });
+    rfx.active = 0;
+    rfx.sig = "";
+    rfx.ret.connect(this.masterGain);
+    this.applyReturns(true);
+  }
+
+  // Reconcile both growth and shrinkage: removed strips must release plugin graphs,
+  // analyser taps, sample buffers and voices before their indexes can be reused.
+  ensureChannelChains() {
+    if (!this.ctx || !this.chains) return;
+    while (this.channelGains.length > this.store.numChannels) {
+      const i = this.channelGains.length - 1;
+      this.silenceChannel(i);
+      this._disposeChain(`c${i}`);
+      this.channelGains.pop();
+    }
+    this.buffers.length = this.reverseBuffers.length = this.store.numChannels;
+    for (let i = this.channelGains.length; i < this.store.numChannels; i++) {
+      const g = this.ctx.createGain();
+      g.gain.value = this.store.channel(i).volume;
+      this.channelGains.push(g);
+      this._makeChain(`c${i}`, g);
+      this.syncChain(i);
+    }
+  }
+
+  ensureInstrumentChains() {
+    if (!this.ctx || !this.chains) return;
+    const count = this.store.project.instruments.length;
+    while (this.instrumentGains.length > count) {
+      const i = this.instrumentGains.length - 1;
+      this.releaseAll(i, { immediate: true });
+      this._disposeChain(`i${i}`);
+      this.instrumentGains.pop();
+    }
+    for (let i = this.instrumentGains.length; i < count; i++) {
+      const g = this.ctx.createGain();
+      g.gain.value = this.instrumentAudible(i) ? this.store.instrument(i).volume : 0;
+      this.instrumentGains.push(g);
+      this._makeChain(`i${i}`, g);
+      this.syncChain(i, true);
+    }
+  }
+
+  _disposeChain(key) {
+    const chain = this.chains?.get(key);
+    if (!chain) return;
+    for (const it of chain.slots.values()) {
+      for (const n of Object.values(it.taps || {})) { try { n.disconnect(); } catch {} }
+      this._disposeInstance(it);
+    }
+    for (const send of Object.values(chain.sendFx || {})) {
+      for (const n of Object.values(send.inst.taps || {})) { try { n.disconnect(); } catch {} }
+      send.amt.disconnect(); send.en.disconnect();
+    }
+    chain.input.disconnect(); chain.out.disconnect();
+    this.chains.delete(key);
+    this._ensureGateLoop();
+  }
+
+  _flushEffects() {
+    if (!this.ctx) return;
+    for (const key of [...this.chains.keys()]) this._disposeChain(key);
+    clearTimeout(this.reverbFx?.timer);
+    const seen = new Set();
+    const disconnect = value => {
+      if (!value || typeof value !== "object" || seen.has(value)) return;
+      seen.add(value);
+      if (typeof value.disconnect === "function") { try { value.disconnect(); } catch {} }
+      else for (const item of Object.values(value)) disconnect(item);
+    };
+    for (const node of [this.delayNode, this.delayR, this.reverbNode, this.delayFx, this.reverbFx, this._busTaps]) disconnect(node);
+    this._busTaps = {};
+    this.channelGains = []; this.instrumentGains = [];
+    this._createReturns();
+    this.ensureChannelChains(); this.ensureInstrumentChains();
+  }
+
+  resetProjectAudio() {
+    if (!this.ctx) return;
+    this.pause();
+    this._flushEffects();
+    this.buffers = new Array(this.store.numChannels).fill(null);
+    this.reverseBuffers = new Array(this.store.numChannels).fill(null);
+    this.setMasterVolume(this.store.project.masterVolume);
+  }
+
+  _makeChain(key, input) {
+    const out = this.ctx.createGain();
+    out.connect(this.masterGain);
+    input.connect(out); // empty chain until syncChain wires plugins in
+    // The strip's delay and reverb sends tap the chain output (after the last plugin):
+    //   out → amount → on/off → shared bus      (levels come from owner.sends, see syncChain)
+    // "inst" is a stand-in for the plugin instance a slot would have, so faces can meter it.
+    const sendFx = {};
+    for (const [bus, node] of [
+      ["delay", this.delayNode],
+      ["reverb", this.reverbNode],
+    ]) {
+      const amt = this.ctx.createGain();
+      const en = this.ctx.createGain();
+      amt.gain.value = 0;
+      en.gain.value = 1;
+      out.connect(amt).connect(en).connect(node);
+      sendFx[bus] = { amt, en, on: true, inst: { inp: out, out, nodes: null, taps: null } };
+    }
+    this.chains.set(key, { input, out, slots: new Map(), sig: "", sendFx });
+  }
+
+  // Bring a strip's two send values in line with owner.sends. Amount moves at once (as the
+  // old send plugin's did); on/off crossfades so a bypass never clicks. A strip that was just
+  // (re)loaded, meaning a different owner object than last time, jumps straight to its state,
+  // so opening a song never fades its sends in.
+  _applySends(chain, owner) {
+    const fresh = chain.owner !== owner;
+    chain.owner = owner;
+    for (const bus of ["delay", "reverb"]) {
+      const f = chain.sendFx[bus];
+      const rec = owner.sends?.[bus];
+      const on = !!rec && rec.enabled !== false;
+      const amount = rec ? rec.amount : 0;
+      if (f.amount !== amount) {
+        f.amt.gain.value = amount;
+        f.amount = amount;
+      }
+      if (f.on !== on) {
+        f.on = on;
+        if (f.init && !fresh) f.en.gain.setTargetAtTime(on ? 1 : 0, this.ctx.currentTime, 0.008);
+        else f.en.gain.value = on ? 1 : 0;
+      }
+      if (!f.init) {
+        f.en.gain.value = on ? 1 : 0;
+        f.init = true;
+      }
+    }
+  }
+
+  // One plugin instance wrapped in a bypass switch:
+  //   inp → feed → plugin → wet → out
+  //   inp → dry ─────────────────→ out
+  // Bypass fades wet/feed down and dry up, so toggling never rebuilds anything and
+  // a bypassed send stops feeding its bus.
+  _makeInstance(def) {
+    const ctx = this.ctx;
+    const type = PLUGIN_TYPES[def.type];
+    const nodes = type.create(ctx, {
+      delayBus: this.delayNode,
+      reverbBus: this.reverbNode,
+    });
+    const inp = ctx.createGain();
+    const feed = ctx.createGain();
+    const wet = ctx.createGain();
+    const dry = ctx.createGain();
+    const out = ctx.createGain();
+    inp.connect(feed).connect(nodes.input);
+    nodes.output.connect(wet).connect(out);
+    inp.connect(dry).connect(out);
+    const on = def.enabled !== false;
+    feed.gain.value = wet.gain.value = on ? 1 : 0;
+    dry.gain.value = on ? 0 : 1;
+    return { def, typeId: def.type, type, nodes, inp, feed, wet, dry, out, on, pkey: "" };
+  }
+
+  _applyParams(it, def) {
+    const P = { ...pluginDefaults(def.type), ...(def.params || {}) };
+    const key = JSON.stringify(P);
+    if (key === it.pkey) return; // unchanged — skip (curves are costly to rebuild)
+    it.pkey = key;
+    it.type.apply(this.ctx, it.nodes, P);
+  }
+
+  _setBypass(it, on) {
+    if (it.on === on) return;
+    it.on = on;
+    const t = this.ctx.currentTime;
+    it.feed.gain.setTargetAtTime(on ? 1 : 0, t, 0.008);
+    it.wet.gain.setTargetAtTime(on ? 1 : 0, t, 0.008);
+    it.dry.gain.setTargetAtTime(on ? 0 : 1, t, 0.008);
+  }
+
+  _disposeInstance(it) {
+    try {
+      it.type.dispose?.(it.nodes);
+    } catch {
+      /* noop */
+    }
+    const seen = new Set();
+    const walk = (v) => {
+      if (!v || typeof v !== "object" || seen.has(v)) return;
+      seen.add(v);
+      if (Array.isArray(v)) return v.forEach(walk);
+      if (v instanceof AudioNode) {
+        if (typeof v.stop === "function")
+          try {
+            v.stop();
+          } catch {
+            /* already stopped */
+          }
+        try {
+          v.disconnect();
+        } catch {
+          /* noop */
+        }
+      }
+    };
+    Object.values(it.nodes).forEach(walk);
+    [it.inp, it.feed, it.wet, it.dry, it.out].forEach(walk);
+  }
+
+  // Bring a channel's (or synth's, inst = true) audio chain in line with its
+  // store state: inserts then FX. Plugins are kept by slot id, so a reorder only
+  // rewires, a bypass only crossfades, and a param change only re-applies params.
+  syncChain(idx, inst = false) {
+    if (!this.ctx) return;
+    const chain = this.chains?.get((inst ? "i" : "c") + idx);
+    const owner = inst ? this.store.instrument(idx) : this.store.channel(idx);
+    if (!chain || !owner) return;
+    normalizeOwner(owner);
+    const defs = [...owner.inserts, ...owner.fx].filter(
+      (d) => PLUGIN_TYPES[d.type],
+    );
+    const sig = defs.map((d) => `${d.id}:${d.type}`).join("|");
+    if (sig !== chain.sig) {
+      const next = new Map();
+      for (const d of defs) {
+        let it = chain.slots.get(d.id);
+        if (it && it.typeId !== d.type) {
+          this._disposeInstance(it);
+          it = null;
+        }
+        next.set(d.id, it || this._makeInstance(d));
+      }
+      for (const [id, it] of chain.slots)
+        if (next.get(id) !== it) this._disposeInstance(it);
+      try {
+        chain.input.disconnect();
+      } catch {
+        /* noop */
+      }
+      for (const it of next.values())
+        try {
+          it.out.disconnect();
+        } catch {
+          /* noop */
+        }
+      let node = chain.input;
+      for (const it of next.values()) {
+        node.connect(it.inp);
+        node = it.out;
+      }
+      node.connect(chain.out);
+      for (const it of next.values()) if (it.taps) it.out.connect(it.taps.outAn); // face meters survive a reorder
+      chain.slots = next;
+      chain.sig = sig;
+      this._ensureGateLoop();
+    }
+    for (const d of defs) {
+      const it = chain.slots.get(d.id);
+      it.def = d;
+      this._applyParams(it, d);
+      this._setBypass(it, d.enabled !== false);
+    }
+    this._applySends(chain, owner);
+  }
+
+  // Live param/bypass update for one slot (called while a slider moves).
+  updateSlot(idx, inst, id) {
+    const chain = this.chains?.get((inst ? "i" : "c") + idx);
+    const owner = inst ? this.store.instrument(idx) : this.store.channel(idx);
+    if (chain && owner && sendBusId(id)) return this._applySends(chain, owner);
+    const it = chain?.slots.get(id);
+    const def = [...(owner?.inserts || []), ...(owner?.fx || [])].find(
+      (d) => d?.id === id,
+    );
+    if (!it || !def) return this.syncChain(idx, inst);
+    it.def = def;
+    this._applyParams(it, def);
+    this._setBypass(it, def.enabled !== false);
+  }
+
+  // Live plugin instance for a slot (nodes, meters) — used by plugin faces.
+  slotInstance(idx, inst, id) {
+    const chain = this.chains?.get((inst ? "i" : "c") + idx);
+    const bus = sendBusId(id);
+    if (bus) return chain?.sendFx[bus].inst || null; // a strip send ("send:delay")
+    return chain?.slots.get(id) || null;
+  }
+  // Input/output analysers on a slot, created on first ask (side branches, never in the path).
+  slotTaps(idx, inst, id) {
+    const it = this.slotInstance(idx, inst, id);
+    if (!it) return null;
+    if (!it.taps) {
+      const mk = () => {
+        const a = this.ctx.createAnalyser();
+        a.fftSize = 4096;
+        a.smoothingTimeConstant = 0.7;
+        a.minDecibels = -100;
+        a.maxDecibels = -10;
+        return a;
+      };
+      it.taps = { inAn: mk(), outAn: mk() };
+      it.inp.connect(it.taps.inAn);
+      it.out.connect(it.taps.outAn);
+    }
+    return it.taps;
+  }
+  releaseSlotTaps(idx, inst, id) {
+    const it = this.slotInstance(idx, inst, id);
+    if (!it?.taps) return;
+    for (const a of [it.taps.inAn, it.taps.outAn])
+      try {
+        a.disconnect();
+      } catch {
+        /* noop */
+      }
+    try {
+      it.inp.disconnect(it.taps.inAn);
+      it.out.disconnect(it.taps.outAn);
+    } catch {
+      /* noop */
+    }
+    it.taps = null;
+  }
+
+  // Older call sites: both now mean "sync this owner's whole chain".
+  rebuildInserts(ch, inst = false) {
+    this.syncChain(ch, inst);
+  }
+  applyFx(ch, inst = false) {
+    this.syncChain(ch, inst);
+  }
+
+  // Service loop for control-rate plugins (noise gate level detection).
+  _ensureGateLoop() {
+    if (this.offline) return;
+    const live = () => {
+      const out = [];
+      for (const chain of this.chains?.values() || [])
+        for (const it of chain.slots.values()) if (it.type.service) out.push(it);
+      return out;
+    };
+    const hasGate = live().length > 0;
+    if (hasGate && !this._gateTimer) {
+      this._gateTimer = setInterval(() => {
+        for (const it of live())
+          if (it.on) it.type.service(this.ctx, it.nodes);
+      }, 30);
+    } else if (!hasGate && this._gateTimer) {
+      clearInterval(this._gateTimer);
+      this._gateTimer = null;
+    }
+  }
+
+  _delayTime() {
+    const div = BEAT_DIVS.find(([v]) => v === returnsOf(this.store.project).delay.time) || BEAT_DIVS[2];
+    return Math.min(9.9, (60 / (this.store.project.bpm || 120)) * div[1]); // default: dotted 8th
+  }
+
+  syncDelayToBpm() {
+    if (this.delayNode) this.applyReturns();
+  }
+
+  // Pushes project.returns onto the shared delay and reverb. Cheap to call often (slider
+  // drags, undo, load, tempo change); the reverb impulse is only rebuilt when it must be.
+  applyReturns(first = false) {
+    if (!this.ctx || !this.delayFx) return;
+    const R = returnsOf(this.store.project);
+    const now = this.ctx.currentTime;
+    const t = first ? 0 : 0.05;
+    const set = (param, v) => (first ? (param.value = v) : param.setTargetAtTime(v, now, t || 0.01));
+    const d = R.delay;
+    const dfx = this.delayFx;
+    const time = this._delayTime();
+    set(this.delayNode.delayTime, time);
+    set(this.delayR.delayTime, time);
+    set(dfx.toneL.frequency, d.tone);
+    set(dfx.toneR.frequency, d.tone);
+    const fb = d.feedback;
+    set(dfx.selfL.gain, fb * (1 - d.spread));
+    set(dfx.selfR.gain, fb * (1 - d.spread));
+    set(dfx.crossLR.gain, fb * d.spread);
+    set(dfx.crossRL.gain, fb * d.spread);
+    set(dfx.centerL.gain, 1 - d.spread);
+    set(dfx.centerR.gain, 1 - d.spread);
+    set(dfx.hardL.gain, d.spread);
+    set(dfx.hardR.gain, d.spread);
+    set(dfx.ret.gain, d.ret);
+    const r = R.reverb;
+    const rfx = this.reverbFx;
+    set(rfx.pre.delayTime, r.predelay / 1000);
+    set(rfx.ret.gain, r.ret);
+    this._scheduleImpulse(first);
+  }
+
+  // The impulse depends on decay/shape/damp/width only; rebuilt (debounced) when they change.
+  _scheduleImpulse(now = false) {
+    now = now || this.offline;
+    const r = returnsOf(this.store.project).reverb;
+    const sig = [r.decay, r.shape, r.damp, r.width].join("|");
+    const rfx = this.reverbFx;
+    if (sig === rfx.sig) return;
+    clearTimeout(rfx.timer);
+    const go = () => {
+      rfx.sig = sig;
+      const next = rfx.active ^ 1;
+      const buf = this._makeReverbImpulse(r);
+      const a = rfx.convs[rfx.active];
+      const b = rfx.convs[next];
+      b.conv.buffer = buf;
+      const t = this.ctx.currentTime;
+      if (now) {
+        a.gain.gain.value = 0;
+        b.gain.gain.value = 1;
+      } else {
+        b.gain.gain.setTargetAtTime(1, t, 0.03);
+        a.gain.gain.setTargetAtTime(0, t, 0.03);
+      }
+      rfx.active = next;
+    };
+    if (now) go();
+    else rfx.timer = setTimeout(go, 140);
+  }
+
+  // Fixed noise bed (so dragging a knob changes the tail's shape, not its random grain),
+  // shaped by decay and slope, optionally darkened and narrowed. With the defaults this is the
+  // original impulse: raw noise under a (1 - t)^3 fade over 2.2 s.
+  _makeReverbImpulse({ decay, shape, damp, width }) {
+    const sr = this.ctx.sampleRate;
+    const max = Math.ceil(sr * 8);
+    if (!this._noise || this._noise[0].length !== max) {
+      this._noise = [0, 1].map(() => Float32Array.from({ length: max }, () => Math.random() * 2 - 1));
+    }
+    const len = Math.ceil(sr * decay);
+    const buf = this.ctx.createBuffer(2, len, sr);
+    const L = this._noise[0];
+    const Rn = this._noise[1];
+    const dark = damp < 19999;
+    for (let c = 0; c < 2; c++) {
+      const out = buf.getChannelData(c);
+      const own = c ? Rn : L;
+      let y = 0;
+      for (let i = 0; i < len; i++) {
+        const x = own[i] * (c ? width : 1) + (c ? L[i] * (1 - width) : 0);
+        let v = x;
+        if (dark) {
+          // one-pole low-pass whose cutoff falls as the tail ages (air absorbs highs first)
+          const fc = damp * (1 - 0.75 * (i / len));
+          y += (1 - Math.exp((-2 * Math.PI * fc) / sr)) * (x - y);
+          v = y;
+        }
+        out[i] = v * Math.pow(1 - i / len, shape);
+      }
+    }
+    return buf;
+  }
+
+  // Analyser on a return's output for faces (created on first ask, a side branch).
+  busTap(ns) {
+    if (!this.ctx || !this.delayFx) return null;
+    this._busTaps = this._busTaps || {};
+    if (!this._busTaps[ns]) {
+      const a = this.ctx.createAnalyser();
+      a.fftSize = 2048;
+      a.smoothingTimeConstant = 0.6;
+      (ns === "delay" ? this.delayFx.ret : this.reverbFx.ret).connect(a);
+      this._busTaps[ns] = a;
+    }
+    return this._busTaps[ns];
+  }
+
+  setBuffer(ch, buffer) {
+    this.buffers[ch] = buffer;
+    this.reverseBuffers[ch] = null;
+  }
+
+  silenceChannel(ch) {
+    for (const voice of this._voices?.get(ch) || []) {
+      try {
+        voice.src.stop();
+      } catch {}
+      voice.gain.disconnect();
+    }
+    this._voices?.delete(ch);
+    if (this._lastVoice) this._lastVoice[ch] = null;
+  }
+
+  getReverseBuffer(ch) {
+    if (!this.reverseBuffers[ch] && this.buffers[ch]) {
+      const src = this.buffers[ch];
+      const rev = this.ctx.createBuffer(
+        src.numberOfChannels,
+        src.length,
+        src.sampleRate,
+      );
+      for (let c = 0; c < src.numberOfChannels; c++) {
+        const from = src.getChannelData(c);
+        const to = rev.getChannelData(c);
+        for (let i = 0, n = src.length; i < n; i++) to[i] = from[n - 1 - i];
+      }
+      this.reverseBuffers[ch] = rev;
+    }
+    return this.reverseBuffers[ch];
+  }
+
+  setChannelVolume(ch, v) {
+    if (this.channelGains[ch])
+      this.offline ? this.channelGains[ch].gain.value = v : this.channelGains[ch].gain.setTargetAtTime(v, this.ctx.currentTime, 0.01);
+  }
+
+  // Solo is global: if ANY sample channel or synth is soloed, only soloed ones
+  // (of either kind) are audible. Mute always wins.
+  anySolo() {
+    return (
+      this.store.project.channels.some((c) => c.solo) ||
+      this.store.project.instruments.some((s) => s.solo)
+    );
+  }
+  channelAudible(ch) {
+    const c = this.store.channel(ch);
+    return !c.mute && (!this.anySolo() || !!c.solo);
+  }
+  instrumentAudible(i) {
+    const s = this.store.instrument(i);
+    return !s.mute && (!this.anySolo() || !!s.solo);
+  }
+
+  // Re-apply mute/solo to everything already sounding (call after a solo/mute change).
+  applySolo({ cut = false } = {}) {
+    if (!this.ctx) return;
+    for (let i = 0; i < this.store.project.instruments.length; i++)
+      this.setInstrumentVolume(i, this.store.instrument(i).volume);
+    if (cut)
+      for (let ch = 0; ch < this.store.numChannels; ch++)
+        if (!this.channelAudible(ch)) this.silenceChannel(ch);
+  }
+
+  setInstrumentVolume(i, v) {
+    if (this.offline && this.instrumentGains?.[i]) this.instrumentGains[i].gain.value = this.instrumentAudible(i) ? v : 0;
+    else if (this.instrumentGains?.[i])
+      this.instrumentGains[i].gain.setTargetAtTime(
+        this.instrumentAudible(i) ? v : 0,
+        this.ctx.currentTime,
+        0.01,
+      );
+  }
+
+  // Sequenced and live notes use the same ownership ledger. The synth still receives its
+  // original finite gate for transport playback, so existing arrangements keep their sound.
+  triggerNote(i, pitch, vel = 1, time = 0, durSec = 0.3) {
+    return this._startVoice(i, pitch, vel, { time, duration: durSec, source: "transport", held: false });
+  }
+
+  _voiceVisual(n, on) {
+    if (this.offline || n.visual === on) return;
+    n.visual = on;
+    const key = `${n.i}:${n.pitch}`;
+    const before = this._visualCounts.get(key) || 0;
+    const after = Math.max(0, before + (on ? 1 : -1));
+    if (after) this._visualCounts.set(key, after); else this._visualCounts.delete(key);
+    if (!!before !== !!after) emitNoteVisual(n.i, n.pitch, after > 0);
+  }
+
+  _voiceEnded(n) {
+    if (!n || n.ended) return;
+    n.ended = true;
+    for (const timer of n.timers) clearTimeout(timer);
+    this._voiceVisual(n, false);
+    this._live.delete(n.id);
+    this._synthVoices.delete(n.id);
+    if (!this.offline && typeof document !== "undefined") document.dispatchEvent(new CustomEvent("synth-voice-ended", { detail: { id: n.id, i: n.i, pitch: n.pitch, source: n.source } }));
+  }
+
+  _startVoice(i, pitch, vel, options) {
+    this.ensureContext();
+    const instrument = this.store.instrument(i);
+    const synth = SYNTH_BANK[instrument?.synthId];
+    if (!synth || !this.instrumentGains?.[i]) return 0;
+    const active = () => [...this._synthVoices.values()].filter(n => !n.stopping);
+    if (!this.offline) {
+      while (active().length >= this.maxSynthVoices || active().filter(n => n.i === i).length >= this.maxInstrumentVoices) {
+        const voices = active();
+        const victim = voices.find(n => n.i === i && n.voice.released) || voices.find(n => n.i === i) || voices[0];
+        if (!victim) break;
+        victim.stopping = true;
+        victim.voice.stop();
+        this._live.delete(victim.id);
+        this._voiceVisual(victim, false);
+      }
+    }
+    const P = { ...synthDefaults(instrument.synthId), ...(instrument.params || {}) };
+    const time = Math.max(this.ctx.currentTime, Number.isFinite(options.time) ? options.time : this.ctx.currentTime);
+    const duration = Number.isFinite(options.duration) ? Math.max(0.001, options.duration) : null;
+    const held = !!options.held;
+    const live = synth.live || {};
+    let release = typeof live.release === "function" ? live.release(P) : P.release ?? P.rel ?? 0.25;
+    release = Math.max(0.01, Math.min(12, Number.isFinite(+release) ? +release : 0.25));
+    const n = { id: ++this._voiceSeq, i, pitch, time, source: options.source || "live", release, timers: [], visual: false, ended: false, stopping: false };
+    try {
+      n.voice = createVoice(this.ctx, this.instrumentGains[i], synth, instrument.synthId,
+        { pitch, vel, time, dur: duration ?? live.gate ?? 0.6, held: held && duration == null }, P, () => this._voiceEnded(n));
+    } catch (error) {
+      console.warn("voice error", error);
+      return 0;
+    }
+    this._synthVoices.set(n.id, n);
+    if (held) this._live.set(n.id, n);
+    if (options.bend) n.voice.setBend(options.bend, time);
+    if (!this.offline) {
+      const later = (at, fn) => {
+        if (at <= this.ctx.currentTime) fn();
+        else n.timers.push(setTimeout(fn, (at - this.ctx.currentTime) * 1000));
+      };
+      later(time, () => { if (!n.ended && !n.stopping) this._voiceVisual(n, true); });
+      if (duration != null) later(time + duration, () => this._voiceVisual(n, false));
+    }
+    return n.id;
+  }
+
+  startNote(i, pitch, vel = 1, options = {}) {
+    return this._startVoice(i, pitch, vel, { ...options, held: true });
+  }
+
+  releaseNote(id, atTime = this.ctx?.currentTime || 0) {
+    const n = this._synthVoices.get(id);
+    if (!n) return;
+    this._live.delete(id);
+    if (atTime < n.time) {
+      n.stopping = true;
+      for (const timer of n.timers) clearTimeout(timer);
+      n.voice.stop(atTime);
+      this._voiceVisual(n, false);
+      return;
+    }
+    n.voice.release(atTime, n.release);
+    const off = () => this._voiceVisual(n, false);
+    if (atTime <= this.ctx.currentTime || this.offline) off();
+    else n.timers.push(setTimeout(off, (atTime - this.ctx.currentTime) * 1000));
+  }
+
+  setNotePitchBend(id, semitones) { this._synthVoices.get(id)?.voice.setBend(semitones); }
+
+  releaseAll(i = null, { immediate = false } = {}) {
+    const voices = immediate ? this._synthVoices : this._live;
+    for (const n of [...voices.values()]) if (i == null || n.i === i) {
+      if (immediate) {
+        n.stopping = true;
+        n.voice.stop();
+        this._live.delete(n.id);
+        for (const timer of n.timers) clearTimeout(timer);
+        this._voiceVisual(n, false);
+      } else this.releaseNote(n.id);
+    }
+  }
+
+  liveCount() { return this._live.size; }
+
+  async effectsReady() {
+    const pending = [];
+    for (const chain of this.chains?.values() || [])
+      for (const it of chain.slots.values()) if (it.nodes.ready) pending.push(it.nodes.ready);
+    return Promise.all(pending);
+  }
+
+  setMasterVolume(v) {
+    if (this.masterGain) {
+      if (this.offline) this.masterGain.gain.value = v;
+      else this.masterGain.gain.setTargetAtTime(v, this.ctx.currentTime, 0.01);
+    }
+  }
+
+  stepDuration() {
+    return 60 / this.store.project.bpm / 4; // 16th notes
+  }
+
+  play() {
+    this.ensureContext();
+    if (this.isPlaying) return;
+    this.isPlaying = true;
+    this._transportGeneration++;
+    this.currentStep = 0;
+    this._elapsedSteps = 0;
+    this._timeline = [];
+    this.playingSequence = this.store.project.currentSequence;
+    this.nextStepTime = this.ctx.currentTime + 0.05;
+    this._transportStart = this.nextStepTime;
+    this._transportEnd = Infinity;
+    this._tick();
+  }
+
+  pause() {
+    // Notify recorders while their final audio-clock position is still available.
+    this._transportEnd = this.ctx?.currentTime || 0;
+    if (!this.offline && typeof document !== "undefined") document.dispatchEvent(new CustomEvent("transport-stop", { detail: { time: this._transportEnd } }));
+    this.isPlaying = false;
+    this._transportGeneration++;
+    clearTimeout(this.timer);
+    for (const timer of this._transportTimers) clearTimeout(timer);
+    this._transportTimers.clear();
+    for (const ch of this._voices?.keys() || []) this.silenceChannel(ch);
+    this.releaseAll(null, { immediate: true });
+  }
+
+  stop() {
+    this.pause();
+    this.currentStep = 0;
+    if (this.onStep) this.onStep(-1, this.playingSequence);
+  }
+
+  panic() {
+    this.stop();
+    this.stopPreview();
+    this._flushEffects();
+  }
+
+  getTransportPosition(atTime = this.ctx?.currentTime || 0) {
+    const time = Math.min(atTime, this._transportEnd ?? Infinity);
+    if (this.isPlaying && this.ctx) this._catchUp(Math.min(time, this.ctx.currentTime));
+    const spans = this._timeline;
+    let span = spans[0];
+    for (let j = spans.length - 1; j >= 0; j--) if (spans[j].time <= time) { span = spans[j]; break; }
+    if (!span) return { sequenceIndex: this.playingSequence, step: 0, elapsedSteps: 0, time, playing: this.isPlaying };
+    const fraction = Math.max(0, Math.min(1, (time - span.time) / (span.end - span.time)));
+    return { sequenceIndex: span.sequenceIndex, step: span.step + fraction, elapsedSteps: span.elapsedSteps + fraction, time, playing: this.isPlaying };
+  }
+
+  getTransportSegments(startTime, endTime = this.ctx?.currentTime || 0) {
+    const out = [];
+    const end = Math.min(endTime, this._transportEnd ?? Infinity);
+    if (this.isPlaying && this.ctx) this._catchUp(Math.min(end, this.ctx.currentTime));
+    for (const span of this._timeline) {
+      const from = Math.max(startTime, span.time), to = Math.min(end, span.end);
+      if (to <= from) continue;
+      const startStep = span.step + (from - span.time) / (span.end - span.time);
+      const endStep = span.step + (to - span.time) / (span.end - span.time);
+      const previous = out[out.length - 1];
+      if (previous && previous.sequenceIndex === span.sequenceIndex && Math.abs(previous.endStep - startStep) < 1e-6)
+        previous.endStep = endStep;
+      else out.push({ sequenceIndex: span.sequenceIndex, startStep, endStep });
+    }
+    return out;
+  }
+
+  _tick() {
+    if (!this.isPlaying) return;
+    const now = this.ctx.currentTime;
+    // Missed audio cannot be recovered. Advance the musical cursor without firing a burst
+    // of old notes; the next event is scheduled on the first future step boundary.
+    this._catchUp(now - 0.005);
+    while (this.nextStepTime < now + SCHEDULE_AHEAD) {
+      this._recordSpan();
+      this._scheduleStep(this.currentStep, this.nextStepTime);
+      this._advance();
+    }
+    if (!this.offline) this.timer = setTimeout(() => this.isPlaying && this._tick(), LOOKAHEAD_MS);
+  }
+
+  _catchUp(time) {
+    while (this.nextStepTime < time) { this._recordSpan(); this._advance(); }
+  }
+
+  _recordSpan() {
+    this._timeline.push({ time: this.nextStepTime, end: this.nextStepTime + this._stepGap(this.currentStep),
+      sequenceIndex: this.playingSequence, step: this.currentStep, elapsedSteps: this._elapsedSteps });
+    if (this._timeline.length > 4096) this._timeline.splice(0, this._timeline.length - 4096);
+  }
+
+  _stepGap(step) {
+    const dur = this.stepDuration();
+    const swing = this.store.project.swing / 100;
+    return dur + (step % 2 === 0 ? dur * swing : -dur * swing);
+  }
+
+  _advance() {
+    this.nextStepTime += this._stepGap(this.currentStep);
+    this.currentStep++;
+    this._elapsedSteps++;
+    if (this.currentStep >= NUM_STEPS) {
+      this.currentStep = 0;
+      if (this.store.project.continuous) {
+        const seqs = this.store.project.sequences;
+        let next = this.playingSequence + 1;
+        if (next >= seqs.length || (!this.store.project.playEmptySequences && this._isEmpty(seqs[next]))) next = 0;
+        this.playingSequence = next;
+      }
+    }
+  }
+
+  _isEmpty(seq) {
+    return (
+      seq.steps.every((row) => row.every((v) => v === 0)) &&
+      (seq.notes || []).every((list) => list.length === 0)
+    );
+  }
+
+  // After undo/redo the sequence list can shrink under a running transport.
+  clampPlayingSequence() {
+    const last = this.store.project.sequences.length - 1;
+    if (this.playingSequence > last) this.playingSequence = Math.max(0, last);
+  }
+
+  _scheduleStep(step, time) {
+    const seq = this.store.project.sequences[this.playingSequence];
+    if (!seq) return;
+    const stepDur = this.stepDuration();
+    // A step's offset spans the real gap to the next step (swing included), so a
+    // late hit can never overtake the next step's trigger.
+    const swing = this.store.project.swing / 100;
+    const gap = stepDur + (step % 2 === 0 ? stepDur * swing : -stepDur * swing);
+    for (let ch = 0; ch < this.store.numChannels; ch++) {
+      const raw = seq.steps[ch]?.[step];
+      const v = stepVal(raw);
+      if (!v) continue;
+      const c = this.store.channel(ch);
+      if (!this.channelAudible(ch)) continue;
+      this.trigger(
+        ch,
+        time + stepOff(raw) * gap,
+        v === 2 ? 1.25 : 1,
+        stepObj(raw),
+      );
+    }
+    // instrument notes starting on this step
+    for (let i = 0; i < this.store.project.instruments.length; i++) {
+      if (!this.instrumentAudible(i)) continue;
+      for (const n of seq.notes?.[i] || []) {
+        if (n.step === step)
+          this.triggerNote(i, n.pitch, n.vel, time, n.dur * stepDur);
+      }
+    }
+    if (!this.offline) {
+      const sequenceIndex = this.playingSequence;
+      const generation = this._transportGeneration;
+      const delay = Math.max(0, (time - this.ctx.currentTime) * 1000);
+      const timer = setTimeout(() => {
+        this._transportTimers.delete(timer);
+        if (!this.isPlaying || generation !== this._transportGeneration) return;
+        if (this.store.project.currentSequence !== sequenceIndex) {
+          this._selectingSequence = true;
+          try { this.store.selectSequence(sequenceIndex); } finally { this._selectingSequence = false; }
+        }
+        this.onStep?.(step, sequenceIndex, time);
+      }, delay);
+      this._transportTimers.add(timer);
+    }
+  }
+
+  // Trigger a channel's sample at `time`. `over` = per-step overrides
+  // ({rev, trimStart, trimEnd, pitch}) that take precedence over channel settings.
+  trigger(ch, time = 0, velocity = 1, over = null) {
+    this.ensureContext();
+    const c = this.store.channel(ch);
+    const rev = over?.rev ?? c.reverse;
+    const rawPitch = over?.pitch ?? c.pitch;
+    const pitch = Number.isFinite(rawPitch)
+      ? Math.max(0.1, Math.min(this.store.project.songOrigin ? 100 : 4, rawPitch))
+      : 1;
+    const rawStart = over?.trimStart ?? c.trimStart,
+      rawEnd = over?.trimEnd ?? c.trimEnd;
+    const trimStart = Number.isFinite(rawStart)
+      ? Math.max(
+          0,
+          Math.min(1 - (c.clipSnapshot ? Number.EPSILON : 1e-7), rawStart),
+        )
+      : 0;
+    const trimEnd = Number.isFinite(rawEnd)
+      ? Math.max(
+          trimStart + (c.clipSnapshot ? Number.EPSILON : 1e-7),
+          Math.min(1, rawEnd),
+        )
+      : 1;
+    const buffer = rev ? this.getReverseBuffer(ch) : this.buffers[ch];
+    if (!buffer) return;
+    const t = time || this.ctx.currentTime;
+
+    const src = this.ctx.createBufferSource();
+    src.buffer = buffer;
+    src.playbackRate.value = pitch;
+
+    let start = trimStart * buffer.duration;
+    const dur = c.clipSnapshot
+      ? (trimEnd - trimStart) * buffer.duration
+      : Math.max(0.001, (trimEnd - trimStart) * buffer.duration);
+    if (rev) start = (1 - trimEnd) * buffer.duration;
+
+    const vg = this.ctx.createGain();
+    vg.gain.value = velocity;
+    src.connect(vg).connect(this.channelGains[ch]);
+
+    // Cut/crossfade the previous voice on this channel:
+    // - per-step xfade (ms) always crossfades, regardless of global choke
+    // - otherwise global choke mode cuts with the project fade time
+    const xfadeMs = over?.xfade;
+    const cutFadeSec =
+      xfadeMs != null && xfadeMs > 0
+        ? xfadeMs / 1000
+        : this.store.project.choke
+          ? Math.max(0.002, (this.store.project.fadeMs ?? 15) / 1000)
+          : null;
+    const sustain = sustainDuration(c, over, buffer, this.store.project.bpm);
+    if (sustain) {
+      src.loop = true;
+      src.loopStart = sampleLoop(c).start;
+      src.loopEnd = sampleLoop(c).end;
+    }
+    const audibleDuration = sustain ?? dur / pitch,
+      edgeFade = Math.min(0.005, audibleDuration / 3);
+    let fadeIn = edgeFade;
+    if (cutFadeSec != null && this._lastVoice?.[ch]) {
+      const prev = this._lastVoice[ch];
+      try {
+        if (prev.gain.gain.cancelAndHoldAtTime)
+          prev.gain.gain.cancelAndHoldAtTime(t);
+        else {
+          prev.gain.gain.cancelScheduledValues(t);
+          prev.gain.gain.setValueAtTime(prev.gain.gain.value, t);
+        }
+        prev.gain.gain.linearRampToValueAtTime(0, t + cutFadeSec);
+        prev.src.stop(t + cutFadeSec + 0.01);
+      } catch {
+        /* already ended */
+      }
+      // fade the new voice IN over the same span for a smooth crossfade
+      if (xfadeMs != null && xfadeMs > 0) {
+        fadeIn = Math.min(cutFadeSec, audibleDuration / 3);
+      }
+    }
+    (this._lastVoice ||= {})[ch] = { src, gain: vg };
+    vg.gain.setValueAtTime(0, t);
+    vg.gain.linearRampToValueAtTime(velocity, t + fadeIn);
+    vg.gain.setValueAtTime(velocity, t + audibleDuration - edgeFade);
+    vg.gain.linearRampToValueAtTime(0, t + audibleDuration);
+
+    const voices = (this._voices ||= new Map()).get(ch) || new Set();
+    this._voices.set(ch, voices);
+    const voice = { src, gain: vg };
+    if (!this.offline && voices.size >= 32) {
+      const oldest = voices.values().next().value;
+      try { oldest.src.stop(); } catch {}
+      oldest.gain.disconnect();
+      voices.delete(oldest);
+    }
+    voices.add(voice);
+    src.onended = () => {
+      voices.delete(voice);
+      if (!voices.size) this._voices.delete(ch);
+      if (this._lastVoice?.[ch]?.src === src) this._lastVoice[ch] = null;
+      src.disconnect();
+      vg.disconnect();
+    };
+    // Web Audio duration is measured in source seconds, before playback rate.
+    if (sustain) {
+      src.start(t, start);
+      src.stop(t + audibleDuration);
+    } else src.start(t, start, dur);
+  }
+
+  // Play a raw AudioBuffer through the master bus (library audition). Returns a stop fn.
+  playBuffer(
+    buffer,
+    start = 0,
+    end = buffer.duration,
+    onEnded = null,
+    options = {},
+  ) {
+    this.stopPreview();
+    this.ensureContext();
+    if (this._previewSrc) {
+      try {
+        this._previewSrc.stop();
+      } catch {
+        /* already stopped */
+      }
+    }
+    const src = this.ctx.createBufferSource();
+    const rate = options.rate ?? 1;
+    if (options.reverse) {
+      const reversed = this.ctx.createBuffer(
+        buffer.numberOfChannels,
+        buffer.length,
+        buffer.sampleRate,
+      );
+      for (let c = 0; c < buffer.numberOfChannels; c++)
+        reversed.copyToChannel(buffer.getChannelData(c).slice().reverse(), c);
+      src.buffer = reversed;
+    } else src.buffer = buffer;
+    src.playbackRate.value = rate;
+    if (options.loop) {
+      src.loop = true;
+      src.loopStart = options.loop.start;
+      src.loopEnd = options.loop.end;
+    }
+    const gain = this.ctx.createGain();
+    src.connect(gain).connect(this.masterGain);
+    const t = this.ctx.currentTime,
+      duration = options.gateSeconds ?? (end - start) / rate,
+      level = options.level ?? 0.9,
+      fade = Math.min(0.005, duration / 3);
+    gain.gain.setValueAtTime(0, t);
+    gain.gain.linearRampToValueAtTime(level, t + fade);
+    gain.gain.setValueAtTime(level, t + duration - fade);
+    gain.gain.linearRampToValueAtTime(0, t + duration);
+    if (options.loop) {
+      src.start(t, start);
+      src.stop(t + duration);
+    } else
+      src.start(
+        t,
+        options.reverse ? buffer.duration - end : start,
+        end - start,
+      );
+    src.onended = () => {
+      src.disconnect();
+      gain.disconnect();
+      if (this._previewSrc === src) this._previewSrc = null;
+      onEnded?.();
+    };
+    this._previewSrc = src;
+    return () => {
+      try {
+        src.stop();
+      } catch {
+        /* noop */
+      }
+    };
+  }
+
+  stopPreview() {
+    if (!this._catalogueStarting) this.stopCataloguePreview?.();
+    if (!this._playlistStarting) this.stopPlaylistPreview?.();
+    this.stopSongPreview?.();
+    if (this._previewSrc) {
+      try {
+        this._previewSrc.stop();
+      } catch {
+        /* noop */
+      }
+      this._previewSrc = null;
+    }
+  }
+
+  // Audition an arbitrary trim range (used by trim modal)
+  audition(ch, startFrac, endFrac) {
+    this.ensureContext();
+    const buffer = this.buffers[ch];
+    if (!buffer) return;
+    const src = this.ctx.createBufferSource();
+    src.buffer = buffer;
+    src.playbackRate.value = this.store.channel(ch).pitch;
+    const gain = this.ctx.createGain();
+    src.connect(gain).connect(this.channelGains[ch]);
+    const voices = (this._voices ||= new Map()).get(ch) || new Set();
+    this._voices.set(ch, voices);
+    if (voices.size >= 32) {
+      const oldest = voices.values().next().value;
+      try { oldest.src.stop(); } catch {}
+      oldest.gain.disconnect(); voices.delete(oldest);
+    }
+    const voice = { src, gain };
+    voices.add(voice);
+    src.onended = () => {
+      voices.delete(voice);
+      if (!voices.size) this._voices.delete(ch);
+      src.disconnect(); gain.disconnect();
+    };
+    const start = startFrac * buffer.duration;
+    const dur = Math.max(0.001, (endFrac - startFrac) * buffer.duration);
+    src.start(this.ctx.currentTime, start, dur);
+  }
+}
+
+// Keyboard visuals: the piano roll and the jiMS10 panel light keys from these
+// events, so sequencer playback, typed keys, MIDI and mouse all show the same way.
+export function emitNoteVisual(i, pitch, on) {
+  if (typeof document === "undefined") return;
+  document.dispatchEvent(
+    new CustomEvent("synth-note", { detail: { i, pitch, on } }),
+  );
+}
+
+export const engine = new Engine();
