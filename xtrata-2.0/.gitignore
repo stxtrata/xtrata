@@ -105,3 +105,6 @@ public/casino-machines/*/src/qa/browser/*.log
 # Run logs and tool screenshots
 *.log
 tools/*/shots/
+
+# Reproducible inscribable runtime, built from beta-pro source with bundled notices.
+/public/audionaut-beta-pro/chain-runtime/

@@ -15,3 +15,7 @@
 @media(max-width:700px){#pro-workspace{padding:10px}.pro-strip{flex-basis:156px}.pro-row{gap:7px}.pro-table td,.pro-table th{padding:6px}.pro-field{min-width:65px}.pro-field input[type=number]{width:78px}.pro-help{font-size:12px}#pro-workspace-nav{padding:7px;gap:4px}#pro-workspace-nav button{font-size:11px}}
 
 #pro-workspace>canvas,.pro-workspace-view>canvas{max-width:100%;height:auto}.pro-points{max-height:45vh;overflow:auto;scrollbar-gutter:stable}
+
+.pro-pad-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}.pro-pad-grid .pro-take{min-width:0}.pro-pad-grid select{max-width:100%}.pro-chain-table{width:100%;border-collapse:collapse}.pro-chain-table td,.pro-chain-table th{padding:8px;text-align:left;overflow-wrap:anywhere}.pro-chain-table input{max-width:100%}@media(max-width:800px){.pro-pad-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}@media(max-width:420px){.pro-pad-grid{grid-template-columns:1fr}}
+
+.pro-pad-triggers{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin:12px 0}.pro-pad-triggers button{min-height:64px;white-space:normal;font-size:13px}.pro-workspace-view details>summary{cursor:pointer;padding:12px 0}.pro-chain-card,.pro-chain-card p{overflow-wrap:anywhere;min-width:0}

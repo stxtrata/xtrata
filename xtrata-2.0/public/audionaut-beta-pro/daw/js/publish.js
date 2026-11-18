@@ -12,8 +12,14 @@ const $ = selector => document.querySelector(selector);
 const filename = name => (String(name || "Audionaut project").replace(/[^\w\- ]+/g, "").trim() || "Audionaut project");
 
 export async function prepareInscription(file) {
-  const decision = classifyCreateFiles([file]);
-  const id = await storeCreateHandoff([file], { reason: decision.reason, source: HANDOFF_SOURCE });
+  const files=Array.isArray(file)?file:[file];
+  const decision = classifyCreateFiles(files);
+  let id;
+  try{id=await storeCreateHandoff(files,{reason:decision.reason,source:HANDOFF_SOURCE});}
+  catch(cause){
+    const error=new Error('This browser could not preserve the upload files. Download them, then open inscription review and choose the files manually.',{cause});
+    error.code='HANDOFF_STORAGE';error.manualReviewUrl=decision.destination==='wizard'?'/wizard/':'/inscribe';throw error;
+  }
   return createHandoffUrl(decision.destination === "wizard" ? "/wizard/" : "/inscribe", id, HANDOFF_SOURCE);
 }
 

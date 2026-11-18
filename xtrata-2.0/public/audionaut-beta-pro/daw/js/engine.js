@@ -18,6 +18,7 @@ import { beatToSeconds, secondsToBeat, swingStep, unswingStep, seededRandom, has
 import { trackAddress } from './project-model.js';
 import { syncMixer as applyMixer, disposeMixer, validateRouting } from './mixer-runtime.js';
 import { createSamplerVoice } from './sampler-voice.js';
+import {isProInstrument,createProInstrumentVoice} from './pro-instruments.js';
 import { voiceAutomation } from './automation-runtime.js';
 
 const LOOKAHEAD_MS = 25; // scheduler tick
@@ -300,6 +301,8 @@ export class Engine {
     const nodes = type.create(ctx, {
       delayBus: this.delayNode,
       reverbBus: this.reverbNode,
+      irSource: def.irSource,
+      resolveImpulseResponse: source => {const a=trackAddress(this.store.project,source?.sourceTrackId);return a?.kind==='sample'?this.buffers[a.index]:null;},
     });
     const inp = ctx.createGain();
     const feed = ctx.createGain();
@@ -374,16 +377,22 @@ export class Engine {
     const defs = [...owner.inserts, ...owner.fx].filter(
       (d) => PLUGIN_TYPES[d.type],
     );
-    const sig = defs.map((d) => `${d.id}:${d.type}`).join("|");
+    const resourceKey = d => {const a=d.irSource&&trackAddress(this.store.project,d.irSource.sourceTrackId);return JSON.stringify(d.irSource ? [d.irSource,a?.index??-1,!!this.buffers[a?.index],this._bufferRevisions?.get(d.irSource.sourceTrackId)||0] : null);};
+    const sig = defs.map((d) => `${d.id}:${d.type}:${resourceKey(d)}`).join("|");
     if (sig !== chain.sig) {
       const next = new Map();
       for (const d of defs) {
         let it = chain.slots.get(d.id);
-        if (it && it.typeId !== d.type) {
-          this._disposeInstance(it);
-          it = null;
+        if (it && it.typeId !== d.type) it=null;
+        if(it && it.resourceKey!==resourceKey(d)){
+          if(it.nodes.updateImpulseResponse){
+            it.nodes.updateImpulseResponse(d.irSource,source=>{const a=trackAddress(this.store.project,source?.sourceTrackId);return a?.kind==='sample'?this.buffers[a.index]:null;}).catch(error=>{
+              if(!this.offline&&typeof document!=='undefined')document.dispatchEvent(new CustomEvent('audio-error',{detail:{message:error.message}}));
+            });
+          }else it=null;
         }
-        next.set(d.id, it || this._makeInstance(d));
+        it ||= this._makeInstance(d);it.resourceKey=resourceKey(d);
+        next.set(d.id, it);
       }
       for (const [id, it] of chain.slots)
         if (next.get(id) !== it) this._disposeInstance(it);
@@ -624,6 +633,7 @@ export class Engine {
   }
 
   setBuffer(ch, buffer) {
+    const id=this.store.channel(ch)?.id;if(id){this._bufferRevisions ||= new Map();this._bufferRevisions.set(id,(this._bufferRevisions.get(id)||0)+1);}
     this.buffers[ch] = buffer;
     this.reverseBuffers[ch] = null;
   }
@@ -755,13 +765,19 @@ export class Engine {
     const n = { id: ++this._voiceSeq, i, pitch, time, endTime: duration == null ? Infinity : time+duration+release, source: options.source || "live", release, timers: [], visual: false, ended: false, stopping: false };
     try {
       const note={ pitch, vel, time, dur: duration ?? live.gate ?? 0.6, held: held && duration == null, offset:options.chaseOffsetSeconds || 0 };
-      n.voice = instrument.sampler?.enabled
+      n.voice = isProInstrument(instrument.synthId)
+        ? createProInstrumentVoice(this.ctx,this.instrumentGains[i],instrument,note,P,()=>this._voiceEnded(n),{seed:options.seed ?? hashSeed(`${this.seed}:${n.id}:${pitch}`),offline:this.offline,bufferForSource:entry=>{const a=trackAddress(this.store.project,entry.sourceTrackId);return a?.kind==='sample'?this.buffers[a.index]:null;}})
+        : instrument.sampler?.enabled
         ? createSamplerVoice(this.ctx,this.instrumentGains[i],instrument.sampler,note,id=>{const a=trackAddress(this.store.project,id);return a?.kind==='sample'?this.buffers[a.index]:null;},()=>this._voiceEnded(n))
         : createVoice(this.ctx, this.instrumentGains[i], synth, instrument.synthId,note,P,()=>this._voiceEnded(n),{seed:options.seed ?? hashSeed(`${this.seed}:${n.id}:${pitch}`),prepared:options.prepared});
     } catch (error) {
+      if(this.offline)throw error;
+      this.lastVoiceError=error.message;
+      if(typeof document!=='undefined')document.dispatchEvent(new CustomEvent('audio-error',{detail:{message:error.message}}));
       console.warn("voice error", error);
       return 0;
     }
+    if(Number.isFinite(n.voice.endTime))n.endTime=n.voice.endTime;
     this._synthVoices.set(n.id, n);
     if (held) this._live.set(n.id, n);
     if (options.bend) n.voice.setBend(options.bend, time);
@@ -793,7 +809,7 @@ export class Engine {
       return;
     }
     n.voice.release(atTime, n.release);
-    n.endTime=atTime+n.release;
+    n.endTime=Number.isFinite(n.voice.endTime)?n.voice.endTime:atTime+n.release;
     const off = () => this._voiceVisual(n, false);
     if (atTime <= this.ctx.currentTime || this.offline) off();
     else n.timers.push(setTimeout(off, (atTime - this.ctx.currentTime) * 1000));
@@ -819,7 +835,7 @@ export class Engine {
   async effectsReady() {
     const pending = [];
     for (const chain of this.chains?.values() || [])
-      for (const it of chain.slots.values()) if (it.nodes.ready) pending.push(it.nodes.ready);
+      for (const it of chain.slots.values()) if (it.on && it.nodes.ready) pending.push(it.nodes.ready);
     return Promise.all(pending);
   }
 

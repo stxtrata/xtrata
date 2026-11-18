@@ -26,6 +26,7 @@ import { initWorkspace } from "./pro-workspace.js";
 
 const $ = (s) => document.querySelector(s);
 let sampleRestore = Promise.resolve([]);
+document.addEventListener('audio-error',event=>ui.setStatus(event.detail.message,true));
 
 // ------------------------------------------------------------ transport
 async function togglePlay() {
@@ -246,7 +247,7 @@ function initFileOps() {
     try {
       const text = await file.text();
       if (!unchanged()) return ui.setStatus("The project changed while the file was opening. Load it again when ready.", true);
-      persist.importProject(text);
+      await persist.importProjectAsync(text,{guard:unchanged});
       ui.setStatus("Project loaded. Fetching samples…");
       const failures = await sampleRestore;
       ui.refreshAllChannels();

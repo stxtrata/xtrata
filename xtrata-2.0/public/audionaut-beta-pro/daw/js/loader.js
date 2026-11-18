@@ -1,3 +1,7 @@
+import {chainLibrary as defaultChainLibrary,verifyChainBytes} from './chain-library.js';
+import {validateChainReference,chainRefKey} from './chain-manifest.js';
+let activeChainLibrary=defaultChainLibrary;
+export function setChainSourceLibrary(library){if(typeof library?.read!=='function')throw Error('Invalid chain reader.');activeChainLibrary=library;}
 // Shared, transactional L1/L2 audio loader. Remote preview cache is bounded.
 import { store, stepVal, makeChannel } from "./state.js";
 import {decodePcmWav} from './pcm-wav.js';
@@ -230,6 +234,17 @@ async function decodeSource(
       "This inscription is a song or application. Open Songs & historic applications to audition or export a song session.",
     );
   const context = engine.ensureContext();
+  if(source.chainRef){
+    const ref=validateChainReference(source.chainRef);
+    if(source.type!=='xtrata'||String(source.value)!==ref.tokenId||source.network!==ref.network||source.contractId!==ref.contractId)throw Error('The sound source differs from its chain reference.');
+    const key='chain:'+chainRefKey(ref)+':'+ref.sha256+':'+ref.bytes+':'+ref.mediaType+':'+(source.audioSha256||'');
+    if(cache.has(key))return cache.get(key);
+    const bytes=await verifyChainBytes(ref,await activeChainLibrary.read(ref,{signal}));
+    const extracted=await extractAudio(new Response(bytes,{headers:{'content-type':ref.mediaType}}),source.label||'Chain sample',signal,0,false);
+    if(source.audioSha256&&await audioHash(extracted.arrayBuffer)!==source.audioSha256)throw Error('Chain audio payload differs from its pinned hash.');
+    const audioBuffer=await decodePcmWav(context,extracted.arrayBuffer,{signal})||await context.decodeAudioData(extracted.arrayBuffer.slice(0));abort(signal);
+    const result={audioBuffer,sampleName:extracted.sampleName,soundMetadata:extracted.soundMetadata,source:structuredClone(source)};keep(key,result);return result;
+  }
   if(source.localAssetId){
     const key='asset:'+source.localAssetId;
     if(cache.has(key))return cache.get(key);
@@ -338,6 +353,8 @@ export function assignDecodedSample(ch, source, result, { reset = true, dirty = 
     label: source.label,
     ...(source.localAssetId && { localAssetId: source.localAssetId }),
     ...(source.sourceSha256 && { sourceSha256: source.sourceSha256 }),
+    ...(source.network && {network:source.network,contractId:source.contractId}),
+    ...(source.chainRef && {chainRef:structuredClone(source.chainRef),chainAssetId:source.chainAssetId}),
     ...(source.audioSha256 && { audioSha256: source.audioSha256 }),
     ...(source.assetId && {
       assetId: source.assetId,
@@ -432,7 +449,7 @@ export async function reloadAllSamples(onProgress, concurrency = 3) {
       source = channel.source;
     try {
       onProgress?.(ch, channel.sampleName || source.value);
-      if (channel.clipSnapshot && !source.localAssetId && !source.collectedFrom) {
+      if (channel.clipSnapshot && !source.chainRef && !source.localAssetId && !source.collectedFrom) {
         const { restoreClipChannel } = await import("./clip-actions.js");
         await restoreClipChannel(ch);
       } else await loadSample(ch, source, { preserve: true });

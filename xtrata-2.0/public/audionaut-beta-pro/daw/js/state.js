@@ -168,7 +168,8 @@ class Store {
     if (this.numChannels <= 1) return false;
     const removed=this.project.channels.at(-1);
     const owners=[...this.project.channels,...this.project.instruments];
-    if(this.project.timeline.clips.some(c=>c.sourceTrackId===removed.id&&c.trackId!==removed.id)||owners.some(t=>t.freezeState?.trackId===removed.id||t.sampler?.zones?.some(z=>z.sourceTrackId===removed.id)||t.takes?.some(take=>take.sourceTrackId===removed.id)))throw new Error('This sample is used by a clip, sampler, take or frozen track. Remove those references before deleting it.');
+    if(this.project.timeline.clips.some(c=>c.sourceTrackId===removed.id&&c.trackId!==removed.id)||owners.some(t=>t.freezeState?.trackId===removed.id||t.sampler?.zones?.some(z=>z.sourceTrackId===removed.id)||t.sampleInstrument?.sources?.some(z=>z.sourceTrackId===removed.id)||t.takes?.some(take=>take.sourceTrackId===removed.id)))throw new Error('This sample is used by a clip, sampler, take or frozen track. Remove those references before deleting it.');
+    if([...owners,...this.project.buses,this.project.master].some(t=>[...t.inserts||[],...t.fx||[]].some(slot=>slot.irSource?.sourceTrackId===removed.id)))throw new Error('This sample is used as an impulse response. Remove that reference first.');
     if(removed.freezeState)throw new Error('Unfreeze this track before deleting it.');
     this.project.channels.pop();
     this.project.sequences.forEach((seq) => seq.steps.pop());

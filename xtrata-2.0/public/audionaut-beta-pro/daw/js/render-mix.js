@@ -1,3 +1,4 @@
+import {isProInstrument,proInstrumentTailSeconds} from './pro-instruments.js';
 // Playback and export share one musical event plan. Output encoding runs in a worker.
 import {Engine} from './engine.js';
 import {compilePlaybackPlan} from './playback-plan.js';
@@ -15,7 +16,7 @@ function estimateTail(project,plan,buffers,stem=null){
   let last=plan.duration;
   for(const e of plan.events){
     const address=trackAddress(project,e.trackId);if(!address||!leafIds.has(address.track.id))continue;
-    if(e.type==='note')last=Math.max(last,e.endTime+synthTailSeconds(address.track.synthId,address.track.params||{}));
+    if(e.type==='note'){const tail=isProInstrument(address.track.synthId)?proInstrumentTailSeconds(address.track,e,{bufferForSource:source=>{const index=project.channels.findIndex(t=>t.id===source.sourceTrackId);return buffers[index]||project.channels[index]?.analysis;}}):synthTailSeconds(address.track.synthId,address.track.params||{});last=Math.max(last,e.endTime+tail);}
     if(e.type==='sample'){
       // The shared plan includes printed clip tails in event.endTime, while its
       // nominal song duration stays musical. Count that extension exactly once.
@@ -38,7 +39,7 @@ function estimateTail(project,plan,buffers,stem=null){
   const routeTail=(id,seen=new Set())=>{
     if(memo.has(id))return memo.get(id);if(seen.has(id))throw new Error('Mixer routing cannot feed back into itself.');
     const owner=chains.get(id);if(!owner)return 0;seen=new Set(seen).add(id);
-    const own=[...owner.inserts||[],...owner.fx||[]].reduce((sum,slot)=>{if(slot.enabled===false)return sum;const params=slot.params||{};return sum+Math.max(pluginTailSeconds(slot.type,params),0,Number(params.decay)||0,Number(params.tailSeconds)||0);},0);
+    const own=[...owner.inserts||[],...owner.fx||[]].reduce((sum,slot)=>{if(slot.enabled===false)return sum;const params=slot.params||{};return sum+Math.max(pluginTailSeconds(slot.type,params,{irSource:slot.irSource,irDuration:buffers[project.channels.findIndex(t=>t.id===slot.irSource?.sourceTrackId)]?.duration}),0,Number(params.decay)||0,Number(params.tailSeconds)||0);},0);
     const routes=id==='master'?[]:[owner.output||'master',...(owner.auxSends||[]).filter(send=>send.amount>0).map(send=>send.busId)];
     const total=own+Math.max(0,...routes.map(next=>routeTail(next,seen)));memo.set(id,total);return total;
   };
