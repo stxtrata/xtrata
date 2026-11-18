@@ -522,9 +522,14 @@ const vox = {
       o.type = "sawtooth";
       o.frequency.value = f0;
       o.detune.value = d * P.choir;
-      o.connect(src);
       return o;
     });
+    // Keep summation order explicit. Native junctions with three or more inputs
+    // may accumulate in different orders between graphs; resonant filtering can
+    // magnify that float32 rounding. Each junction below has exactly two inputs.
+    const oscPair = ctx.createGain();
+    oscs[0].connect(oscPair); oscs[1].connect(oscPair);
+    oscPair.connect(src); oscs[2].connect(src);
     // vibrato fades in after a short delay
     const lfo = ctx.createOscillator();
     lfo.frequency.value = P.vibRate;
@@ -565,6 +570,7 @@ const vox = {
         const mid = from.map((a, k) => ({ f: a.f + (to[k].f - a.f) * t, g: a.g + (to[k].g - a.g) * t, q: a.q + (to[k].q - a.q) * t }));
         bank.gain.linearRampToValueAtTime(norm(mid), time + P.morph * t);
       }
+    const formantOutputs = [];
     from.forEach((fm, k) => {
       const bp = ctx.createBiquadFilter();
       bp.type = "bandpass";
@@ -577,8 +583,11 @@ const vox = {
       const g = ctx.createGain();
       g.gain.setValueAtTime(fm.g, time);
       if (to !== from) g.gain.linearRampToValueAtTime(to[k].g, time + P.morph);
-      lp.connect(bp).connect(g).connect(bank);
+      lp.connect(bp).connect(g); formantOutputs.push(g);
     });
+    const formantPair = ctx.createGain();
+    formantOutputs[0].connect(formantPair); formantOutputs[1].connect(formantPair);
+    formantPair.connect(bank); formantOutputs[2].connect(bank);
     // amplitude envelope
     const g = ctx.createGain();
     const peak = Math.max(0.001, vel * P.level);

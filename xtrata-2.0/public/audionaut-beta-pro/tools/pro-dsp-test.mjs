@@ -11,7 +11,20 @@ try {
     const failures=[], checks=[], metrics={};
     const check=(label,ok,details)=>{checks.push(label);if(!ok) failures.push({label,details});};
     const stats=(buffer,start=0,end=buffer.duration)=>{let peak=0,energy=0,n=0,bad=0;for(let ch=0;ch<buffer.numberOfChannels;ch++){const a=buffer.getChannelData(ch);for(let i=Math.floor(start*buffer.sampleRate);i<Math.min(a.length,Math.floor(end*buffer.sampleRate));i++){if(!Number.isFinite(a[i]))bad++;peak=Math.max(peak,Math.abs(a[i]));energy+=a[i]*a[i];n++;}}return{peak,rms:Math.sqrt(energy/Math.max(1,n)),bad};};
-    const render=async(id,P,sr,{duration=.2,length=2,held=false,release=null,seed=42,prepare=false,change=null}={})=>{const ctx=new OfflineAudioContext(2,Math.ceil(sr*length),sr),note={pitch:60,vel:.8,time:0,dur:duration,held};if(prepare)await prepareSynthVoice(id,note,P,sr,{seed});let ends=0;const voice=createVoice(ctx,ctx.destination,SYNTH_BANK[id],id,note,P,()=>ends++,{seed});if(change)await voice.setParameters(change.params,change.time);if(release!=null)voice.release(release,.1);const bufferDurations=voice.sources.map(s=>s.node.buffer?.duration);const audio=await ctx.startRendering();await new Promise(r=>setTimeout(r,0));return{audio,voice,ends,bufferDurations};};
+    const render=async(id,P,sr,{duration=.2,length=2,held=false,release=null,seed=42,prepare=false,change=null,captureNoise=false,invertNoise=false,start=0}={})=>{
+      const ctx=new OfflineAudioContext(2,Math.ceil(sr*length),sr),note={pitch:60,vel:.8,time:start,dur:duration,held};
+      if(prepare)await prepareSynthVoice(id,note,P,sr,{seed});
+      let ends=0;const voice=createVoice(ctx,ctx.destination,SYNTH_BANK[id],id,note,P,()=>ends++,{seed});
+      if(change)await voice.setParameters(change.params,change.time);
+      if(release!=null)voice.release(release,.1);
+      const bufferDurations=voice.sources.map(s=>s.node.buffer?.duration);
+      // Capture the source before rendering, because completed voices release it.
+      const sourceNoise=(captureNoise||invertNoise)?voice.sources.find(s=>s.node.buffer&&s.node.loop)?.node.buffer.getChannelData(0):null;
+      const noise=sourceNoise?.slice();
+      if(invertNoise&&sourceNoise)for(let i=0;i<sourceNoise.length;i++)sourceNoise[i]=-sourceNoise[i];
+      const audio=await ctx.startRendering();await new Promise(r=>setTimeout(r,0));
+      return{audio,voice,ends,bufferDurations,noise};
+    };
     metrics.synths=[];
     for(const sr of [44100,48000,96000]){
       metrics.latency??={};metrics.latency[sr]=await calibratePluginLatency(sr);
@@ -55,7 +68,41 @@ try {
     for(const id of ["fm4","kiln","anneal","palinode","lantern"]){
       const P=synthDefaults(id),sr=48000,ctx=new OfflineAudioContext(2,sr*3,sr),note={pitch:60,vel:.8,time:0,dur:.4,held:false};ctx.seed=42;SYNTH_BANK[id].voice(ctx,ctx.destination,note,P);const legacy=await ctx.startRendering(),modern=(await render(id,P,sr,{duration:.4,length:3,seed:42,prepare:true})).audio;let diff=0;for(let c=0;c<2;c++){const a=legacy.getChannelData(c),z=modern.getChannelData(c);for(let i=0;i<a.length;i++)diff=Math.max(diff,Math.abs(a[i]-z[i]));}check(`${id} factory compatibility`,diff<1e-6,diff);
     }
-    const seedA=(await render("vox",synthDefaults("vox"),48000)).audio,seedB=(await render("vox",synthDefaults("vox"),48000)).audio;let seedDiff=0;for(let c=0;c<2;c++)for(let i=0;i<seedA.length;i++)seedDiff=Math.max(seedDiff,Math.abs(seedA.getChannelData(c)[i]-seedB.getChannelData(c)[i]));check("noise seed repeatability",seedDiff<1e-6,seedDiff);
+    {
+      const compare=(a,b)=>{
+        let peak=0,errorEnergy=0,signalEnergy=0,count=0;
+        for(let c=0;c<a.numberOfChannels;c++){
+          const x=a.getChannelData(c),y=b.getChannelData(c);
+          for(let i=0;i<x.length;i++){const d=x[i]-y[i];peak=Math.max(peak,Math.abs(d));errorEnergy+=d*d;signalEnergy+=x[i]*x[i];count++;}
+        }
+        return{peak,rms:Math.sqrt(errorEnergy/count),relativeRms:Math.sqrt(errorEnergy/Math.max(signalEnergy,1e-30))};
+      };
+      // Retain the original peak limit; also detect persistent low-level errors.
+      // Native Web Audio output may round differently across browser builds, but
+      // the seeded source data itself must be exact, before filters or summing.
+      const equivalent=d=>d.peak<1e-6&&d.rms<1e-8&&d.relativeRms<1e-6;
+      const hashNoise=data=>{let hash=2166136261;for(const x of new Uint32Array(data.buffer,data.byteOffset,data.length))hash=Math.imul(hash^x,16777619);return hash>>>0;};
+      const sourceFixtures={44100:3405097892,48000:2814611308,96000:1256349057};
+      metrics.repeatability=[];
+      for(const sr of [44100,48000,96000])for(const breath of [0,.12,.8]){
+        const P={...synthDefaults("vox"),breath},reference=await render("vox",P,sr,{captureNoise:true});
+        if(breath===.12)check(`Vox canonical noise fixture ${sr}`,reference.noise&&hashNoise(reference.noise)===sourceFixtures[sr],reference.noise&&hashNoise(reference.noise));
+        // Breath=0 distinguishes graph accumulation from source randomness.
+        for(let repeat=1;repeat<=3;repeat++){
+          const next=await render("vox",P,sr,{captureNoise:true}),error=compare(reference.audio,next.audio);
+          metrics.repeatability.push({sr,breath,repeat,...error});
+          check(`Vox audio repeatability ${sr} breath=${breath} run=${repeat}`,equivalent(error),error);
+          if(breath>0)check(`Vox source noise exact ${sr} breath=${breath} run=${repeat}`,reference.noise?.length===next.noise?.length&&reference.noise?.every((x,i)=>Object.is(x,next.noise[i])));
+        }
+      }
+      // Prove the comparison rejects meaningful random-stream and timing errors.
+      const sr=48000,P={...synthDefaults("vox"),breath:.8},reference=await render("vox",P,sr);
+      const wrongNoise=compare(reference.audio,(await render("vox",P,sr,{invertNoise:true})).audio);
+      const shifted=compare(reference.audio,(await render("vox",P,sr,{start:1/sr})).audio);
+      metrics.repeatabilityControls={wrongNoise,shifted};
+      check("repeatability detects changed noise",!equivalent(wrongNoise),wrongNoise);
+      check("repeatability detects one-sample timing change",!equivalent(shifted),shifted);
+    }
     {
       const sr=48000,ctx=new OfflineAudioContext(2,sr,sr),n=PLUGIN_TYPES.filter.create(ctx,{});PLUGIN_TYPES.filter.apply(ctx,n,{...pluginDefaults("filter"),cutoff:100,q:.1});const s=ctx.createOscillator();s.frequency.value=3000;s.connect(n.input);n.output.connect(ctx.destination);s.start();s.stop(1);PLUGIN_TYPES.filter.automate(ctx,n,"cutoff",10000,.5,"step");PLUGIN_TYPES.filter.automate(ctx,n,"mode","hp",.8);const a=await ctx.startRendering();check("mapped filter automation timestamp",stats(a,.55,.7).rms>stats(a,.2,.4).rms*20,{before:stats(a,.2,.4),after:stats(a,.55,.7)});check("compound automation boundary",n.P.mode==="hp"&&!n.automationError,n.automationError);
     }

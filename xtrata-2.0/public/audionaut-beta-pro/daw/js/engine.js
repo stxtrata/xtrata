@@ -243,7 +243,10 @@ export class Engine {
     //   out → amount → on/off → shared bus      (levels come from owner.sends, see syncChain)
     // "inst" is a stand-in for the plugin instance a slot would have, so faces can meter it.
     const sendFx = {};
-    for (const [bus, node] of [
+    // Shared returns enter the master. Even a zero-gain send back into those
+    // returns forms a graph cycle; Firefox then adds a 128-frame cycle delay.
+    // The master therefore has no strip sends to its own return inputs.
+    for (const [bus, node] of key === 'master' ? [] : [
       ["delay", this.delayNode],
       ["reverb", this.reverbNode],
     ]) {
@@ -266,6 +269,7 @@ export class Engine {
     chain.owner = owner;
     for (const bus of ["delay", "reverb"]) {
       const f = chain.sendFx[bus];
+      if (!f) continue;
       const rec = owner.sends?.[bus];
       const on = !!rec && rec.enabled !== false;
       const amount = rec ? rec.amount : 0;
@@ -433,7 +437,7 @@ export class Engine {
   slotInstance(idx, inst, id) {
     const chain = this.chains?.get((inst ? "i" : "c") + idx);
     const bus = sendBusId(id);
-    if (bus) return chain?.sendFx[bus].inst || null; // a strip send ("send:delay")
+    if (bus) return chain?.sendFx[bus]?.inst || null; // a strip send ("send:delay")
     return chain?.slots.get(id) || null;
   }
   // Input/output analysers on a slot, created on first ask (side branches, never in the path).

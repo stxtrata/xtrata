@@ -1,6 +1,7 @@
-import { pluginLatencySamples,synthLatencySamples } from './plugins.js';
+import { pluginLatencySamples,synthLatencySamples,PLUGIN_TYPES } from './plugins.js';
 // Routing is a directed graph. Every edge has compensation; cycles are rejected.
 export function validateRouting(project) {
+  if([...project.master?.inserts||[],...project.master?.fx||[]].some(slot=>PLUGIN_TYPES[slot.type]?.shared))throw new Error('Master effects cannot send back to shared returns. Put delay or reverb sends on a track or bus.');
   const owners=[...project.channels,...project.instruments,...(project.buses||[])], ids=new Set(['master',...owners.map(o=>o.id)]);
   const edges=new Map(owners.map(o=>[o.id,[o.output||'master',...(o.auxSends||[]).filter(s=>s.amount>0).map(s=>s.busId)]]));
   for(const owner of [...owners,{...project.master,id:'master'}])for(const slot of [...owner.inserts||[],...owner.fx||[]])if(slot.enabled!==false&&slot.sidechainTrackId&&slot.sidechainTrackId!==owner.id){if(!ids.has(slot.sidechainTrackId))throw new Error('The sidechain source no longer exists.');edges.get(slot.sidechainTrackId)?.push(owner.id);}

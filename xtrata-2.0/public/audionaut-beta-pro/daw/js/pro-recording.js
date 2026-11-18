@@ -49,7 +49,7 @@ export async function stopAudioRecording(){
       await rec.queue;rec.meta.complete=!rec.error;if(rec.error)rec.meta.error=rec.error;
       await transaction(['sessions'],'readwrite',tx=>tx.objectStore('sessions').put({...rec.meta}));return rec.meta;
     }catch(error){rec.error=error.message;throw error;}
-    finally{rec.source.disconnect();rec.node.disconnect();rec.silent.disconnect();rec.monitor?.disconnect();rec.stream.getTracks().forEach(t=>t.stop());if(session===rec)session=null;rec.onUpdate({recording:false,...rec.meta,error:rec.error});}
+    finally{rec.node.port.onmessage=null;rec.node.port.close();rec.source.disconnect();rec.node.disconnect();rec.silent.disconnect();rec.monitor?.disconnect();rec.stream.getTracks().forEach(t=>{t.onended=null;t.stop();});rec.flushed=null;if(session===rec)session=null;rec.onUpdate({recording:false,...rec.meta,error:rec.error});}
   })();return rec.stopPromise;
 }
 export async function recoverCapturedTake(id,{trackId,onProgress=()=>{}}={}){
