@@ -217,3 +217,14 @@ https://radio.xtrata.xyz/radio/embed*
   ! Content-Security-Policy
 https://radio.xtrata.xyz/radio/endorse*
   ! Content-Security-Policy
+
+# Separate gated beta-pro community test edition.
+/audionaut-beta-pro
+  Cache-Control: no-store
+  X-Robots-Tag: noindex, nofollow
+/audionaut-beta-pro/
+  Cache-Control: no-store
+  X-Robots-Tag: noindex, nofollow
+/audionaut-beta-pro/*
+  Cache-Control: no-store
+  X-Robots-Tag: noindex, nofollow
