@@ -1,0 +1,6 @@
+class AudioNautCapture extends AudioWorkletProcessor {
+  constructor(options){super();this.startFrame=options.processorOptions?.startFrame||0;this.endFrame=options.processorOptions?.endFrame??Infinity;this.active=true;this.size=4096;this.used=0;this.buffers=null;this.start=0;this.port.onmessage=e=>{if(e.data==='stop'){this.flush();this.active=false;this.port.postMessage({done:true});}};}
+  flush(){if(!this.used||!this.buffers)return;const channels=this.buffers.map(b=>b.slice(0,this.used));this.port.postMessage({frame:this.start,channels},channels.map(b=>b.buffer));this.used=0;}
+  process(inputs){const input=inputs[0];if(!this.active||!input?.length)return true;if(!this.buffers)this.buffers=Array.from({length:Math.min(2,input.length)},()=>new Float32Array(this.size));for(let i=0;i<input[0].length;i++){if(currentFrame+i>=this.endFrame){this.flush();this.active=false;this.port.postMessage({done:true});break;}if(currentFrame+i<this.startFrame)continue;if(!this.used)this.start=currentFrame+i;for(let ch=0;ch<this.buffers.length;ch++)this.buffers[ch][this.used]=input[ch]?.[i]||0;this.used++;if(this.used===this.size)this.flush();}return true;}
+}
+registerProcessor('audionaut-capture',AudioNautCapture);

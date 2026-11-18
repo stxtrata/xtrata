@@ -4,6 +4,9 @@
 /audionaut /audionaut/index.html 200
 /audionaut/ /audionaut/index.html 200
 # Community beta: same holder gate, separate workstation and browser storage.
+# Independent community beta-pro edition.
+/audionaut-beta-pro /audionaut-beta-pro/index.html 200
+/audionaut-beta-pro/ /audionaut-beta-pro/index.html 200
 /audionaut-beta /audionaut-beta/index.html 200
 /audionaut-beta/ /audionaut-beta/index.html 200
 # Artist portal: preserve published Audionaut links and cached page assets.

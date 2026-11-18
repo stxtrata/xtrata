@@ -1,0 +1,73 @@
+name: AudioNaut beta-pro
+on:
+  pull_request:
+    paths:
+      - 'xtrata-2.0/public/audionaut-beta-pro/**'
+      - 'xtrata-2.0/src/audionaut-beta-pro/**'
+      - 'xtrata-2.0/functions/**/audionaut*pro*'
+      - 'xtrata-2.0/functions/audionaut-beta-pro/**'
+      - 'xtrata-2.0/functions/api/audionaut-beta-pro/**'
+      - 'xtrata-2.0/vite.audionaut-beta-pro.config.ts'
+      - 'xtrata-2.0/package*.json'
+      - 'xtrata-2.0/public/_headers'
+      - 'xtrata-2.0/public/_redirects'
+      - '.github/workflows/audionaut-beta-pro.yml'
+  push:
+    branches: [audionaut-beta-pro]
+  workflow_dispatch:
+    inputs:
+      soak_seconds:
+        description: 'Playback endurance duration in seconds (120–7200)'
+        default: '120'
+        required: false
+concurrency:
+  group: audionaut-beta-pro-${{ github.event.pull_request.head.ref || github.ref_name }}
+  cancel-in-progress: true
+permissions:
+  contents: read
+jobs:
+  workstation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 150
+    defaults:
+      run:
+        working-directory: xtrata-2.0
+    env:
+      SOAK_SECONDS: ${{ inputs.soak_seconds || '120' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: xtrata-2.0/package-lock.json
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - run: npm run build:audionaut-beta-pro
+      - run: npx vitest run functions/lib/__tests__/audionaut-pro-auth.test.ts
+      - run: node public/audionaut-beta-pro/tools/pro-suite.mjs
+
+  browser-compatibility:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        browser: [firefox, webkit]
+    defaults:
+      run:
+        working-directory: xtrata-2.0
+    env:
+      AUDIONAUT_TEST_BROWSER: ${{ matrix.browser }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: xtrata-2.0/package-lock.json
+      - run: npm ci
+      - run: npx playwright install --with-deps ${{ matrix.browser }}
+      - run: node public/audionaut-beta-pro/tools/pro-recovery-test.mjs
+      - run: node public/audionaut-beta-pro/tools/pro-workspace-test.mjs
+      - run: node public/audionaut-beta-pro/tools/pro-export-test.mjs
