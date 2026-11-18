@@ -64,7 +64,8 @@ describe('replacing an old player', () => {
     const x = setup(); x.r.start(snap());
     const l = await x.ready(snap({ balance: 50_000n, returnTo: undefined }));
     expect(x.text(l)).toContain('There is nowhere set to send it');
-    expect(x.labels(l)).toEqual(['Stop · keep my old player']);
+    expect(x.text(l)).not.toContain('top right');
+    expect(x.labels(l)).toEqual(['Connect Stacks wallet', 'Stop · keep my old player']);
   });
 
   it('waits while anything is on its way, and while the balance is not known', async () => {

@@ -22,6 +22,7 @@ import { dropStatus, dropTotals, wallCheck, type DropStep } from '../lib/listeni
 import { tierById } from '../lib/listening-wallet/tiers';
 import type { Snapshot } from './controller';
 import { copyButton, feedbackButton, shareLink } from './feedback';
+import { connectStacksWallet } from './connect-stacks';
 
 export interface GiftDeps {
   json(url: string, init?: RequestInit): Promise<any>;
@@ -727,7 +728,7 @@ export function createGifts(deps: GiftDeps) {
     const main = deps.main();
     const parts: HTMLElement[] = [el('p', 'Make an album and fund copies of it to give away.', 'ppp-mute')];
     if (!main) {
-      parts.push(el('p', 'Connect a Stacks wallet (top right) to make albums.'));
+      parts.push(el('p', 'Connect a Stacks wallet (Xverse or Leather) to make albums.'), button('Connect Stacks wallet', connectStacksWallet, 'primary'));
     } else {
       if (g.admin) {
         const box = el('div', '', 'ppp-gift-admin');

@@ -69,3 +69,21 @@ it('skips the pop-up once an Xtrata Music Wallet is in use: the button only adds
   btn.click();await vi.waitFor(()=>expect(mock.connect).toHaveBeenCalledTimes(1));expect(chooser).not.toHaveBeenCalled();
  }finally{delete w.XtrataRadioConnectChooser;delete document.documentElement.dataset.pppSolo;}
 });
+it('a linked player that is open without its Stacks wallet says so on the button and goes straight to Xverse or Leather',async()=>{
+ const w=window as unknown as {XtrataRadioConnectChooser?:()=>Promise<string|null>};
+ const chooser=vi.fn(async()=>'music');w.XtrataRadioConnectChooser=chooser;document.documentElement.dataset.pppAs='jim.btc';
+ try{
+  await import('../wallet');const btn=document.getElementById('radio-wallet-connect') as HTMLButtonElement;
+  expect(document.getElementById('radio-wallet-address')?.textContent).toBe('♪ jim.btc');
+  expect(btn.textContent).toBe('Connect Stacks wallet');
+  btn.click();await vi.waitFor(()=>expect(mock.connect).toHaveBeenCalledTimes(1));expect(chooser).not.toHaveBeenCalled();
+ }finally{delete w.XtrataRadioConnectChooser;delete document.documentElement.dataset.pppAs;}
+});
+it('a failed connect brings the You screen forward so the reason can be read',async()=>{
+ mock.connect.mockRejectedValue(Error('Cancelled'));const shown=vi.fn();window.addEventListener('xtrata:radio-panel',shown);
+ try{
+  await import('../wallet');(document.getElementById('radio-wallet-connect') as HTMLButtonElement).click();
+  await vi.waitFor(()=>expect(document.getElementById('radio-wallet-message')?.textContent).toBe('Cancelled'));
+  expect(shown).toHaveBeenCalledTimes(1);
+ }finally{window.removeEventListener('xtrata:radio-panel',shown);}
+});

@@ -1273,7 +1273,7 @@ function start(root: HTMLElement) {
           key.push(el('p', `This device already has a listening wallet for ${whoList(s.others)}. If you meant to use that one, switch to that wallet.`, 'ppp-warn'));
           lines.push(el('p', `Otherwise, set up a new listening wallet for ${who(s.main)} below. Each address keeps its own plays, likes and funds, like a playlist per profile.`));
         } else if (!s.solo && s.main) lines.push(el('p', `This is the listening wallet for ${who(s.main)}. Each wallet address you connect gets its own on this device, so plays and likes stay separate, like a playlist per profile.`, 'ppp-mute'));
-        if (s.solo) lines.push(el('p', 'Already have a Stacks wallet? Connect it first (top right) so your plays and likes count for it. No wallet? Carry on: you do not need one.', 'ppp-mute'));
+        if (s.solo) lines.push(el('p', 'Already have a Stacks wallet? Connect it first (the Connect button at the bottom of this page) so your plays and likes count for it. No wallet? Carry on: you do not need one.', 'ppp-mute'));
         // A live gift link is for a brand-new wallet, so claiming it leads. Someone who already has a listening
         // wallet (e.g. synced from another device) can still unlock it, or put the gift aside for now.
         const gift = gifts.liveGift();
@@ -1479,7 +1479,7 @@ function start(root: HTMLElement) {
     }
     // A passkey synced to this device opened someone's existing wallet: say whose, first.
     if (s.solo && s.creditedTo && s.listening && !['intro', 'off', 'elsewhere', 'loading'].includes(s.step))
-      key.unshift(el('p', `This is ${who(s.creditedTo)}'s listening wallet. Plays and likes count for ${who(s.creditedTo)}. Connect it (top right) to see its likes here too.`, 'ppp-ok'));
+      key.unshift(el('p', `This is ${who(s.creditedTo)}'s listening wallet. Plays and likes count for ${who(s.creditedTo)}. Connect its Stacks wallet (the button at the bottom of this page) to see its likes here too.`, 'ppp-ok'));
     $('.ppp-key').replaceChildren(...key);
     // The two places a listener can be: the open-world player (wallet 0), and the album that is open (or was last). Every
     // other album is picked from "My albums", which then takes the second tab's place.
@@ -1592,7 +1592,7 @@ function start(root: HTMLElement) {
         name.append(el('b', '.btc name'), ' (for example yourname.btc) is a name you own on that network. Give your player one and your plays, likes and station show under that name everywhere on Xtrata.');
         const how = el('p', 'Names are registered at BNS One. You need a little STX and a Stacks wallet to buy one; then send the name to your player using the code below.', 'ppp-mute');
         const go = el('p'); go.append(link('Find a name at BNS One →', 'https://bns.one'));
-        const linkUp = el('p', 'Already have a Stacks wallet with a name (Xverse or Leather)? Connect it (top right) and link this player to it. The player stays on this device and keeps its plays; everything it does is then credited to your name, like a second device on one account.');
+        const linkUp = el('p', 'Already have a Stacks wallet with a name (Xverse or Leather)? Connect it (the button at the bottom of this page) and link this player to it. The player stays on this device and keeps its plays; everything it does is then credited to your name, like a second device on one account.');
         const friend = el('p', 'Know someone who loves music? When there is a giveaway on, send them the page and they can claim a free player of their own.');
         const fl = el('p'); fl.append(link('See the giveaway →', 'https://xtrata.xyz/giveaway'));
         body.replaceChildren(
