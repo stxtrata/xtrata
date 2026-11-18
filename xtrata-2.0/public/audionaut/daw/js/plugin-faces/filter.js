@@ -230,8 +230,11 @@ import { Kit } from "./runtime.js";
       c.fillStyle = INK; c.beginPath(); c.roundRect ? c.roundRect(tx, ty, tw, 17, 8) : c.rect(tx, ty, tw, 17); c.fill(); c.fillStyle = '#fff'; c.font = '800 10px ' + MONO; c.textAlign = 'center'; c.fillText(tag, tx + tw / 2, ty + 9);
     }
     // canvas drag: x = cutoff, y = resonance
-    { let down = false; const mv = e => { const [x, y] = pxy(dc, e); const px = x * D.W; P.set('cutoff', fOf((px - D.ML) / dpw)); P.setNorm('q', 1 - clamp((y * D.H - D.MT) / dph, 0, 1)); };
-      dc.addEventListener('pointerdown', e => { down = true; dc.setPointerCapture(e.pointerId); mv(e); e.preventDefault(); }); dc.addEventListener('pointermove', e => { if (down) mv(e); }); dc.addEventListener('pointerup', () => { down = false; }); dc.addEventListener('pointercancel', () => { down = false; }); }
+    P.bindXY(dc, 'cutoff', 'q', { rect: () => {
+      const r = dc.getBoundingClientRect();
+      return { left: r.left + r.width * D.ML / D.W, top: r.top + r.height * D.MT / D.H,
+        width: r.width * dpw / D.W, height: r.height * dph / D.H };
+    } });
     const mi = $('#mi'), mo = $('#mo'), mih = $('#mih'), moh = $('#moh'), ti = $('#ti'), to = $('#to');
     const pcx = pc.getContext('2d'), dcx = dc.getContext('2d');
     P.raf(t => {

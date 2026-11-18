@@ -178,7 +178,7 @@ const XOVER = 800; // horn / drum crossover
 function organVoice(ctx, dest, note, P) {
   const { pitch, time } = note;
   const v = clamp(Number.isFinite(note.vel) ? note.vel : 1, 0, 1.5);
-  const gate = Math.max(0.02, Number.isFinite(note.dur) ? note.dur : 0.5);
+  const gate = Math.max(0.02, note.held ? Infinity : Number.isFinite(note.dur) ? note.dur : 0.5);
   const f0 = mtof(pitch);
   const A = Math.max(0.002, P.attack);
   const R = Math.max(0.01, P.release);
@@ -499,7 +499,7 @@ const tonewheel = {
     { name: "Rock Riff (E)", dsl: "0:E3:3 0:B3:3 0:E4:3 4:E3:2 4:B3:2 4:E4:2 8:G3:3 8:D4:3 8:G4:3 12:A3:4 12:E4:4 12:A4:4 16:E3:3 16:B3:3 16:E4:3 20:E3:2 20:B3:2 20:E4:2 24:D4:2:100 24:A4:2:100 26:C#4:2 26:G#4:2 28:A3:4 28:E4:4 28:A4:4 32:E3:3 32:B3:3 32:E4:3 36:E3:2 36:B3:2 36:E4:2 40:G3:3 40:D4:3 40:G4:3 44:A3:4 44:E4:4 44:A4:4 48:C4:6 48:G4:6 48:C5:6 56:D4:8 56:A4:8 56:D5:8" },
   ],
   presets: PRESETS,
-  live: { hold: 30 }, // organs sustain: a held key keeps sounding for 30 s
+  live: {}, // the managed voice owns an open gate until key-up
   ui: {
     theme: { accent: "#c98a3d", lcd: "#ffd9a0", lcdBg: "#241a0e", edge: "#463018", bg: "#1b140c" },
     logo: ["", "Cathedral"],

@@ -57,10 +57,11 @@ export function createSynthPicker(select, bank, { cls = "" } = {}) {
   refresh();
 
   function choose(id) {
+    const changed = valueDesc.get.call(select) !== id;
     valueDesc.set.call(select, id);
     refresh();
     closePopover(true);
-    select.dispatchEvent(new Event("change", { bubbles: true }));
+    if (changed) select.dispatchEvent(new Event("change", { bubbles: true }));
   }
 
   function open() {

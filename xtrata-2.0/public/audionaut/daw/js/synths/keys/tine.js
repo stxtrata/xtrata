@@ -336,7 +336,7 @@ const paramDefs = [
 function tineVoice(ctx, dest, note, P) {
   const { pitch, time } = note;
   const v = clamp(Number.isFinite(note.vel) ? note.vel : 1, 0, 1.5);
-  const gate = Math.max(0.02, Number.isFinite(note.dur) ? note.dur : 0.5);
+  const gate = Math.max(0.02, note.held ? Infinity : Number.isFinite(note.dur) ? note.dur : 0.5);
   const sr = ctx.sampleRate;
   const k = keyFor(P, pitch, v, gate, sr);
   let data = cacheGet(k);
@@ -484,7 +484,7 @@ const tine = {
   tagline: "Electric & acoustic keys - Rhodes tine, Wurli reed, piano and clav models with touch-sensitive timbre",
   color: "#f5a65b",
   params: paramDefs,
-  live: { hold: 3.5 }, // offline-rendered: held notes render a 3.5 s gate, key-up fades
+  live: { naturalDecay: true }, // struck keys decay naturally; key-up damps the owned voice
   voice: tineVoice,
   scope: tineScope,
   lines: [

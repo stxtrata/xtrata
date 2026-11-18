@@ -107,7 +107,7 @@ export const TIDALGLASS_SYNTHS = {
       if (vel < 0.002 || p.level <= 0) return;
       const pitch = tgClamp(Number.isFinite(note.pitch) ? note.pitch : 60, 0, 127);
       const freq = tgFreq(pitch);
-      const d = Math.max(0.02, Number.isFinite(note.dur) ? note.dur : 0.5);
+      const d = Math.max(0.02, note.held ? Infinity : Number.isFinite(note.dur) ? note.dur : 0.5);
       const off = t + d;
       const A = p.attack, Dn = p.decay, S = p.sustain, Rl = p.release;
       // velocity: loudness, and (Touch) a harder strike is brighter and more FM-excited

@@ -148,10 +148,17 @@ function voice(ctx, dest, { pitch, vel, time, dur }, P) {
     const cents = i === 0 ? 0 : P.drift * Math.min(28, i * 5);
     if (cents > 0.05) {
       const rate = 0.07 + i * 0.053 + clamp(v, 0, 1) * 0.09;
-      const n = clamp(Math.ceil(T * 14), 16, 400);
-      const curve = new Float32Array(n);
-      for (let k = 0; k < n; k++) curve[k] = cents * Math.sin(2 * Math.PI * rate * ((k / (n - 1)) * T));
-      osc.detune.setValueCurveAtTime(curve, t, T);
+      if (!Number.isFinite(T)) {
+        const lfo = ctx.createOscillator(), depth = ctx.createGain();
+        lfo.frequency.value = rate; depth.gain.value = cents;
+        lfo.connect(depth).connect(osc.detune);
+        srcs.push(lfo);
+      } else {
+        const n = clamp(Math.ceil(T * 14), 16, 400);
+        const curve = new Float32Array(n);
+        for (let k = 0; k < n; k++) curve[k] = cents * Math.sin(2 * Math.PI * rate * ((k / (n - 1)) * T));
+        osc.detune.setValueCurveAtTime(curve, t, T);
+      }
     }
     srcs.push(osc);
   }

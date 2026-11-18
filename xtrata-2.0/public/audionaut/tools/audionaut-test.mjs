@@ -24,7 +24,7 @@ const { srv, url } = await serve();
 const b = await browser();
 const logs = [];
 const fails = [];
-const ok = (cond, msg) => { if (!cond) fails.push(msg); return cond; };
+const ok = (cond, msg) => { if (!cond) { fails.push(msg); console.log("FAIL", msg); } return cond; };
 
 async function open(width = 1400, height = 900) {
   const ctx = await b.newContext({ viewport: { width, height }, hasTouch: true });
@@ -35,7 +35,7 @@ async function open(width = 1400, height = 900) {
   p.on("response", (r) => { if (r.url().startsWith(url) && r.status() >= 400) logs.push(`http ${r.status()}: ${r.url().slice(url.length)}`); });
   // fake Web MIDI: window.__midi.send([status, d1, d2]) reaches every input listener
   await p.addInitScript(() => {
-    const input = { name: "Test MIDI", onmidimessage: null };
+    const input = { id: "test-midi", state: "connected", name: "Test MIDI", onmidimessage: null };
     const access = { inputs: new Map([["t", input]]), onstatechange: null };
     window.__midi = { send: (data) => input.onmidimessage && input.onmidimessage({ data: Uint8Array.from(data) }) };
     navigator.requestMIDIAccess = async () => access;
@@ -50,13 +50,19 @@ async function open(width = 1400, height = 900) {
     engine.ensureContext();
     const T = (window.__T = { engine, store, LK, SYNTH_BANK, started: [], released: 0, lightsOn: new Map() });
     const s0 = engine.startNote.bind(engine), r0 = engine.releaseNote.bind(engine);
-    engine.startNote = (i, pitch, vel) => { const id = s0(i, pitch, vel); T.started.push({ i, pitch, vel, id }); return id; };
-    engine.releaseNote = (id) => { if (engine._live?.has(id)) T.released++; return r0(id); };
+    engine.startNote = (i, pitch, vel, options) => { const id = s0(i, pitch, vel, options); T.started.push({ i, pitch, vel, id }); return id; };
+    engine.releaseNote = (id, atTime) => { if (engine._live?.has(id)) T.released++; return r0(id, atTime); };
     T.reset = () => { T.started = []; T.released = 0; };
     T.taps = {};
     T.level = (i) => {
-      let a = T.taps[i];
-      if (!a) { a = T.taps[i] = engine.ctx.createAnalyser(); a.fftSize = 2048; engine.instrumentGains[i].connect(a); }
+      const gain = engine.instrumentGains[i];
+      let tap = T.taps[i];
+      if (!tap || tap.gain !== gain || tap.analyser.context !== engine.ctx) {
+        if (tap) { try { tap.gain.disconnect(tap.analyser); } catch {} tap.analyser.disconnect(); }
+        const analyser = engine.ctx.createAnalyser(); analyser.fftSize = 2048; gain.connect(analyser);
+        tap = T.taps[i] = { gain, analyser };
+      }
+      const a = tap.analyser;
       const buf = new Float32Array(2048); a.getFloatTimeDomainData(buf);
       let s = 0; for (const v of buf) s += v * v; return Math.sqrt(s / buf.length);
     };
@@ -208,11 +214,11 @@ async function keyboardTests(p, id) {
 
 async function panelFits(p, id, label) {
   const r = await p.evaluate(() => {
-    const m = document.querySelector("#modal-synth"), f = document.querySelector("#synth-front");
+    const f = document.querySelector("#synth-front");
     const fr = f.getBoundingClientRect();
     const host = f.querySelector(".sfp-face-host > div");
     const hr = host ? host.getBoundingClientRect() : fr;
-    return { open: !m.classList.contains("hidden"), fw: fr.width, fh: fr.height, hw: hr.width, vw: innerWidth, vh: innerHeight, sw: document.scrollingElement.scrollWidth, fl: fr.left, fr: fr.right };
+    return { open: document.body.classList.contains("synth-dock-open") && f.dataset.built === "1", fw: fr.width, fh: fr.height, hw: hr.width, vw: innerWidth, vh: innerHeight, sw: document.scrollingElement.scrollWidth, fl: fr.left, fr: fr.right };
   });
   ok(r.open, `${id}: panel did not open (${label})`);
   ok(r.hw <= r.fw + 1 && r.fl >= -1 && r.fr <= r.vw + 1, `${id}: panel overflows at ${label} ${JSON.stringify(r)}`);
@@ -243,7 +249,7 @@ const run = async () => {
     const pm = await p.evaluate(async (id) => {
       const sel = document.querySelector("#sfp-preset");
       const presets = __T.SYNTH_BANK[id].presets || [];
-      if (!sel) return { missing: true, n: presets.length };
+      if (!sel) return { missing: presets.length > 0, n: 0, want: presets.length, bad: [] };
       const vals = [...sel.querySelectorAll("option")].filter((o) => o.value !== "");
       const bad = [];
       const { synthDefaults } = await import("/audionaut/daw/js/synths.js");
@@ -275,7 +281,7 @@ const run = async () => {
     await panelFits(p, id, "390x844");
     if (flags.shots) await p.screenshot({ path: `${flags.shots}/${id}-mobile.png` });
     await p.setViewportSize({ width: 1400, height: 900 }); await wait(p, 150);
-    await p.keyboard.press("Escape"); await wait(p, 100);
+    await p.locator("#sfp-close").click(); await wait(p, 100);
     const after = await p.evaluate(() => __T.clean());
     ok(after.live === 0 && after.held === 0, `${id}: notes left after closing the panel ${JSON.stringify(after)}`);
     process.stdout.write(`${id} `);

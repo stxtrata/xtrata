@@ -1,5 +1,7 @@
 // state.js — central store with pub/sub. Single source of truth for the project.
 
+import { newProjectId, retainAssets } from "./assets.js";
+
 export const NUM_CHANNELS = 16; // default channel count
 export const MAX_CHANNELS = 64;
 export const NUM_INSTRUMENTS = 4;
@@ -84,6 +86,7 @@ export function makeInstrument(i) {
 
 export function makeProject() {
   return {
+    projectId: newProjectId(),
     projectName: "Untitled",
     artistName: "",
     bpm: 120,
@@ -120,9 +123,10 @@ class Store {
     };
   }
 
-  emit(event, payload) {
+  emit(event, payload, { dirty = true } = {}) {
+    retainAssets("current-project", this.project);
     (this._subs[event] || []).forEach((fn) => fn(payload));
-    if (event !== "dirty") this.emit("dirty");
+    if (event !== "dirty" && dirty) this.emit("dirty", { event, payload });
   }
 
   // --- convenience accessors ---
@@ -241,6 +245,7 @@ class Store {
   }
 
   selectSequence(i) {
+    const previousLength = this.project.sequences.length;
     while (
       this.project.sequences.length <= i &&
       this.project.sequences.length < MAX_SEQUENCES
@@ -249,7 +254,8 @@ class Store {
     }
     i = Math.max(0, Math.min(i, this.project.sequences.length - 1));
     this.project.currentSequence = i;
-    this.emit("sequence", i);
+    // Existing-sequence selection is view/transport state; creating one is an edit.
+    this.emit("sequence", i, { dirty: this.project.sequences.length !== previousLength });
   }
 
   clearSequence() {

@@ -279,18 +279,24 @@ function makeP(typeId, def, root, link) {
         if (e.button) return;
         try { el.setPointerCapture(e.pointerId); } catch (x) { /* synthetic */ }
         drag = true; moved = false; sy = e.clientY; sx = e.clientX; sn = P.norm(id);
-        if (o.abs && p.type !== "toggle" && p.type !== "select") absSet(e);
+        if (o.abs && !e.shiftKey && p.type !== "toggle" && p.type !== "select") absSet(e);
+        sn = P.norm(id);
         el.classList.add("drag"); e.preventDefault(); el.focus({ preventScroll: true });
       });
       el.addEventListener("pointermove", (e) => {
         if (!drag) return;
         if (p.type === "toggle" || p.type === "select") { moved = moved || Math.abs(e.clientY - sy) > 4; return; }
-        if (o.abs) { absSet(e); return; }
-        const rng = o.range || 170, ax = o.axis || "y";
+        const ax = o.axis || "y";
+        const rect = o.abs ? el.getBoundingClientRect() : null;
+        const rng = o.abs ? Math.max(1, ax === "x" ? rect.width : rect.height) : o.range || 170;
         let d = ax === "x" ? (e.clientX - sx) / rng : (sy - e.clientY) / rng;
         if (o.invert) d = -d;
         if (e.shiftKey) d *= 0.2;
-        moved = true; P.setNorm(id, sn + d);
+        moved = true;
+        // Incremental deltas keep the value continuous when Shift changes mid-drag.
+        sn = clamp(sn + d, 0, 1);
+        P.setNorm(id, sn);
+        sx = e.clientX; sy = e.clientY;
       });
       const end = (e) => {
         if (!drag) return;
@@ -304,24 +310,39 @@ function makeP(typeId, def, root, link) {
         e.preventDefault();
         if (p.type === "select") { const n = p.options.length; P.set(id, clamp(getv(id) + (e.deltaY > 0 ? 1 : -1), 0, n - 1)); return; }
         if (p.type === "toggle") return;
-        P.setNorm(id, P.norm(id) - e.deltaY * 0.0012);
+        P.setNorm(id, P.norm(id) - e.deltaY * 0.0012 * (e.shiftKey ? 0.2 : 1));
       }, { passive: false });
       el.addEventListener("keydown", (e) => {
         const k = e.key; let dn = 0;
         if (k === "ArrowUp" || k === "ArrowRight") dn = 1; else if (k === "ArrowDown" || k === "ArrowLeft") dn = -1;
         if (!dn) { if (k === " " && p.type === "toggle") { e.preventDefault(); P.set(id, getv(id) ? 0 : 1); } return; }
         e.preventDefault();
-        if (p.type === "select") P.set(id, getv(id) + dn); else P.setNorm(id, P.norm(id) + dn * 0.03);
+        if (p.type === "select") P.set(id, getv(id) + dn); else P.setNorm(id, P.norm(id) + dn * (e.shiftKey ? 0.006 : 0.03));
       });
       return el;
     },
-    bindXY(el, idX, idY) {
+    bindXY(el, idX, idY, options = {}) {
       el.tabIndex = 0; el.setAttribute("data-bind", idX + "," + idY);
       P.sub(idX, (v, n) => el.style.setProperty("--x", n)); P.sub(idY, (v, n) => el.style.setProperty("--y", n));
-      let drag = false;
-      const set = (e) => { const r = el.getBoundingClientRect(); P.setNorm(idX, (e.clientX - r.left) / r.width); P.setNorm(idY, 1 - (e.clientY - r.top) / r.height); };
-      el.addEventListener("pointerdown", (e) => { try { el.setPointerCapture(e.pointerId); } catch (x) { /* synthetic */ } drag = true; el.classList.add("drag"); set(e); e.preventDefault(); });
-      el.addEventListener("pointermove", (e) => { if (drag) set(e); });
+      let drag = false, px = 0, py = 0, nx = 0, ny = 0;
+      const bounds = options.rect || (() => el.getBoundingClientRect());
+      const set = (e) => { const r = bounds(); P.setNorm(idX, (e.clientX - r.left) / r.width); P.setNorm(idY, 1 - (e.clientY - r.top) / r.height); };
+      el.addEventListener("pointerdown", (e) => {
+        if (e.button) return;
+        try { el.setPointerCapture(e.pointerId); } catch (x) { /* synthetic */ }
+        drag = true; px = e.clientX; py = e.clientY; el.classList.add("drag");
+        if (!e.shiftKey) set(e);
+        nx = P.norm(idX); ny = P.norm(idY);
+        e.preventDefault();
+      });
+      el.addEventListener("pointermove", (e) => {
+        if (!drag) return;
+        const r = bounds(), fine = e.shiftKey ? 0.2 : 1;
+        nx = clamp(nx + (e.clientX - px) / Math.max(1, r.width) * fine, 0, 1);
+        ny = clamp(ny - (e.clientY - py) / Math.max(1, r.height) * fine, 0, 1);
+        P.setNorm(idX, nx); P.setNorm(idY, ny);
+        px = e.clientX; py = e.clientY;
+      });
       const end = () => { drag = false; el.classList.remove("drag"); };
       el.addEventListener("pointerup", end); el.addEventListener("pointercancel", end);
       el.addEventListener("dblclick", () => { P.set(idX, pdef(def, idX).def); P.set(idY, pdef(def, idY).def); });

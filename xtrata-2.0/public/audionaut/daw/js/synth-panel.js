@@ -11,7 +11,7 @@
 
 import { store } from "./state.js";
 import { engine } from "./engine.js";
-import { addMidiListener, ensureMidi, setMidiEnabled, isMidiOn, midiStatus, setMidiTarget } from "./midi-input.js";
+import { addMidiListener, ensureMidi, setMidiEnabled, isMidiOn, midiStatus, setMidiTarget, getMidiTarget } from "./midi-input.js";
 import { SYNTH_BANK, synthDefaults } from "./synths.js";
 import { Kit } from "./synth-faces/index.js";
 import { attachKeyboard, noteOn, noteOff, allOff, getOctave, setOctave, TYPED_VEL } from "./live-keys.js";
@@ -666,7 +666,13 @@ function build(id) {
   disposeFace();
   synthId = id;
   const synth = SYNTH_BANK[id];
-  spec = synth.ui;
+  spec = synth.ui || {
+    logo: ["", synth.name], sub: synth.tagline || "Synthesizer",
+    theme: { accent: synth.color || "#2edb84", lcd: "#d5f6e5", lcdBg: "#10231b", edge: "#40524a", bg: "#17231e" },
+    sections: [{ title: "Sound", items: synth.params.map(p => p.type === "select"
+      ? { type: "radio", key: p.key, options: p.options.map(v => [v, String(v)]) }
+      : { type: "knob", key: p.key, label: p.label, fmt: p.step >= 1 ? "int" : "num2" }) }],
+  };
   schema = Object.fromEntries(synth.params.map((p) => [p.key, p]));
   ctrls = {};
   widgets = {};
@@ -909,31 +915,22 @@ function armLearn(key, elm) {
 }
 function onMidi({ data }) {
   const [status, d1, d2 = 0] = data;
-  const type = status & 0xf0;
-  if (type === 0xb0) {
-    if (!keysLive()) return;
-    if (learn && learnTarget) {
-      for (const cc of Object.keys(ccMap)) if (ccMap[cc] === learnTarget) delete ccMap[cc];
-      ccMap[d1] = learnTarget;
-      saveCcMap();
-      setStatus(`CC ${d1} → ${schema[learnTarget].label}`);
-      root.querySelector(".armed")?.classList.remove("armed");
-      learnTarget = null;
-      return;
-    }
-    const key = ccMap[d1];
-    const p = key && schema[key];
-    if (!p) return;
-    const v = fromNorm(p, d2 / 127, ctrls[key]?.curve);
-    writeParam(key, v);
-    widgets[key]?.set(v);
-  } else if (type === 0x90 && d2 > 0) {
-    // the roll has its own MIDI handler — keysLive() is false while it (or any modal) is open
-    if (!keysLive()) return;
-    noteOn(`midi:${status & 15}:${d1}`, inst, d1, d2 / 127); // held until note-off
-  } else if (type === 0x80 || (type === 0x90 && d2 === 0)) {
-    noteOff(`midi:${status & 15}:${d1}`);
+  // Notes, sustain, bend and panic are owned by midi-input, regardless of editor focus.
+  if ((status & 0xf0) !== 0xb0 || [64, 120, 123].includes(d1) || !isOpen()) return;
+  if (learn && learnTarget) {
+    for (const cc of Object.keys(ccMap)) if (ccMap[cc] === learnTarget) delete ccMap[cc];
+    ccMap[d1] = learnTarget;
+    saveCcMap();
+    setStatus(`CC ${d1} → ${schema[learnTarget].label}`);
+    root.querySelector(".armed")?.classList.remove("armed");
+    learnTarget = null;
+    return;
   }
+  const key = ccMap[d1], p = key && schema[key];
+  if (!p || p.type === "select") return;
+  const v = fromNorm(p, d2 / 127, ctrls[key]?.curve);
+  writeParam(key, v);
+  widgets[key]?.set(v);
 }
 function paintMidi() {
   if (!isOpen()) return;
@@ -1005,14 +1002,8 @@ function showDockInstrument() {
   if (!root) return;
   hideDockPanel();
   paintTabs();
-  setMidiTarget(inst);
   const ins = store.instrument(inst);
   const id = ins.synthId;
-  if (!SYNTH_BANK[id]?.ui) {
-    root.className = "sfp sfp-empty";
-    root.textContent = `${ins.name} has no front panel yet — open its MIDI roll (♪) to edit it.`;
-    return;
-  }
   lit.clear();
   build(id);
   root.dataset.built = "1";
@@ -1049,6 +1040,7 @@ export function openSynthPanel(i) {
   // a visible roll owns the computer keys, so hand over to the dock
   $("#modal-roll")?.classList.add("hidden");
   inst = i;
+  setMidiTarget(i);
   saveDockPref({ inst: i, open: true });
   ensureMidi();
   engine.ensureContext();
@@ -1067,6 +1059,7 @@ export function initSynthPanel() {
   if (!root) return;
   const pref = dockPref();
   inst = Number.isInteger(pref.inst) && store.instrument(pref.inst) ? pref.inst : 0;
+  setMidiTarget(inst);
   dockEl().classList.toggle("tall", !!pref.tall);
   $("#synth-dock-toggle").addEventListener("click", () => setDockOpen(!dockOpen()));
   $("#synth-dock-size").addEventListener("click", () => {
@@ -1078,6 +1071,12 @@ export function initSynthPanel() {
     });
   });
   addMidiListener(onMidi);
+  document.addEventListener("instrument-target", ({ detail }) => {
+    if (inst === detail.i) return;
+    inst = detail.i;
+    saveDockPref({ inst });
+    if (dockOpen()) showDockInstrument(); else paintTabs();
+  });
   document.addEventListener("midi-status", paintMidi);
   window.addEventListener("keydown", onKey, true);
   window.addEventListener("keyup", onKeyUp, true);

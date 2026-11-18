@@ -2,7 +2,7 @@
 // and the classic panel), computer keys and Web MIDI all start and stop notes through here.
 //
 //  - noteOn(src, inst, pitch, vel) / noteOff(src): `src` names the thing holding the note
-//    ("kb3:<pointerId>", "key:a", "midi:0:60"), so a key-up always releases exactly the note its
+//    ("kb3:<pointerId>", "key:a", "midi:<port>:0:60"), so a key-up releases exactly the note its
 //    key-down started, even after an octave shift. Re-pressing a src first releases its old note.
 //  - attachKeyboard(el, …): Pointer Events for mouse, pen and multi-touch, with pointer capture,
 //    glissando (every key passed over plays, up and down), and release on pointerup / cancel /
@@ -12,30 +12,111 @@
 // lights follow real note state whatever the input (sequencer playback included).
 
 import { engine } from "./engine.js";
+import { store } from "./state.js";
+import { createArpeggiator, normalizeArp } from "./arpeggiator.js";
 
-export const TYPED_VEL = 0.8; // computer-keyboard velocity (pointer velocity comes from key height)
-const held = new Map(); // src -> engine live-note id
-let octave = 3; // C3 = MIDI 48 at the bottom of the computer-key row
+export const TYPED_VEL = 0.8;
+const held = new Map(); // physical source -> { id, inst, pitch, vel, bend }
+const outputs = new Map(); // voice id -> input identity, including scheduled arp pulses
+let octave = 3;
 let seq = 0;
-
-export function noteOn(src, inst, pitch, vel = TYPED_VEL) {
-  noteOff(src);
-  if (!(pitch >= 0 && pitch <= 127)) return 0;
-  const id = engine.startNote(inst, pitch, vel);
-  if (id) held.set(src, id);
+let pulse = 0;
+const emit = (detail) => document.dispatchEvent(new CustomEvent("live-note", { detail }));
+export const getArpSettings = (i) => normalizeArp(store.instrument(i)?.arp);
+function startOutput(src, n, options = {}) {
+  const time = options.time ?? engine.ensureContext().currentTime;
+  const id = engine.startNote(n.inst, n.pitch, n.vel, { ...options, source: src, bend: n.bend || 0 });
+  if (id) {
+    outputs.set(id, { src, ...n });
+    emit({ src, inst: n.inst, pitch: n.pitch, vel: n.vel, on: true, time, duration: options.duration });
+  }
   return id;
 }
+function releaseOutput(id, time = engine.ctx?.currentTime || 0) {
+  const n = outputs.get(id);
+  if (!n) return;
+  outputs.delete(id);
+  engine.releaseNote(id, time);
+  emit({ ...n, on: false, time });
+}
+const arp = createArpeggiator({
+  now: () => engine.ensureContext().currentTime,
+  bpm: () => store.project.bpm,
+  settings: getArpSettings,
+  notes: (inst) => [...held.values()].filter(n => n.inst === inst),
+  play: (inst, n, time, duration) => startOutput(`arp:${inst}:${++pulse}`, { ...n, inst }, { time, duration }),
+  stop: releaseOutput,
+  position: (time) => engine.getTransportPosition?.(time),
+});
+export function setArpSettings(i, patch) {
+  if (!store.instrument(i)) return;
+  const previous = getArpSettings(i), next = normalizeArp({ ...previous, ...patch });
+  store.setInstrumentProp(i, "arp", next);
+  return next;
+}
+function refreshArp(i) {
+  arp.cancel(i);
+  const enabled = getArpSettings(i).enabled;
+  for (const [src, n] of held) if (n.inst === i) {
+    if (n.id) releaseOutput(n.id);
+    n.id = enabled ? 0 : startOutput(src, n);
+  }
+  arp.update(i);
+  document.dispatchEvent(new CustomEvent("arp-settings", { detail: { i, settings: getArpSettings(i) } }));
+}
+store.on("instrument", ({ i, prop }) => {
+  if (prop === "arp") refreshArp(i);
+  if (prop === "synthId") {
+    const sources = [];
+    for (const [src, n] of held) if (n.inst === i) { sources.push(src); held.delete(src); }
+    arp.cancel(i);
+    for (const [id, n] of outputs) if (n.inst === i) releaseOutput(id);
+    document.dispatchEvent(new CustomEvent("performance-reset", { detail: { sources } }));
+  }
+});
+export function noteOn(src, inst, pitch, vel = TYPED_VEL, options = {}) {
+  noteOff(src);
+  if (!(pitch >= 0 && pitch <= 127) || !store.instrument(inst)) return 0;
+  engine.ensureContext();
+  const n = { inst, pitch, vel, bend: options.bend || 0, origin: src, id: 0 };
+  held.set(src, n);
+  if (getArpSettings(inst).enabled) arp.update(inst);
+  else n.id = startOutput(src, n);
+  return n.id || 1;
+}
 export function noteOff(src) {
-  const id = held.get(src);
-  if (id == null) return;
+  const n = held.get(src);
+  if (!n) return;
   held.delete(src);
-  engine.releaseNote(id);
+  if (n.id) releaseOutput(n.id);
+  for (const [id, output] of outputs) if (output.origin === src) releaseOutput(id);
+  arp.update(n.inst);
+}
+export function bendNotes(prefix, semitones) {
+  for (const [src, n] of held) if (src.startsWith(prefix)) n.bend = semitones;
+  for (const [id, n] of outputs) if (n.src.startsWith(prefix) || (n.origin && n.origin.startsWith(prefix))) engine.setNotePitchBend?.(id, semitones);
 }
 export function allOff(prefix = "") {
-  for (const k of [...held.keys()]) if (k.startsWith(prefix)) noteOff(k);
+  for (const src of [...held.keys()]) if (src.startsWith(prefix)) noteOff(src);
+  if (!prefix) arp.clear();
+  document.dispatchEvent(new CustomEvent("performance-reset", { detail: { prefix } }));
+}
+export function panic() {
+  allOff();
+  for (const id of [...outputs.keys()]) releaseOutput(id);
+  engine.panic?.();
 }
 export const heldCount = () => held.size;
-
+document.addEventListener("synth-voice-ended", ({ detail }) => {
+  const n = outputs.get(detail.id);
+  if (n) { outputs.delete(detail.id); emit({ ...n, on: false, time: engine.ctx?.currentTime || 0 }); }
+  arp.ended(detail.id);
+});
+store.on("load", () => {
+  allOff();
+  for (const id of [...outputs.keys()]) releaseOutput(id);
+  engine.releaseAll();
+});
 export const getOctave = () => octave;
 export function setOctave(o) {
   const n = Math.min(6, Math.max(0, o | 0));
@@ -52,6 +133,7 @@ function wireGlobal() {
   if (wired || typeof window === "undefined") return;
   wired = true;
   window.addEventListener("blur", () => allOff());
+  document.addEventListener("transport-stop", () => allOff());
   window.addEventListener("pagehide", () => allOff());
   document.addEventListener("visibilitychange", () => document.hidden && allOff());
 }

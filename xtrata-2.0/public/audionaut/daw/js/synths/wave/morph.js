@@ -249,7 +249,7 @@ function morphVoice(ctx, dest, note, P) {
   const { pitch, time } = note;
   const v = clamp(Number.isFinite(note.vel) ? note.vel : 1, 0, 1.5);
   const vq = Math.min(v, 1.4);
-  const gate = Math.max(0.02, Number.isFinite(note.dur) ? note.dur : 0.5);
+  const gate = Math.max(0.02, note.held ? Infinity : Number.isFinite(note.dur) ? note.dur : 0.5);
   const f0 = mtof(pitch);
   const A = Math.max(0.002, P.attack);
   const D = Math.max(0.02, P.decay);

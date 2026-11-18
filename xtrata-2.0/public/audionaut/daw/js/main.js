@@ -20,6 +20,10 @@ import { initSourceBrowser } from "./source-browser.js";
 import { initSamplesLoops } from "./samples-loops-browser.js";
 import { initAudioTools } from "./audio-tools.js";
 import { renderOrdinalReferences } from "./ordinal-links.js";
+import { sourceIdentity } from "./assets.js";
+import { initPerformanceControls } from "./performance-controls.js";
+import { initProjectLibrary } from "./project-library.js";
+import { initPublish } from "./publish.js";
 
 const $ = (s) => document.querySelector(s);
 let sampleRestore = Promise.resolve([]);
@@ -66,10 +70,11 @@ let starterTicket = 0; // a newer pick makes an older one that is still loading 
 // its way.
 async function loadStarter({ guard = null, url = STARTER_URL, message = WELCOME } = {}) {
   const ticket = ++starterTicket;
+  const unchanged = replacementGuard();
   const response = await fetch(url);
   if (!response.ok) throw new Error(`Starter song unavailable (${response.status}).`);
   const text = await response.text();
-  if (ticket !== starterTicket || (guard && store.project !== guard)) return false;
+  if (ticket !== starterTicket || !unchanged() || (guard && store.project !== guard)) return false;
   persist.importProject(text);
   resetHistory();
   ui.setStatus("Loading the starter session's sounds…");
@@ -89,22 +94,20 @@ async function loadStarter({ guard = null, url = STARTER_URL, message = WELCOME 
 // Has the person changed anything since the current project finished loading? Playing, chaining
 // sequences and the project's own samples arriving do not count; steps, notes, synth and mixer
 // changes do. Used to decide when switching songs needs a confirmation.
-const sessionState = { loading: false, edited: false };
-function trackEdits() {
-  for (const event of ["step", "regions", "notes", "instrument", "channel", "channels", "samples", "project"])
-    store.on(event, () => {
-      if (!sessionState.loading) sessionState.edited = true;
-    });
-  store.on("load", () => {
-    sessionState.edited = false;
-    sessionState.loading = true;
-    const mine = sampleRestore;
-    mine.then(
-      () => sampleRestore === mine && (sessionState.loading = false),
-      () => (sessionState.loading = false),
-    );
-  });
+const sessionState = { edited: false, revision: 0 };
+let replacementTicket = 0;
+function replacementGuard() {
+  const project = store.project, revision = sessionState.revision, ticket = ++replacementTicket;
+  return () => store.project === project && sessionState.revision === revision && replacementTicket === ticket;
 }
+function trackEdits() {
+  store.on("dirty", (change) => {
+    sessionState.revision++;
+    if (change?.event !== "load") sessionState.edited = true;
+  });
+  store.on("load", ({ restore } = {}) => { if (!restore) sessionState.edited = false; });
+}
+const confirmReplace = () => !sessionState.edited || confirm("Replace this project? Download a project file first if you want a separate copy of your changes.");
 
 // The song library behind the dropdown. Fails quietly: without the index the select stays hidden
 // and the Starter button still works.
@@ -228,16 +231,23 @@ function initSequenceBar() {
 // ------------------------------------------------------------ file ops
 function initFileOps() {
   $("#btn-save").addEventListener("click", () => {
-    persist.downloadProject();
-    ui.setStatus("Project exported as JSON.");
+    try {
+      persist.downloadProject();
+      sessionState.edited = false;
+      ui.setStatus("Project exported as JSON.");
+    } catch (error) { ui.setStatus(`Export failed: ${error.message}`, true); }
   });
   $("#btn-load").addEventListener("click", () => $("#file-input").click());
   $("#file-input").addEventListener("change", async (e) => {
     const file = e.target.files[0];
     e.target.value = "";
     if (!file) return;
+    if (!confirmReplace()) return;
+    const unchanged = replacementGuard();
     try {
-      persist.importProject(await file.text());
+      const text = await file.text();
+      if (!unchanged()) return ui.setStatus("The project changed while the file was opening. Load it again when ready.", true);
+      persist.importProject(text);
       ui.setStatus("Project loaded. Fetching samples…");
       const failures = await sampleRestore;
       ui.refreshAllChannels();
@@ -260,10 +270,14 @@ function initFileOps() {
       ui.setStatus(`Starter session failed: ${err.message}`, true);
     }
   });
-  $("#btn-new").addEventListener("click", () => {
+  $("#btn-new").addEventListener("click", async () => {
     if (!confirm("Start a new project? Unsaved changes will be lost.")) return;
     stopAll();
-    persist.clearAutosave();
+    const unchanged = replacementGuard();
+    try {
+      if (!await persist.clearAutosave({ guard: unchanged }) || !unchanged())
+        return ui.setStatus("The project changed while New was opening. Your current work was retained.", true);
+    } catch (error) { return ui.setStatus(`Could not start a new project: ${error.message}`, true); }
     store.loadProject(makeProject());
     resetHistory();
     ui.setStatus("New project.");
@@ -296,7 +310,8 @@ function initKeyboard() {
     if (e.code === "Space") {
       e.preventDefault();
       togglePlay();
-    } else if (e.key === "ArrowLeft")
+    } else if (document.querySelector(".modal:not(.hidden)")) return;
+    else if (e.key === "ArrowLeft")
       store.selectSequence(store.project.currentSequence - 1);
     else if (e.key === "ArrowRight")
       store.selectSequence(store.project.currentSequence + 1);
@@ -304,7 +319,7 @@ function initKeyboard() {
 }
 
 // ------------------------------------------------------------ store subscriptions
-const audioKey = (c) => JSON.stringify([c.source ?? null, c.clipSnapshot ?? null]);
+const audioKey = (c) => `${sourceIdentity(c.source)}|${JSON.stringify(c.clipSnapshot ?? null)}`;
 function sameAudioSources(a, b) {
   if (!a || !b || a.channels.length !== b.channels.length) return false;
   return a.channels.every((c, i) => audioKey(c) === audioKey(b.channels[i]));
@@ -316,7 +331,7 @@ function initSubscriptions() {
   // running plays that sequence straight away (same step position, so it stays in
   // time). The engine's own chain-to-next-sequence sets this first, so it's a no-op there.
   store.on("sequence", () => {
-    if (engine.isPlaying)
+    if (engine.isPlaying && !engine._selectingSequence)
       engine.playingSequence = store.project.currentSequence;
   });
   store.on("sequence", () => {
@@ -334,6 +349,13 @@ function initSubscriptions() {
       engine.reverseBuffers.fill(null);
     }
     engine.clampPlayingSequence();
+    if (engine.ctx) {
+      engine.ensureChannelChains();
+      engine.ensureInstrumentChains();
+      engine.setMasterVolume(store.project.masterVolume);
+      for (let i = 0; i < store.numChannels; i++) engine.setChannelVolume(i, store.channel(i).volume);
+      engine.syncDelayToBpm();
+    }
     if (engine.ctx)
       for (let i = 0; i < store.numChannels; i++) engine.rebuildInserts(i);
     if (engine.ctx)
@@ -366,6 +388,7 @@ function initSubscriptions() {
     });
   });
   store.on("channel", ({ ch }) => ui.refreshChannelRow(ch));
+  store.on("channels", () => engine.ensureChannelChains());
   store.on("channel", ({ ch, prop }) => {
     if (engine.ctx) {
       engine.setChannelVolume(ch, store.channel(ch).volume);
@@ -394,7 +417,7 @@ function initSubscriptions() {
     clearTimeout(saveTimer);
     saveTimer = setTimeout(() => {
       saveTimer = null;
-      persist.autosave();
+      persist.autosave().catch((error) => ui.setStatus(`Browser save failed: ${error.message}. Export a project file.`, true));
     }, 800);
   });
   // Flush a pending autosave when the tab is hidden or closed so the last
@@ -403,7 +426,7 @@ function initSubscriptions() {
     if (saveTimer == null) return;
     clearTimeout(saveTimer);
     saveTimer = null;
-    persist.autosave();
+    persist.autosave().catch(() => {}); // persistent save-state indicator reports failures
   };
   addEventListener("pagehide", flushAutosave);
   document.addEventListener("visibilitychange", () => {
@@ -412,7 +435,7 @@ function initSubscriptions() {
 }
 
 // ------------------------------------------------------------ boot
-function boot() {
+async function boot() {
   persist.restoreSettings();
   initHeader();
   initStarterLibrary();
@@ -428,6 +451,9 @@ function boot() {
   initPianoRoll();
   initSynthPanel();
   initMidi();
+  initPerformanceControls();
+  initProjectLibrary({ confirmReplace });
+  initPublish({ samplesReady: () => sampleRestore });
   initArrange();
   initSourceBrowser();
   initSamplesLoops();
@@ -442,8 +468,12 @@ function boot() {
   $("#btn-redo").addEventListener("click", doRedo);
 
   ui.labelIconButtons();
-  const restored = persist.restoreAutosave();
+  const bootProject = store.project;
+  let restored = false;
+  try { restored = await persist.restoreAutosave(); }
+  catch (error) { ui.setStatus(`Browser recovery is unavailable: ${error.message}. You can load a project file.`, true); }
   if (!restored) {
+    if (store.project !== bootProject || sessionState.edited) return;
     syncHeaderFromProject();
     ui.buildChannels();
     attachStrips();
@@ -471,4 +501,10 @@ function boot() {
   }
 }
 
-document.addEventListener("DOMContentLoaded", boot);
+document.addEventListener("audionaut-panic", () => {
+  $("#btn-play").textContent = "▶";
+  $("#btn-play").classList.remove("active");
+  ui.movePlayhead(-1);
+  ui.setStatus("All notes and playback stopped.");
+});
+document.addEventListener("DOMContentLoaded", () => boot().catch((error) => ui.setStatus(`Could not open the workstation: ${error.message}`, true)));

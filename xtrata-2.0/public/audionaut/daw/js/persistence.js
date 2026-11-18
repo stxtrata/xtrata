@@ -17,6 +17,9 @@ import { SYNTH_BANK } from "./synths.js";
 import { validateSoundMetadata } from "./onboard-library.js";
 import { validateClipSnapshot } from "./clip-contract.js";
 import { normalizeOwner, cleanReturns } from "./plugins.js";
+import { internProjectAssets, portableProject, storageAssets, registerAsset, newProjectId, pruneAssets } from "./assets.js";
+import { saveProjectRevision, listProjectRevisions, loadProjectRevision, clearActiveProject, deleteProjectRevisions } from "./project-storage.js";
+import { normalizeArp } from "./arpeggiator.js";
 
 // Display names the synths carried before the rename. A saved instrument whose name is still
 // the old stock name follows the synth to its new name; custom names are never touched.
@@ -57,12 +60,12 @@ function wordMetadata(value) {
 const AUTOSAVE_KEY = "audionaut.v0.2.project";
 const SETTINGS_KEY = "audionaut.v0.2.settings";
 
-// Pretty-printed for files people may open; `compact` (autosave) saves ~30% of
-// the localStorage quota that embedded audio and big projects compete for.
-export function exportProject({ compact = false } = {}) {
+// Pretty-printed for files people may open; compact files omit whitespace.
+// Browser recovery stores project objects and shared assets separately in IndexedDB.
+export function exportProject({ compact = false, project = store.project } = {}) {
   return JSON.stringify(
     {
-      ...store.project,
+      ...portableProject(project),
       format: "audionaut-workstation/2",
       clipSnapshotVersion: 1,
     },
@@ -78,6 +81,7 @@ export function downloadProject() {
   a.download = `${(store.project.projectName || "audional-project").replace(/[^\w\- ]+/g, "")}.json`;
   a.click();
   setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+  updateStatus({ message: "Project exported as a portable file." });
 }
 
 export function importProject(json) {
@@ -92,7 +96,9 @@ export function importProject(json) {
     data.format === "audionaut-workstation/2"
       ? normalizeNative(data)
       : convertLegacy(data);
+  internProjectAssets(project);
   store.loadProject(project);
+  pruneAssets();
   return project;
 }
 
@@ -109,6 +115,7 @@ function normalizeNative(data) {
   if (data.songEndStep != null)
     p.songEndStep = finite(data.songEndStep, 64, 1, MAX_SEQUENCES * NUM_STEPS);
   Object.assign(p, {
+    projectId: typeof data.projectId === "string" && /^[\w-]{1,100}$/.test(data.projectId) ? data.projectId : newProjectId(),
     projectName: data.projectName ?? p.projectName,
     artistName: data.artistName ?? "",
     bpm: +data.bpm || 120,
@@ -206,6 +213,7 @@ function normalizeNative(data) {
       if (!SYNTH_BANK[p.instruments[i].synthId])
         p.instruments[i].synthId = "jims10";
       p.instruments[i].volume = finite(p.instruments[i].volume, 0.8, 0, 1.5);
+      p.instruments[i].arp = normalizeArp(p.instruments[i].arp);
       p.instruments[i].fx =
         inst && inst.fx && typeof inst.fx === "object" ? inst.fx : [];
       p.instruments[i].inserts = inst?.inserts;
@@ -303,7 +311,7 @@ function convertLegacy(data) {
   const p = makeProject();
   p.projectName = data.projectName || "Imported project";
   p.artistName = data.artistName || "";
-  p.bpm = +data.projectBPM || +data.bpm || 120;
+  p.bpm = finite(data.projectBPM ?? data.bpm, 120, 20, 420);
 
   const urls = data.channelURLs || [];
   const vols = data.channelVolume || [];
@@ -362,39 +370,125 @@ function convertLegacy(data) {
   return p;
 }
 
-// --- autosave ---
-export function autosave() {
-  if (!store.settings.autosave) return;
+// --- async browser recovery ---
+let revision = 0, saveQueue = Promise.resolve(), clearedProject = null;
+let status = { state: "dirty", dirty: true, message: "Not saved yet.", savedAt: null };
+const statusListeners = new Set();
+function updateStatus(next) {
+  status = { ...status, ...next };
+  for (const listener of statusListeners) listener({ ...status });
+}
+export function subscribeSaveStatus(listener) {
+  statusListeners.add(listener); listener({ ...status });
+  return () => statusListeners.delete(listener);
+}
+store.on("dirty", () => {
+  revision++;
+  updateStatus({ state: store.settings.autosave ? "dirty" : "disabled", dirty: true,
+    message: store.settings.autosave ? "Changes awaiting browser recovery." : "Browser recovery is off. Export a project file." });
+});
+function reportStorageError(error) {
+  updateStatus({ state: "error", dirty: true, message: `Browser recovery failed: ${error.message || error}. Export a project file to keep your work.` });
+}
+export function autosave({ force = false } = {}) {
+  if (!force && !store.settings.autosave) {
+    updateStatus({ state: "disabled", message: "Browser recovery is off. Export a project file." });
+    return Promise.resolve(null);
+  }
+  const project = store.project, savedRevision = revision;
+  // Capture a small immutable project now; storageAssets captures its audio records
+  // before asynchronous hashing, so later edits cannot change the pending save.
+  const pending = storageAssets(structuredClone(project));
+  updateStatus({ state: "saving", message: "Saving browser recovery…" });
+  const task = saveQueue.catch(() => {}).then(async () => {
+    const prepared = await pending;
+    const saved = await saveProjectRevision(prepared.project, prepared.assets, {
+      isActive: () => project === store.project && project !== clearedProject,
+    });
+    if (project === store.project && savedRevision === revision)
+      updateStatus({ state: "saved", dirty: false, message: "Saved in this browser.", savedAt: saved.updatedAt });
+    else updateStatus({ state: "dirty", dirty: true, message: "Newer changes awaiting browser recovery.", savedAt: saved.updatedAt });
+    return saved;
+  }).catch((error) => { reportStorageError(error); throw error; });
+  // Attach a handler immediately, including when callers intentionally fire-and-forget.
+  task.catch(() => {}); pending.catch(() => {});
+  saveQueue = task;
+  return task;
+}
+async function applyRecovery(saved) {
+  if (!saved) return false;
+  for (const asset of saved.assets) registerAsset(asset.data, asset.id);
+  importProject({ ...saved.project, format: "audionaut-workstation/2" });
+  updateStatus({ state: "saved", dirty: false, message: "Restored browser recovery.", savedAt: saved.updatedAt });
+  return true;
+}
+export async function restoreAutosave() {
+  const initialProject = store.project, initialRevision = revision;
+  const unchanged = () => store.project === initialProject && revision === initialRevision;
+  let loaded = false;
   try {
-    localStorage.setItem(AUTOSAVE_KEY, exportProject({ compact: true }));
-  } catch {
-    document.querySelector("#status-text").textContent =
-      "Browser storage is full. Save a project file to keep embedded audio.";
+    const saved = await loadProjectRevision();
+    if (!unchanged()) return false; // never replace edits made while storage was opening
+    if (saved) return await applyRecovery(saved);
+    const raw = globalThis.localStorage?.getItem(AUTOSAVE_KEY);
+    if (!raw) return false;
+    importProject(raw);
+    loaded = true;
+    const migratedProject = store.project, migratedRevision = revision;
+    // Keep legacy recovery until its replacement is committed successfully.
+    const prepared = await storageAssets(structuredClone(migratedProject));
+    const migrated = await saveProjectRevision(prepared.project, prepared.assets, {
+      isActive: () => store.project === migratedProject && migratedProject !== clearedProject,
+    });
+    globalThis.localStorage?.removeItem(AUTOSAVE_KEY);
+    if (store.project === migratedProject && revision === migratedRevision)
+      updateStatus({ state: "saved", dirty: false, message: "Migrated browser recovery.", savedAt: migrated.updatedAt });
+    return true;
+  } catch (error) {
+    reportStorageError(error);
+    if (loaded) return true; // migration failure must not re-import over subsequent edits
+    if (!unchanged()) return false;
+    // A disabled/unavailable IndexedDB must not make an existing legacy save vanish.
+    try {
+      const raw = globalThis.localStorage?.getItem(AUTOSAVE_KEY);
+      if (raw) { importProject(raw); reportStorageError(error); return true; }
+    } catch { /* retained current project and the original recovery data */ }
+    throw error;
   }
 }
-
-export function restoreAutosave() {
+export const listSavedProjects = () => listProjectRevisions();
+export async function restoreSavedProject(id) {
+  const previous = store.project, previousRevision = revision;
   try {
-    const raw = localStorage.getItem(AUTOSAVE_KEY);
-    if (raw) {
-      importProject(raw);
-      return true;
-    }
-  } catch {
-    /* ignore corrupt */
+    const saved = await loadProjectRevision(id);
+    if (store.project !== previous || revision !== previousRevision)
+      throw new Error("The project changed while recovery loaded; your current work was retained.");
+    return await applyRecovery(saved);
   }
-  return false;
+  catch (error) { reportStorageError(error); throw error; }
+}
+export const deleteSavedProject = (projectId) => deleteProjectRevisions(projectId);
+export async function clearAutosave({ guard = () => true } = {}) {
+  const project = store.project;
+  clearedProject = project;
+  try {
+    await saveQueue.catch(() => {});
+    if (!guard()) { if (clearedProject === project) clearedProject = null; return false; }
+    const cleared = await clearActiveProject({ guard, projectId: project.projectId });
+    if (!cleared || !guard()) { if (clearedProject === project) clearedProject = null; return false; }
+    globalThis.localStorage?.removeItem(AUTOSAVE_KEY);
+    return true;
+  } catch (error) { if (clearedProject === project) clearedProject = null; throw error; }
 }
 
-export function clearAutosave() {
-  try {
-    localStorage.removeItem(AUTOSAVE_KEY);
-  } catch {
-    /* storage unavailable */
-  }
+function syncAutosaveStatus() {
+  if (!store.settings.autosave)
+    updateStatus({ state: "disabled", message: "Browser recovery is off. Export a project file." });
+  else if (status.state === "disabled")
+    updateStatus({ state: status.dirty ? "dirty" : "saved", message: status.dirty ? "Changes awaiting browser recovery." : "Saved in this browser." });
 }
-
 export function saveSettings() {
+  syncAutosaveStatus();
   try {
     localStorage.setItem(SETTINGS_KEY, JSON.stringify(store.settings));
   } catch {
@@ -406,6 +500,7 @@ export function restoreSettings() {
   try {
     const raw = localStorage.getItem(SETTINGS_KEY);
     if (raw) Object.assign(store.settings, JSON.parse(raw));
+    syncAutosaveStatus();
   } catch {
     /* ignore */
   }

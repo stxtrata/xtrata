@@ -26,6 +26,37 @@ body {
   margin: 0;
   height: 100%;
 }
+html { scrollbar-gutter: stable; }
+#performance-bar {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px;
+  padding: 8px 16px; background: var(--panel); border-bottom: 1px solid var(--border);
+}
+#performance-bar label { display: inline-flex; align-items: center; gap: 6px; font-size: 11px; }
+#performance-bar select, .publish-field select {
+  max-width: 100%; background: var(--panel-2); color: var(--text);
+  border: 1px solid var(--border); border-radius: 4px; padding: 4px;
+}
+#live-instrument { max-width: 180px; }
+#live-midi-status { font-size: 10px; color: var(--dim); max-width: 260px; overflow-wrap: anywhere; }
+#live-panic { border-color: var(--danger); }
+#arp-gate { width: 72px; }
+#arp-gate-value { width: 32px; }
+#save-state { min-width: 142px; font-size: 10px; color: var(--dim); }
+#save-state[data-state="saved"] { color: var(--accent); }
+#save-state[data-state="error"] { color: var(--danger); }
+.channel.instrument.midi-target { box-shadow: inset 3px 0 0 var(--accent); }
+.channel.instrument.midi-target .ch-name { border-color: var(--accent); }
+.project-recovery-row { display: flex; gap: 16px; align-items: center; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid var(--border); }
+.project-recovery-row div { min-width: 0; overflow-wrap: anywhere; }
+.project-recovery-row small { display: block; color: var(--dim); margin-top: 5px; }
+.publish-field { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 12px 0; }
+.publish-actions { flex-wrap: wrap; }
+#publish-status, #projects-status { line-height: 1.6; overflow-wrap: anywhere; }
+@media (max-width: 600px) {
+  #performance-bar { padding: 8px; gap: 8px; }
+  #live-midi-status { flex-basis: 100%; max-width: 100%; }
+  .publish-field { flex-direction: column; align-items: flex-start; }
+}
 body {
   background: var(--bg);
   color: var(--text);
@@ -113,6 +144,7 @@ input[type="range"] {
   display: flex;
   gap: 8px;
   min-width: 0;
+  flex-shrink: 0;
 }
 .project-meta input {
   width: 128px;
@@ -189,6 +221,9 @@ input[type="range"] {
 
 .file-ops {
   display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  max-width: 100%;
   gap: 6px;
   margin-left: auto;
 }
@@ -202,16 +237,6 @@ input[type="range"] {
 .starter-select[hidden] {
   display: none;
 }
-@media (min-width: 1180px) {
-  /* one compact header row on desktop */
-  #top-bar {
-    flex-wrap: nowrap;
-  }
-  .file-ops {
-    flex-shrink: 0;
-  }
-}
-
 /* ------------------------------------------------ sequence bar */
 #sequence-bar {
   display: flex;

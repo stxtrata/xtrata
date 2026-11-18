@@ -45,6 +45,8 @@ import { record as recordHistory } from "./history.js";
 import { NUM_INSTRUMENTS } from "./state.js";
 import { SYNTH_BANK } from "./synths.js";
 import { createSynthPicker } from "./synth-picker.js";
+import { changeSynth } from "./synth-selection.js";
+import { getMidiTarget, setMidiTarget } from "./midi-input.js";
 import { openRoll } from "./pianoroll.js";
 import { openSynthPanel } from "./synth-panel.js";
 import {
@@ -325,6 +327,7 @@ export function buildInstruments() {
     const synth = SYNTH_BANK[instr.synthId] || SYNTH_BANK.jims10;
     const row = el("div", "channel instrument");
     row.dataset.inst = i;
+    row.classList.toggle("midi-target", getMidiTarget() === i);
     row.style.setProperty("--ch-color", synth.color);
 
     const ctrl = el("div", "channel-controls");
@@ -332,6 +335,7 @@ export function buildInstruments() {
     const nameInput = el("input", "ch-name");
     nameInput.value = instr.name;
     nameInput.spellcheck = false;
+    nameInput.addEventListener("focus", () => setMidiTarget(i));
     nameInput.addEventListener("change", () =>
       store.setInstrumentProp(i, "name", nameInput.value),
     );
@@ -342,7 +346,6 @@ export function buildInstruments() {
 
     const panelBtn = el("button", "ch-btn panel-open", "🎛");
     panelBtn.title = "Open the synth panel (pots, faders & pads)";
-    panelBtn.hidden = !synth.ui;
     panelBtn.addEventListener("click", () => openSynthPanel(i));
 
     const fxBtn = el("button", "ch-btn fx fxb", "FX");
@@ -356,9 +359,10 @@ export function buildInstruments() {
 
     const previewBtn = el("button", "ch-btn", "▹");
     previewBtn.title = "Preview (C3)";
-    previewBtn.addEventListener("click", () =>
-      engine.triggerNote(i, 48, 1, 0, 0.4),
-    );
+    previewBtn.addEventListener("click", () => {
+      setMidiTarget(i);
+      engine.triggerNote(i, 48, 1, 0, 0.4);
+    });
 
     const muteBtn = el("button", "ch-btn toggle mute", "M");
     muteBtn.title = "Mute";
@@ -390,7 +394,7 @@ export function buildInstruments() {
 
     // per-channel synth picker: any instrument channel can load any synth in the bank
     const synthSel = el("select", "inst-synth-select");
-    synthSel.title = "Synth loaded on this instrument channel — pick any synth (resets its sound to that synth's default patch)";
+    synthSel.title = "Choose a synth. Each synth's last patch is kept on this instrument.";
     synthSel.setAttribute("aria-label", `Instrument ${i + 1} synth`);
     const synthPicker = createSynthPicker(synthSel, SYNTH_BANK); // folder tree: Bass, Leads, … Glass & Crystal
     synthSel.value = instr.synthId in SYNTH_BANK ? instr.synthId : "jims10";
@@ -398,14 +402,8 @@ export function buildInstruments() {
       const id = synthSel.value;
       const next = SYNTH_BANK[id];
       if (!next) return;
-      const prev = store.instrument(i);
-      const prevDefault = SYNTH_BANK[prev.synthId]?.name;
-      store.setInstrumentProp(i, "synthId", id);
-      store.setInstrumentProp(i, "params", null); // the new synth starts from its own defaults
-      // keep a name the user typed; follow the synth name only while it is still the default one
-      if (!prev.name || prev.name === prevDefault) store.setInstrumentProp(i, "name", next.name);
-      document.dispatchEvent(new CustomEvent("instrument-renamed", { detail: i }));
-      setStatus(`${next.name} loaded on instrument ${i + 1}.`);
+      if (changeSynth(i, id)) setStatus(`${next.name} loaded on instrument ${i + 1}; its last patch is restored.`);
+      setMidiTarget(i);
     });
 
     const copyBtn = el("button", "ch-btn tiny", "⧉");
@@ -541,7 +539,7 @@ export function refreshInstrumentRow(i) {
   if (ss && ss.value !== instr.synthId && instr.synthId in SYNTH_BANK) ss.value = instr.synthId;
   markChainButtons(instr, row.querySelector(".fxb"), row.querySelector(".ins"));
   const pb = row.querySelector(".panel-open");
-  if (pb) pb.hidden = !synth.ui;
+  if (pb) pb.hidden = false;
   drawInstStrip(i);
 }
 

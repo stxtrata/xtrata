@@ -89,7 +89,7 @@ const velBite = (v) => 0.6 + 0.4 * Math.min(v, 1.4);
 function jibassVoice(ctx, dest, note, P) {
   const { pitch, time } = note;
   const v = clamp(Number.isFinite(note.vel) ? note.vel : 1, 0, 1.5);
-  const gate = Math.max(0.02, Number.isFinite(note.dur) ? note.dur : 0.5);
+  const gate = Math.max(0.02, note.held ? Infinity : Number.isFinite(note.dur) ? note.dur : 0.5);
   const f0 = mtof(pitch);
 
   // ---------- amp envelope (exponential A-D-S, gate = note length, then R)

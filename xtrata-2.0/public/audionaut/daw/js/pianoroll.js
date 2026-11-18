@@ -5,10 +5,14 @@
 // live recording.
 
 import { store, NUM_STEPS } from "./state.js";
-import { engine, emitNoteVisual } from "./engine.js";
-import { addMidiListener, ensureMidi, setMidiEnabled, isMidiOn, midiStatus, setMidiTarget } from "./midi-input.js";
+import { engine } from "./engine.js";
+import { ensureMidi, setMidiEnabled, isMidiOn, midiStatus, setMidiTarget } from "./midi-input.js";
 import { SYNTH_BANK, synthDefaults, parseLine } from "./synths.js";
 import { createSynthPicker } from "./synth-picker.js";
+import { changeSynth } from "./synth-selection.js";
+import { noteOn, noteOff, allOff, getOctave, setOctave, TYPED_VEL } from "./live-keys.js";
+import { beginTransaction, endTransaction } from "./history.js";
+import { quantizeRecordedSpan } from "./performance-recorder.js";
 
 const $ = (s) => document.querySelector(s);
 
@@ -188,13 +192,8 @@ function onRightEdge(n, x) {
 function onMouseDown(e) {
   if (e.button === 2) return; // handled in contextmenu
   const { x, y } = eventXY(e);
-  if (x < KEY_W) {
-    // keyboard strip: preview
-    const { pitch } = gridPos(x, y);
-    if (pitch >= LOW && pitch <= HIGH)
-      engine.triggerNote(inst, pitch, 1, 0, noteDur * engine.stepDuration());
-    return;
-  }
+  if (x < KEY_W) return;
+
   const n = noteAtXY(x, y);
   if (n) {
     if (!selection.has(n)) {
@@ -440,7 +439,7 @@ function renderSynthPanel() {
   const head = document.createElement("div");
   head.className = "synth-head";
   head.innerHTML = `<span class="synth-name">${synth.name}</span><span class="synth-tag">${synth.tagline}</span>`;
-  if (synth.ui) {
+  if (synth) {
     const open = document.createElement("button");
     open.className = "synth-open-panel";
     open.textContent = "🎛 Open synth panel";
@@ -481,10 +480,11 @@ function renderSynthPanel() {
     const val = document.createElement("span");
     val.className = "synth-val";
     val.textContent = params[p.key];
+    input.dataset.param = p.key;
     input.addEventListener("input", () => {
       const v = p.type === "select" ? input.value : +input.value;
       const cur = {
-        ...synthDefaults(instr.synthId),
+        ...synthDefaults(store.instrument(inst).synthId),
         ...(store.instrument(inst).params || {}),
       };
       cur[p.key] = v;
@@ -527,11 +527,11 @@ const KEYMAP = {
   o: 13,
   l: 14,
 };
-let baseOctave = 3;
+
 
 function onKeyDown(e) {
   if ($("#modal-roll").classList.contains("hidden")) return;
-  if (e.target.matches?.("input, select, textarea")) return;
+  if (e.target.matches?.("input, select, textarea, [contenteditable]")) return;
 
   // editing shortcuts
   const mod = e.metaKey || e.ctrlKey;
@@ -569,76 +569,82 @@ function onKeyDown(e) {
   const k = e.key.toLowerCase();
   if (mod) return; // let global shortcuts (undo/redo) through
   if (k === "z") {
-    baseOctave = Math.max(0, baseOctave - 1);
-    return setRollStatus(`Octave: C${baseOctave}`);
+    return setRollStatus(`Octave: C${setOctave(getOctave() - 1)}`);
   }
   if (k === "x") {
-    baseOctave = Math.min(7, baseOctave + 1);
-    return setRollStatus(`Octave: C${baseOctave}`);
+    return setRollStatus(`Octave: C${setOctave(getOctave() + 1)}`);
   }
   if (!(k in KEYMAP)) return;
-  const pitch = (baseOctave + 1) * 12 + KEYMAP[k];
+  const pitch = (getOctave() + 1) * 12 + KEYMAP[k];
   if (pitch < LOW || pitch > HIGH) return;
-  engine.triggerNote(inst, pitch, 1, 0, noteDur * engine.stepDuration());
+  e.preventDefault();
+  e.stopImmediatePropagation();
   heldTyped.set(k, pitch);
-  emitNoteVisual(inst, pitch, true); // held until the key is released
-  if (recArmed && engine.isPlaying) {
-    const step = engine.currentStep % NUM_STEPS;
-    store.addNote(inst, { step, dur: noteDur, pitch, vel: 1 });
-    drawRoll();
-  }
+  noteOn(`roll:key:${k}`, inst, pitch, TYPED_VEL);
 }
 
 function setRollStatus(msg) {
   $("#roll-status").textContent = msg;
 }
 
-const heldMidi = new Map();
-export function handleMidiMessage({ data }) {
-  if ($("#modal-roll").classList.contains("hidden")) return;
-  const [status, pitch, velocity = 0] = data,
-    type = status & 0xf0,
-    key = `${status & 15}:${pitch}`;
-  if (type === 0x90 && velocity > 0 && pitch >= LOW && pitch <= HIGH) {
-    const vel = velocity / 127;
-    engine.triggerNote(inst, pitch, vel, 0, noteDur * engine.stepDuration());
-    emitNoteVisual(inst, pitch, true); // held until note-off
-    if (recArmed && engine.isPlaying) {
-      const step = Math.max(0, lastPlayStep) % NUM_STEPS,
-        note = { step, dur: Math.min(noteDur, NUM_STEPS - step), pitch, vel };
-      const project = store.project,
-        sequence = store.seq;
-      store.addNote(inst, note);
-      heldMidi.set(key, {
-        note,
-        project,
-        sequence,
-        inst,
-        startedAt: engine.ctx.currentTime,
-        stepDuration: engine.stepDuration(),
-      });
-      drawRoll();
-    }
-  } else if (type === 0x80 || (type === 0x90 && velocity === 0)) {
-    emitNoteVisual(inst, pitch, false);
-    const held = heldMidi.get(key);
-    heldMidi.delete(key);
-    if (
-      held &&
-      held.project === store.project &&
-      held.sequence.notes[held.inst].includes(held.note)
-    ) {
-      held.note.dur = clamp(
-        Math.round(
-          (engine.ctx.currentTime - held.startedAt) / held.stepDuration,
-        ),
-        1,
-        NUM_STEPS - held.note.step,
-      );
-      store.emit("notes", held.inst);
-      drawRoll();
-    }
+const recording = new Map();
+let recordingTransaction = false;
+const rollVisible = () => !$("#modal-roll").classList.contains("hidden");
+function recordFinish(src, time = engine.ctx?.currentTime || 0) {
+  const held = recording.get(src);
+  if (!held) return;
+  recording.delete(src);
+  clearTimeout(held.timer);
+  if (held.project !== store.project) return;
+  const end = Math.min(time, held.end ?? Infinity);
+  if (end < held.time) return; // queued arp pulse was cancelled before it sounded
+  const segments = engine.getTransportSegments?.(held.time, end) || [];
+  if (!segments.length && held.position?.playing) segments.push({ sequenceIndex: held.position.sequenceIndex, startStep: held.position.step, endStep: held.position.step + 1 });
+  const notes = quantizeRecordedSpan(segments, held.pitch, held.vel, NUM_STEPS);
+  for (const { sequenceIndex, note } of notes) {
+    const seq = store.project.sequences[sequenceIndex];
+    if (seq?.notes?.[held.inst]) seq.notes[held.inst].push(note);
   }
+  if (notes.length) store.emit("notes", held.inst);
+  drawRoll();
+}
+function finishRecording() {
+  for (const src of [...recording.keys()]) recordFinish(src);
+  if (recordingTransaction) { recordingTransaction = false; endTransaction(); }
+}
+function onLiveNote({ detail: n }) {
+  if (!n.on) return recordFinish(n.src, n.time);
+  if (!recArmed || !rollVisible() || !engine.isPlaying || n.inst !== inst) return;
+  recordFinish(n.src, n.time);
+  if (!recordingTransaction) { beginTransaction(); recordingTransaction = true; }
+  const held = { ...n, project: store.project, position: engine.getTransportPosition?.(n.time), timer: 0 };
+  if (Number.isFinite(n.duration)) {
+    held.end = n.time + n.duration;
+    held.timer = setTimeout(() => recordFinish(n.src, held.end), Math.max(0, (held.end - engine.ctx.currentTime) * 1000));
+  }
+  recording.set(n.src, held);
+}
+function releaseRollInputs() {
+  finishRecording();
+  allOff("roll:");
+  heldTyped.clear();
+  lit.clear();
+}
+export function closeRoll() {
+  releaseRollInputs();
+  $("#modal-roll").classList.add("hidden");
+}
+function refreshRoll() {
+  selection.clear();
+  drag = null;
+  if (!store.instrument(inst)) inst = 0;
+  if (!rollVisible()) return;
+  const instrument = store.instrument(inst);
+  $("#roll-title").textContent = `${instrument.name} — MIDI Roll`;
+  $("#roll-synth-select").value = instrument.synthId;
+  renderSynthPanel();
+  renderLineSelect();
+  drawRoll();
 }
 
 function paintMidi() {
@@ -646,7 +652,7 @@ function paintMidi() {
   const b = $("#roll-midi");
   if (b) b.textContent = on ? "MIDI input: on" : "Enable MIDI input";
   b?.classList.toggle("on", on);
-  if (!on) heldMidi.clear();
+  if (!on) finishRecording();
   if ($("#modal-roll").classList.contains("hidden")) return;
   setRollStatus(
     error ||
@@ -660,6 +666,7 @@ function paintMidi() {
 
 // --------------------------------------------------------------- modal lifecycle
 export function openRoll(i) {
+  if (inst !== i) releaseRollInputs();
   inst = i;
   setMidiTarget(i);
   ensureMidi();
@@ -683,6 +690,34 @@ export function initPianoRoll() {
   canvas.height = ROWS * CELL_H;
   ctx2d = canvas.getContext("2d");
 
+  const pointers = new Map();
+  document.addEventListener("performance-reset", ({ detail }) => {
+    if (!detail?.prefix || "roll:".startsWith(detail.prefix)) pointers.clear();
+  });
+  const keyPointer = (e) => {
+    const { x, y } = eventXY(e), pitch = gridPos(x, y).pitch;
+    if (x >= KEY_W || x < 0 || pitch < LOW || pitch > HIGH) return null;
+    return pitch;
+  };
+  canvas.addEventListener("pointerdown", e => {
+    const pitch = keyPointer(e);
+    if (e.button > 0 || pitch == null) return;
+    e.preventDefault();
+    canvas.setPointerCapture(e.pointerId);
+    pointers.set(e.pointerId, pitch);
+    noteOn(`roll:pointer:${e.pointerId}`, inst, pitch, TYPED_VEL);
+  });
+  canvas.addEventListener("pointermove", e => {
+    if (!pointers.has(e.pointerId)) return;
+    if (e.pointerType === "mouse" && !e.buttons) { pointers.delete(e.pointerId); noteOff(`roll:pointer:${e.pointerId}`); return; }
+    const pitch = keyPointer(e);
+    if (pitch === pointers.get(e.pointerId)) return;
+    noteOff(`roll:pointer:${e.pointerId}`);
+    pointers.set(e.pointerId, pitch);
+    if (pitch != null) noteOn(`roll:pointer:${e.pointerId}`, inst, pitch, TYPED_VEL);
+  });
+  const pointerEnd = e => { pointers.delete(e.pointerId); noteOff(`roll:pointer:${e.pointerId}`); };
+  for (const type of ["pointerup", "pointercancel", "lostpointercapture"]) canvas.addEventListener(type, pointerEnd);
   canvas.addEventListener("mousedown", onMouseDown);
   canvas.addEventListener("mousemove", onMouseMove);
   window.addEventListener("mouseup", onMouseUp);
@@ -694,17 +729,9 @@ export function initPianoRoll() {
   createSynthPicker(sel, SYNTH_BANK, { cls: "roll-picker" }); // folder tree, wraps the select
   sel.addEventListener("change", () => {
     ensureMidi();
-    store.setInstrumentProp(inst, "synthId", sel.value);
-    store.setInstrumentProp(inst, "params", null);
-    const label = SYNTH_BANK[sel.value].name;
-    store.setInstrumentProp(inst, "name", label);
-    $("#roll-title").textContent = `${label} — MIDI Roll`;
-    renderSynthPanel();
-    renderLineSelect();
-    drawRoll();
-    document.dispatchEvent(
-      new CustomEvent("instrument-renamed", { detail: inst }),
-    );
+    releaseRollInputs();
+    changeSynth(inst, sel.value);
+    refreshRoll();
   });
 
   $("#roll-dur").addEventListener("change", (e) => {
@@ -726,6 +753,7 @@ export function initPianoRoll() {
 
   $("#roll-rec").addEventListener("click", () => {
     recArmed = !recArmed;
+    if (!recArmed) finishRecording();
     $("#roll-rec").classList.toggle("rec-on", recArmed);
     setRollStatus(
       recArmed
@@ -738,11 +766,9 @@ export function initPianoRoll() {
     store.clearNotes(inst);
     drawRoll();
   });
-  $("#roll-close").addEventListener("click", () =>
-    $("#modal-roll").classList.add("hidden"),
-  );
+  $("#roll-close").addEventListener("click", closeRoll);
   $("#roll-midi").addEventListener("click", () => setMidiEnabled(!isMidiOn()));
-  addMidiListener(handleMidiMessage);
+  document.addEventListener("live-note", onLiveNote);
   document.addEventListener("midi-status", paintMidi);
   paintMidi();
 
@@ -750,13 +776,28 @@ export function initPianoRoll() {
   document.addEventListener("keyup", (e) => {
     const k = e.key.toLowerCase();
     if (heldTyped.has(k)) {
-      emitNoteVisual(inst, heldTyped.get(k), false);
+      noteOff(`roll:key:${k}`);
       heldTyped.delete(k);
     }
   });
-  window.addEventListener("blur", () => {
-    for (const p of heldTyped.values()) emitNoteVisual(inst, p, false);
-    heldTyped.clear();
+  window.addEventListener("blur", releaseRollInputs);
+  document.addEventListener("transport-stop", finishRecording);
+  document.addEventListener("performance-reset", finishRecording);
+  new MutationObserver(() => { if (!rollVisible()) releaseRollInputs(); }).observe($("#modal-roll"), { attributes: true, attributeFilter: ["class"] });
+  document.addEventListener("instrument-target", ({ detail }) => {
+    if (rollVisible() && inst !== detail.i) { releaseRollInputs(); inst = detail.i; refreshRoll(); }
+  });
+  store.on("load", () => { releaseRollInputs(); refreshRoll(); });
+  store.on("instrument", ({ i, prop }) => {
+    if (i !== inst || !rollVisible()) return;
+    if (["synthId", "name"].includes(prop)) refreshRoll();
+    if (prop === "params") {
+      const params = { ...synthDefaults(store.instrument(inst).synthId), ...(store.instrument(inst).params || {}) };
+      $("#roll-synth-panel").querySelectorAll("[data-param]").forEach(input => {
+        input.value = params[input.dataset.param];
+        input.parentElement.querySelector(".synth-val").textContent = input.value;
+      });
+    }
   });
   document.addEventListener("synth-note", (e) => {
     if (e.detail.i === inst) setLit(e.detail.pitch, e.detail.on);

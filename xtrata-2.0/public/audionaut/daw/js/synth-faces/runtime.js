@@ -76,14 +76,19 @@ function analyserFor(inst) {
   const ctx = engine.ctx;
   const g = engine.instrumentGains?.[inst];
   if (!ctx || !g) return null;
-  let a = taps.get(inst);
-  if (!a || a.context !== ctx) {
-    a = ctx.createAnalyser();
-    a.fftSize = 2048;
-    g.connect(a); // dead-end tap: only measures, never changes the sound
-    taps.set(inst, a);
+  let tap = taps.get(inst);
+  if (!tap || tap.context !== ctx || tap.gain !== g) {
+    if (tap) {
+      try { tap.gain.disconnect(tap.analyser); } catch { /* the old strip was already disconnected */ }
+      tap.analyser.disconnect();
+    }
+    const analyser = ctx.createAnalyser();
+    analyser.fftSize = 2048;
+    g.connect(analyser); // dead-end tap: only measures, never changes the sound
+    tap = { context: ctx, gain: g, analyser };
+    taps.set(inst, tap);
   }
-  return a;
+  return tap.analyser;
 }
 
 function makeP(synthId, inst, def, root) {

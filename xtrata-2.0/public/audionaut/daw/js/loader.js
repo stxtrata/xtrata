@@ -14,6 +14,7 @@ import { loadPackAudio } from "./pack-library.js";
 import { LANDMARKS } from "./song-format.js";
 import { fetchCatalogueAudio } from "./catalogue-retrieval.js";
 import { base64ToBytes } from "./audio-utils.js";
+import { assetSource, assetData } from "./assets.js";
 const ORDINAL = /^[a-f0-9]{64}i\d+$/i,
   MAX_BYTES = 50 * 1024 * 1024,
   CACHE_BYTES = 64 * 1024 * 1024;
@@ -34,6 +35,7 @@ export function ordinalId(value) {
   return id.toLowerCase();
 }
 export function resolveSource(source, settings = store.settings) {
+  if (source.localAssetId) return assetData(source.localAssetId);
   if (source.type === "ordinal")
     return (
       settings.ordinalsGateway.replace(/\/?$/, "/") + ordinalId(source.value)
@@ -227,17 +229,17 @@ export async function fetchAndDecode(
       return {
         audioBuffer,
         sampleName: source.file.name,
-        source: {
+        source: assetSource({
           type: "file",
           value: inlineBytes(bytes),
           label: source.file.name,
-        },
+        }),
       };
     }
-    if (!source.value?.startsWith("data:"))
+    if (!source.localAssetId && !source.value?.startsWith("data:"))
       throw new Error("Re-select this legacy local file.");
   }
-  const key =
+  const key = source.localAssetId ? "asset:" + source.localAssetId :
     source.type === "synth"
       ? "synth:" +
         (SOUND_BY_KEY[source.value] ? onboardVariant(source).id : source.value)
@@ -305,16 +307,17 @@ export async function fetchAndDecode(
     if (pending.get(key) === request) pending.delete(key);
   }
 }
-export function assignDecodedSample(ch, source, result, { reset = true } = {}) {
+export function assignDecodedSample(ch, source, result, { reset = true, dirty = true } = {}) {
   const channel = store.channel(ch);
   if (!channel) throw new Error("This sample channel no longer exists.");
   tickets.set(ch, Symbol());
   engine.silenceChannel(ch);
   engine.setBuffer(ch, result.audioBuffer);
-  channel.source = result.source || {
+  channel.source = assetSource(result.source || {
     type: source.type,
     value: source.type === "ordinal" ? ordinalId(source.value) : source.value,
     label: source.label,
+    ...(source.localAssetId && { localAssetId: source.localAssetId }),
     ...(source.sourceSha256 && { sourceSha256: source.sourceSha256 }),
     ...(source.audioSha256 && { audioSha256: source.audioSha256 }),
     ...(source.assetId && {
@@ -324,7 +327,7 @@ export function assignDecodedSample(ch, source, result, { reset = true } = {}) {
       contractId: source.contractId,
       verifiedAudio: source.verifiedAudio === true,
     }),
-  };
+  });
   channel.sampleName = source.label || result.sampleName;
   channel.unresolvedSource = null;
   channel.soundMetadata = result.soundMetadata || null;
@@ -352,7 +355,7 @@ export function assignDecodedSample(ch, source, result, { reset = true } = {}) {
     channel.name = String(channel.sampleName)
       .replace(/\.[a-z0-9]+$/i, "")
       .slice(0, 24);
-  store.emit("channel", { ch, prop: "source", value: channel.source });
+  store.emit("channel", { ch, prop: "source", value: channel.source }, { dirty });
   return channel.sampleName;
 }
 // Empties a channel: stops its voices, drops the decoded audio and returns every sample-related
@@ -393,7 +396,7 @@ export async function loadSample(
       "The destination changed while loading.",
       "AbortError",
     );
-  return assignDecodedSample(ch, source, result, { reset: !preserve });
+  return assignDecodedSample(ch, source, result, { reset: !preserve, dirty: !preserve });
 }
 // Restores every channel's audio. Channels load through a small worker pool so
 // slow gateway fetches overlap instead of forming a waterfall at start-up.

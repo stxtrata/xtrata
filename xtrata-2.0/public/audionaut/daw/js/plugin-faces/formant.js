@@ -93,12 +93,22 @@ import { Kit } from "./runtime.js";
   // segmented vowel strip (custom pointer logic -> P.set): el has 5 children
   function vowelStrip(el, P, key) {
     const set = e => { const r = el.getBoundingClientRect(); P.set(key, clamp((e.clientX - r.left) / r.width * 5 - 0.5, 0, 4)); };
-    let drag = false;
-    el.addEventListener('pointerdown', e => { drag = true; try { el.setPointerCapture(e.pointerId); } catch (x) { } set(e); e.preventDefault(); });
-    el.addEventListener('pointermove', e => { if (drag) set(e); });
+    let drag = false, px = 0, value = 0;
+    el.addEventListener('pointerdown', e => {
+      if (e.button) return;
+      drag = true; px = e.clientX;
+      try { el.setPointerCapture(e.pointerId); } catch (x) { }
+      if (!e.shiftKey) set(e);
+      value = P.get(key); e.preventDefault();
+    });
+    el.addEventListener('pointermove', e => {
+      if (!drag) return;
+      value = clamp(value + (e.clientX - px) / Math.max(1, el.getBoundingClientRect().width) * 5 * (e.shiftKey ? 0.2 : 1), 0, 4);
+      P.set(key, value); px = e.clientX;
+    });
     el.addEventListener('pointerup', () => { drag = false; }); el.addEventListener('pointercancel', () => { drag = false; });
     el.addEventListener('dblclick', () => P.set(key, P.def(key).def));
-    el.addEventListener('wheel', e => { e.preventDefault(); P.set(key, clamp(P.get(key) + (e.deltaY < 0 ? 0.25 : -0.25), 0, 4)); }, { passive: false });
+    el.addEventListener('wheel', e => { e.preventDefault(); P.set(key, clamp(P.get(key) + (e.deltaY < 0 ? 0.25 : -0.25) * (e.shiftKey ? 0.2 : 1), 0, 4)); }, { passive: false });
     el.setAttribute('data-vs', key);
     return P.sub(key, v => { el.style.setProperty('--v', v / 4); [...el.children].forEach((c, i) => { c.style.setProperty('--d', clamp(1 - Math.abs(v - i), 0, 1)); c.classList.toggle('on', Math.round(v) === i); }); });
   }

@@ -10,7 +10,7 @@
       rel="icon"
       href="data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2040%2040'%3E%3Cellipse%20cx='20'%20cy='20'%20rx='6.6'%20ry='16.5'%20transform='rotate(18%2020%2020)'%20fill='none'%20stroke='%232f8cff'%20stroke-width='2.8'/%3E%3Cpath%20fill-rule='evenodd'%20fill='%23f58a14'%20d='M30%2020a10%2010%200%201%200-20%200a10%2010%200%201%200%2020%200ZM24.4%2020a4.4%204.4%200%201%201-8.8%200a4.4%204.4%200%201%201%208.8%200Z'/%3E%3Cpath%20d='M20%203.5A6.6%2016.5%200%200%200%2020%2036.5'%20transform='rotate(18%2020%2020)'%20fill='none'%20stroke='%232f8cff'%20stroke-width='2.8'/%3E%3C/svg%3E"
     />
-    <link rel="stylesheet" href="daw/css/style.css?v=20261006j" />
+    <link rel="stylesheet" href="daw/css/style.css?v=20261118" />
     <meta name="robots" content="noindex" />
   </head>
   <body>
@@ -117,6 +117,9 @@
             Beats
           </button>
           <button id="btn-save" title="Export project JSON">Save</button>
+          <button id="btn-projects" title="Saved projects and recovery versions">Projects</button>
+          <button id="btn-publish" title="Export a mix or prepare a project for inscription">Export / Inscribe</button>
+          <span id="save-state" role="status" aria-live="polite">Changes pending</span>
           <button
             id="btn-load"
             title="Load project JSON (new or legacy Audional format)"
@@ -140,6 +143,17 @@
         </div>
       </header>
 
+      <section id="performance-bar" aria-label="Live instrument and arpeggiator">
+        <label>Play instrument <select id="live-instrument" aria-label="Live instrument"></select></label>
+        <button id="live-midi" type="button">Enable MIDI</button>
+        <span id="live-midi-status" role="status" aria-live="polite">MIDI not connected</span>
+        <button id="live-panic" type="button" title="Stop every note, arpeggiator and preview">Panic</button>
+        <label class="chk"><input id="arp-enabled" type="checkbox" /> Arp</label>
+        <label>Rate <select id="arp-rate"><option value="1">1/4</option><option value="2">1/8</option><option value="4" selected>1/16</option><option value="8">1/32</option></select></label>
+        <label>Order <select id="arp-mode"><option value="up">Up</option><option value="down">Down</option><option value="updown">Up / down</option><option value="random">Random</option></select></label>
+        <label>Octaves <select id="arp-octaves"><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option></select></label>
+        <label>Gate <input id="arp-gate" type="range" min="0.1" max="0.95" step="0.05" value="0.7" /><output id="arp-gate-value">70%</output></label>
+      </section>
       <section id="source-bar" aria-label="Audio sources and tools">
         <span class="source-badge">BITCOIN L1 × XTRATA L2</span>
         <button id="btn-l1-audio">L1 audio library</button>
@@ -258,6 +272,29 @@
       </section>
     </div>
 
+    <div id="modal-projects" class="modal hidden">
+      <div class="modal-box" role="dialog" aria-modal="true" aria-labelledby="projects-title">
+        <h2 id="projects-title">Projects and recovery</h2>
+        <p id="projects-status"></p>
+        <div id="project-library-list"></div>
+        <div class="modal-actions"><button id="projects-save">Save in browser now</button><button id="projects-close">Close</button></div>
+      </div>
+    </div>
+    <div id="modal-publish" class="modal hidden">
+      <div class="modal-box" role="dialog" aria-modal="true" aria-labelledby="publish-title">
+        <h2 id="publish-title">Export / Inscribe</h2>
+        <label class="publish-field">File <select id="publish-format"><option value="audio">Stereo audio mix (WAV)</option><option value="project">Editable Audionaut project (JSON)</option></select></label>
+        <label class="publish-field">Audio range <select id="publish-scope"><option value="song">Song — every sequence once</option><option value="sequence">Current sequence once</option></select></label>
+        <label class="publish-field">Effect tail <select id="publish-tail"><option value="2">2 seconds</option><option value="4" selected>4 seconds</option><option value="8">8 seconds</option><option value="12">12 seconds</option></select></label>
+        <p id="publish-status" role="status" aria-live="polite"></p>
+        <div class="modal-actions publish-actions">
+          <button id="publish-prepare" class="primary">Prepare file</button>
+          <button id="publish-download" disabled>Download file</button>
+          <button id="publish-continue" disabled>Review inscription</button>
+          <button id="publish-close">Close</button>
+        </div>
+      </div>
+    </div>
     <!-- Sample loader modal -->
     <div id="modal-loader" class="modal hidden">
       <div class="modal-box">

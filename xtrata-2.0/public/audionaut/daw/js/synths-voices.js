@@ -266,7 +266,7 @@ const fm4 = {
   color: "#22d3ee",
   params: fmParams,
   presets: FM_PRESETS,
-  live: { hold: 2.5 }, // offline-rendered: held notes render a 2.5 s gate, key-up fades
+  live: { sustainLoop: true }, // managed live rendering supplies a continuous sustain region
   voice(ctx, dest, { pitch, vel, time, dur }, P) {
     const v = Math.round(vel * 32) / 32;
     const d = Math.round(dur * 500) / 500;

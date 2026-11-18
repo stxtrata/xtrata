@@ -148,7 +148,7 @@ export async function restoreClipChannel(ch) {
       gateSteps: channel.gateSteps,
     },
   );
-  assignDecodedSample(ch, channel.source, result, { reset: false });
+  assignDecodedSample(ch, channel.source, result, { reset: false, dirty: false });
   channel.trimStart = start / result.audioBuffer.duration;
   channel.trimEnd = end / result.audioBuffer.duration;
   channel.unresolvedSource = null;

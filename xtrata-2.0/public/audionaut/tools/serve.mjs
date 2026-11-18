@@ -4,6 +4,7 @@ import http from "node:http";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { createRequire } from "node:module";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const TYPES = { ".html": "text/html", ".js": "text/javascript", ".mjs": "text/javascript", ".css": "text/css", ".json": "application/json", ".svg": "image/svg+xml", ".png": "image/png", ".wav": "audio/wav", ".mp3": "audio/mpeg", ".webp": "image/webp", ".woff2": "font/woff2" };
@@ -26,12 +27,18 @@ export function serve(port = 0) {
 // Launch headless Chromium (Playwright from the environment or a local install).
 export async function browser() {
   let pw;
-  for (const p of ["playwright", "/opt/npm-tools/node_modules/playwright/index.mjs"]) {
+  for (const p of [process.env.PLAYWRIGHT_MODULE, "playwright", "/opt/npm-tools/node_modules/playwright/index.mjs"].filter(Boolean)) {
     try { pw = await import(p); break; } catch { /* try next */ }
+  }
+  if (!pw) {
+    try { pw = createRequire(import.meta.url)("playwright"); } catch { /* optional global NODE_PATH */ }
   }
   if (!pw) throw new Error("Playwright not found — npm i -g playwright");
   const chromium = pw.chromium || pw.default.chromium;
-  return chromium.launch({ args: ["--autoplay-policy=no-user-gesture-required"] });
+  return chromium.launch({
+    executablePath: process.env.CHROMIUM_PATH || undefined,
+    args: ["--autoplay-policy=no-user-gesture-required"],
+  });
 }
 
 // a page that never touches the network beyond our server (fonts etc. are aborted)

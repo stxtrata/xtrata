@@ -255,7 +255,7 @@ export const PRISM_SYNTHS = {
       const pitch = clamp(num(note.pitch, 60), 0, 127);
       const vel = clamp(num(note.vel, 1), 0, 1.5);
       const time = num(note.time, 0);
-      const dur = Math.max(0, num(note.dur, 0.5));
+      const dur = note.held ? Infinity : Math.max(0, num(note.dur, 0.5));
       if (vel < 0.002 || P.level === 0 || dur < 0.005) return;
       const gate = time + dur;
       const stopAt = gate + P.release + 0.025;

@@ -281,7 +281,7 @@ function textureVoice(ctx, dest, note, P) {
   const { pitch, time } = note;
   const v = clamp(Number.isFinite(note.vel) ? note.vel : 1, 0, 1.5);
   const vq = Math.min(v, 1.4);
-  const gate = Math.max(0.03, Number.isFinite(note.dur) ? note.dur : 0.5);
+  const gate = Math.max(0.03, note.held ? Infinity : Number.isFinite(note.dur) ? note.dur : 0.5);
   const f0 = mtof(pitch);
   const model = MODELS.includes(P.model) ? P.model : "wind";
   const A = Math.min(Math.max(0.005, P.attack), Math.max(0.01, gate * 0.9));

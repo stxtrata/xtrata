@@ -110,7 +110,7 @@ function windsVoice(ctx, dest, note, P) {
   const { pitch, time } = note;
   const v = clamp(Number.isFinite(note.vel) ? note.vel : 1, 0, 1.5);
   const vq = Math.min(v, 1.4);
-  const gate = Math.max(0.02, Number.isFinite(note.dur) ? note.dur : 0.5);
+  const gate = Math.max(0.02, note.held ? Infinity : Number.isFinite(note.dur) ? note.dur : 0.5);
   const f0 = mtof(pitch);
   const model = MODELS.includes(P.model) ? P.model : "brass";
   const A = gate < 0.2 ? Math.min(Math.max(0.005, P.attack), gate * 0.7) : Math.max(0.005, P.attack);
