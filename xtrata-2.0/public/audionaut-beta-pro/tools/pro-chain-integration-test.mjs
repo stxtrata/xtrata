@@ -90,13 +90,26 @@ try {
     const L = await import('/audionaut-beta-pro/daw/js/loader.js');
     const CL = await import('/audionaut-beta-pro/daw/js/chain-library.js');
     const CC = await import('/audionaut-beta-pro/daw/js/clip-contract.js');
+    const { synthDefaults } = await import('/audionaut-beta-pro/daw/js/synths.js');
+    const { defaultInstrumentConfig } = await import('/audionaut-beta-pro/daw/js/pro-instruments-config.js');
+    const { pluginDefaults } = await import('/audionaut-beta-pro/daw/js/plugins.js');
     const { projectFingerprint, SOURCE_HASH_VERSION } = await import('/audionaut-beta-pro/daw/js/chain-draft-storage.js');
     const ctx = new AudioContext(), audio = ctx.createBuffer(1, 22050, 44100);
     for (let i = 0; i < audio.length; i++) audio.getChannelData(0)[i] = .4 * Math.sin(i * 2 * Math.PI * 220 / 44100);
     const source = await A.registerAudioBuffer(audio, { name: 'Synthetic fixture.wav', bitDepth: 'float32' });
     const project = S.makeProject(); project.projectName = 'Immutable fixture'; project.channels.length = 2;
-    project.instruments.length = 0; project.sequences = [S.makeSequence(2, 0)];
+    project.instruments.length = 3; project.sequences = [S.makeSequence(2, 3)];
     project.channels[0].source = source; project.channels[1].source = structuredClone(source);
+    for (const [index, kind] of ['drumrack', 'granulator', 'concertpiano'].entries()) {
+      const instrument = project.instruments[index], config = defaultInstrumentConfig(kind);
+      config.sources = [{ id: 'shared-chain-sample', sourceTrackId: project.channels[0].id }];
+      if (kind === 'drumrack') config.pads[0].sourceId = 'shared-chain-sample';
+      else if (kind === 'granulator') config.sourceId = 'shared-chain-sample';
+      else config.zones = [{ id: 'all-keys', sourceId: 'shared-chain-sample', rootMidi: 60, lowMidi: 0, highMidi: 127, lowVelocity: 1, highVelocity: 127, gain: 1 }];
+      Object.assign(instrument, { synthId: kind, params: synthDefaults(kind), sampleInstrument: config });
+      project.sequences[0].notes[index] = [{ id: `chain-note-${kind}`, step: 0, dur: 4, pitch: kind === 'drumrack' ? 36 : 60, vel: .7 }];
+    }
+    project.master.inserts = ['dynamicEq', 'hybridReverb', 'masteringLimiter', 'gate'].map(type => ({ id: `chain-${type}`, type, enabled: true, params: pluginDefaults(type) }));
     const catalogue = CC.parseClipLibrary(await (await fetch('/audionaut-beta-pro/daw/data/samples-loops-catalogue.json')).json());
     const clipSource = catalogue.sources[0], clip = structuredClone(catalogue.clips.find(clip => clip.sourceId === clipSource.id));
     clip.region = { startSeconds: 0, endSeconds: .5, startFrame: null, endFrame: null, frameRate: null, endExclusive: true };
@@ -165,11 +178,32 @@ try {
     let wrapperRejected = false;
     try { await L.fetchAndDecode({ ...source, value: '909', chainRef: wrapperRef }); } catch (error) { wrapperRejected = /Recursive|external/.test(error.message); }
     L.setChainSourceLibrary(CL.chainLibrary);
-    return { duration: decoded.audioBuffer.duration, wrongLength, guarded, guardUnchanged, preservedManifest, preservedSnapshot, legacySame, badRuntime, wrapperRejected };
+    const { CHAIN_PUBLICATION_MAX_BYTES } = await import('/audionaut-beta-pro/daw/js/chain-publish-limits.js');
+    const { prepareInscription } = await import('/audionaut-beta-pro/daw/js/publish.js');
+    const oversized = new Blob([new Uint8Array(CHAIN_PUBLICATION_MAX_BYTES + 1)], { type: 'audio/wav' });
+    const largeProject = structuredClone(chainTest.project);
+    largeProject.channels[0].source = chainTest.A.registerBlob(oversized, { name: 'Oversized dependency.wav' });
+    let oversizedPackage = false;
+    try { await C.prepareDependencyPackage(largeProject); } catch (error) { oversizedPackage = error.code === 'CHAIN_PUBLICATION_SIZE'; }
+    const oversizedDraft = structuredClone(draft);
+    // Escaped JSON text exceeds the publishing cap while remaining within the
+    // independent 64 MiB chain-document in-memory/read validation limit.
+    oversizedDraft.project.projectName = '\n'.repeat(CHAIN_PUBLICATION_MAX_BYTES / 2);
+    let oversizedSong = false;
+    try { await C.prepareChainPublication(oversizedDraft); } catch (error) { oversizedSong = error.code === 'CHAIN_PUBLICATION_SIZE'; }
+    let handoffOpens = 0, oversizedAudioHandoff = false, oversizedInstructionHandoff = false;
+    const open = IDBFactory.prototype.open;
+    IDBFactory.prototype.open = function (...args) { handoffOpens++; return open.apply(this, args); };
+    try {
+      try { await prepareInscription(new File([oversized], 'oversized.wav', { type: 'audio/wav' })); } catch (error) { oversizedAudioHandoff = error.code === 'CHAIN_PUBLICATION_SIZE'; }
+      try { await prepareInscription(new File([oversized], 'oversized.chain.json', { type: 'application/json' })); } catch (error) { oversizedInstructionHandoff = error.code === 'CHAIN_PUBLICATION_SIZE'; }
+    } finally { IDBFactory.prototype.open = open; }
+    return { duration: decoded.audioBuffer.duration, wrongLength, guarded, guardUnchanged, preservedManifest, preservedSnapshot, legacySame, badRuntime, wrapperRejected, oversizedPackage, oversizedSong, oversizedAudioHandoff, oversizedInstructionHandoff, oversizedNeverOpenedHandoff: handoffOpens === 0 };
   }, song);
   assert.ok(Math.abs(checks.duration - .5) < .0001);
   for (const [key, value] of Object.entries(checks)) if (key !== 'duration') assert.equal(value, true, key);
   console.log('PASS atomic guarded import, old native import, decoded-cache length isolation and no wrapper URL escape');
+  console.log('PASS oversized audio and instruction publication reject before upload handoff storage');
 
   // A real UI race: hold runtime catalog fetch while a user edits the live project.
   const ui = await blank(context);
@@ -211,23 +245,41 @@ try {
     const { engine, store } = AudioNautChainPlayer;
     const analyser = engine.ctx.createAnalyser(); analyser.fftSize = 2048;
     engine.masterGain.connect(analyser);
+    const instrumentMeters = store.project.instruments.map((_, index) => {
+      const meter = engine.ctx.createAnalyser(); meter.fftSize = 2048;
+      engine.instrumentGains[index].connect(meter); return meter;
+    });
+    const instrumentPeaks = instrumentMeters.map(() => 0);
     await engine.play();
-    const samples = new Float32Array(analyser.fftSize); let peak = 0;
-    for (let i = 0; i < 25; i++) {
+    const samples = new Float32Array(analyser.fftSize), audioStart = engine.ctx.currentTime, deadline = performance.now() + 10000; let peak = 0;
+    // Measure an actual audio-clock interval. A busy CI host can leave Firefox's
+    // device clock temporarily stationary while wall-clock timers keep firing.
+    for (let i = 0; performance.now() < deadline && (i < 25 || engine.ctx.currentTime - audioStart < .75); i++) {
       await new Promise(resolve => setTimeout(resolve, 30)); analyser.getFloatTimeDomainData(samples);
       for (const sample of samples) peak = Math.max(peak, Math.abs(sample));
+      for (const [index, meter] of instrumentMeters.entries()) {
+        meter.getFloatTimeDomainData(samples);
+        for (const sample of samples) instrumentPeaks[index] = Math.max(instrumentPeaks[index], Math.abs(sample));
+      }
     }
     const result = { peak, running: engine.isPlaying, channels: store.project.channels.length,
-      duration: engine.buffers[0].duration, context: engine.ctx.state };
-    engine.stop(); engine.masterGain.disconnect(analyser); return result;
+      duration: engine.buffers[0].duration, context: engine.ctx.state, audioElapsed: engine.ctx.currentTime - audioStart, instrumentPeaks,
+      worklets: [...engine.chains.get('master').slots.values()].map(slot => ({ type: slot.typeId, active: !!slot.nodes.wk, error: slot.nodes.workletError || null })) };
+    engine.stop(); engine.masterGain.disconnect(analyser);
+    for (const [index, meter] of instrumentMeters.entries()) engine.instrumentGains[index].disconnect(meter);
+    return result;
   });
-  assert.ok(played.peak > .01, `cold chain playback must be audible: peak ${played.peak}`);
+  assert.ok(played.peak > .01, `cold chain playback must be audible: ${JSON.stringify(played)}`);
   assert.equal(played.running, true); assert.equal(played.context, 'running');
+  assert.ok(played.audioElapsed >= .5, 'the standalone audio device clock must advance');
   assert.equal(played.channels, 2); assert.ok(Math.abs(played.duration - .5) < .0001);
+  assert.equal(played.worklets.length, 4);
+  for (const worklet of played.worklets) { assert.equal(worklet.active, true, `${worklet.type} must use its bundled AudioWorklet`); assert.equal(worklet.error, null, worklet.type); }
+  for (const [index, peak] of played.instrumentPeaks.entries()) assert.ok(peak > .001, `new instrument ${index} must play its chain sample: peak ${peak}`);
   assert.ok(rpcCalls.some(call => call.name === 'get-chunk' || call.name === 'get-chunk-batch'));
   assert.ok(rpcCalls.some(call => call.token === '100'));
   assert.ok(rpcCalls.some(call => call.token === '101'));
-  console.log(`PASS cold standalone runtime reconstructs chain bytes through SDK RPC and plays audio (peak ${played.peak.toFixed(4)})`);
+  console.log(`PASS cold standalone runtime plays all 3 new instruments, 3 new effects and legacy gate with bundled worklets (peak ${played.peak.toFixed(4)})`);
 
   const modifiedRuntime = Buffer.from(runtimeBytes.toString().replace('<script type="module" id="audionaut-runtime">', '<script type="module" id="audionaut-runtime">globalThis.unexpectedRuntimeChange=1;'));
   assert.notEqual(hash(modifiedRuntime), hash(runtimeBytes), 'test changes runtime script');

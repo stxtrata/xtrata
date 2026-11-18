@@ -108,6 +108,9 @@ export async function renderMix(project,buffers,{scope='song',range,tail='auto',
       scheduleDspBoundary(context,progressOwner,at,()=>{abort(signal);onProgress({phase:'render',progress:at/total});});
     }
     const audio=await Promise.race([context.startRendering(),cancelled]);abort(signal);
+    // Processor failures silence a worklet without rejecting startRendering().
+    // Let queued error notifications settle before treating the render as valid.
+    await yieldUI();abort(signal);renderer.assertEffectsHealthy();
     for(const chain of renderer.chains.values())for(const slot of chain.slots.values())if(slot.nodes.automationError)throw new Error(`Effect automation could not render: ${slot.nodes.automationError}`);
     onProgress({phase:'encode',progress:0});
     const blob=await encodeWavAsync(audio,{start:lead,end:Math.min(audio.duration,lead+duration),bitDepth,dither,seed:1,signal,onProgress:progress=>onProgress({phase:'encode',progress})});

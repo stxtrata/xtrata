@@ -51,6 +51,14 @@ const plugin = {
       }
       if (matches.length && contents.includes('new Worker('))
         contents = contents.replace(/type:\s*(['"])module\1/g, "type:'classic'");
+      // A downloaded file has an opaque origin. AudioWorklet module loaders reject
+      // blob:null URLs in Chromium; self-contained data modules work without a host.
+      // The legacy dynamics processors embed their source directly instead of a URL.
+      if (args.path === path.join(js, 'plugin-worklets.js')) {
+        const blobModule = 'URL.createObjectURL(new Blob([WORKLET_SRC], { type: "text/javascript" }))';
+        if (!contents.includes(blobModule)) throw new Error('Legacy worklet packaging changed; review standalone module loading.');
+        contents = contents.replace(blobModule, "'data:text/javascript;charset=utf-8,' + encodeURIComponent(WORKLET_SRC)");
+      }
       return { contents, loader: 'js' };
     });
   }
@@ -99,7 +107,7 @@ for (const p of [...packages.values()].sort((a, b) => a.name.localeCompare(b.nam
 }
 const esc = (s) => s.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;');
 const script =
-  `globalThis.__AUDIONAUT_RUNTIME_URLS={};for(const [id,code] of Object.entries(${JSON.stringify(Object.fromEntries([...resources].sort()))}))globalThis.__AUDIONAUT_RUNTIME_URLS[id]=URL.createObjectURL(new Blob([code],{type:'text/javascript'}));\n${result.outputFiles[0].text}`.replaceAll(
+  `globalThis.__AUDIONAUT_RUNTIME_URLS={};for(const [id,code] of Object.entries(${JSON.stringify(Object.fromEntries([...resources].sort()))}))globalThis.__AUDIONAUT_RUNTIME_URLS[id]=id.endsWith('-worklet.js')?'data:text/javascript;charset=utf-8,'+encodeURIComponent(code):URL.createObjectURL(new Blob([code],{type:'text/javascript'}));\n${result.outputFiles[0].text}`.replaceAll(
     '</script',
     '<\\/script'
   );

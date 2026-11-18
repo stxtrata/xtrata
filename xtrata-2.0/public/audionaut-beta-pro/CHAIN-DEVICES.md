@@ -32,6 +32,15 @@ remote sound service or downloaded third-party DSP engine was added.
   release control and estimated intersample peak protection. This is not a claim
   of certified true-peak compliance for every possible signal.
 
+Hybrid Reverb checks native convolution against a reference impulse. A bundled,
+first-party fallback handles browsers that fail that check, with cooperative
+processing and prepared state transferred to its audio worker. This fallback
+supports **up to two-second IRs for live playback**; verified native processing
+and offline rendering retain the ten-second limit. An oversized live replacement
+retains the previous IR and reports the limit. Real-time results still depend on
+CPU load and initial browser compilation. Fatal audio-processor failures are
+reported during live use and reject exports before WAV encoding.
+
 These have new IDs. Existing Orderbook, Liquidity and Stoploss settings and sounds
 remain available, so old projects do not silently change to a new algorithm.
 The catalogue now contains **31 instruments and 23 effects**.
@@ -77,6 +86,13 @@ playable audio is bound separately.
 Ordinary portable project exports continue to work as before. The new chain
 format is an additional publishing option. New devices are not promised to open
 in older AudioNaut editions; beta-pro continues to import supported older songs.
+
+New inscription preparation and review are capped at **32 MiB per file**, the
+current Xtrata core limit (2,048 chunks of 16,384 bytes). The bound includes the
+runtime, each newly collected audio file and the final instruction JSON; oversized
+files are rejected before the upload handoff. Reading already-inscribed, verified
+references retains its separate manifest limits. A custom contract with a lower
+limit still requires the normal contract-specific review in Create/Wizard.
 
 ## Standalone reconstruction
 

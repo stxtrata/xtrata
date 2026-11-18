@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { parseClipLibrary, resolveClipRegion, canonicalJSON, sha256Text, validateClipSnapshot } from '../daw/js/clip-contract.js';
+import { CHAIN_PUBLICATION_MAX_BYTES, assertChainPublicationSize, assertChainPublicationFiles } from '../daw/js/chain-publish-limits.js';
 import { CHAIN_MANIFEST_FORMAT, CHAIN_SONG_FORMAT, validateChainReference, validateChainManifest,
   scanProjectSources, buildChainSong, validateChainSong, chainRefKey, ChainValidationError } from '../daw/js/chain-manifest.js';
 import { sha256Bytes, verifyChainBytes, createChainLibrary, chainContentUrl,
@@ -36,6 +37,15 @@ test('canonical refs and raw gateway URLs', () => {
   assert.equal(url.searchParams.get('raw'), '1');
   assert.equal(url.searchParams.get('contractId'), contractId);
   assert.equal(chainRefKey(ref), `mainnet:${contractId}:1`);
+});
+test('publication permits exactly 32 MiB and rejects one byte over before any handoff', () => {
+  assert.equal(assertChainPublicationSize(CHAIN_PUBLICATION_MAX_BYTES), 33554432);
+  for (const name of ['Playback runtime.html', 'Collected audio.wav', 'Instruction song.json']) {
+    const exact = [{ name, size: CHAIN_PUBLICATION_MAX_BYTES }];
+    assert.equal(assertChainPublicationFiles(exact), exact);
+    assert.throws(() => assertChainPublicationFiles([{ name, size: CHAIN_PUBLICATION_MAX_BYTES + 1 }]), error => error.code === 'CHAIN_PUBLICATION_SIZE' && /32 MiB/.test(error.message) && /33,554,433/.test(error.message));
+  }
+  assert.equal(validateChainReference({ ...ref, bytes: CHAIN_PUBLICATION_MAX_BYTES + 1 }).bytes, CHAIN_PUBLICATION_MAX_BYTES + 1, 'existing-reference read limit is independent of new publication limit');
 });
 test('token IDs reject precision loss, signs, leading zeros, overflow and malformed hashes', () => {
   for (const tokenId of [1, '-1', '+1', '01', '1.0', '1e3', ' 1', '', (1n << 128n).toString()]) assert.throws(() => validateChainReference({ ...ref, tokenId }), code('TOKEN'));

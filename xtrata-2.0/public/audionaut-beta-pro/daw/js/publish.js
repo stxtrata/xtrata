@@ -1,4 +1,5 @@
 import { HANDOFF_SOURCE } from "./storage-config.js";
+import {assertChainPublicationFiles} from './chain-publish-limits.js';
 import { store } from "./state.js";
 import { engine } from "./engine.js";
 import { exportProjectAsync, autosave } from "./persistence.js";
@@ -13,6 +14,7 @@ const filename = name => (String(name || "Audionaut project").replace(/[^\w\- ]+
 
 export async function prepareInscription(file) {
   const files=Array.isArray(file)?file:[file];
+  assertChainPublicationFiles(files);
   const decision = classifyCreateFiles(files);
   let id;
   try{id=await storeCreateHandoff(files,{reason:decision.reason,source:HANDOFF_SOURCE});}

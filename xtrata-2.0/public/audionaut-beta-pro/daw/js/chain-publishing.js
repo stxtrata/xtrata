@@ -4,6 +4,7 @@ import { fetchAndDecode } from './loader.js';
 import { assetBlob, dataUrlBlob } from './assets.js';
 import { encodeWavAsync } from './audio-utils.js';
 import { RUNTIME_VERSION } from './runtime-version.js';
+import { assertChainPublicationSize } from './chain-publish-limits.js';
 
 const RUNTIME_BASE = new URL('../../chain-runtime/', import.meta.url);
 function at(root, pointer, value) {
@@ -42,6 +43,7 @@ export async function prepareDependencyPackage(
     response = await fetch(new URL('player.html', RUNTIME_BASE), { signal });
   if (!response.ok) throw Error('The playback package could not be read.');
   const runtimeBlob = await response.blob();
+  assertChainPublicationSize(runtimeBlob.size, 'Playback runtime');
   if (
     runtimeBlob.size !== runtime.bytes ||
     (await sha256Bytes(await runtimeBlob.arrayBuffer())) !== runtime.sha256
@@ -67,8 +69,10 @@ export async function prepareDependencyPackage(
     else if (source.value?.startsWith('data:audio/')) blob = dataUrlBlob(source.value);
     else {
       const decoded = await fetchAndDecode(source, { signal });
+      assertChainPublicationSize(44 + decoded.audioBuffer.length * decoded.audioBuffer.numberOfChannels * 4, source.label || 'Collected audio');
       blob = await encodeWavAsync(decoded.audioBuffer, { bitDepth: 'float32', signal });
     }
+    if (!ref) assertChainPublicationSize(blob.size, source.label || 'Collected audio');
     const sha256 = await sha256Bytes(await blob.arrayBuffer());
     let asset = byHash.get(sha256);
     if (!asset) {
@@ -136,12 +140,14 @@ export async function prepareChainPublication(draft, { signal, onProgress } = {}
   )
     throw Error('Use the exact playback runtime prepared by this AudioNaut release.');
   const document = buildChainSong(draft.project, { manifest, bindings: draft.bindings });
-  await prepareChainSongImport(document, { signal, onProgress });
-  return new File(
+  const file = new File(
     [JSON.stringify(document)],
     `${String(document.project.projectName || 'AudioNaut song')
       .replace(/[^\w -]/g, '')
       .slice(0, 80)}.chain.json`,
     { type: 'application/json' }
   );
+  assertChainPublicationSize(file.size, 'Instruction song JSON');
+  await prepareChainSongImport(document, { signal, onProgress });
+  return file;
 }

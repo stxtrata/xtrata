@@ -1,6 +1,7 @@
 // Local first-party module; packaged alongside the app for chain deployment.
 import {DynamicEqDSP,ReverbTailDSP,MasteringLimiterDSP} from './pro-effects-dsp.js';
 import {PRO_WORKLET_PARAMS} from './pro-effects-schema.js';
+import {PartitionedConvolverDSP} from './pro-convolution.js';
 const kernels={dynamicEq:DynamicEqDSP,hybridReverb:ReverbTailDSP,masteringLimiter:MasteringLimiterDSP};
 for(const [id,Kernel] of Object.entries(kernels)){
   class Processor extends AudioWorkletProcessor{
@@ -19,3 +20,16 @@ for(const [id,Kernel] of Object.entries(kernels)){
   }
   registerProcessor(`audionaut-pro-${id}-v1`,Processor);
 }
+registerProcessor('audionaut-pro-convolution-v1',class extends AudioWorkletProcessor{
+  constructor(){
+    super();this.dsp=null;this.dead=false;
+    this.port.onmessage=event=>{
+      if(event.data?.type==='dispose'){this.dead=true;this.dsp=null;}
+      else if(event.data?.type==='init'&&!this.dead){
+        try{const state=event.data.state;this.dsp=new PartitionedConvolverDSP(state.plan,state);this.port.postMessage({type:'ready'});}
+        catch(error){this.dead=true;this.port.postMessage({type:'error',message:error.message});}
+      }
+    };
+  }
+  process(inputs,outputs){if(this.dead)return false;if(this.dsp)this.dsp.process(inputs[0]||[],outputs[0]);return true;}
+});

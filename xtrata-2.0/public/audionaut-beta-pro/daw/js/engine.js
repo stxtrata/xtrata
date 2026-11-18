@@ -836,7 +836,16 @@ export class Engine {
     const pending = [];
     for (const chain of this.chains?.values() || [])
       for (const it of chain.slots.values()) if (it.on && it.nodes.ready) pending.push(it.nodes.ready);
-    return Promise.all(pending);
+    const results = await Promise.all(pending);
+    this.assertEffectsHealthy();
+    return results;
+  }
+
+  assertEffectsHealthy() {
+    for (const chain of this.chains?.values() || [])
+      for (const it of chain.slots.values())
+        if (it.on && it.nodes.processorError)
+          throw new Error(`${PLUGIN_TYPES[it.typeId]?.name || 'Audio effect'} stopped processing: ${it.nodes.processorError}`);
   }
 
   setMasterVolume(v) {
