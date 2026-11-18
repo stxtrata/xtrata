@@ -6,6 +6,7 @@ import {inspectPcmWav,decodePcmPlanes} from '../daw/js/pcm-wav.js';
 import {mixDuration} from '../daw/js/render-mix.js';
 import {makeProject} from '../daw/js/state.js';
 import {serve,browser} from './serve.mjs';
+import {checkOfflinePolicy} from './offline-policy-checks.mjs';
 const planes=[new Float32Array([0,.5,-.5,1.25]),new Float32Array([0,-.5,.5,-1.25])];
 const fake={sampleRate:48000,length:4,duration:4/48000,numberOfChannels:2,getChannelData:i=>planes[i]};
 for(const depth of [16,24,'float32']){const blob=encodeWav(fake,{bitDepth:depth}),view=new DataView(await blob.arrayBuffer());assert.equal(view.getUint16(34,true),depth==='float32'?32:depth);assert.equal(view.getUint16(20,true),depth==='float32'?3:1);if(depth==='float32')assert.equal(view.getFloat32(44+3*8,true),1.25);}
@@ -21,6 +22,9 @@ const staticRequest=srv.listeners('request')[0];srv.removeAllListeners('request'
 srv.on('request',(req,res)=>{if(req.url==='/__export-processor-failure.js'){res.writeHead(200,{'content-type':'text/javascript'});res.end("registerProcessor('export-processor-failure',class extends AudioWorkletProcessor{process(){throw new Error('Synthetic export processor failure');}});");}else staticRequest(req,res);});
 try{
 await page.route('**/__export',r=>r.fulfill({contentType:'text/html',body:'<!doctype html><title>Export test</title><button id=activate>Start audio checks</button>'}));await page.goto(url+'/__export');await page.click('#activate');
+const support=await page.evaluate(async()=>(await import('/audionaut-beta-pro/daw/js/audio-render-support.js')).offlineRenderSupport());
+if(!support.supported){console.log(JSON.stringify(await checkOfflinePolicy(page,url)));console.log('PASS WebKit final audio refusal plus source-independent WAV/ZIP encoding, project/MIDI export, live audio and sample-worker checks; offline export fidelity is unsupported');}
+else {
 const result=await page.evaluate(async()=>{
 const {makeProject,makeSequence,store}=await import('/audionaut-beta-pro/daw/js/state.js');const {normalizeProjectModel}=await import('/audionaut-beta-pro/daw/js/project-model.js');const {renderMix,renderStems}=await import('/audionaut-beta-pro/daw/js/render-mix.js');const {compilePlaybackPlan}=await import('/audionaut-beta-pro/daw/js/playback-plan.js');const {registerAudioBuffer}=await import('/audionaut-beta-pro/daw/js/assets.js');const P=await import('/audionaut-beta-pro/daw/js/persistence.js');const L=await import('/audionaut-beta-pro/daw/js/loader.js');
 const q=makeProject();q.channels.length=1;q.bpm=420;q.playEmptySequences=false;q.sequences=Array.from({length:3},()=>makeSequence(1));q.sequences[0].steps[0][0]=q.sequences[2].steps[0][0]=1;normalizeProjectModel(q);
@@ -46,4 +50,5 @@ store.loadProject(makeProject());const source=await registerAudioBuffer(buffer,{
 await ctx.close();return {bits:view.getUint16(34,true),rate:view.getUint32(24,true),seconds,planned:plan.duration,progress,different,maxDelta,cancelled,stems:stems.length,runtimeFailed,failureMessage,failedAfterReady,readinessRejected,recoverableIrRetained,recordDuration:decoded.audioBuffer.duration,archiveInline:JSON.parse(frozen).channels[0].source.value.startsWith('data:audio/')};
 });
 console.log(JSON.stringify(result));assert.equal(result.bits,24);assert.equal(result.rate,48000);assert.ok(Math.abs(result.seconds-result.planned)<1/48000+.0001);assert.ok(result.maxDelta<1e-6,'seeded exports may differ only by native float32 rounding');assert.equal(result.cancelled,true);assert.equal(result.stems,1);assert.ok(Math.abs(result.recordDuration-.1)<.0001);assert.equal(result.archiveInline,true);assert.ok(result.progress.includes('encode'));assert.equal(result.runtimeFailed,true);assert.match(result.failureMessage,/stopped processing/);assert.equal(result.failedAfterReady,true,'Runtime processor failure must reject after rendering and before encoding');assert.equal(result.readinessRejected,true);assert.equal(result.recoverableIrRetained,true);console.log('Native float32 repeatability maximum sample delta:',result.maxDelta);console.log('PASS pro export: WAV formats, shared plan, repeatability, cancellation/stems, archive roundtrip, fatal processor rejection and recoverable IR preservation');
+}
 }finally{await b.close();srv.close();}

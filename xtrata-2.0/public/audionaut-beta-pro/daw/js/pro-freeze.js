@@ -6,7 +6,9 @@ import {assignDecodedSample} from './loader.js';
 import {PLUGIN_TYPES} from './plugins.js';
 import {compilePlaybackPlan} from './playback-plan.js';
 import {decodePcmWav} from './pcm-wav.js';
+import {assertOfflineRenderSupported} from './audio-render-support.js';
 export async function freezeTrack(trackId,{signal,onProgress}={}){
+  assertOfflineRenderSupported();
   const track=store.track(trackId);if(!track||trackId==='master'||track.freezeState)throw Error('Choose an unfrozen sample or instrument track.');if(store.numChannels>=64)throw Error('Free a sample channel before freezing.');
   if((track.auxSends||[]).some(s=>s.preFader&&s.amount>0)||[...track.inserts||[],...track.fx||[]].some(s=>s.enabled!==false&&PLUGIN_TYPES[s.type]?.shared))throw Error('Use post-fader sends before freezing this track. Pre-fader or mid-chain shared sends need their own printed stem to preserve the mix.');
   if([...track.inserts||[],...track.fx||[]].some(s=>s.sidechainTrackId&&store.project.buses.some(b=>b.id===s.sidechainTrackId)))throw Error('Freeze a bus-sidechained track with a separate printed detector stem first.');

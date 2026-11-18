@@ -20,6 +20,7 @@ import { syncMixer as applyMixer, disposeMixer, validateRouting } from './mixer-
 import { createSamplerVoice } from './sampler-voice.js';
 import {isProInstrument,createProInstrumentVoice} from './pro-instruments.js';
 import { voiceAutomation } from './automation-runtime.js';
+import { assertOfflineRenderSupported } from './audio-render-support.js';
 
 const LOOKAHEAD_MS = 25; // scheduler tick
 const SCHEDULE_AHEAD = 0.12; // seconds scheduled in advance
@@ -29,6 +30,7 @@ const sendBusId = (id) => (typeof id === "string" && id.startsWith("send:") ? id
 
 export class Engine {
   constructor({ store: projectStore = store, contextFactory = null, offline = false, seed = projectStore.project.renderSeed || projectStore.project.projectId } = {}) {
+    if(offline)assertOfflineRenderSupported();
     this.store = projectStore;
     this.contextFactory = contextFactory;
     this.offline = offline;
@@ -66,8 +68,11 @@ export class Engine {
   }
 
   ensureContext() {
+    if(this.offline||typeof this.ctx?.startRendering==='function')assertOfflineRenderSupported();
     if (!this.ctx) {
-      this.ctx = this.contextFactory ? this.contextFactory() : new (window.AudioContext || window.webkitAudioContext)({latencyHint:'interactive'});
+      const context = this.contextFactory ? this.contextFactory() : new (window.AudioContext || window.webkitAudioContext)({latencyHint:'interactive'});
+      if(typeof context.startRendering==='function')assertOfflineRenderSupported();
+      this.ctx=context;
       this.masterGain = this.ctx.createGain();
       this.masterGain.gain.value = this.store.project.masterVolume;
       this.masterGain.connect(this.ctx.destination);

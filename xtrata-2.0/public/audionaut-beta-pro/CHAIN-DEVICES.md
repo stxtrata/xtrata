@@ -87,6 +87,20 @@ Ordinary portable project exports continue to work as before. The new chain
 format is an additional publishing option. New devices are not promised to open
 in older AudioNaut editions; beta-pro continues to import supported older songs.
 
+Audio mix/stem export and track freeze require desktop Chrome/Chromium or Firefox.
+Safari/WebKit can intermittently drop a 128-frame sample block during native
+offline rendering, shifting the remaining notes despite identical source audio.
+Beta-pro therefore refuses those offline output operations on WebKit and explains
+which browser to use. This also covers WebKit-based iPhone/iPad browsers. Live
+playback, editing, file loading, portable project saving and chain instruction
+preparation remain available. Sample decoding and the app's own sample-processing
+workers do not perform the affected offline mix and remain available.
+WebKit also rejects imported reverb responses that need sample-rate conversion;
+use a response matching the audio context's rate or a supported desktop browser.
+A failed replacement preserves the previous response. Internal capability probes
+and older generated-sample code still use native offline contexts; this bounded
+policy does not claim to repair every WebKit audio path.
+
 New inscription preparation and review are capped at **32 MiB per file**, the
 current Xtrata core limit (2,048 chunks of 16,384 bytes). The bound includes the
 runtime, each newly collected audio file and the final instruction JSON; oversized
@@ -119,6 +133,13 @@ Focused suites cover the new instruments/effects at 44.1, 48 and 96 kHz in
 Chromium, Firefox and WebKit; live audio/cleanup; sample mappings; limiter
 measurements; IR transactions; export tails; old sampler velocity formats;
 chain parser/cache/transport failures; and isolated cold-player reconstruction.
+Strict offline-output repeatability is required in Chromium and Firefox.
+WebKit tests verify deterministic source generation, live behavior and explicit
+refusal of unsupported offline exports/freezes; raw DSP diagnostics do not imply
+that native WebKit offline output is reliable.
+Granulator scheduling also has a clock-jump regression: if node setup outlasts
+the remaining grain window, the expired grain is disconnected and skipped before
+an invalid envelope can reach the audio graph.
 The cold reconstruction tests use simulated read-only RPC responses, never
 wallet signing or paid inscriptions. Existing compatibility, recovery, export,
 gate and endurance tests remain in `tools/pro-suite.mjs`.

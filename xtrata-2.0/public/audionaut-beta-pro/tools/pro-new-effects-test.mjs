@@ -7,7 +7,8 @@ try{
   await p.goto(`${server.url}/probe`);
   const result=await p.evaluate(async()=>{
     const base='/audionaut-beta-pro/daw/js/',{PLUGIN_TYPES,pluginDefaults,pluginLatencySamples,pluginTailSeconds,cleanChain}=await import(base+'plugins.js'),{StereoMeter}=await import(base+'metering.js'),{nativeConvolutionReport,prepareConvolutionPlan,convolutionState,convolutionTransfers}=await import(base+'pro-convolution.js');
-    const checks=[],failures=[],metrics={};const check=(name,ok,detail)=>{checks.push(name);if(!ok)failures.push({name,detail});};
+    const support=(await import(base+'audio-render-support.js')).offlineRenderSupport();
+    const checks=[],failures=[],metrics={offlineDeliverySupport:support,scope:'Raw DSP diagnostics and live effect checks; no final-output API is bypassed'};const check=(name,ok,detail)=>{checks.push(name);if(!ok)failures.push({name,detail});};
     const stats=(a,start=0,end=a.duration)=>{let peak=0,energy=0,count=0,bad=0;for(let c=0;c<a.numberOfChannels;c++){const d=a.getChannelData(c);for(let i=Math.floor(start*a.sampleRate);i<Math.min(d.length,Math.floor(end*a.sampleRate));i++){peak=Math.max(peak,Math.abs(d[i]));energy+=d[i]*d[i];count++;if(!Number.isFinite(d[i]))bad++;}}return{peak,rms:Math.sqrt(energy/Math.max(1,count)),bad};};
     const diff=(a,b)=>{let peak=0;for(let c=0;c<a.numberOfChannels;c++)for(let i=0;i<a.length;i++)peak=Math.max(peak,Math.abs(a.getChannelData(c)[i]-b.getChannelData(c)[i]));return peak;};
     const render=async(id,P,sr,{length=1,signal=(i)=>.1*Math.sin(2*Math.PI*997*i/sr),stereo='same',sidechain=null,automate=null,ir=null,convolutionBackend}={})=>{
@@ -86,7 +87,16 @@ try{
     }
     const malformed=cleanChain([{id:'ir-test',type:'hybridReverb',params:{},irSource:{sourceTrackId:'sample-track'}}]);check('IR asset reference persists',malformed[0]?.irSource?.sourceTrackId==='sample-track');check('old limiter retained',PLUGIN_TYPES.limiter.name==='Stoploss'&&PLUGIN_TYPES.reverbSend.name==='Liquidity');check('custom IR export tail',pluginTailSeconds('hybridReverb',{decay:1,predelay:25},{irSource:{sourceTrackId:'sample-track'},irDuration:8})>=8.025);
     for(const [label,resolve]of [['missing',()=>null],['too long',ctx=>ctx.createBuffer(1,ctx.sampleRate*11,ctx.sampleRate)],['invalid',ctx=>{const b=ctx.createBuffer(1,100,ctx.sampleRate);b.getChannelData(0)[0]=NaN;return b;}]]){const ctx=new OfflineAudioContext(2,4800,48000),n=PLUGIN_TYPES.hybridReverb.create(ctx,{irSource:{sourceTrackId:'bad'},resolveImpulseResponse:()=>resolve(ctx)});let error;try{await n.ready;}catch(e){error=e.message;}check(`custom IR ${label} rejected`,!!error,error);PLUGIN_TYPES.hybridReverb.dispose(n);}
+    if (support.supported) {
     const resampled=await render('hybridReverb',{mix:1,balance:0,predelay:0},96000,{length:.2,signal:i=>i===0?1:0,ir:()=>{const c=new OfflineAudioContext(1,4800,48000),b=c.createBuffer(1,4800,48000);b.getChannelData(0)[2400]=1;return b;}});check('custom IR resamples across export rates',stats(resampled.audio,.049,.052).peak>.1,stats(resampled.audio,.049,.052));
+    } else {
+      const ctx=new OfflineAudioContext(2,9600,96000),type=PLUGIN_TYPES.hybridReverb,n=type.create(ctx);await n.ready;
+      const original=n.convolver,source=ctx.createBuffer(1,4800,48000);source.getChannelData(0)[2400]=1;
+      let error;try{await n.setImpulseResponse(source);}catch(e){error={code:e.code,message:e.message};}
+      check('WebKit cross-rate IR conversion rejected with matching-rate guidance',error?.code==='AUDIONAUT_OFFLINE_WEBKIT_UNSUPPORTED'&&/48000/.test(error.message)&&/96000/.test(error.message)&&/Choose an impulse at 96000 Hz/.test(error.message)&&/desktop Chrome, Edge or Firefox/.test(error.message),error);
+      check('WebKit rejected IR conversion retains previous audible graph',n.convolver===original&&!!n.workletError&&!n.processorError);type.dispose(n);
+    }
+
     {
       const ctx=new OfflineAudioContext(2,4800,48000),type=PLUGIN_TYPES.hybridReverb,n=type.create(ctx,{convolutionBackend:'partitioned'});await n.ready;
       const original=n.convolver.buffer,tail=n.wk;let missing=false;try{await n.updateImpulseResponse({sourceTrackId:'missing'},()=>null);}catch{missing=true;}

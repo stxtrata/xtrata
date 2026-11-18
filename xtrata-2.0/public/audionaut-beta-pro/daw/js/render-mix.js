@@ -8,6 +8,7 @@ import {projectTracks,trackAddress,normalizeProjectModel} from './project-model.
 import {projectLatencySeconds} from './mixer-runtime.js';
 import {scheduleDspBoundary} from './plugin-automation.js';
 import {synthTailSeconds} from './synths.js';
+import {assertOfflineRenderSupported} from './audio-render-support.js';
 const abort=signal=>{if(signal?.aborted)throw new DOMException('Export cancelled.','AbortError');};
 const yieldUI=()=>new Promise(resolve=>setTimeout(resolve,0));
 function audible(project,owner){const owners=projectTracks(project);return !owner.mute&&(!owners.some(t=>t.solo)||owner.solo);}
@@ -53,6 +54,7 @@ export function mixDuration(project,{scope='song',tail=4,range}={}){
   const plan=compilePlaybackPlan(project,{scope,range});return plan.duration+(tail==='auto'?estimateTail(project,plan,[]):Math.max(0,Math.min(120,Number(tail)||0)));
 }
 export async function renderMix(project,buffers,{scope='song',range,tail='auto',sampleRate=48000,bitDepth=24,dither=false,signal,onProgress=()=>{},seed=project.renderSeed,stem=null,stage='mix',maxMemoryBytes=512*1024*1024}={}){
+  assertOfflineRenderSupported();
   abort(signal);if(![22050,44100,48000,88200,96000].includes(sampleRate))throw new Error('Choose a supported export sample rate.');
   const snapshot=normalizeProjectModel(structuredClone(project));
   if(stage==='track'){
@@ -118,6 +120,7 @@ export async function renderMix(project,buffers,{scope='song',range,tail='auto',
   }finally{progressOwner.disposed=true;signal?.removeEventListener('abort',cancelHandler);renderer.dispose?.();}
 }
 export async function renderStems(project,buffers,options={}){
+  assertOfflineRenderSupported();
   const tracks=projectTracks(project).filter(t=>!t.mute&&(!options.trackIds||options.trackIds.includes(t.id))),result=[];
   let bytes=0;
   for(let i=0;i<tracks.length;i++){

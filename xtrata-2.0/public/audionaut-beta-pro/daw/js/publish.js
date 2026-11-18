@@ -7,6 +7,7 @@ import { downloadBlob } from "./audio-utils.js";
 import { renderMix, renderStems } from "./render-mix.js";
 import {collectProjectAssets} from './loader.js';
 import {zipFiles} from './zip-files.js';
+import {offlineRenderSupport,assertOfflineRenderSupported} from './audio-render-support.js';
 import { classifyCreateFiles, storeCreateHandoff, takeCreateHandoff, createHandoffUrl } from "../../../create-routing.js";
 
 const $ = selector => document.querySelector(selector);
@@ -33,6 +34,14 @@ export function initPublish({ samplesReady = async () => {} } = {}) {
   const field=(id,label,values,initial)=>{const row=document.createElement('label');row.className='publish-field';row.textContent=label+' ';const select=document.createElement('select');select.id=id;for(const [value,text]of values)select.append(option(value,text));select.value=initial;row.append(select);$('#publish-tail').closest('label').after(row);return select;};
   field('publish-rate','Sample rate',[[22050,'22.05 kHz'],[44100,'44.1 kHz'],[48000,'48 kHz'],[88200,'88.2 kHz'],[96000,'96 kHz']],'48000');
   field('publish-depth','Resolution',[[16,'16-bit PCM'],[24,'24-bit PCM'],['float32','32-bit float']],'24');
+  const audioSupport=offlineRenderSupport(),audioSelected=()=>['audio','stems'].includes($('#publish-format').value);
+  const supportNotice=document.createElement('p');supportNotice.id='publish-audio-support';supportNotice.className='pro-help';supportNotice.hidden=audioSupport.supported;supportNotice.textContent=audioSupport.reason||'';
+  $('#publish-format').closest('label').after(supportNotice);
+  if(!audioSupport.supported){
+    for(const item of $('#publish-format').options)if(['audio','stems'].includes(item.value))item.disabled=true;
+    if(audioSelected())$('#publish-format').value='project';
+    for(const id of ['publish-scope','publish-tail','publish-rate','publish-depth'])$('#'+id).disabled=true;
+  }
   const cancel=document.createElement('button');cancel.id='publish-cancel';cancel.textContent='Cancel preparation';$('#publish-prepare').after(cancel);
   let prepared = null, controller = null;
   const status = message => { $("#publish-status").textContent = message; };
@@ -40,7 +49,8 @@ export function initPublish({ samplesReady = async () => {} } = {}) {
     controller?.abort(); controller = null; prepared = null;
     $("#publish-download").disabled = true;
     $("#publish-continue").disabled = true;
-    status("Prepare a file, download it if you wish, then continue to review inscription costs.");
+    $("#publish-prepare").disabled=!audioSupport.supported&&audioSelected();
+    status(!audioSupport.supported&&audioSelected()?audioSupport.reason:"Prepare a file, download it if you wish, then continue to review inscription costs.");
   };
   $("#btn-publish").addEventListener("click", () => { clear(); modal.classList.remove("hidden"); });
   $("#publish-close").addEventListener("click", () => { clear(); modal.classList.add("hidden"); });
@@ -56,11 +66,12 @@ export function initPublish({ samplesReady = async () => {} } = {}) {
     const mine = controller = new AbortController();
     const button = $("#publish-prepare"); button.disabled = true;
     try {
+      const kind = $("#publish-format").value;
+      if(kind==='audio'||kind==='stems')assertOfflineRenderSupported();
       const cancelled=new Promise((_,reject)=>mine.signal.addEventListener('abort',()=>reject(new DOMException('Export cancelled.','AbortError')),{once:true}));
       await Promise.race([samplesReady(),cancelled]);
       if(mine.signal.aborted)return;
       const project = structuredClone(store.project);
-      const kind = $("#publish-format").value;
       const revision = store.project;
       let changed = false;
       const unsubscribe = store.on("dirty", () => { changed = true; });
@@ -84,7 +95,7 @@ export function initPublish({ samplesReady = async () => {} } = {}) {
       $("#publish-continue").disabled = false;
     } catch (error) {
       if (error.name !== "AbortError") status(`Preparation failed: ${error.message}`);
-    } finally { button.disabled = false; }
+    } finally { button.disabled = !audioSupport.supported&&audioSelected(); }
   });
   $("#publish-download").addEventListener("click", () => prepared && downloadBlob(prepared, prepared.name));
   $("#publish-continue").addEventListener("click", async () => {

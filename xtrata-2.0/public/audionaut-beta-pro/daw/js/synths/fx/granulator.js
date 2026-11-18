@@ -46,12 +46,16 @@ export function createGranulatorVoice(ctx, destination, instrument, config, note
     const source = ctx.createBufferSource(), envelope = ctx.createGain(), pan = ctx.createStereoPanner();
     source.buffer = buffer; source.loop = true; source.loopStart = 0; source.loopEnd = buffer.duration;
     source.playbackRate.value = rate; source.detune.setValueAtTime(bendAt(at) * 100, Math.max(start, at)); pan.pan.value = (random() * 2 - 1) * P.spread;
-    source.connect(envelope).connect(pan).connect(filter);
     const actual = Math.max(start, ctx.currentTime, at), elapsed = actual - at, duration = size - elapsed, curve = new Float32Array(64);
+    // Node creation can span an audio quantum. Recheck after that work: a grain
+    // which was eligible above may now have ended. Do not invent a new tail or
+    // submit a nonpositive curve duration for an expired/subsample remainder.
+    if(duration < 1 / ctx.sampleRate){source.disconnect();envelope.disconnect();pan.disconnect();return;}
     const amplitude = .65 / Math.sqrt(Math.max(1, P.density * size / 2));
     for (let i = 0; i < curve.length; i++) curve[i] = Math.sin(Math.PI * (elapsed + duration * i / (curve.length - 1)) / size) ** 2 * amplitude;
     curve[curve.length - 1] = 0;
     envelope.gain.setValueCurveAtTime(curve, actual, duration);
+    source.connect(envelope).connect(pan).connect(filter);
     const grain = { source, envelope, pan, at, key };
     grains.set(key, grain);
     source.onended = () => { if (grains.get(key) === grain) grains.delete(key); source.disconnect(); envelope.disconnect(); pan.disconnect(); finish(); };

@@ -188,7 +188,7 @@ export function nativeConvolutionReport(sampleRate){
 export async function prepareConvolution(buffer,{forceFallback=false,isCurrent=()=>true,live=false}={}){
   const native=await nativeConvolutionReport(buffer.sampleRate);
   if(native.safe&&!forceFallback)return{kind:'native',buffer,native};
-  if(live&&buffer.duration>PORTABLE_LIVE_IR_SECONDS)throw new Error("This browser's portable live reverb supports impulses up to 2 seconds. Shorten the impulse or render it offline.");
+  if(live&&buffer.duration>PORTABLE_LIVE_IR_SECONDS)throw new Error("This browser's portable live reverb supports impulses up to 2 seconds. Shorten the impulse, or render it in desktop Chrome, Edge or Firefox.");
   if(!isCurrent())throw new Error('Convolution preparation was superseded.');
   const plan=await prepareConvolutionPlan(Array.from({length:buffer.numberOfChannels},(_,ch)=>buffer.getChannelData(ch)),{isCurrent});
   const state=convolutionState(plan),transfers=convolutionTransfers(state),bytes=transfers.reduce((sum,b)=>sum+b.byteLength,0);

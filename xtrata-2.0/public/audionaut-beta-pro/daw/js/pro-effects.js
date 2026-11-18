@@ -4,6 +4,7 @@ import {masteringLatencySamples} from './pro-effects-dsp.js';
 import {scheduleDspBoundary} from './plugin-automation.js';
 import {seededRandom} from './synths/resources.js';
 import {prepareConvolution} from './pro-convolution.js';
+import {assertOfflineRenderSupported} from './audio-render-support.js';
 const lin=x=>Math.pow(10,x/20);
 const contexts=new WeakMap(),earlyBuffers=new WeakMap();
 const defaults=schema=>Object.fromEntries(schema.map(p=>[p.key,p.def]));
@@ -84,6 +85,7 @@ export function validateImpulseResponse(buffer,ctx){
 export async function prepareImpulseResponse(buffer,ctx){
   validateImpulseResponse(buffer,ctx);
   if(buffer.sampleRate===ctx.sampleRate)return buffer;
+  assertOfflineRenderSupported(`This browser cannot reliably convert a ${buffer.sampleRate} Hz reverb impulse to ${ctx.sampleRate} Hz. Choose an impulse at ${ctx.sampleRate} Hz, or convert it in desktop Chrome, Edge or Firefox.`);
   const offline=new OfflineAudioContext(buffer.numberOfChannels,Math.ceil(buffer.duration*ctx.sampleRate),ctx.sampleRate),source=offline.createBufferSource();
   source.buffer=buffer;source.connect(offline.destination);source.start();return offline.startRendering();
 }

@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import './pro-granulator-timing-test.mjs';
 import { serve, browser, page } from './serve.mjs';
 const { srv, url } = await serve(), b = await browser(), logs = [];
 try {
@@ -14,6 +15,8 @@ try {
     const { makeProject, makeSequence } = await import(base + 'state.js');
     const { normalizeProjectModel } = await import(base + 'project-model.js');
     const { renderMix } = await import(base + 'render-mix.js');
+    const { offlineRenderSupport } = await import(base + 'audio-render-support.js');
+    const support = offlineRenderSupport();
     const { decodePcmPlanes, inspectPcmWav } = await import(base + 'pcm-wav.js');
     const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
     const energy = (buffer, from = 0, to = buffer.duration) => {
@@ -22,6 +25,15 @@ try {
       return { rms: Math.sqrt(sum / Math.max(1, count)), peak, finite };
     };
     const compare = (a, b) => { let peak = 0; for (let ch = 0; ch < a.numberOfChannels; ch++) for (let i = 0; i < a.length; i++) peak = Math.max(peak, Math.abs(a.getChannelData(ch)[i] - b.getChannelData(ch)[i])); return peak; };
+    const sampleHash = buffer => { if (!buffer) return null; let hash = 2166136261; for (let ch = 0; ch < buffer.numberOfChannels; ch++) { const data = buffer.getChannelData(ch), bytes = new Uint8Array(data.buffer, data.byteOffset, data.byteLength); for (const byte of bytes) hash = Math.imul(hash ^ byte, 16777619); } return (hash >>> 0).toString(16).padStart(8, '0'); };
+    const repeatDetails = (a, b) => {
+      const x = a.buffer.getChannelData(0), y = b.buffer.getChannelData(0); let firstDifference = -1, lastDifference = -1;
+      for (let i = 0; i < x.length; i++) if (Math.abs(x[i] - y[i]) > 1e-6) { if (firstDifference < 0) firstDifference = i; lastDifference = i; }
+      // Inspect only after both renders complete; a pre-render digest/yield can
+      // hide native source-processing races on some WebKit builds.
+      const sourceA = a.voice.sources?.[0]?.buffer, sourceB = b.voice.sources?.[0]?.buffer;
+      return { difference: compare(a.buffer, b.buffer), firstDifference, lastDifference, onsetA: x.findIndex(v => Math.abs(v) > 1e-6), onsetB: y.findIndex(v => Math.abs(v) > 1e-6), audioA: energy(a.buffer), audioB: energy(b.buffer), sourceHashA: sampleHash(sourceA), sourceHashB: sampleHash(sourceB), sourceDifference: sourceA && sourceB ? compare(sourceA, sourceB) : null };
+    };
     async function render(id, { sr = 48000, pitch = id === 'drumrack' ? 36 : 60, velocity = .8, config, params = {}, source, seed = 1234, change } = {}) {
       const ctx = new OfflineAudioContext(2, sr * 2, sr), instrument = { id: 'instrument-under-test', synthId: id, sampleInstrument: config };
       const voice = createProInstrumentVoice(ctx, ctx.destination, instrument, { pitch, vel: velocity, time: .05, dur: .6, held: false }, { ...synthDefaults(id), ...params }, null, { offline: true, seed, bufferForSource: source });
@@ -31,13 +43,23 @@ try {
       for (let attempt = 0; attempt < 20 && !voice.ended; attempt++) await wait(5);
       return { buffer, voice, cache: starterCacheStats(ctx) };
     }
-    const out = { starters: [], generic: [], pads: [], live: [] };
+    const out = { support, starters: [], generic: [], pads: [], live: [], repeatDiagnostics: {}, sourcePcm: [] };
+    // Pure source PCM determinism is independent of the native offline renderer.
+    const { drumStarterSample } = await import(base + 'synths/drums/drumrack.js');
+    const { granularStarterSample } = await import(base + 'synths/fx/granulator.js');
+    const { pianoStarterSample } = await import(base + 'synths/keys/concertpiano.js');
+    for (const [id, source] of [['drumrack', ctx => drumStarterSample(ctx, 0)], ['granulator', granularStarterSample], ['concertpiano', ctx => pianoStarterSample(ctx, 60, 2)]]) {
+      const a = source(new OfflineAudioContext(1, 1, 48000)), b = source(new OfflineAudioContext(1, 1, 48000));
+      out.sourcePcm.push({ id, difference: compare(a, b), hashA: sampleHash(a), hashB: sampleHash(b), frames: a.length });
+    }
     for (const id of ['drumrack', 'granulator', 'concertpiano']) {
       if (!SYNTH_BANK[id]) throw Error('Instrument not registered: ' + id);
       for (const sr of [44100, 48000, 96000]) {
         const played = await render(id, { sr }); out.starters.push({ id, sr, ...energy(played.buffer), tail: energy(played.buffer, 1.6).rms, ended: played.voice.ended, cacheBytes: played.cache.bytes });
       }
-      const a = await render(id), same = await render(id); out[id + 'Repeat'] = compare(a.buffer, same.buffer);
+      out.repeatDiagnostics[id] = [];
+      for (let pair = 0; pair < 4; pair++) { const a = await render(id), same = await render(id); out.repeatDiagnostics[id].push(repeatDetails(a, same)); }
+      out[id + 'Repeat'] = Math.max(...out.repeatDiagnostics[id].map(pair => pair.difference));
       const ctx = new OfflineAudioContext(2, 48000 * 2, 48000); createVoice(ctx, ctx.destination, SYNTH_BANK[id], id, { pitch: id === 'drumrack' ? 36 : 60, vel: .8, time: .05, dur: .6 }, synthDefaults(id), null, { seed: 1234 }); out.generic.push({ id, ...energy(await ctx.startRendering()) });
       await window.instrumentProgress(id + ' rate/seed/managed voice checks');
     }
@@ -81,6 +103,7 @@ try {
       project.instruments[0].synthId = id; project.instruments[0].params = synthDefaults(id);
       project.sequences[0].notes[0] = [{ id: 'export-note', step: id === 'drumrack' ? 15 : 0, dur: id === 'drumrack' ? .4 : 4, pitch: id === 'drumrack' ? 48 : 60, vel: .8 }];
       project.songEndStep = 16; normalizeProjectModel(project);
+      if (!support.supported) { let code; try { await renderMix(project, []); } catch (error) { code = error.code; } out.exports.push({ id, rejected: code }); continue; }
       const blob = await renderMix(project, [], { tail: 'auto', bitDepth: 'float32' }), bytes = await blob.arrayBuffer(), metadata = inspectPcmWav(bytes), planes = decodePcmPlanes(bytes);
       const buffer = { numberOfChannels: 2, duration: metadata.frames / metadata.sampleRate, sampleRate: metadata.sampleRate, getChannelData: i => planes[i] };
       out.exports.push({ id, seconds: buffer.duration, rms: energy(buffer).rms, late: energy(buffer, 2.05, 2.3).rms });
@@ -92,10 +115,12 @@ try {
     const rack = structuredClone(customDrum); rack.sources[0].sourceTrackId = project.channels[0].id;
     project.instruments[0].synthId = 'drumrack'; project.instruments[0].sampleInstrument = rack; project.instruments[0].params = synthDefaults('drumrack');
     project.sequences[0].notes[0] = [{ id: 'late-custom', step: 15, dur: .4, pitch: 36, vel: .8 }]; normalizeProjectModel(project);
+    if (support.supported) {
     const exported = await renderMix(project, [longSample], { tail: 'auto', bitDepth: 'float32' }), encoded = await exported.arrayBuffer(), header = inspectPcmWav(encoded), decoded = decodePcmPlanes(encoded);
     const longBuffer = { numberOfChannels: 2, duration: header.frames / header.sampleRate, sampleRate: header.sampleRate, getChannelData: i => decoded[i] };
     out.customExport = { seconds: longBuffer.duration, late: energy(longBuffer, 4.5, 5).rms };
     await window.instrumentProgress('custom source tail export');
+    } else { try { await renderMix(project, [longSample]); } catch (error) { out.customExport = { rejected: error.code }; } }
     const live = new AudioContext(); await live.resume();
     for (const id of ['drumrack', 'granulator', 'concertpiano']) {
       const analyser = live.createAnalyser(); analyser.fftSize = 2048; analyser.connect(live.destination);
@@ -113,15 +138,18 @@ try {
   for (const voice of result.starters) { assert.equal(voice.finite, true); assert.ok(voice.rms > 1e-4, JSON.stringify(voice)); assert.ok(voice.peak < 2); assert.ok(voice.tail < 1e-6); assert.equal(voice.ended, true); assert.ok(voice.cacheBytes <= 32 * 1024 * 1024); }
   for (const voice of result.generic) { assert.ok(voice.rms > 1e-4); assert.equal(voice.finite, true); }
   for (const [i, pad] of result.pads.entries()) { assert.equal(pad.index, i); assert.ok(pad.rms > 1e-4); }
-  for (const id of ['drumrack', 'granulator', 'concertpiano']) assert.ok(result[id + 'Repeat'] <= 1e-6, id + ' repeatability');
+  for (const source of result.sourcePcm) { assert.equal(source.difference, 0); assert.equal(source.hashA, source.hashB); assert.ok(source.frames > 0); }
+  if (result.support.supported) for (const id of ['drumrack', 'granulator', 'concertpiano']) assert.ok(result[id + 'Repeat'] <= 1e-6, id + ' repeatability');
   assert.ok(result.velocityRatio > 3.9 && result.velocityRatio < 4.1); assert.equal(result.silentDrum, 0);
   assert.equal(result.grainSource.quiet, 0); assert.ok(result.grainSource.audible > .001); assert.ok(result.grainSeedDifference > .001); assert.equal(result.grainChange.before, 0); assert.ok(result.grainChange.after > .001);
   assert.ok(result.choke.endTime <= .205); assert.ok(result.choke.tail < 1e-7); assert.ok(result.separateRack.endTime > 1); assert.ok(result.separateRack.tail > 1e-5);
   assert.deepEqual(result.zones, ['soft-zone', 'hard-zone']); assert.equal(result.pianoCustom.zone, 'hard-zone'); assert.equal(result.pianoCustom.rate, 2); assert.ok(result.pianoCustom.audible > .001);
   assert.equal(result.missingRejected, true); assert.equal(result.malformedRejected, true); assert.equal(result.budgetRejected, true); assert.equal(result.drumKeyUpKeepsTail, true);
   assert.ok(Math.abs(result.tails.crash - 1.75) < 1e-9); assert.ok(Math.abs(result.tails.longCustom - 7.95) < 1e-9); assert.ok(Math.abs(result.tails.pitchedChase - 2.95) < 1e-9);
+  if (result.support.supported) {
   for (const item of result.exports) { assert.ok(item.rms > .001, JSON.stringify(item)); if (item.id === 'drumrack') { assert.ok(Math.abs(item.seconds - 3.675) <= 1 / 48000); assert.ok(item.late > 1e-4); } }
   assert.ok(Math.abs(result.customExport.seconds - 5.875) <= 1 / 48000); assert.ok(result.customExport.late > .001);
+  } else { for (const item of [...result.exports, result.customExport]) assert.equal(item.rejected, 'AUDIONAUT_OFFLINE_WEBKIT_UNSUPPORTED'); }
   for (const voice of result.live) { assert.equal(voice.audible, true, voice.id); assert.equal(voice.ended, true, voice.id); }
-  assert.deepEqual(logs, []); console.log('PASS three sample instruments: live/offline audio, 16 pads, choke isolation, deterministic input-buffer grains, multisample velocity/root mapping, source failures and cleanup');
+  assert.deepEqual(logs, []); console.log(result.support.supported ? 'PASS three sample instruments: strict repeatability, live/offline audio, pads/choke, granular input, multisample mapping, export tails and cleanup' : 'PASS WebKit instrument source PCM, live audio, pads/choke, mapping and explicit export refusal; raw native offline results are diagnostics only, not delivery fidelity');
 } finally { await b.close(); await new Promise(resolve => srv.close(resolve)); }
