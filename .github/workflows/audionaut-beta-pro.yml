@@ -69,6 +69,7 @@ jobs:
       - run: npm ci
       - run: npx playwright install --with-deps ${{ matrix.browser }}
       - name: Provide a real-time virtual audio output
+        if: matrix.browser == 'firefox'
         run: bash public/audionaut-beta-pro/tools/ci-audio.sh
       - run: node public/audionaut-beta-pro/tools/pro-recovery-test.mjs
       - run: node public/audionaut-beta-pro/tools/pro-workspace-test.mjs
