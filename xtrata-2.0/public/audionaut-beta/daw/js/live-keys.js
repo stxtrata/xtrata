@@ -1,0 +1,208 @@
+// live-keys.js — the ONE shared path for playing a synth live: on-screen keyboards (every face
+// and the classic panel), computer keys and Web MIDI all start and stop notes through here.
+//
+//  - noteOn(src, inst, pitch, vel) / noteOff(src): `src` names the thing holding the note
+//    ("kb3:<pointerId>", "key:a", "midi:<port>:0:60"), so a key-up releases exactly the note its
+//    key-down started, even after an octave shift. Re-pressing a src first releases its old note.
+//  - attachKeyboard(el, …): Pointer Events for mouse, pen and multi-touch, with pointer capture,
+//    glissando (every key passed over plays, up and down), and release on pointerup / cancel /
+//    lost capture / window blur / tab switch.
+//  - one octave setting shared by the computer keys and every on-screen keyboard.
+// Key lights are not drawn here: engine.startNote / releaseNote emit "synth-note" events, so
+// lights follow real note state whatever the input (sequencer playback included).
+
+import { engine } from "./engine.js";
+import { store } from "./state.js";
+import { createArpeggiator, normalizeArp } from "./arpeggiator.js";
+
+export const TYPED_VEL = 0.8;
+const held = new Map(); // physical source -> { id, inst, pitch, vel, bend }
+const outputs = new Map(); // voice id -> input identity, including scheduled arp pulses
+let octave = 3;
+let seq = 0;
+let pulse = 0;
+const emit = (detail) => document.dispatchEvent(new CustomEvent("live-note", { detail }));
+export const getArpSettings = (i) => normalizeArp(store.instrument(i)?.arp);
+function startOutput(src, n, options = {}) {
+  const time = options.time ?? engine.ensureContext().currentTime;
+  const id = engine.startNote(n.inst, n.pitch, n.vel, { ...options, source: src, bend: n.bend || 0 });
+  if (id) {
+    outputs.set(id, { src, ...n });
+    emit({ src, inst: n.inst, pitch: n.pitch, vel: n.vel, on: true, time, duration: options.duration });
+  }
+  return id;
+}
+function releaseOutput(id, time = engine.ctx?.currentTime || 0) {
+  const n = outputs.get(id);
+  if (!n) return;
+  outputs.delete(id);
+  engine.releaseNote(id, time);
+  emit({ ...n, on: false, time });
+}
+const arp = createArpeggiator({
+  now: () => engine.ensureContext().currentTime,
+  bpm: () => store.project.bpm,
+  settings: getArpSettings,
+  notes: (inst) => [...held.values()].filter(n => n.inst === inst),
+  play: (inst, n, time, duration) => startOutput(`arp:${inst}:${++pulse}`, { ...n, inst }, { time, duration }),
+  stop: releaseOutput,
+  position: (time) => engine.getTransportPosition?.(time),
+});
+export function setArpSettings(i, patch) {
+  if (!store.instrument(i)) return;
+  const previous = getArpSettings(i), next = normalizeArp({ ...previous, ...patch });
+  store.setInstrumentProp(i, "arp", next);
+  return next;
+}
+function refreshArp(i) {
+  arp.cancel(i);
+  const enabled = getArpSettings(i).enabled;
+  for (const [src, n] of held) if (n.inst === i) {
+    if (n.id) releaseOutput(n.id);
+    n.id = enabled ? 0 : startOutput(src, n);
+  }
+  arp.update(i);
+  document.dispatchEvent(new CustomEvent("arp-settings", { detail: { i, settings: getArpSettings(i) } }));
+}
+store.on("instrument", ({ i, prop }) => {
+  if (prop === "arp") refreshArp(i);
+  if (prop === "synthId") {
+    const sources = [];
+    for (const [src, n] of held) if (n.inst === i) { sources.push(src); held.delete(src); }
+    arp.cancel(i);
+    for (const [id, n] of outputs) if (n.inst === i) releaseOutput(id);
+    document.dispatchEvent(new CustomEvent("performance-reset", { detail: { sources } }));
+  }
+});
+export function noteOn(src, inst, pitch, vel = TYPED_VEL, options = {}) {
+  noteOff(src);
+  if (!(pitch >= 0 && pitch <= 127) || !store.instrument(inst)) return 0;
+  engine.ensureContext();
+  const n = { inst, pitch, vel, bend: options.bend || 0, origin: src, id: 0 };
+  held.set(src, n);
+  if (getArpSettings(inst).enabled) arp.update(inst);
+  else n.id = startOutput(src, n);
+  return n.id || 1;
+}
+export function noteOff(src) {
+  const n = held.get(src);
+  if (!n) return;
+  held.delete(src);
+  if (n.id) releaseOutput(n.id);
+  for (const [id, output] of outputs) if (output.origin === src) releaseOutput(id);
+  arp.update(n.inst);
+}
+export function bendNotes(prefix, semitones) {
+  for (const [src, n] of held) if (src.startsWith(prefix)) n.bend = semitones;
+  for (const [id, n] of outputs) if (n.src.startsWith(prefix) || (n.origin && n.origin.startsWith(prefix))) engine.setNotePitchBend?.(id, semitones);
+}
+export function allOff(prefix = "") {
+  for (const src of [...held.keys()]) if (src.startsWith(prefix)) noteOff(src);
+  if (!prefix) arp.clear();
+  document.dispatchEvent(new CustomEvent("performance-reset", { detail: { prefix } }));
+}
+export function panic() {
+  allOff();
+  for (const id of [...outputs.keys()]) releaseOutput(id);
+  engine.panic?.();
+}
+export const heldCount = () => held.size;
+document.addEventListener("synth-voice-ended", ({ detail }) => {
+  const n = outputs.get(detail.id);
+  if (n) { outputs.delete(detail.id); emit({ ...n, on: false, time: engine.ctx?.currentTime || 0 }); }
+  arp.ended(detail.id);
+});
+store.on("load", () => {
+  allOff();
+  for (const id of [...outputs.keys()]) releaseOutput(id);
+  engine.releaseAll();
+});
+export const getOctave = () => octave;
+export function setOctave(o) {
+  const n = Math.min(6, Math.max(0, o | 0));
+  if (n === octave) return octave;
+  octave = n;
+  document.dispatchEvent(new CustomEvent("live-octave", { detail: octave }));
+  return octave;
+}
+// semitone offset applied to on-screen keyboards (0 at the default octave)
+export const keyOffset = () => 12 * (octave - 3);
+
+let wired = false;
+function wireGlobal() {
+  if (wired || typeof window === "undefined") return;
+  wired = true;
+  window.addEventListener("blur", () => allOff());
+  document.addEventListener("transport-stop", () => allOff());
+  window.addEventListener("pagehide", () => allOff());
+  document.addEventListener("visibilitychange", () => document.hidden && allOff());
+}
+wireGlobal();
+
+// Attach glissando pointer play to a keyboard container.
+//   keyAt(node) -> { midi, el } | null   which key a hit-tested node belongs to
+//   inst()      -> instrument slot to play
+//   velAt(e, el) optional; default: lower on the key = louder (0.45 … 1.0)
+export function attachKeyboard(el, { keyAt, inst, velAt }) {
+  const tag = `kb${++seq}`;
+  const ptrs = new Map(); // pointerId -> midi currently held by that pointer (or null when off the keys)
+  const rootNode = el.getRootNode();
+  const hitRoot = rootNode && rootNode.elementFromPoint ? rootNode : document;
+  const vel =
+    velAt ||
+    ((e, k) => {
+      const r = k.getBoundingClientRect();
+      const f = r.height ? (e.clientY - r.top) / r.height : 0.6;
+      return 0.45 + 0.55 * Math.min(1, Math.max(0, f));
+    });
+  const hit = (e) => {
+    const n = hitRoot.elementFromPoint(e.clientX, e.clientY);
+    return n && el.contains(n) ? keyAt(n) : null;
+  };
+  const press = (e, k) => {
+    ptrs.set(e.pointerId, k.midi);
+    noteOn(`${tag}:${e.pointerId}`, inst(), k.midi, vel(e, k.el));
+  };
+  const end = (e) => {
+    if (!ptrs.has(e.pointerId)) return;
+    ptrs.delete(e.pointerId);
+    noteOff(`${tag}:${e.pointerId}`);
+  };
+  const onDown = (e) => {
+    if (e.button > 0) return;
+    const k = hit(e) || keyAt(e.target);
+    if (!k) return;
+    e.preventDefault();
+    try {
+      el.setPointerCapture(e.pointerId);
+    } catch {
+      /* synthetic pointer */
+    }
+    press(e, k);
+  };
+  const onMove = (e) => {
+    if (!ptrs.has(e.pointerId)) return;
+    if (e.pointerType === "mouse" && e.buttons === 0) return end(e); // missed the up (e.g. outside a frame)
+    const k = hit(e);
+    const cur = ptrs.get(e.pointerId);
+    const m = k ? k.midi : null;
+    if (m === cur) return;
+    noteOff(`${tag}:${e.pointerId}`);
+    if (k) press(e, k);
+    else ptrs.set(e.pointerId, null); // left the keys: silent until it comes back
+  };
+  el.addEventListener("pointerdown", onDown);
+  el.addEventListener("pointermove", onMove);
+  el.addEventListener("pointerup", end);
+  el.addEventListener("pointercancel", end);
+  el.addEventListener("lostpointercapture", end);
+  el.addEventListener("contextmenu", (e) => e.preventDefault());
+  el.style.touchAction = "none";
+  return {
+    tag,
+    release() {
+      allOff(`${tag}:`);
+      ptrs.clear();
+    },
+  };
+}

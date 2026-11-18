@@ -3,6 +3,9 @@
 /arcade/ /x/3653?fullscreen=1 302
 /audionaut /audionaut/index.html 200
 /audionaut/ /audionaut/index.html 200
+# Community beta: same holder gate, separate workstation and browser storage.
+/audionaut-beta /audionaut-beta/index.html 200
+/audionaut-beta/ /audionaut-beta/index.html 200
 # Artist portal: preserve published Audionaut links and cached page assets.
 /audionauts/royalties /music/artist/royalties/collections/audionauts-1-0/ 301
 /audionauts/royalties/ /music/artist/royalties/collections/audionauts-1-0/ 301
