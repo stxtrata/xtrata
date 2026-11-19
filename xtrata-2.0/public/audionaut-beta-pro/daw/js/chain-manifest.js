@@ -1,5 +1,6 @@
 // Immutable, transport-independent dependency documents. No wallet or store access.
 import { validateClipSnapshot } from './clip-contract.js';
+import { validateLegacyImport } from './legacy-bridge/provenance.js';
 export const CHAIN_MANIFEST_FORMAT = 'audionaut-chain-manifest/1';
 export const CHAIN_SONG_FORMAT = 'audionaut-chain-song/1';
 export const CHAIN_LIMITS = Object.freeze({ maxAssets: 4096, maxAssetBytes: 256 * 1024 * 1024,
@@ -142,6 +143,10 @@ export function scanProjectSources(project, options = {}) {
     // Original catalogue snapshots carry hashed provenance URLs, not fetch instructions.
     // Their channel's source is still bound normally; chain loading never follows this metadata.
     if (key === 'clipSnapshot' && value !== null) { validateInertClipSnapshot(value, path); return; }
+    // This bounded schema contains provenance only (hashes, reviewed repair
+    // evidence and inactive legacy instructions). Audio sources remain on the
+    // channel graph and must still bind to immutable manifest dependencies.
+    if(path==='/legacyImport'&&value!==null){validateLegacyImport(value);return;}
     if (value !== null && typeof value === 'object' && /(?:assetData|audioData|base64|binary|buffer)$/i.test(key)) unresolved.push({ path, reason: 'Inline binary resource has no immutable dependency' });
     if (!value || typeof value !== 'object') {
       if (typeof value === 'string' && value && (LOCATOR.test(value.trim()) || RESOURCE_KEY.test(key))) unresolved.push({ path, reason: 'Unbound external or local resource' });

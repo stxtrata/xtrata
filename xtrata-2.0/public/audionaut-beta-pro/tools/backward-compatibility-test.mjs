@@ -59,12 +59,22 @@ const legacy = {
   trimSettings: [{ start: 12, end: 88 }], projectChannelNames: ["Legacy sample"],
   projectSequences: { Sequence1: { ch0: { steps: [1, 5, { index: 9, reverse: true }] } }, Sequence2: { ch0: { steps: [3, 7] } } },
 };
-for (const input of [legacy, ...["audional-sequencer-x/1", "audional-sequencer-l1xl2/1"].map((format) => ({ ...JSON.parse(originals[0].raw), format }))]) {
+for (const input of ["audional-sequencer-x/1", "audional-sequencer-l1xl2/1"].map((format) => ({ ...JSON.parse(originals[0].raw), format }))) {
   originalPersistence.importProject(input);
   const expected = originalView(JSON.parse(originalPersistence.exportProject({ compact: true })));
   betaPersistence.importProject(input);
   assert.deepEqual(originalView(JSON.parse(betaPersistence.exportProject({ compact: true }))), expected, "legacy original import semantics preserved");
 }
+// Raw pre-AudioNaut files now use the documented editor bridge. Preserve actual
+// saved sequence numbers and reverse flags, which the old generic importer lost.
+betaPersistence.importProject(legacy);
+assert.equal(betaStore.project.channels.length,1);
+assert.equal(betaStore.project.sequences.length,3);
+assert.ok(betaStore.project.sequences[0].steps[0].every(value=>value===0));
+assert.deepEqual(betaStore.project.sequences[1].steps[0][8],{v:1,rev:true});
+assert.equal(betaStore.project.sequences[2].steps[0][2],1);
+for(const[key,value]of Object.entries({volume:.72,pitch:.75,trimStart:.12,trimEnd:.88}))assert.equal(betaStore.channel(0)[key],value);
+assert.equal(betaStore.project.legacyPlayback.id,'audionals-editor-v1');
 // The beta's extra arpeggiator and velocity data also remain intact.
 for(const song of originals){oldBetaPersistence.importProject(song.raw);const file=oldBetaPersistence.exportProject();betaPersistence.importProject(file);assert.deepEqual(originalView(JSON.parse(betaPersistence.exportProject({compact:true}))),originalView(JSON.parse(oldBetaPersistence.exportProject({compact:true}))),song.id+': beta import preserved');assert.equal(betaStore.project.mixerVersion,1);assert.equal(betaStore.project.timeline.enabled,false);}
 console.log(`PASS original formats: all ${songs.length} starter songs, ${Object.keys(originalSynths).length} synth patches and three legacy formats`);

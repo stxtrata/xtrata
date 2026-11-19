@@ -9,6 +9,7 @@ import {projectLatencySeconds} from './mixer-runtime.js';
 import {scheduleDspBoundary} from './plugin-automation.js';
 import {synthTailSeconds} from './synths.js';
 import {assertOfflineRenderSupported} from './audio-render-support.js';
+import {legacyPlaybackProfile} from './legacy-bridge/playback.js';
 const abort=signal=>{if(signal?.aborted)throw new DOMException('Export cancelled.','AbortError');};
 const yieldUI=()=>new Promise(resolve=>setTimeout(resolve,0));
 function audible(project,owner){const owners=projectTracks(project);return !owner.mute&&(!owners.some(t=>t.solo)||owner.solo);}
@@ -21,7 +22,7 @@ function estimateTail(project,plan,buffers,stem=null){
     if(e.type==='sample'){
       // The shared plan includes printed clip tails in event.endTime, while its
       // nominal song duration stays musical. Count that extension exactly once.
-      if(e.clip){last=Math.max(last,e.endTime??e.time+e.duration);continue;}
+      if(e.clip||legacyPlaybackProfile(project)){last=Math.max(last,e.endTime??e.time+e.duration);continue;}
       const source=trackAddress(project,e.sourceTrackId||e.trackId),buffer=buffers[source?.index];if(!buffer)continue;
       const rate=e.playbackRate||e.over?.pitch||address.track.pitch||1;
       const length=buffer.duration*((e.over?.trimEnd??address.track.trimEnd??1)-(e.over?.trimStart??address.track.trimStart??0))/rate;

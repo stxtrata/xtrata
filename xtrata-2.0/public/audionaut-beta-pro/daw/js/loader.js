@@ -258,7 +258,7 @@ async function decodeSource(
       if (source.file.size > MAX_BYTES)
         throw new Error("Choose an audio file smaller than 256 MB.");
       const bytes = await source.file.arrayBuffer(),
-        audioBuffer = await context.decodeAudioData(bytes.slice(0));
+        audioBuffer = await decodePcmWav(context,bytes.slice(0),{signal}) || await context.decodeAudioData(bytes.slice(0));
       abort(signal);
       return {
         audioBuffer,
@@ -317,7 +317,7 @@ async function decodeSource(
       if (expectedHash && (await audioHash(arrayBuffer)) !== expectedHash)
         throw new Error("Audio failed its integrity check.");
       result = {
-        audioBuffer: await context.decodeAudioData(arrayBuffer.slice(0)),
+        audioBuffer: await decodePcmWav(context,arrayBuffer.slice(0),{signal}) || await context.decodeAudioData(arrayBuffer.slice(0)),
         sampleName,
         soundMetadata:
           soundMetadata ||
@@ -341,7 +341,7 @@ async function decodeSource(
     if (pending.get(key) === request) pending.delete(key);
   }
 }
-export function assignDecodedSample(ch, source, result, { reset = true, dirty = true } = {}) {
+export function assignDecodedSample(ch, source, result, { reset = true, dirty = true, preserveLabels = false } = {}) {
   const channel = store.channel(ch);
   if (!channel) throw new Error("This sample channel no longer exists.");
   tickets.set(ch, Symbol());
@@ -364,7 +364,7 @@ export function assignDecodedSample(ch, source, result, { reset = true, dirty = 
       verifiedAudio: source.verifiedAudio === true,
     }),
   });
-  channel.sampleName = source.label || result.sampleName;
+  if (!preserveLabels || !channel.sampleName) channel.sampleName = source.label || result.sampleName;
   channel.unresolvedSource = null;
   channel.soundMetadata = result.soundMetadata || (!reset&&source.collectedFrom ? channel.soundMetadata : null);
   if (reset) {
@@ -387,7 +387,7 @@ export function assignDecodedSample(ch, source, result, { reset = true, dirty = 
     sampleRate: result.audioBuffer.sampleRate,
     channels: result.audioBuffer.numberOfChannels,
   };
-  if (channel.name.startsWith("Channel "))
+  if (!preserveLabels && channel.name.startsWith("Channel "))
     channel.name = String(channel.sampleName)
       .replace(/\.[a-z0-9]+$/i, "")
       .slice(0, 24);

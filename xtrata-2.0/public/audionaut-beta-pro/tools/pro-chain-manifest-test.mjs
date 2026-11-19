@@ -6,6 +6,8 @@ import { CHAIN_MANIFEST_FORMAT, CHAIN_SONG_FORMAT, validateChainReference, valid
   scanProjectSources, buildChainSong, validateChainSong, chainRefKey, ChainValidationError } from '../daw/js/chain-manifest.js';
 import { sha256Bytes, verifyChainBytes, createChainLibrary, chainContentUrl,
   fetchChainBytes, prepareChainSongImport, verifyManifestDependencies } from '../daw/js/chain-library.js';
+import { prepareLegacyImport } from '../daw/js/legacy-bridge/index.js';
+import { listVerifiedLegacyRepairs } from '../daw/js/legacy-bridge/repair-registry.js';
 
 const tests = [];
 function test(name, fn) { tests.push([name, fn]); }
@@ -30,6 +32,20 @@ const snapshotContent = { version: 1, source: originalSource, clip: originalClip
   effectiveVerification: { tempo: false, seam: false, tuning: false } };
 const originalSnapshot = { ...snapshotContent, snapshotHash: sha256Text(canonicalJSON(snapshotContent)) };
 validateClipSnapshot(originalSnapshot);
+
+test('bounded legacy provenance stays inert while every channel source still binds',async()=>{
+  const prepared=await prepareLegacyImport({channelURLs:['a'.repeat(64)+'i0'],projectSequences:{Sequence0:{ch0:{steps:[0,1,64]}}}},{profileId:'audionals-editor-v1'});
+  const candidate=prepared.project,repair=listVerifiedLegacyRepairs()[0];
+  candidate.legacyImport.sourceHash=repair.originalSha256;candidate.legacyImport.sourceBytes=repair.originalBytes;
+  candidate.legacyImport.repairs=[{format:'audionaut-legacy-repair/1',...repair,changedFields:['/channelURLs'],restoredEvents:[]}];
+  candidate.legacyImport.warnings.push({code:'REVIEWED',severity:'info',path:'/channelURLs/0',message:'Historical source identity preserved.'});
+  const song=buildChainSong(candidate,options);assert.equal(validateChainSong(song).format,CHAIN_SONG_FORMAT);
+  assert.equal(song.project.legacyImport.repairs[0].provenance.repository,repair.provenance.repository);
+  assert.throws(()=>buildChainSong(candidate,{manifest,bindings:{}}),code('MISSING'));
+  const hidden=clone(candidate);hidden.legacyImport.inertEvents[0].source={type:'url',value:'https://unbound.invalid/hidden.wav'};
+  assert.throws(()=>buildChainSong(hidden,options),/retained legacy event/);
+  const unknown=clone(candidate);unknown.legacyImport.audioData='data:audio/wav;base64,Zg==';assert.throws(()=>buildChainSong(unknown,options),/provenance/);
+});
 
 test('canonical refs and raw gateway URLs', () => {
   assert.deepEqual(validateChainReference(ref), ref);

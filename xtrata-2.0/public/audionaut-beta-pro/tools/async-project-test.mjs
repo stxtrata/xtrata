@@ -21,14 +21,14 @@ try {
     const data = JSON.parse(P.exportProject()); data.projectName = "Incoming file"; return JSON.stringify(data);
   });
   await page.evaluate(() => {
-    const original = File.prototype.text;
-    File.prototype.text = function () { return this.name === "delayed.json" ? new Promise((resolve) => window.__fileReady = resolve) : original.call(this); };
+    const original = File.prototype.arrayBuffer;
+    File.prototype.arrayBuffer = function () { return this.name === "delayed.json" ? new Promise((resolve) => window.__fileReady = resolve) : original.call(this); };
   });
   await page.setInputFiles("#file-input", { name: "delayed.json", mimeType: "application/json", buffer: Buffer.from(incoming) });
   await page.waitForFunction(() => typeof window.__fileReady === "function");
   await page.evaluate(async (incoming) => {
     const { store } = await import("/audionaut-beta-pro/daw/js/state.js");
-    store.setProjectProp("bpm", 177); window.__fileReady(incoming);
+    store.setProjectProp("bpm", 177); window.__fileReady(new TextEncoder().encode(incoming).buffer);
   }, incoming);
   await page.waitForFunction(() => document.querySelector("#status-text").textContent.includes("changed while the file"));
   assert.equal(await page.evaluate(async () => (await import("/audionaut-beta-pro/daw/js/state.js")).store.project.bpm), 177);

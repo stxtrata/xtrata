@@ -55,8 +55,9 @@ const retained = store.project, invalid = JSON.parse(exported);
 invalid.channels[1] = null;
 assert.throws(() => persistence.importProject(invalid)); assert.equal(store.project, retained);
 for (const bpm of [-120, "Infinity", 0]) {
-  persistence.importProject({ projectSequences: {}, projectBPM: bpm });
-  assert.ok(Number.isFinite(store.project.bpm) && store.project.bpm >= 20 && store.project.bpm <= 420);
+  const before=store.project;
+  assert.throws(()=>persistence.importProject({ projectSequences: {Sequence0:{}}, projectBPM: bpm }),/setting|tempo|number/i);
+  assert.equal(store.project,before,'invalid legacy tempo cannot replace the active project');
 }
 store.loadProject(makeProject()); history.resetHistory();
 assert.equal(assets.assetStats().count, 0, "assets outside the current project and history are released");
