@@ -1,9 +1,16 @@
+import {
+  createRegionControls,
+  REGION_SNAP_OPTIONS,
+  regionSnap,
+  setRegionSnap,
+  rawStep
+} from './region-controls.js';
 import { songPosition, songBarMarks } from './song-ruler.js';
 import { store } from './state.js';
 import { engine } from './engine.js';
 import { songRegions, editSongRegion, waveformIndex } from './song-regions.js';
 import { drawWaveformRegion } from './waveform-drawing.js';
-import { beatToSeconds, meterAt } from './timeline.js';
+import { beatToSeconds, secondsToBeat } from './timeline.js';
 import { beginTransaction, endTransaction } from './history.js';
 import { openStepEditor } from './ui.js';
 import { openRoll, openClipRoll } from './pianoroll.js';
@@ -14,10 +21,10 @@ const HEADER = 44,
   LEFT = 220;
 export function mount(root) {
   let zoom = 56,
-    snap = 0.25,
     follow = true,
-    selected = null,
-    drag = null,
+    controls = null,
+    modelProject = null,
+    modelGeneration = -1,
     model = null,
     rows = [],
     dead = false,
@@ -33,17 +40,7 @@ export function mount(root) {
     action('Stop', () => document.querySelector('#btn-stop').click()),
     action('Return to start', () => engine.seekBeat(0)),
     position,
-    choice(
-      'Snap',
-      [
-        ['0.25', 'Step'],
-        ['1', 'Beat'],
-        ['4', 'Bar'],
-        ['0', 'Off']
-      ],
-      String(snap),
-      (v) => (snap = +v)
-    ),
+    choice('Snap', REGION_SNAP_OPTIONS, String(regionSnap()), setRegionSnap),
     choice(
       'Zoom',
       [
@@ -82,7 +79,7 @@ export function mount(root) {
     playhead = el('div', null, { className: 'song-playhead', 'aria-hidden': 'true' }),
     info = el(
       'p',
-      'Select a region to edit it. Drag to move; drag either edge to trim. Double-click to open its editor.',
+      'Drag regions to move; drag either edge to trim. Shift-click or drag empty space to select a group. Alt: free · Ctrl: fine · right-click: reverse.',
       { className: 'pro-help' }
     ),
     tools = row(),
@@ -109,35 +106,16 @@ export function mount(root) {
     advanced.append(host);
     advancedDispose = module.mount(host);
   });
-  const chosen = () => model?.regions.find((r) => r.id === selected);
-  const guard = (fn) => {
-    try {
-      fn();
-    } catch (error) {
-      status(error.message, true);
-      info.textContent = error.message;
+  const displayProject = () => controls?.project || store.project;
+  function getModel(project = displayProject()) {
+    if (!model || modelProject !== project || modelGeneration !== store.generation) {
+      model = songRegions(project, engine.buffers);
+      modelProject = project;
+      modelGeneration = store.generation;
     }
-  };
-  function edit(region, patch) {
-    if (region.clip && patch.remove) {
-      store.removeClip(region.clipId);
-      selected = null;
-      refresh();
-      return;
-    }
-    const next = structuredClone(store.project);
-    editSongRegion(next, region, patch);
-    beginTransaction();
-    try {
-      store.project.sequences = next.sequences;
-      store.project.timeline = next.timeline;
-      store.emit('project', { prop: 'sequences' }, { historyPaths: [['sequences'], ['timeline']] });
-    } finally {
-      endTransaction();
-    }
-    selected = null;
-    refresh();
+    return model;
   }
+  const chosen = () => controls?.selected[0];
   function openEditor(r) {
     if (r.clip) {
       advanced.open = true;
@@ -158,16 +136,23 @@ export function mount(root) {
     info.textContent = `${r.track.name} · ${r.type === 'sample' ? 'Audio region' : 'Note'} · beat ${(r.start + 1).toFixed(2)}${r.missing ? ' · Sound unavailable' : ''}`;
     tools.append(
       action('Edit region', () => openEditor(r)),
-      action('Delete region', () => guard(() => edit(r, { remove: true })))
+      action(controls.selected.length > 1 ? 'Delete selected' : 'Delete region', () =>
+        controls.apply(controls.selected.map((region) => ({ region, patch: { remove: true } })))
+      )
     );
     if (r.type === 'sample' && !r.clip)
-      tools.append(action('Reverse', () => guard(() => edit(r, { reverse: !r.window.reverse }))));
+      tools.append(
+        action('Reverse', () =>
+          controls.apply([{ region: r, patch: { reverse: !r.window.reverse } }])
+        )
+      );
   }
   function refresh() {
     if (dead) return;
-    model = songRegions(store.project, engine.buffers);
+    modelProject = null;
+    model = getModel();
     rows = [...store.project.channels, ...store.project.instruments].filter((t) => !t.assetOnly);
-    if (selected && !chosen()) selected = null;
+
     draw();
     editTools();
   }
@@ -179,7 +164,8 @@ export function mount(root) {
       });
   }
   function draw() {
-    if (dead || !model) return;
+    if (dead) return;
+    model = getModel();
     const width = Math.max(320, scroll.clientWidth),
       height = Math.max(180, scroll.clientHeight),
       sx = scroll.scrollLeft,
@@ -251,14 +237,13 @@ export function mount(root) {
           w = Math.max(3, ((r.missing ? Math.max(r.end, r.start + 0.25) : r.end) - r.start) * zoom),
           top = y + 4,
           h = TRACK - 8;
-        g.fillStyle = r.id === selected ? '#43ffa42b' : '#ffffff10';
+        g.fillStyle = controls?.isSelected(r) ? '#43ffa42b' : '#ffffff10';
         g.fillRect(x, top, w, h);
-        g.strokeStyle =
-          r.id === selected
-            ? '#43ffa4'
-            : r.cut || r.window?.reverse
-              ? '#ff9f43'
-              : track.color || '#80cbd6';
+        g.strokeStyle = controls?.isSelected(r)
+          ? '#43ffa4'
+          : r.cut || r.window?.reverse
+            ? '#ff9f43'
+            : track.color || '#80cbd6';
         g.strokeRect(x + 0.5, top + 0.5, w - 1, h - 1);
         if (r.buffer && r.end > r.start) {
           drawWaveformRegion(g, {
@@ -276,14 +261,34 @@ export function mount(root) {
               waveformIndex(
                 r.window,
                 r.buffer,
-                beatToSeconds(store.project, r.start + f * (r.end - r.start)) -
-                  beatToSeconds(store.project, r.start)
+                beatToSeconds(displayProject(), r.start + f * (r.end - r.start)) -
+                  beatToSeconds(displayProject(), r.start)
               )
           });
         } else if (r.type === 'note') {
           g.fillStyle = track.color || '#80cbd6';
           const noteY = top + 5 + (1 - (r.pitch % 12) / 12) * (h - 12);
           g.fillRect(x + 2, noteY, Math.max(1, w - 4), 4);
+        }
+        g.fillStyle = '#ffffff59';
+        g.fillRect(x, top, 2, h);
+        g.fillRect(x + w - 2, top, 2, h);
+        if (r.next?.over?.xfade && r.naturalEnd > r.next.start) {
+          const bx = LEFT + r.next.start * zoom - sx,
+            fx =
+              (secondsToBeat(
+                displayProject(),
+                beatToSeconds(displayProject(), r.next.start) + r.next.over.xfade / 1000
+              ) -
+                r.next.start) *
+              zoom;
+          g.strokeStyle = '#22d3ee';
+          g.beginPath();
+          g.moveTo(bx, top);
+          g.lineTo(bx + fx, top + h);
+          g.moveTo(bx + fx, top);
+          g.lineTo(bx, top + h);
+          g.stroke();
         }
         if (r.missing && w > 45) {
           g.fillStyle = '#c3ced9';
@@ -293,24 +298,6 @@ export function mount(root) {
       }
     });
     for (const label of headers.children) if (!seen.has(label.dataset.trackId)) label.remove();
-    if (drag?.preview) {
-      const r = drag.region,
-        y = HEADER + rows.findIndex((t) => t.id === r.trackId) * TRACK - sy + 3;
-      g.strokeStyle = '#fff';
-      g.setLineDash([4, 3]);
-      g.strokeRect(
-        LEFT + (drag.preview.start ?? r.start) * zoom - sx,
-        y,
-        Math.max(
-          3,
-          ((drag.preview.end ?? r.end + (drag.kind === 'move' ? drag.preview.start - r.start : 0)) -
-            (drag.preview.start ?? r.start)) *
-            zoom
-        ),
-        TRACK - 6
-      );
-      g.setLineDash([]);
-    }
     g.restore();
     g.fillStyle = '#101922';
     g.fillRect(0, 0, width, HEADER);
@@ -340,7 +327,12 @@ export function mount(root) {
     playhead.hidden = x < LEFT || x > scroll.clientWidth;
     playhead.style.left = x + 'px';
     playhead.dataset.beat = String(beat);
-    if (engine.isPlaying && follow && !drag && (x > scroll.clientWidth - 35 || x < LEFT))
+    if (
+      engine.isPlaying &&
+      follow &&
+      !controls?.dragging &&
+      (x > scroll.clientWidth - 35 || x < LEFT)
+    )
       scroll.scrollLeft = Math.max(0, beat * zoom - (scroll.clientWidth - LEFT) * 0.25);
   }
   function animate() {
@@ -348,120 +340,105 @@ export function mount(root) {
     paintTransport();
     frame = requestAnimationFrame(animate);
   }
-  function hit(e) {
+  function bounds(r) {
     const box = canvas.getBoundingClientRect(),
-      x = e.clientX - box.left,
-      y = e.clientY - box.top,
-      beat = Math.max(0, (x - LEFT + scroll.scrollLeft) / zoom),
-      track = rows[Math.floor((y - HEADER + scroll.scrollTop) / TRACK)];
+      i = rows.findIndex((t) => t.id === r.trackId);
+    const y = box.top + HEADER + i * TRACK - scroll.scrollTop,
+      left = box.left + LEFT + r.start * zoom - scroll.scrollLeft;
+    if (
+      i < 0 ||
+      y + TRACK < box.top + HEADER ||
+      y > box.bottom ||
+      left > box.right ||
+      left + Math.max(3, (r.end - r.start) * zoom) < box.left + LEFT
+    )
+      return null;
     return {
-      x,
-      y,
-      beat,
-      region: [...model.regions]
-        .reverse()
-        .find(
-          (r) =>
-            r.trackId === track?.id && beat >= r.start && beat <= Math.max(r.end, r.start + 0.08)
-        )
+      left,
+      right: left + Math.max(3, (r.end - r.start) * zoom),
+      top: y + 4,
+      bottom: y + TRACK - 4
     };
   }
-  canvas.addEventListener('pointerdown', (e) => {
-    if (e.button) return;
-    const h = hit(e);
-    if (h.x < LEFT) return;
-    e.preventDefault();
-    canvas.focus();
-    if (h.y < HEADER) {
-      engine.seekBeat(h.beat);
-      paintTransport();
-      return;
-    }
-    selected = h.region?.id || null;
-    editTools();
-    if (h.region) {
-      const r = h.region,
-        left = LEFT + r.start * zoom - scroll.scrollLeft,
-        right = LEFT + r.end * zoom - scroll.scrollLeft;
-      drag = {
-        region: r,
-        beat: h.beat,
-        generation: store.generation,
-        kind:
-          Math.abs(h.x - right) < 7
-            ? 'end'
-            : Math.abs(h.x - left) < 7 && r.type === 'sample'
-              ? 'left'
-              : 'move'
-      };
-      canvas.setPointerCapture(e.pointerId);
-    }
-    draw();
-  });
-  canvas.addEventListener('pointermove', (e) => {
-    if (!drag) return;
-    const h = hit(e),
-      d = h.beat - drag.beat,
-      r = drag.region,
-      quant = (v) => {
-        if (e.altKey || !snap) return v;
-        const m = meterAt(store.project, v),
-          unit = snap === 4 ? (m.numerator * 4) / m.denominator : snap,
-          origin = snap === 4 ? m.beat : 0;
-        return origin + Math.round((v - origin) / unit) * unit;
-      };
-    if (drag.kind === 'end') drag.preview = { end: Math.max(r.start + 0.015625, quant(r.end + d)) };
-    else if (drag.kind === 'left')
-      drag.preview = {
-        start: Math.max(0, Math.min(r.end - 0.015625, quant(r.start + d))),
-        end: r.end,
-        trimLeft: true
-      };
-    else {
-      const start = Math.max(0, quant(r.start + d));
-      drag.preview = { start };
-    }
-    draw();
-  });
-  canvas.addEventListener('pointerup', () => {
-    const d = drag;
-    drag = null;
-    if (d?.preview)
-      guard(() => {
-        if (d.generation !== store.generation)
-          throw Error('The song changed during this drag. Please try again.');
-        edit(d.region, d.preview);
-      });
-    draw();
-  });
-  canvas.addEventListener('pointercancel', () => {
-    drag = null;
-    draw();
-  });
-  canvas.addEventListener('lostpointercapture', () => {
-    if (drag) {
-      drag = null;
+  const marquee = el('div', null, { className: 'region-marquee', hidden: true });
+  document.body.append(marquee);
+  controls = createRegionControls({
+    root: canvas,
+    active: () => !dead && root.isConnected,
+    regions: (p) => getModel(p).regions,
+    bounds,
+    repaint: () => {
       draw();
-    }
-  });
-  canvas.addEventListener('dblclick', (e) => {
-    const r = hit(e).region;
-    if (r) openEditor(r);
-  });
-  canvas.addEventListener('keydown', (e) => {
-    const r = chosen();
-    if (!r) return;
-    if (['Delete', 'Backspace', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
-      e.preventDefault();
-      e.stopPropagation();
-      guard(() =>
-        edit(
-          r,
-          e.key === 'Delete' || e.key === 'Backspace'
-            ? { remove: true }
-            : { start: Math.max(0, r.start + (e.key === 'ArrowRight' ? 1 : -1) * (snap || 0.0625)) }
-        )
+      editTools();
+    },
+    message: (text) => (info.textContent = text),
+    open: openEditor,
+    seek: (beat) => engine.seekBeat(beat),
+    limits: (p) => ({ start: 0, end: p.timeline.enabled ? 65536 : p.sequences.length * 64 }),
+    point(e, forced = false) {
+      const b = canvas.getBoundingClientRect(),
+        x = e.clientX - b.left,
+        y = e.clientY - b.top,
+        beat = (x - LEFT + scroll.scrollLeft) / zoom,
+        track = rows[Math.floor((y - HEADER + scroll.scrollTop) / TRACK)];
+      return {
+        target: canvas,
+        trackId: track?.id,
+        beat: Math.max(0, beat),
+        position: rawStep(displayProject(), beat),
+        ...(!forced
+          ? x < LEFT || y < 0 || y > b.height
+            ? { kind: 'outside' }
+            : y < HEADER
+              ? { kind: 'seek' }
+              : !track
+                ? { kind: 'outside' }
+                : {}
+          : {})
+      };
+    },
+    marquee: (rect) => {
+      marquee.hidden = !rect;
+      if (rect)
+        Object.assign(marquee.style, {
+          left: rect.left + 'px',
+          top: rect.top + 'px',
+          width: rect.right - rect.left + 'px',
+          height: rect.bottom - rect.top + 'px'
+        });
+    },
+    add: (h) => {
+      const p = store.project,
+        ch = p.channels.findIndex((t) => t.id === h.trackId);
+      if (ch < 0) return;
+      const clip = p.timeline.enabled
+        ? p.timeline.clips.find(
+            (c) =>
+              c.type === 'pattern' &&
+              c.trackId === h.trackId &&
+              h.beat >= c.start &&
+              h.beat < c.start + c.duration
+          )
+        : null;
+      if (p.timeline.enabled && !clip) {
+        status('Add a clip in Advanced arrangement for this empty lane.');
+        return;
+      }
+      const seq = clip
+        ? p.sequences.find((s) => s.id === clip.sequenceId)
+        : p.sequences[Math.floor(h.position / 64)];
+      const step = Math.floor(
+        clip ? rawStep(p, h.beat - clip.start + (clip.offset || 0)) : h.position % 64
       );
+      if (!seq || step < 0 || step >= 64) return;
+      beginTransaction();
+      try {
+        const v = seq.steps[ch][step];
+        seq.steps[ch][step] = v ? 0 : 1;
+        store.emit('project', { prop: 'sequences' });
+      } finally {
+        endTransaction();
+      }
     }
   });
   scroll.addEventListener('scroll', draw);
@@ -483,6 +460,8 @@ export function mount(root) {
   return () => {
     dead = true;
     advancedTicket++;
+    controls.dispose();
+    marquee.remove();
     ro.disconnect();
     offs.forEach((f) => f());
     cancelAnimationFrame(frame);

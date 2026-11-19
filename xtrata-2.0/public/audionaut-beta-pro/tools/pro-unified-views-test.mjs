@@ -189,7 +189,7 @@ try {
   );
   ok((await tab.locator('.song-playhead').count()) === 1, 'Playhead mounted');
   ok(
-    (await tab.locator('.song-transport select').first().inputValue()) === '0.25',
+    (await tab.locator('.song-transport select').first().inputValue()) === '1',
     'Default snap label is Step'
   );
   const box = await tab.locator('.song-canvas').boundingBox();

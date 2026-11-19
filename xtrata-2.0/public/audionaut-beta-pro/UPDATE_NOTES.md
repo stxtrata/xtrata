@@ -4,6 +4,35 @@ This workstation is isolated at `/audionaut-beta-pro/` behind the existing
 membership gate. The original AudioNaut and earlier beta are unchanged.
 `BETA.md` describes isolation and original-file compatibility.
 
+## Shared region controls and historical audio loading — 19 November 2026
+
+- Patterns and Timeline now use one interaction controller: grab/move cursors,
+  both trim edges, Shift selection, marquee selection, grouped edits, arrow-key
+  nudging, Delete, right-click sample reversal, crossfades and cancellation.
+  Snap values are shared. Alt moves freely; Ctrl gives fine movement. Previews
+  leave the saved song untouched until release, with one undo step per gesture.
+- Historical imports, direct sample loading and Samples & Loops share retrieval,
+  embedded-audio extraction and decoding. JSON base64 fields, HTML audio elements,
+  inline audio data URLs and mislabelled HTML fragments use the same parser.
+  Configured fallback gateways apply to import transport failures as well.
+- Unsupported portable PCM layouts now reach the browser decoder, matching the
+  catalogue fallback. Truncated PCM is still rejected. Cancellation releases a
+  pending native decode instead of occupying the catalogue queue indefinitely.
+  Existing source/payload hash checks and pinned-source restrictions remain.
+- The supplied report identifies OB1 #11 Small Click with “Unsupported PCM WAV
+  layout.” Its actual inscription returned HTTP 403 here, so that exact audio
+  remains a community retry case; synthetic fixtures verify the failure path.
+- The immutable playback runtime advances to `beta-pro-shared-audio-1`. It remains
+  prepared, not inscribed, with no new third-party audio dependency. Previously
+  published runtime versions are unchanged.
+- Regression coverage adds 54 shared gesture checks and nine import wrapper
+  fixtures. Chrome/WebKit exercise real unusual-rate browser decoding. Local
+  macOS Firefox stalls in native WAV decoding even for ordinary 44.1 kHz audio;
+  it verifies wrapper/PCM parity and the fallback/cancellation contract instead.
+  Linux Firefox CI exercises the real fallback too.
+- The original and earlier beta trees, membership gate and song schema are unchanged.
+  A sound-desk mixer layout is planned separately and is not part of this release.
+
 ## Continuous timeline and shared keyboards — 19 November 2026
 
 - Timeline opens directly from the loaded song. There is no conversion step:

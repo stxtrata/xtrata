@@ -102,7 +102,7 @@ still requires its ordinary immutable dependency binding.
 
 ## Chain runtime
 
-Runtime version `beta-pro-legacy-bridge-2` bundles automatic loading, the bridge,
+Runtime version `beta-pro-shared-audio-1` bundles automatic loading, the bridge,
 decoder worker, verified repair data and existing audio engine into the standalone
 HTML artifact.
 No new external runtime or sample library is required. Its legacy reader can load
@@ -151,3 +151,7 @@ live/offline controls without app modules. Chrome and WebKit decoded the same
 fixture. PCM WAV import uses the existing first-party decoder; other codecs use
 the browser decoder with bounded loading time and cancellation. Firefox compressed
 audio needs validation on community machines; a timeout retains the open project.
+
+Direct loads, catalogue samples and historical imports share `fetchSourceAudio` and
+`decodeAudioBytes`. Unsupported portable PCM layouts fall back to the native decoder;
+malformed/truncated PCM does not. Abort releases pending native decoding work.
