@@ -25,13 +25,15 @@ try {
   ok(geometry, 'Partial-octave black keys fit the shared keyboard');
   const knobs = await p.locator('.sfp-drumrack .knob-wrap').evaluateAll(nodes => nodes.map(n => n.getBoundingClientRect().top));
   ok(knobs.length === 4 && Math.max(...knobs) - Math.min(...knobs) < 2, 'All four knobs sit side by side');
-  await p.evaluate(() => {
-    const ctx = drumTest.engine.ensureContext(), analyser = ctx.createAnalyser(); drumTest.engine.masterGain.connect(analyser);
+  await p.evaluate(async () => {
+    const ctx = drumTest.engine.ensureContext(); await ctx.resume();
+    const analyser = ctx.createAnalyser(), silent = ctx.createGain(); silent.gain.value = 0;
+    drumTest.engine.masterGain.connect(analyser); analyser.connect(silent).connect(ctx.destination);
     const data = new Float32Array(analyser.fftSize); drumTest.peak = 0;
     drumTest.timer = setInterval(() => { analyser.getFloatTimeDomainData(data); for (const x of data) drumTest.peak = Math.max(drumTest.peak, Math.abs(x)); }, 5);
   });
   await p.locator('#sfp-keys [data-midi="36"]').click({ position: { x: 5, y: 60 } });
-  await p.waitForTimeout(150);
+  await p.waitForFunction(() => drumTest.peak > .01, null, { timeout: 5000 });
   ok(await p.evaluate(() => drumTest.peak > .01), 'Clicking the C1 kick produces real audio');
   await p.keyboard.press('a'); await p.waitForTimeout(80);
   ok(await p.evaluate(() => drumTest.pitches.filter(n => n === 36).length >= 2), 'Computer keyboard and on-screen keyboard trigger the same kick');
@@ -67,7 +69,8 @@ try {
   ok(assigned.decoded, 'Shared loader decodes the actual library sample');
   ok(assigned.mapped && assigned.unassigned && assigned.originalChannels, 'Save/reload retains pad mapping without replacing other sounds');
   await p.evaluate(() => { drumTest.peak = 0; });
-  await p.getByRole('button', { name: 'Play pad', exact: true }).click(); await p.waitForTimeout(250);
+  await p.getByRole('button', { name: 'Play pad', exact: true }).click();
+  await p.waitForFunction(() => drumTest.peak > .001, null, { timeout: 5000 });
   ok(await p.evaluate(() => drumTest.peak > .001), 'Loaded library pad produces real audio');
   await p.getByRole('tab', { name: 'New instruments', exact: true }).click();
   await p.getByText('Edit pad samples and controls', { exact: true }).click();
@@ -99,4 +102,7 @@ try {
   await p.evaluate(() => clearInterval(drumTest.timer));
   ok(!logs.some(x => /pageerror:/.test(x)), logs.join('\n'));
   console.log(JSON.stringify({ checks, browser: process.env.AUDIONAUT_TEST_BROWSER || 'chromium', assigned }));
+} catch (error) {
+  for (const context of b.contexts()) for (const p of context.pages()) console.error(await p.evaluate(() => ({ peak: window.drumTest?.peak, pitches: window.drumTest?.pitches, state: window.drumTest?.engine.ctx?.state, time: window.drumTest?.engine.ctx?.currentTime, error: window.drumTest?.engine.lastVoiceError })).catch(() => ({})));
+  throw error;
 } finally { await b.close(); srv.close(); }
