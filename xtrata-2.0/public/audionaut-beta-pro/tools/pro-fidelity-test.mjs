@@ -1,11 +1,12 @@
 import assert from 'node:assert/strict';
 import { serve, browser, page } from './serve.mjs';
+import { checkOfflinePolicy } from './offline-policy-checks.mjs';
 
 const { srv, url } = await serve(), b = await browser(), logs = [], results = [];
 const rates = [44100, 48000, 96000];
 // Native PCM tests retain a tight float32 graph tolerance. Cross-rate rendering
 // resamples the printed track instead of its original source before gain/pan.
-// Chromium/WebKit peak at 8.0e-5 and RMS 2.35e-7; Firefox's SRC gives peak
+// Chromium peak at 8.0e-5 and RMS 2.35e-7; Firefox's SRC gives peak
 // 1.97e-4, RMS 4.21e-6, relative RMS 2.18e-4. A dry source-only Firefox control
 // retains the residual (peak 7.91e-5/RMS 3.61e-6), confirming conversion rather
 // than a master/reverb routing error. Require ALL converted bounds: -70.5 dBFS
@@ -15,6 +16,14 @@ const nativeLimits = { peak: 1e-6, rms: 1e-7, relativeRms: 1e-5 };
 const convertedLimits = { peak: 3e-4, rms: 6e-6, relativeRms: 3e-4 };
 const within = (error, limits) => ['peak', 'rms', 'relativeRms'].every(key => error[key] <= limits[key]);
 try {
+  const probe = await page(b, url, { logs });
+  await probe.goto(`${url}/audionaut-beta-pro/daw.html`);
+  const support = await probe.evaluate(async () => (await import('/audionaut-beta-pro/daw/js/audio-render-support.js')).offlineRenderSupport());
+  if (!support.supported) {
+    console.log(JSON.stringify(await checkOfflinePolicy(probe, url)));
+    console.log('PASS WebKit freeze/export refusal, source processing, MIDI/automation boundaries and live piano; native/cross-rate offline fidelity is unsupported');
+  } else {
+  await probe.close();
   for (const nativeRate of rates) {
     const p = await page(b, url, { logs });
     // Exercise the engine's actual device-rate freeze path independently of the
@@ -148,6 +157,7 @@ try {
     assert.equal(result.invalidLoop, true);
     assert.equal(result.stepAutomation, true);
   }
-  assert.deepEqual(logs.filter(l => l.startsWith('pageerror')), []);
   console.log('PASS native/cross-rate freeze fidelity, exact frame counts, unfreeze restoration, MIDI split and automation boundaries');
+  }
+  assert.deepEqual(logs.filter(l => l.startsWith('pageerror')), []);
 } finally { await b.close(); await new Promise(r => srv.close(r)); }

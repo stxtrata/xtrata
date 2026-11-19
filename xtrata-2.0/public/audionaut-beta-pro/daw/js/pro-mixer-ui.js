@@ -31,6 +31,7 @@ export function openEffects(id){
           else params.append(number(p.label||p.key,slot.params[p.key]??p.def,set,{min:p.min??0,max:p.max??1,step:p.step??.01}));
         }section.append(params);
         if(type.sidechain||['opto','gate'].includes(slot.type))section.append(choice('Sidechain source',[['','Internal detector'],...tracks(store).filter(t=>t.id!==id).map(t=>[t.id,t.name])],slot.sidechainTrackId||'',v=>{try{patchSlot({sidechainTrackId:v||null});}catch(error){paint();throw error;}}));
+        if(slot.type==='hybridReverb')section.append(choice('Impulse response',[['','Generated early reflections'],...store.project.channels.filter((t,i)=>engine.buffers[i]||t.id===slot.irSource?.sourceTrackId).map(t=>[t.id,t.name+(engine.buffers[store.project.channels.indexOf(t)]?'':' (audio unavailable)')])],slot.irSource?.sourceTrackId||'',v=>{patchSlot({irSource:v?{sourceTrackId:v}:undefined});}));
         body.append(section);
       });
     }

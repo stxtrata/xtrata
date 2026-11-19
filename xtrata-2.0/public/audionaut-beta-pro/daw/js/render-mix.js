@@ -1,3 +1,4 @@
+import {isProInstrument,proInstrumentTailSeconds} from './pro-instruments.js';
 // Playback and export share one musical event plan. Output encoding runs in a worker.
 import {Engine} from './engine.js';
 import {compilePlaybackPlan} from './playback-plan.js';
@@ -7,6 +8,7 @@ import {projectTracks,trackAddress,normalizeProjectModel} from './project-model.
 import {projectLatencySeconds} from './mixer-runtime.js';
 import {scheduleDspBoundary} from './plugin-automation.js';
 import {synthTailSeconds} from './synths.js';
+import {assertOfflineRenderSupported} from './audio-render-support.js';
 const abort=signal=>{if(signal?.aborted)throw new DOMException('Export cancelled.','AbortError');};
 const yieldUI=()=>new Promise(resolve=>setTimeout(resolve,0));
 function audible(project,owner){const owners=projectTracks(project);return !owner.mute&&(!owners.some(t=>t.solo)||owner.solo);}
@@ -15,7 +17,7 @@ function estimateTail(project,plan,buffers,stem=null){
   let last=plan.duration;
   for(const e of plan.events){
     const address=trackAddress(project,e.trackId);if(!address||!leafIds.has(address.track.id))continue;
-    if(e.type==='note')last=Math.max(last,e.endTime+synthTailSeconds(address.track.synthId,address.track.params||{}));
+    if(e.type==='note'){const tail=isProInstrument(address.track.synthId)?proInstrumentTailSeconds(address.track,e,{bufferForSource:source=>{const index=project.channels.findIndex(t=>t.id===source.sourceTrackId);return buffers[index]||project.channels[index]?.analysis;}}):synthTailSeconds(address.track.synthId,address.track.params||{});last=Math.max(last,e.endTime+tail);}
     if(e.type==='sample'){
       // The shared plan includes printed clip tails in event.endTime, while its
       // nominal song duration stays musical. Count that extension exactly once.
@@ -38,7 +40,7 @@ function estimateTail(project,plan,buffers,stem=null){
   const routeTail=(id,seen=new Set())=>{
     if(memo.has(id))return memo.get(id);if(seen.has(id))throw new Error('Mixer routing cannot feed back into itself.');
     const owner=chains.get(id);if(!owner)return 0;seen=new Set(seen).add(id);
-    const own=[...owner.inserts||[],...owner.fx||[]].reduce((sum,slot)=>{if(slot.enabled===false)return sum;const params=slot.params||{};return sum+Math.max(pluginTailSeconds(slot.type,params),0,Number(params.decay)||0,Number(params.tailSeconds)||0);},0);
+    const own=[...owner.inserts||[],...owner.fx||[]].reduce((sum,slot)=>{if(slot.enabled===false)return sum;const params=slot.params||{};return sum+Math.max(pluginTailSeconds(slot.type,params,{irSource:slot.irSource,irDuration:buffers[project.channels.findIndex(t=>t.id===slot.irSource?.sourceTrackId)]?.duration}),0,Number(params.decay)||0,Number(params.tailSeconds)||0);},0);
     const routes=id==='master'?[]:[owner.output||'master',...(owner.auxSends||[]).filter(send=>send.amount>0).map(send=>send.busId)];
     const total=own+Math.max(0,...routes.map(next=>routeTail(next,seen)));memo.set(id,total);return total;
   };
@@ -52,6 +54,7 @@ export function mixDuration(project,{scope='song',tail=4,range}={}){
   const plan=compilePlaybackPlan(project,{scope,range});return plan.duration+(tail==='auto'?estimateTail(project,plan,[]):Math.max(0,Math.min(120,Number(tail)||0)));
 }
 export async function renderMix(project,buffers,{scope='song',range,tail='auto',sampleRate=48000,bitDepth=24,dither=false,signal,onProgress=()=>{},seed=project.renderSeed,stem=null,stage='mix',maxMemoryBytes=512*1024*1024}={}){
+  assertOfflineRenderSupported();
   abort(signal);if(![22050,44100,48000,88200,96000].includes(sampleRate))throw new Error('Choose a supported export sample rate.');
   const snapshot=normalizeProjectModel(structuredClone(project));
   if(stage==='track'){
@@ -107,6 +110,9 @@ export async function renderMix(project,buffers,{scope='song',range,tail='auto',
       scheduleDspBoundary(context,progressOwner,at,()=>{abort(signal);onProgress({phase:'render',progress:at/total});});
     }
     const audio=await Promise.race([context.startRendering(),cancelled]);abort(signal);
+    // Processor failures silence a worklet without rejecting startRendering().
+    // Let queued error notifications settle before treating the render as valid.
+    await yieldUI();abort(signal);renderer.assertEffectsHealthy();
     for(const chain of renderer.chains.values())for(const slot of chain.slots.values())if(slot.nodes.automationError)throw new Error(`Effect automation could not render: ${slot.nodes.automationError}`);
     onProgress({phase:'encode',progress:0});
     const blob=await encodeWavAsync(audio,{start:lead,end:Math.min(audio.duration,lead+duration),bitDepth,dither,seed:1,signal,onProgress:progress=>onProgress({phase:'encode',progress})});
@@ -114,6 +120,7 @@ export async function renderMix(project,buffers,{scope='song',range,tail='auto',
   }finally{progressOwner.disposed=true;signal?.removeEventListener('abort',cancelHandler);renderer.dispose?.();}
 }
 export async function renderStems(project,buffers,options={}){
+  assertOfflineRenderSupported();
   const tracks=projectTracks(project).filter(t=>!t.mute&&(!options.trackIds||options.trackIds.includes(t.id))),result=[];
   let bytes=0;
   for(let i=0;i<tracks.length;i++){

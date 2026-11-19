@@ -1,3 +1,6 @@
+import {isProInstrument,normalizeInstrumentConfig} from './pro-instruments-config.js';
+import {prepareChainSongImport} from './chain-library.js';
+import {RUNTIME_VERSION} from './runtime-version.js';
 import { STORAGE_KEYS } from "./storage-config.js";
 // persistence.js — save/load project JSON (native + legacy Audional format), autosave.
 
@@ -91,6 +94,20 @@ export async function downloadProject() {
   updateStatus({ message: "Project exported as a portable file." });
 }
 
+export async function importProjectAsync(json,{guard=()=>true,...options}={}) {
+  const data=typeof json==='string'?JSON.parse(json):json;
+  if(data?.format!=='audionaut-chain-song/1')return importProject(data);
+  if(data.manifest?.runtime?.version!==RUNTIME_VERSION)throw Error('This song requires a different AudioNaut runtime version. Open its pinned chain player.');
+  const {currentRuntime}=await import('./chain-publishing.js');
+  const runtime=await currentRuntime(options);
+  if(data.manifest.runtime.sha256!==runtime.sha256||data.manifest.runtime.bytes!==runtime.bytes)throw Error('This song uses different playback code. Open its exact inscribed runtime.');
+  const staged=await prepareChainSongImport(data,options);
+  if(!guard())throw Error('The project changed during chain verification. Open the song again.');
+  const project=importProject({...staged.project,format:'audionaut-workstation/3'});
+  project.chain=staged.manifest;
+  return project;
+}
+
 export function importProject(json) {
   const data = typeof json === "string" ? JSON.parse(json) : json;
   if (!data || typeof data !== "object")
@@ -178,6 +195,12 @@ function validateCandidate(project,strict){
     for(const send of owner.auxSends){if(!busIds.has(send.busId))throw new Error('An auxiliary send routes to a missing bus.');numeric(send.amount,'send amount',0,4);}
     for(const slot of [...owner.inserts||[],...owner.fx||[]])if(slot.sidechainTrackId&&!trackIds.has(slot.sidechainTrackId))throw new Error('An effect refers to a missing sidechain track.');
   }
+  const sampleIds=new Set(project.channels.map(t=>t.id));
+  for(const instrument of project.instruments)if(isProInstrument(instrument.synthId)){
+    instrument.sampleInstrument=normalizeInstrumentConfig(instrument.synthId,instrument.sampleInstrument);
+    for(const source of instrument.sampleInstrument.sources)if(!sampleIds.has(source.sourceTrackId))throw Error('An instrument sample needs an existing sample track. Import the audio into a track first.');
+  }
+  for(const owner of [...owners,project.master])for(const slot of [...owner.inserts||[],...owner.fx||[]])if(slot.irSource&&!sampleIds.has(slot.irSource.sourceTrackId))throw Error('The impulse response sample track is missing.');
   validateRouting(project);
   const timeline=project.timeline;
   numeric(timeline.lengthBeats,'timeline length',.001,1000000);
@@ -287,7 +310,7 @@ function normalizeNative(data) {
         ? validateClipSnapshot(c.clipSnapshot)
         : null;
       if (
-        channel.clipSnapshot &&
+        channel.clipSnapshot && !channel.source?.chainRef &&
         ((channel.source?.collectedFrom || channel.source)?.type !== "ordinal" ||
           (channel.source.collectedFrom || channel.source).value !== channel.clipSnapshot.source.inscriptionId ||
           (channel.source.collectedFrom || channel.source).audioSha256 !==
@@ -299,7 +322,7 @@ function normalizeNative(data) {
           "Channel source differs from its pinned clip snapshot.",
         );
       channel.soundMetadata = c.soundMetadata
-        ? (c.source?.collectedFrom ? structuredClone(c.soundMetadata) : validateSoundMetadata(c.soundMetadata))
+        ? ((c.source?.collectedFrom||c.source?.chainRef) ? structuredClone(c.soundMetadata) : validateSoundMetadata(c.soundMetadata))
         : null;
       if(channel.soundMetadata?.loop){const loop=channel.soundMetadata.loop;if(!Number.isFinite(loop.start)||!Number.isFinite(loop.end)||loop.start<0||loop.end<=loop.start)throw new Error('Invalid archived sample loop.');}
       channel.gateSteps = finite(

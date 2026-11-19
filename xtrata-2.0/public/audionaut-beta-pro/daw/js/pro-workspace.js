@@ -6,6 +6,8 @@ const VIEWS = {
   automation: ['Automation', () => import('./pro-automation-ui.js')],
   recording: ['Record & takes', () => import('./pro-recording-ui.js')],
   sampler: ['Sampler', () => import('./pro-sampler-ui.js')],
+  devices: ['New instruments', () => import('./pro-devices-ui.js')],
+  chain: ['On-chain publishing', () => import('./pro-chain-ui.js')],
   performance: ['Performance', () => import('./pro-diagnostics.js')],
 };
 const KEY = 'audionaut.beta-pro.workspace';
