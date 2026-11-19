@@ -200,12 +200,38 @@ try {
     'Ruler seeks exact song beat'
   );
   await tab.getByRole('button', { name: 'Play or pause song' }).click();
-  await tab.waitForTimeout(250);
+  // Cold audio/worklet preparation can take longer on hosted browsers. Wait
+  // for actual transport progress, never assume it starts within a fixed sleep.
+  await tab.waitForFunction(
+    () => testState.engine.isPlaying && testState.engine.getMusicalPosition().beat > 4.05,
+    null,
+    { timeout: 10000 }
+  );
   const a = +(await tab.locator('.song-playhead').getAttribute('data-beat'));
-  await tab.waitForTimeout(180);
-  const c = +(await tab.locator('.song-playhead').getAttribute('data-beat'));
-  ok(c > a, 'Playhead follows audio clock');
+  await tab.waitForFunction(
+    (previous) => +document.querySelector('.song-playhead').dataset.beat > previous + 0.1,
+    a,
+    { timeout: 10000 }
+  );
+  ok(
+    await tab.evaluate(
+      () =>
+        Math.abs(
+          +document.querySelector('.song-playhead').dataset.beat -
+            testState.engine.getMusicalPosition().beat
+        ) < 0.15
+    ),
+    'Playhead follows audio clock'
+  );
   await tab.getByRole('button', { name: 'Play or pause song' }).click();
+  await tab.waitForFunction(
+    () =>
+      !testState.engine.isPlaying &&
+      Math.abs(
+        +document.querySelector('.song-playhead').dataset.beat -
+          testState.engine.getMusicalPosition().beat
+      ) < 0.01
+  );
   const stopped = +(await tab.locator('.song-playhead').getAttribute('data-beat'));
   await tab.waitForTimeout(100);
   ok(
