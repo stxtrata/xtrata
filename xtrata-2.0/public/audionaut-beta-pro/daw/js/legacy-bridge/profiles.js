@@ -43,30 +43,46 @@ export const LEGACY_PROFILES = Object.freeze({
   })
 });
 export function getLegacyProfile(id) {
-  const profile = LEGACY_PROFILES[id];
+  const profile = Object.hasOwn(LEGACY_PROFILES, id) ? LEGACY_PROFILES[id] : null;
   if (!profile) fail('UNKNOWN_PROFILE', 'Choose a supported historical playback profile.');
   return profile;
 }
 export function selectLegacyProfile(detection, { profileId, sourceHash, provenance = {} } = {}) {
-  const known = KNOWN_LEGACY_HASHES[sourceHash] || null;
-  const implicit =
+  const known = Object.hasOwn(KNOWN_LEGACY_HASHES, sourceHash)
+    ? KNOWN_LEGACY_HASHES[sourceHash]
+    : null;
+  const formatProfile =
     detection.kind === 'og'
       ? 'audionals-og-v1'
       : detection.dense || detection.format === 'dense-audional'
         ? 'audionals-dense-v1'
-        : known?.profileId;
-  const chosen = profileId || provenance.profileId || implicit;
+        : null;
+  // A matching file hash alone does not identify the intended historical player.
+  // Unattested sparse/compact songs use a documented editor default, not a guess
+  // disguised as a verified hash profile.
+  const chosen =
+    profileId || provenance.profileId || formatProfile || known?.profileId || 'audionals-editor-v1';
+  const profileSelection = profileId
+    ? 'explicit'
+    : provenance.profileId
+      ? 'provenance'
+      : formatProfile
+        ? 'format'
+        : known?.profileId
+          ? 'known-hash'
+          : 'editor-default';
   const choices =
     detection.kind === 'og'
       ? [LEGACY_PROFILES['audionals-og-v1']]
       : detection.dense || detection.format === 'dense-audional'
         ? [LEGACY_PROFILES['audionals-dense-v1']]
         : [LEGACY_PROFILES['audionals-editor-v1'], LEGACY_PROFILES['audionals-standalone-v1']];
-  if (chosen && !choices.some((p) => p.id === chosen))
+  if (!choices.some((p) => p.id === chosen))
     fail('PROFILE_MISMATCH', 'That playback profile does not match the document encoding.');
   return {
-    profile: chosen ? getLegacyProfile(chosen) : null,
-    requiresProfileChoice: !chosen,
+    profile: getLegacyProfile(chosen),
+    profileSelection,
+    requiresProfileChoice: false,
     profileChoices: choices.map(({ id, label, description }) => ({ id, label, description })),
     knownHash: known
   };

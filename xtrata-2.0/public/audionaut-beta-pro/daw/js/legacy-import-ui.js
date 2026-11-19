@@ -41,17 +41,18 @@ export async function openProjectFile(file, { guard = () => true, onStatus = () 
     dialog.className = 'pro-dialog legacy-import-dialog';
     dialog.id = 'legacy-import-dialog';
     dialog.setAttribute('aria-labelledby', 'legacy-import-title');
-    const heading = element('h2', 'Open an older Audional song');
+    const heading = element('h2', 'Opening your song');
     heading.id = 'legacy-import-title';
     const intro = element(
       'p',
-      'Review the playback version and sounds before opening. Your current project stays open until this song is ready.'
+      'Playback settings are selected automatically. Your current project stays open until this song’s sounds are ready.'
     );
     const label = element('label', 'Historical player '),
       select = element('select');
     select.setAttribute('aria-label', 'Historical player');
     label.append(select);
-    const description = element('p'),
+    const advanced = element('details'),
+      description = element('p'),
       summary = element('p'),
       details = element('details'),
       report = element('pre');
@@ -62,6 +63,7 @@ export async function openProjectFile(file, { guard = () => true, onStatus = () 
     companionInput.setAttribute('aria-label', 'Matching pattern dictionary');
     companionLabel.append(companionInput);
     details.append(element('summary', 'Import details'), report);
+    advanced.append(element('summary', 'Advanced playback settings'), label, description);
     const status = element('p');
     status.setAttribute('role', 'status');
     status.setAttribute('aria-live', 'polite');
@@ -69,7 +71,7 @@ export async function openProjectFile(file, { guard = () => true, onStatus = () 
       actions = element('div');
     actions.className = 'modal-actions';
     const cancel = element('button', 'Cancel'),
-      open = element('button', 'Check sounds and open'),
+      open = element('button', 'Retry opening song'),
       missing = element('button', 'Open with missing samples');
     missing.hidden = true;
     open.id = 'legacy-import-open';
@@ -79,8 +81,7 @@ export async function openProjectFile(file, { guard = () => true, onStatus = () 
     dialog.append(
       heading,
       intro,
-      label,
-      description,
+      advanced,
       companionLabel,
       summary,
       details,
@@ -105,16 +106,14 @@ export async function openProjectFile(file, { guard = () => true, onStatus = () 
     }
     function show() {
       select.replaceChildren();
-      if (prepared.requiresProfileChoice)
-        select.append(new Option('Choose the player this song used…', ''));
       for (const choice of prepared.profileChoices || [])
         select.append(new Option(choice.label, choice.id));
       const profileId = prepared.project?.legacyImport?.profileId || prepared.report?.profileId;
       if (profileId) select.value = profileId;
       label.hidden = !select.options.length;
+      advanced.hidden = busy || select.options.length < 2;
       description.textContent =
-        (prepared.profileChoices || []).find((item) => item.id === select.value)?.description ||
-        'This file does not identify its playback rules. Choose the editor or standalone player it was intended for.';
+        (prepared.profileChoices || []).find((item) => item.id === select.value)?.description || '';
       const project = prepared.project;
       if (project) {
         const hits = project.sequences.reduce(
@@ -125,9 +124,10 @@ export async function openProjectFile(file, { guard = () => true, onStatus = () 
       } else
         summary.textContent =
           prepared.report.issues?.find((issue) => issue.severity === 'error')?.message ||
-          'A playback choice is needed before the song can be converted.';
+          'This file could not be converted. See the import details for more information.';
       report.textContent = JSON.stringify(prepared.report, null, 2);
       open.disabled = busy || !project || prepared.requiresProfileChoice;
+      open.hidden = busy || !project;
       select.disabled = busy;
       companionLabel.hidden =
         !companion && !prepared.report.issues?.some((issue) => issue.code === 'MISSING_COMPANION');
@@ -155,7 +155,6 @@ export async function openProjectFile(file, { guard = () => true, onStatus = () 
         });
         if (current !== generation || closed) return;
         prepared = next;
-        status.textContent = 'Ready to check this song’s sounds.';
       } catch (error) {
         if (closed || current !== generation) return;
         status.textContent = error.message;
@@ -166,6 +165,7 @@ export async function openProjectFile(file, { guard = () => true, onStatus = () 
           show();
         }
       }
+      if (!closed && current === generation && prepared.project) await loadSong();
     }
     select.addEventListener('change', updateSelection);
     companionInput.addEventListener('change', () => {
@@ -173,6 +173,7 @@ export async function openProjectFile(file, { guard = () => true, onStatus = () 
       updateSelection();
     });
     async function commit(allowMissing) {
+      if (closed || controller.signal.aborted) return;
       if (!guard())
         throw new Error(
           'The project changed while the song was opening. Your current work was retained.'
@@ -186,8 +187,8 @@ export async function openProjectFile(file, { guard = () => true, onStatus = () 
       );
       finish(true);
     }
-    open.addEventListener('click', async () => {
-      if (busy || !prepared.project) return;
+    async function loadSong() {
+      if (closed || busy || !prepared.project) return;
       busy = true;
       show();
       status.textContent = 'Checking this song’s sounds…';
@@ -218,7 +219,8 @@ export async function openProjectFile(file, { guard = () => true, onStatus = () 
         busy = false;
         if (!closed) show();
       }
-    });
+    }
+    open.addEventListener('click', loadSong);
     missing.addEventListener('click', async () => {
       try {
         await commit(true);
@@ -251,5 +253,6 @@ export async function openProjectFile(file, { guard = () => true, onStatus = () 
     });
     show();
     dialog.showModal();
+    void loadSong();
   });
 }

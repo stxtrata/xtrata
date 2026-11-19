@@ -6,9 +6,17 @@ song file: conversion writes a new version 3 project and never edits the input.
 
 ## Opening a song
 
-Use **Load** and select the original JSON, AUDX or gzip file. The preview shows
-the song structure, playback interpretation, warnings and any verified repairs.
-If the file does not identify its historical player, choose the intended version:
+Use **Load** and select the original JSON, AUDX or gzip file. The bridge selects
+the playback interpretation, checks the song and prepares its samples, then opens
+it automatically. There is no required editor/standalone choice or confirmation
+when the song and its samples are ready.
+
+Shared sparse and compact formats use the **Audional editor** interpretation by
+default. Early boolean grids and the distinct OG instruction wrapper are detected
+from their structure. An explicit playback override takes precedence where the
+format supports it; a saved converted project retains its selected interpretation.
+
+The supported interpretations are:
 
 - **Audional editor:** saved steps 1–64 become grid positions 0–63; numbered
   sequence gaps remain rests. Trim duration is passed to the source in seconds.
@@ -20,18 +28,24 @@ If the file does not identify its historical player, choose the intended version
   instruction wrapper retains its established trigger/mute-toggle interpretation.
 
 The bridge does not infer playback intent from a filename. The same old JSON can
-have different meaning in the editor and standalone player. Inactive and repeated
-events remain in bounded import provenance rather than being silently discarded.
+have different meaning in the editor and standalone player, and those shared bytes
+cannot prove which player the author intended. The editor interpretation is a
+documented default, not an inferred historical fact; import reports distinguish
+that default from a format-selected or explicitly selected interpretation.
+Inactive and repeated events remain in bounded import provenance rather than being
+silently discarded.
 Unsupported musical fields, conflicting directions in one cell, unresolved
 dictionary tokens and ambiguous source alignment block conversion with a report.
 
-**Check sounds and open** resolves the candidate's samples before replacing the
-current project. Identical sources load once. Cancel, an intervening edit or a
+Automatic loading resolves the candidate's samples before replacing the current
+project. Identical sources load once. Cancel, an intervening edit or a
 failed validation leaves the current project intact. Missing sounds offer retry,
 cancel or an explicit **Open with missing samples** choice. The latter preserves
 the source references and notes for relinking; unavailable channels remain silent.
-A matching pattern dictionary can be supplied when an unknown serialized song
-requires one. Import reports can be downloaded separately.
+When a loading problem pauses import, **Advanced playback settings** offers the
+historical standalone override for shared formats. A matching pattern dictionary
+can be supplied when an unknown serialized song requires one. Import reports can
+be downloaded separately from that recovery dialog.
 
 ## Supported data and repairs
 
@@ -43,7 +57,7 @@ continue through the native importer. Existing strict chain-song envelopes keep
 their runtime and dependency verification requirements.
 
 Bitcoin `/content/…` URLs and bare inscription IDs retain an `ordinal` identity.
-Gain up to 3 and playback rate up to 100 are preserved for explicit historical
+Gain up to 3 and playback rate up to 100 are preserved for historical
 profiles, including the editor's channel and trim controls. Reverse playback
 reverses the decoded buffer and mirrors trim coordinates. Silent sequences and
 the ending remain part of a one-pass song. Live playback, mix/stem rendering,
@@ -88,8 +102,9 @@ still requires its ordinary immutable dependency binding.
 
 ## Chain runtime
 
-Runtime version `beta-pro-legacy-bridge-1` bundles the bridge, decoder worker,
-verified repair data and existing audio engine into the standalone HTML artifact.
+Runtime version `beta-pro-legacy-bridge-2` bundles automatic loading, the bridge,
+decoder worker, verified repair data and existing audio engine into the standalone
+HTML artifact.
 No new external runtime or sample library is required. Its legacy reader can load
 original Bitcoin sample references without a wallet or reinscription. Ordinary
 web-hosted sample URLs require the editor and are not accepted as chain-contained
@@ -111,9 +126,11 @@ The standalone test blocks website modules/CDNs and supplies simulated Bitcoin
 content, including missing-source and incompatible-runtime failures.
 
 The optional local corpus harness reads explicitly supplied inventory/evidence
-paths. It checks 99 paths / 95 unique file hashes, 173 legacy profile cases and
-11 native projects. Browser checks import, save, reopen and commit all 184 cases
-without fetching private songs or remote audio. The earlier editions' 20 starter
+paths. It checks 99 paths / 95 unique file hashes, automatic import of all 88 legacy
+inputs (85 editor defaults and three detected boolean grids), 173 explicit legacy
+profile cases and 11 native projects. Browser checks import, save, reopen and commit
+all 184 explicit/native cases without fetching private songs or remote audio.
+The earlier editions' 20 starter
 songs, native synth patches, embedded audio and pinned clips retain their existing
 compatibility coverage.
 

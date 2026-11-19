@@ -3,6 +3,15 @@ import assert from 'node:assert/strict';
 import { serve, browser, page } from './serve.mjs';
 const { srv, url } = await serve();
 let b;
+let uiChecks = 0;
+const equal = (...args) => {
+  assert.equal(...args);
+  uiChecks++;
+};
+const same = (...args) => {
+  assert.deepEqual(...args);
+  uiChecks++;
+};
 try {
   b = await browser();
   const p = await page(b, url);
@@ -49,7 +58,11 @@ try {
       buffer = ctx.createBuffer(1, 441, 44100);
     engine.setBuffer(0, buffer);
     const first = await B.prepareLegacyImport(raw);
-    ok(first.requiresProfileChoice && !first.project, 'Ambiguous sparse file requires choice');
+    ok(
+      !first.requiresProfileChoice &&
+        first.project?.legacyImport.profileId === 'audionals-editor-v1',
+      'Sparse file automatically uses editor playback'
+    );
     const converted = await B.prepareLegacyImport(raw, { profileId: 'audionals-editor-v1' });
     ok(converted.project && S.store.project === initial, 'Pure conversion never commits');
     const candidate = P.prepareProject(converted.project);
@@ -182,33 +195,71 @@ try {
         ),
       /different AudioNaut runtime/
     );
+    const standalone = await B.prepareLegacyImport(raw, { profileId: 'audionals-standalone-v1' });
+    await openProjectFile(
+      new File(
+        [P.exportProject({ project: P.prepareProject(standalone.project) })],
+        'saved-standalone.json'
+      )
+    );
+    ok(
+      S.store.project.legacyPlayback.id === 'audionals-standalone-v1' &&
+        !S.store.project.sequences[0].steps[0][0] &&
+        S.store.project.sequences[0].steps[0][1] &&
+        !S.store.project.sequences[0].steps[0][63],
+      'Native file reopening preserves the saved standalone profile and event positions'
+    );
+    ok(
+      !document.querySelector('#legacy-import-dialog'),
+      'Native files reopen without legacy choices'
+    );
+    S.store.loadProject(initial);
+    engine.setBuffer(0, buffer);
     globalThis.legacyUITest = { S, P, A, raw, initial, openProjectFile };
     return { checks };
   });
-  // Exercise the actual dialog, including explicit choice, cancellation and a
-  // source failure. No remote resource or wallet is available in this context.
+  // Opening starts immediately. Hold sample reads to prove cancellation works
+  // during automatic loading, without any profile choice or second open click.
   await p.evaluate(() => {
+    legacyUITest.originalFetch = globalThis.fetch;
+    globalThis.fetch = (_url, { signal } = {}) =>
+      new Promise((_resolve, reject) => {
+        legacyUITest.readStarted = true;
+        const abort = () => reject(new DOMException('Cancelled', 'AbortError'));
+        if (signal?.aborted) abort();
+        else signal?.addEventListener('abort', abort, { once: true });
+      });
     legacyUITest.pending = legacyUITest.openProjectFile(
       new File([JSON.stringify(legacyUITest.raw)], 'old.json')
     );
   });
   await p.locator('#legacy-import-dialog').waitFor();
-  assert.equal(await p.locator('#legacy-import-open').isDisabled(), true);
-  await p.getByRole('combobox', { name: 'Historical player' }).selectOption('audionals-editor-v1');
-  await p.waitForFunction(() => !document.querySelector('#legacy-import-open').disabled);
+  await p.waitForFunction(() => legacyUITest.readStarted);
+  equal(await p.getByRole('combobox', { name: 'Historical player' }).isVisible(), false);
+  equal(await p.locator('#legacy-import-open').isVisible(), false);
   await p.getByRole('button', { name: 'Cancel', exact: true }).click();
-  assert.equal(await p.evaluate(async () => await legacyUITest.pending), false);
-  assert.equal(await p.evaluate(() => legacyUITest.S.store.project === legacyUITest.initial), true);
+  equal(await p.evaluate(async () => await legacyUITest.pending), false);
+  equal(await p.evaluate(() => legacyUITest.S.store.project === legacyUITest.initial), true);
   await p.evaluate(() => {
+    globalThis.fetch = legacyUITest.originalFetch;
     legacyUITest.pending = legacyUITest.openProjectFile(
       new File([JSON.stringify(legacyUITest.raw)], 'old.json')
     );
   });
-  await p.getByRole('combobox', { name: 'Historical player' }).selectOption('audionals-editor-v1');
-  await p.waitForFunction(() => !document.querySelector('#legacy-import-open').disabled);
-  await p.locator('#legacy-import-open').click();
   await p.locator('#legacy-import-missing').waitFor({ state: 'visible' });
-  assert.equal(await p.evaluate(() => legacyUITest.S.store.project === legacyUITest.initial), true);
+  equal(await p.evaluate(() => legacyUITest.S.store.project === legacyUITest.initial), true);
+  equal(await p.getByRole('combobox', { name: 'Historical player' }).isVisible(), false);
+  // A rare historical override stays available in collapsed advanced settings.
+  await p.getByText('Advanced playback settings', { exact: true }).click();
+  await p
+    .getByRole('combobox', { name: 'Historical player' })
+    .selectOption('audionals-standalone-v1');
+  await p.locator('#legacy-import-missing').waitFor({ state: 'visible' });
+  equal(
+    await p.getByRole('combobox', { name: 'Historical player' }).inputValue(),
+    'audionals-standalone-v1'
+  );
+  equal(await p.evaluate(() => legacyUITest.S.store.project === legacyUITest.initial), true);
   await p.getByRole('button', { name: 'Cancel', exact: true }).click();
   await p.evaluate(() => legacyUITest.pending);
   const logs = [],
@@ -251,18 +302,14 @@ try {
     projectChannelNames: ['a'.repeat(64) + 'i0'],
     projectSequences: { Sequence0: { ch0: { steps: [1, { index: 64, reverse: true }] } } }
   };
-  await editor
-    .locator('#file-input')
-    .setInputFiles({
-      name: 'old-sequencer.json',
-      mimeType: 'application/json',
-      buffer: Buffer.from(JSON.stringify(raw))
-    });
-  await editor
-    .getByRole('combobox', { name: 'Historical player' })
-    .selectOption('audionals-editor-v1');
-  await editor.waitForFunction(() => !document.querySelector('#legacy-import-open').disabled);
-  await editor.locator('#legacy-import-open').click();
+  await editor.locator('#file-input').setInputFiles({
+    name: 'old-sequencer.json',
+    mimeType: 'application/json',
+    buffer: Buffer.from(JSON.stringify(raw))
+  });
+  await editor.waitForFunction(
+    () => document.querySelector('#project-name')?.value === 'Full editor legacy fixture'
+  );
   await editor
     .locator('#legacy-import-dialog')
     .waitFor({ state: 'detached' })
@@ -285,26 +332,28 @@ try {
       frames: engine.buffers[0]?.length,
       pitch: store.channel(0).pitch,
       reverse: store.project.sequences[0].steps[0][63].rev,
+      profile: store.project.legacyImport.profileId,
       sampleName: store.channel(0).sampleName
     };
   });
-  assert.deepEqual(loaded, {
+  same(loaded, {
     name: raw.projectName,
     instruments: 0,
     frames: 441,
     pitch: 9.03,
     reverse: true,
+    profile: 'audionals-editor-v1',
     sampleName: 'a'.repeat(64) + 'i0'
   });
-  assert.equal(await editor.locator('.ch-vol').first().inputValue(), '2');
-  assert.equal(await editor.locator('.ch-pitch').first().getAttribute('max'), '100');
-  assert.deepEqual(
+  equal(await editor.locator('.ch-vol').first().inputValue(), '2');
+  equal(await editor.locator('.ch-pitch').first().getAttribute('max'), '100');
+  same(
     logs.filter((log) => log.startsWith('pageerror:')),
     []
   );
   console.log(
     JSON.stringify({
-      checks: result.checks + 9,
+      checks: result.checks + uiChecks,
       browser: process.env.AUDIONAUT_TEST_BROWSER || 'chromium',
       atomicImport: true,
       dialog: true,

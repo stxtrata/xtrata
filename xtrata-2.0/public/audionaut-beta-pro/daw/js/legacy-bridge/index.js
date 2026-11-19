@@ -81,6 +81,7 @@ function stage(envelope, options, repair = null, companion = null) {
   result.profileChoices = selection.profileChoices;
   report.knownHash = selection.knownHash;
   report.profileId = selection.profile?.id || null;
+  report.profileSelection = selection.profileSelection;
   if (detection.mixedDenseSparse) {
     issue(
       report,
@@ -129,16 +130,6 @@ function stage(envelope, options, repair = null, companion = null) {
       encodedEvents: adapted.expandedEvents,
       sourceSequences: adapted.sequences.length
     };
-    if (!selection.profile) {
-      issue(
-        report,
-        'PROFILE_CHOICE_REQUIRED',
-        'Choose which historical player should interpret this song. The original bytes and all decoded events remain unchanged.',
-        '',
-        'info'
-      );
-      return result;
-    }
     const song = normalizeSong(adapted, selection.profile, { report });
     result.normalized = song;
     report.stats = song.stats;
