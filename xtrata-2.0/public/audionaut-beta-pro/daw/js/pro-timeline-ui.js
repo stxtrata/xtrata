@@ -20,7 +20,8 @@ import {
 } from './ui.js';
 import { getMidiTarget } from './midi-input.js';
 import { openRoll, openClipRoll } from './pianoroll.js';
-import { el, action, row, choice, toggle, status } from './pro-ui.js';
+import { focusAutomation, automationTargets, targetKey, findLane, automationEnd, automationValue, drawAutomation, automationGestures, saveAutomation } from './automation-view.js';
+import { el, action, row, choice, toggle, status, number } from './pro-ui.js';
 
 const HEADER = 44;
 export function mount(root) {
@@ -36,7 +37,12 @@ export function mount(root) {
     dead = false,
     frame = 0,
     queued = 0,
-    advancedDispose = null;
+    advancedDispose = null,
+    automation = false,
+    automationControls = null,
+    specs = [], specGeneration = -1;
+  const parameters = new Map();
+  try { automation = localStorage.getItem('audionaut.beta-pro.timeline.automation') === 'on'; } catch {}
   const play = action('Play', () => document.querySelector('#btn-play').click(), {
       'aria-label': 'Play or pause song'
     }),
@@ -63,7 +69,7 @@ export function mount(root) {
       }
     ),
     action('Fit song', () => {
-      zoom = Math.max(1, (scroll.clientWidth - LEFT - 20) / model.end);
+      zoom = Math.max(1, (scroll.clientWidth - LEFT - 20) / (automation ? Math.max(model.end, automationEnd()) : model.end));
       draw();
     }),
     toggle('Follow playhead', follow, (v) => (follow = v))
@@ -76,6 +82,13 @@ export function mount(root) {
     action('+ Audio channel', () => document.querySelector('#channels .ch-add').click()),
     action('+ Instrument', () => document.querySelector('#pro-add-instrument').click())
   );
+  const automationButton = action('Automation', () => {
+    controls?.clear(); automationControls?.clear();
+    automation = !automation;
+    try { localStorage.setItem('audionaut.beta-pro.timeline.automation', automation ? 'on' : 'off'); } catch {}
+    refresh();
+  }, { className: 'song-automation-toggle', 'aria-pressed': String(automation), title: 'Show or hide automation editing. Playback automation stays enabled.' });
+  toolbar.append(automationButton);
   toolbar.classList.add('song-transport');
   const frameBox = el('div', null, { className: 'song-frame' }),
     scroll = el('div', null, {
@@ -145,6 +158,17 @@ export function mount(root) {
   }
   function editTools() {
     tools.replaceChildren();
+    if (automation) {
+      info.textContent = 'Automation overlay · click to add, drag to move, right-click to remove. Arrow keys fine-tune a selected point. Alt: free · Ctrl: fine. Switch Automation off to edit regions; automation keeps playing.';
+      const selection = automationControls?.selection, lane = selection && findLane(selection.target), point = lane?.points.find(p => p.beat === selection.beat);
+      if (point) {
+        const spec = specs.find(s => targetKey(s.target) === targetKey(selection.target));
+        if (!spec) return;
+        const change = patch => { const l = findLane(selection.target); if (!l) return; const points = structuredClone(l.points), p = points.find(p => p.beat === selection.beat); if (!p) return; Object.assign(p, patch); saveAutomation(selection.target, points); selection.beat = p.beat; draw(); editTools(); };
+        tools.append(el('strong', spec.label), number('Automation point beat', point.beat, v => change({ beat: v }), { max: automationEnd(), step: 1 / 16 }), number('Automation point value', point.value, v => change({ value: v }), { min: spec.min, max: spec.max, step: spec.step }), choice('Automation point curve', ['linear', 'step'], point.curve || 'linear', v => change({ curve: v })));
+      }
+      return;
+    }
     const r = chosen();
     if (!r) return;
     info.textContent = `${r.track.name} · ${r.type === 'sample' ? 'Audio region' : 'Note'} · beat ${(r.start + 1).toFixed(2)}${r.missing ? ' · Sound unavailable' : ''}`;
@@ -165,7 +189,7 @@ export function mount(root) {
     if (dead) return;
     modelProject = null;
     model = getModel();
-    rows = [...store.project.channels, ...store.project.instruments].filter((t) => !t.assetOnly);
+    rows = [...store.project.channels, ...store.project.instruments, ...(automation ? [...store.project.buses, { ...store.project.master, id: 'master', name: 'Master' }] : [])].filter((t) => !t.assetOnly);
 
     const sequenceIds = store.project.sequences.map((s) => s.id).join(',');
     if (sequenceSelect.dataset.ids !== sequenceIds) {
@@ -188,12 +212,16 @@ export function mount(root) {
   function draw() {
     if (dead) return;
     model = getModel();
-    rows = [...store.project.channels, ...store.project.instruments].filter((t) => !t.assetOnly);
+    rows = [...store.project.channels, ...store.project.instruments, ...(automation ? [...store.project.buses, { ...store.project.master, id: 'master', name: 'Master' }] : [])].filter((t) => !t.assetOnly);
+    if (specGeneration !== store.generation) { specs = automationTargets(); specGeneration = store.generation; }
+    automationButton.setAttribute('aria-pressed', String(automation));
+    frameBox.classList.toggle('song-automation-active', automation);
+    const songEnd = automation ? Math.max(model.end, automationEnd()) : model.end;
     const width = Math.max(320, scroll.clientWidth),
       height = Math.max(180, scroll.clientHeight),
       sx = scroll.scrollLeft,
       sy = scroll.scrollTop;
-    content.style.width = `${Math.max(width, LEFT + model.end * zoom + 24)}px`;
+    content.style.width = `${Math.max(width, LEFT + songEnd * zoom + 24)}px`;
     content.style.height = `${Math.max(height, HEADER + rows.length * TRACK)}px`;
     // Desktop keeps the Pattern control row; smaller screens wrap those same
     // controls into taller lanes instead of hiding buttons or widening the page.
@@ -204,7 +232,7 @@ export function mount(root) {
     frameBox.style.setProperty('--song-track-height', TRACK + 'px');
     canvas.dataset.controlsWidth = LEFT;
     canvas.dataset.trackHeight = TRACK;
-    content.style.width = `${Math.max(width, LEFT + model.end * zoom + 24)}px`;
+    content.style.width = `${Math.max(width, LEFT + songEnd * zoom + 24)}px`;
     content.style.height = `${Math.max(height, HEADER + rows.length * TRACK)}px`;
     const scale = window.devicePixelRatio || 1;
     canvas.width = Math.round(width * scale);
@@ -244,7 +272,7 @@ export function mount(root) {
         sampleIndex < 0
           ? store.project.instruments.findIndex((t) => t.id === track.id)
           : sampleIndex;
-      const kind = sampleIndex < 0 ? 'instrument' : 'sample';
+      const kind = sampleIndex >= 0 ? 'sample' : index >= 0 ? 'instrument' : 'bus';
       if (label && (label.dataset.ownerIndex !== String(index) || label.dataset.kind !== kind)) {
         label.remove();
         label = null;
@@ -254,7 +282,7 @@ export function mount(root) {
         label.dataset.trackId = track.id;
         label.dataset.ownerIndex = index;
         label.dataset.kind = kind;
-        label.append(createTrackControls(track.id, { patternTools: false, playbackRate: false }));
+        label.append(kind === 'bus' ? el('div') : createTrackControls(track.id, { patternTools: false, playbackRate: false }));
         if (kind === 'sample') bindChannelDrop(label, index);
         headers.append(label);
       }
@@ -265,9 +293,12 @@ export function mount(root) {
       label.classList.toggle('has-sample', !!track.sampleName);
       label.classList.toggle('unresolved-source', !!track.unresolvedSource);
       label.title = track.unresolvedSource?.message || '';
-      refreshTrackControls(label.firstElementChild);
+      if (kind !== 'bus') refreshTrackControls(label.firstElementChild);
+      label.firstElementChild.hidden = automation;
+      automationHeader(label, track);
       const color = label.firstElementChild.style.getPropertyValue('--ch-color') || '#80cbd6';
       label.style.borderLeftColor = color;
+      g.globalAlpha = automation ? .22 : 1;
       for (const r of model.byTrack.get(track.id) || []) {
         if (r.end < leftBeat || r.start > rightBeat) continue;
         const x = LEFT + r.start * zoom - sx,
@@ -333,6 +364,11 @@ export function mount(root) {
           g.fillText('Missing sound', x + 4, top + 20);
         }
       }
+      g.globalAlpha = 1;
+      if (automation) {
+        const c = automationGeometry(track, i);
+        if (c) drawAutomation(g, c, { points: automationControls?.points(c.spec.target) || c.lane?.points || [], selected: targetKey(automationControls?.selection?.target) === targetKey(c.spec.target) ? automationControls.selection.beat : null });
+      }
     });
     for (const label of headers.children) if (!seen.has(label.dataset.trackId)) label.remove();
     g.restore();
@@ -355,6 +391,39 @@ export function mount(root) {
     g.fillText('TRACKS', 8, 26);
     paintTransport();
   }
+  function specFor(track) {
+    const available = specs.filter(s => s.target.trackId === track.id);
+    let spec = available.find(s => targetKey(s.target) === parameters.get(track.id));
+    spec ||= available.find(s => findLane(s.target)) || available[0];
+    if (spec) parameters.set(track.id, targetKey(spec.target));
+    return spec;
+  }
+  function automationGeometry(track, index) {
+    const spec = specFor(track); if (!spec) return null;
+    const start = scroll.scrollLeft / zoom, end = Math.min(automationEnd(), (scroll.scrollLeft + scroll.clientWidth - LEFT) / zoom);
+    return { lane: findLane(spec.target), spec, start, end, x: LEFT, y: HEADER + index * TRACK - scroll.scrollTop + 9, width: (end - start) * zoom, height: TRACK - 18, limit: automationEnd(), snap: regionSnap() / 4 };
+  }
+  function automationHeader(label, track) {
+    let header = label.querySelector('.song-automation-header');
+    if (!automation) { if (header) header.hidden = true; return; }
+    if (!header) { header = el('div', null, { className: 'song-automation-header' }); label.append(header); }
+    header.hidden = false;
+    const spec = specFor(track); if (!spec) return;
+    const available = specs.filter(s => s.target.trackId === track.id), signature = JSON.stringify([track.name, available.map(s => [targetKey(s.target), s.name, !!findLane(s.target)])]);
+    if (header.dataset.signature !== signature) {
+      header.replaceChildren(el('strong', track.name));
+      const select = el('select', null, { 'aria-label': `${track.name} automation parameter` });
+      for (const s of available) select.append(el('option', `${findLane(s.target) ? '● ' : ''}${s.name}`, { value: targetKey(s.target) }));
+      select.addEventListener('change', () => { automationControls.clear(); parameters.set(track.id, select.value); focusAutomation(specFor(track).target); draw(); editTools(); });
+      const bypass = action('Read', () => { const l = findLane(specFor(track).target); if (l) store.setAutomationLane({ ...l, enabled: l.enabled === false }); }, { 'aria-label': `${track.name} automation playback`, title: 'Enable or bypass this automation lane. The Automation toggle only hides its display.' });
+      header.append(select, bypass, el('output', null, { 'aria-label': `${track.name} automation value` })); header.dataset.signature = signature;
+    }
+    header.querySelector('strong').textContent = track.name;
+    header.querySelector('select').value = targetKey(spec.target);
+    const lane = findLane(spec.target), button = header.querySelector('button');
+    button.disabled = !lane; button.textContent = lane?.enabled === false ? 'Bypassed' : lane ? 'Read' : 'Guide'; button.setAttribute('aria-pressed', String(lane?.enabled !== false && !!lane));
+    header.querySelector('output').textContent = Number(automationValue(lane?.points || [], engine.getMusicalPosition().beat, spec.value).toFixed(3));
+  }
   function paintTransport() {
     const beat = engine.getMusicalPosition().beat || 0,
       pos = songPosition(store.project, beat);
@@ -367,7 +436,7 @@ export function mount(root) {
     if (
       engine.isPlaying &&
       follow &&
-      !controls?.dragging &&
+      !controls?.dragging && !automationControls?.dragging &&
       (x > scroll.clientWidth - 35 || x < LEFT)
     )
       scroll.scrollLeft = Math.max(0, beat * zoom - (scroll.clientWidth - LEFT) * 0.25);
@@ -375,6 +444,10 @@ export function mount(root) {
   function animate() {
     if (dead) return;
     paintTransport();
+    if (automation && engine.isPlaying) for (const label of headers.children) {
+      const track = rows.find(t => t.id === label.dataset.trackId), spec = track && specFor(track), out = label.querySelector('output');
+      if (spec && out) out.textContent = Number(automationValue(findLane(spec.target)?.points || [], engine.getMusicalPosition().beat, spec.value).toFixed(3));
+    }
     frame = requestAnimationFrame(animate);
   }
   function bounds(r) {
@@ -401,7 +474,7 @@ export function mount(root) {
   document.body.append(marquee);
   controls = createRegionControls({
     root: canvas,
-    active: () => !dead && root.isConnected,
+    active: () => !dead && root.isConnected && !automation,
     regions: (p) => getModel(p).regions,
     bounds,
     repaint: () => {
@@ -478,6 +551,21 @@ export function mount(root) {
       }
     }
   });
+  automationControls = automationGestures(canvas, {
+    active: () => automation && !dead,
+    hit: e => {
+      const box = canvas.getBoundingClientRect(), x = e.clientX - box.left, y = e.clientY - box.top;
+      if (x < LEFT || x > box.width || y < HEADER || y > box.height) return null;
+      const index = Math.floor((y - HEADER + scroll.scrollTop) / TRACK), track = rows[index];
+      const c = track && automationGeometry(track, index);
+      return c && c.width > 0 && x <= c.x + c.width ? c : null;
+    },
+    repaint: () => { draw(); if (!automationControls.dragging) editTools(); }
+  });
+  canvas.addEventListener('pointerdown', e => {
+    const b = canvas.getBoundingClientRect();
+    if (automation && e.button === 0 && e.clientX >= b.left + LEFT && e.clientY < b.top + HEADER) engine.seekBeat(Math.max(0, (e.clientX - b.left - LEFT + scroll.scrollLeft) / zoom));
+  });
   scroll.addEventListener('scroll', draw);
   headers.addEventListener(
     'wheel',
@@ -517,6 +605,7 @@ export function mount(root) {
     dead = true;
     advancedTicket++;
     controls.dispose();
+    automationControls.dispose();
     marquee.remove();
     ro.disconnect();
     document.removeEventListener('instrument-target', queue);

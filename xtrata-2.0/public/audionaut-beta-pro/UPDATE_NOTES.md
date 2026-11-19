@@ -4,6 +4,31 @@ This workstation is isolated at `/audionaut-beta-pro/` behind the existing
 membership gate. The original AudioNaut and earlier beta are unchanged.
 `BETA.md` describes isolation and original-file compatibility.
 
+## Timeline automation overlay — 19 November 2026
+
+- Timeline has an Automation toggle that reveals editable curves over dimmed
+  regions. Each track selects one parameter; buses and Master are included.
+  The view preference is remembered locally. Hiding curves restores region
+  editing without disabling automation or changing the saved song.
+- Solid gold lines and dots show saved automation, dashed guides show parameters
+  without points, and grey dashed curves identify bypassed lanes. The per-lane
+  Read/Bypassed button controls playback separately from the display toggle.
+- Timeline and the detailed Automation tab share curve drawing and gestures.
+  Single-point lanes and values held after the last point now remain visible.
+  Linear ramps and step changes share the same beat/value coordinates, with
+  viewport drawing reduction for dense recorded curves.
+- Click to add, drag to move, right-click/Delete to remove, or use arrow keys
+  and numeric fields for precision. Alt removes snap and Ctrl uses fine snap.
+  Completed drags form one undo step; Escape, lost capture, a view change or
+  loading another song cancels unfinished edits. Selected Timeline parameters
+  follow into the detailed editor.
+- Validation: 30 interaction, rendering, responsive-layout and persistence checks
+  pass in Chromium, Firefox and WebKit. The regression suite and cross-browser
+  CI now include these checks.
+- No song-format, audio-runtime, dependency, gate, original AudioNaut or earlier
+  beta changes. Existing automation remains compatible with the same saved files
+  and on-chain playback runtime.
+
 ## Drum Rack keyboard, library and panel — 19 November 2026
 
 - Drum Rack opens at C1 (MIDI 36) and shows its 16 mapped pad notes, with drum
