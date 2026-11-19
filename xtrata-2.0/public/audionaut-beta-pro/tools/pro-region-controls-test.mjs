@@ -79,7 +79,7 @@ try {
             : document.querySelector('.song-canvas'),
         r = c.getBoundingClientRect();
       return {
-        left: r.left + (view === 'Patterns' ? 0 : 220),
+        left: r.left + (view === 'Patterns' ? 0 : +c.dataset.controlsWidth),
         top: r.top + (view === 'Patterns' ? 0 : 44),
         scale: view === 'Patterns' ? r.width / 64 : 14,
         selector: view === 'Patterns' ? '.channel[data-ch="0"] .arrange-strip' : '.song-canvas'

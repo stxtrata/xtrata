@@ -26,7 +26,7 @@ save a populated synthetic timeline screenshot locally.
 
 `pro-keyboard-test.mjs` checks the shared pointer lifecycle and Cathedral key
 geometry at desktop and phone widths. `pro-faces-test.mjs` checks black-key
-alignment on every instrument panel. The full suite now has 38 groups; these
+alignment on every instrument panel. The full suite now has 39 groups; these
 view suites also run in the Firefox/WebKit CI matrix.
 
 ## Inherited diagnostic tools
@@ -68,3 +68,7 @@ truncation rejection and cancellation. Both run in the Firefox/WebKit CI matrix.
 On macOS Firefox the native WAV decoder stalls in this local harness; that test
 reports the limitation and checks fallback delegation with a controlled decoder.
 Chrome, WebKit and Linux Firefox use the real native fallback.
+
+`pro-track-controls-test.mjs` checks the shared channel/synth buttons, editors,
+state synchronization, sequence targeting, clipboard, undo, focus retention,
+track creation and control fit at desktop, tablet and phone widths.

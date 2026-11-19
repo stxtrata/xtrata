@@ -12,15 +12,21 @@ import { songRegions, editSongRegion, waveformIndex } from './song-regions.js';
 import { drawWaveformRegion } from './waveform-drawing.js';
 import { beatToSeconds, secondsToBeat } from './timeline.js';
 import { beginTransaction, endTransaction } from './history.js';
-import { openStepEditor } from './ui.js';
+import {
+  openStepEditor,
+  createTrackControls,
+  refreshTrackControls,
+  bindChannelDrop
+} from './ui.js';
+import { getMidiTarget } from './midi-input.js';
 import { openRoll, openClipRoll } from './pianoroll.js';
 import { el, action, row, choice, toggle, status } from './pro-ui.js';
 
-const HEADER = 44,
-  TRACK = 44,
-  LEFT = 220;
+const HEADER = 44;
 export function mount(root) {
-  let zoom = 56,
+  let LEFT = 560,
+    TRACK = 48,
+    zoom = 56,
     follow = true,
     controls = null,
     modelProject = null,
@@ -61,6 +67,14 @@ export function mount(root) {
       draw();
     }),
     toggle('Follow playhead', follow, (v) => (follow = v))
+  );
+  const sequenceField = choice('Edit sequence', [], '0', (v) => store.selectSequence(+v));
+  const sequenceSelect = sequenceField.querySelector('select');
+  sequenceSelect.title = 'Pattern fill, shift, clear and MIDI copy/paste affect this sequence.';
+  toolbar.append(
+    sequenceField,
+    action('+ Audio channel', () => document.querySelector('#channels .ch-add').click()),
+    action('+ Instrument', () => document.querySelector('#pro-add-instrument').click())
   );
   toolbar.classList.add('song-transport');
   const frameBox = el('div', null, { className: 'song-frame' }),
@@ -153,6 +167,14 @@ export function mount(root) {
     model = getModel();
     rows = [...store.project.channels, ...store.project.instruments].filter((t) => !t.assetOnly);
 
+    const sequenceIds = store.project.sequences.map((s) => s.id).join(',');
+    if (sequenceSelect.dataset.ids !== sequenceIds) {
+      sequenceSelect.replaceChildren(
+        ...store.project.sequences.map((s, i) => el('option', `Sequence ${i + 1}`, { value: i }))
+      );
+      sequenceSelect.dataset.ids = sequenceIds;
+    }
+    sequenceSelect.value = store.project.currentSequence;
     draw();
     editTools();
   }
@@ -166,10 +188,22 @@ export function mount(root) {
   function draw() {
     if (dead) return;
     model = getModel();
+    rows = [...store.project.channels, ...store.project.instruments].filter((t) => !t.assetOnly);
     const width = Math.max(320, scroll.clientWidth),
       height = Math.max(180, scroll.clientHeight),
       sx = scroll.scrollLeft,
       sy = scroll.scrollTop;
+    content.style.width = `${Math.max(width, LEFT + model.end * zoom + 24)}px`;
+    content.style.height = `${Math.max(height, HEADER + rows.length * TRACK)}px`;
+    // Desktop keeps the Pattern control row; smaller screens wrap those same
+    // controls into taller lanes instead of hiding buttons or widening the page.
+    LEFT = width >= 1000 ? 560 : width >= 700 ? 300 : Math.min(220, Math.floor(width * 0.55));
+    TRACK = width >= 1000 ? 48 : width >= 700 ? 96 : 144;
+    frameBox.classList.toggle('song-compact-controls', width < 1000);
+    frameBox.style.setProperty('--song-controls-width', LEFT + 'px');
+    frameBox.style.setProperty('--song-track-height', TRACK + 'px');
+    canvas.dataset.controlsWidth = LEFT;
+    canvas.dataset.trackHeight = TRACK;
     content.style.width = `${Math.max(width, LEFT + model.end * zoom + 24)}px`;
     content.style.height = `${Math.max(height, HEADER + rows.length * TRACK)}px`;
     const scale = window.devicePixelRatio || 1;
@@ -205,32 +239,35 @@ export function mount(root) {
       g.fillRect(LEFT, y + TRACK - 1, width - LEFT, 1);
       seen.add(track.id);
       let label = [...headers.children].find((n) => n.dataset.trackId === track.id);
+      const sampleIndex = store.project.channels.findIndex((t) => t.id === track.id);
+      const index =
+        sampleIndex < 0
+          ? store.project.instruments.findIndex((t) => t.id === track.id)
+          : sampleIndex;
+      const kind = sampleIndex < 0 ? 'instrument' : 'sample';
+      if (label && (label.dataset.ownerIndex !== String(index) || label.dataset.kind !== kind)) {
+        label.remove();
+        label = null;
+      }
       if (!label) {
-        label = el('div', null, { className: 'song-track' });
+        label = el('div', null, { className: 'song-track', role: 'group', tabindex: -1 });
         label.dataset.trackId = track.id;
-        label.append(
-          el('span'),
-          action('M', () => store.setTrackProp(track.id, 'mute', !store.track(track.id).mute)),
-          action('S', () => store.setTrackProp(track.id, 'solo', !store.track(track.id).solo))
-        );
-        const gain = el('input', null, { type: 'range', min: 0, step: 0.01 });
-        gain.addEventListener('input', () => store.setTrackProp(track.id, 'volume', +gain.value));
-        label.append(gain);
+        label.dataset.ownerIndex = index;
+        label.dataset.kind = kind;
+        label.append(createTrackControls(track.id));
+        if (kind === 'sample') bindChannelDrop(label, index);
         headers.append(label);
       }
       label.style.top = y - HEADER + 'px';
-      label.style.borderLeftColor = track.color || '#76cad4';
-      label.firstChild.textContent = track.name;
-      label.firstChild.title = track.name;
-      const buttons = label.querySelectorAll('button');
-      buttons[0].setAttribute('aria-label', `Mute ${track.name}`);
-      buttons[0].setAttribute('aria-pressed', String(!!track.mute));
-      buttons[1].setAttribute('aria-label', `Solo ${track.name}`);
-      buttons[1].setAttribute('aria-pressed', String(!!track.solo));
-      const gain = label.querySelector('input');
-      gain.max = store.project.legacyPlayback ? 3 : 1.5;
-      gain.setAttribute('aria-label', `${track.name} volume`);
-      if (document.activeElement !== gain) gain.value = track.volume ?? 1;
+      label.setAttribute('aria-label', `${track.name} controls`);
+      label.classList.toggle('midi-target', kind === 'instrument' && getMidiTarget() === index);
+      label.classList.toggle('solo-dim', engine.anySolo() && !track.solo);
+      label.classList.toggle('has-sample', !!track.sampleName);
+      label.classList.toggle('unresolved-source', !!track.unresolvedSource);
+      label.title = track.unresolvedSource?.message || '';
+      refreshTrackControls(label.firstElementChild);
+      const color = label.firstElementChild.style.getPropertyValue('--ch-color') || '#80cbd6';
+      label.style.borderLeftColor = color;
       for (const r of model.byTrack.get(track.id) || []) {
         if (r.end < leftBeat || r.start > rightBeat) continue;
         const x = LEFT + r.start * zoom - sx,
@@ -243,7 +280,7 @@ export function mount(root) {
           ? '#43ffa4'
           : r.cut || r.window?.reverse
             ? '#ff9f43'
-            : track.color || '#80cbd6';
+            : color;
         g.strokeRect(x + 0.5, top + 0.5, w - 1, h - 1);
         if (r.buffer && r.end > r.start) {
           drawWaveformRegion(g, {
@@ -254,7 +291,7 @@ export function mount(root) {
             y: top,
             width: w,
             height: h,
-            color: track.color || '#80cbd6',
+            color: color,
             visibleLeft: LEFT,
             visibleRight: width,
             indexAt: (f) =>
@@ -266,7 +303,7 @@ export function mount(root) {
               )
           });
         } else if (r.type === 'note') {
-          g.fillStyle = track.color || '#80cbd6';
+          g.fillStyle = color;
           const noteY = top + 5 + (1 - (r.pitch % 12) / 12) * (h - 12);
           g.fillRect(x + 2, noteY, Math.max(1, w - 4), 4);
         }
@@ -442,6 +479,16 @@ export function mount(root) {
     }
   });
   scroll.addEventListener('scroll', draw);
+  headers.addEventListener(
+    'wheel',
+    (event) => {
+      if (event.ctrlKey) return;
+      scroll.scrollTop += event.deltaY;
+      scroll.scrollLeft += event.deltaX;
+      event.preventDefault();
+    },
+    { passive: false }
+  );
   scroll.addEventListener(
     'wheel',
     () => {
@@ -452,7 +499,16 @@ export function mount(root) {
     },
     { passive: true }
   );
-  const offs = ['dirty', 'load', 'channel'].map((name) => store.on(name, queue));
+  const offs = [
+    'dirty',
+    'load',
+    'channel',
+    'instrument',
+    'channels',
+    'instruments',
+    'sequence'
+  ].map((name) => store.on(name, queue));
+  document.addEventListener('instrument-target', queue);
   const ro = new ResizeObserver(draw);
   ro.observe(scroll);
   refresh();
@@ -463,6 +519,7 @@ export function mount(root) {
     controls.dispose();
     marquee.remove();
     ro.disconnect();
+    document.removeEventListener('instrument-target', queue);
     offs.forEach((f) => f());
     cancelAnimationFrame(frame);
     cancelAnimationFrame(queued);

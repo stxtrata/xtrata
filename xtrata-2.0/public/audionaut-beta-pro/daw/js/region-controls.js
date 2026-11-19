@@ -449,7 +449,7 @@ export function createRegionControls(view) {
     if (
       !view.active() ||
       e.target?.isContentEditable ||
-      e.target?.closest?.('dialog,.modal:not(.hidden)') ||
+      e.target?.closest?.('dialog,.modal:not(.hidden),.synth-pop,.channel-controls,button,a') ||
       /^(INPUT|TEXTAREA|SELECT)$/.test(e.target?.tagName) ||
       e.metaKey ||
       e.ctrlKey ||

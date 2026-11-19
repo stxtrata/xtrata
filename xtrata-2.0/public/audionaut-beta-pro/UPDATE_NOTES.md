@@ -4,8 +4,17 @@ This workstation is isolated at `/audionaut-beta-pro/` behind the existing
 membership gate. The original AudioNaut and earlier beta are unchanged.
 `BETA.md` describes isolation and original-file compatibility.
 
-## Shared region controls and historical audio loading — 19 November 2026
+## Shared track controls, region editing and historical audio loading — 19 November 2026
 
+- Timeline uses the same sample and synth control builders as Patterns: sample
+  loading/preview/trim, FX, inserts, provenance links, volume, pitch, pattern tools,
+  synth folders/panels, MIDI rolls and MIDI copy/paste. An explicit Edit sequence
+  selector identifies the target for sequence-specific operations. Audio channels
+  and instruments can be added directly. Smaller screens wrap controls into taller
+  lanes, preserving waveform alignment. Focused controls survive redraws.
+- Control values and active states refresh from the same store in both views.
+  Pattern cycling derives its next state from the song, so switching workspaces
+  does not restart its cycle. Shared provenance popovers stay within the viewport.
 - Patterns and Timeline now use one interaction controller: grab/move cursors,
   both trim edges, Shift selection, marquee selection, grouped edits, arrow-key
   nudging, Delete, right-click sample reversal, crossfades and cancellation.
