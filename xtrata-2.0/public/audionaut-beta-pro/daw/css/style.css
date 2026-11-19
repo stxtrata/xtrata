@@ -2451,6 +2451,18 @@ button:disabled {
   opacity: 0.85;
 }
 
+/* The five performance panels flow from three sections to a single touch column. */
+:is(.sfp-portwheel,.sfp-hushwire,.sfp-clatterstep,.sfp-switchyard,.sfp-neverend) .sfp-body {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 225px), 1fr));
+}
+:is(.sfp-portwheel,.sfp-hushwire,.sfp-clatterstep,.sfp-switchyard,.sfp-neverend) .sfp-row {
+  flex-wrap: wrap;
+}
+:is(.sfp-portwheel,.sfp-hushwire,.sfp-clatterstep,.sfp-switchyard,.sfp-neverend) .sfp-xy {
+  min-height: 92px;
+  max-height: 155px;
+}
+
 /* ---- new synths (synths/index.js): panels are laid out as auto-fitting section tiles ---- */
 .sfp-jibass .sfp-body,
 .sfp-kiln .sfp-body,
