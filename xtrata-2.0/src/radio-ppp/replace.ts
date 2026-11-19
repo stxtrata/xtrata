@@ -12,6 +12,7 @@
  * Hero record: those would be left behind.
  */
 import type { Snapshot } from './controller';
+import { connectStacksWallet } from './connect-stacks';
 
 export interface ReplaceDeps {
   json(url: string): Promise<any>;
@@ -103,7 +104,7 @@ export function createReplace(deps: ReplaceDeps) {
       head(1, 'empty it');
       out.push(el('p', `It holds ${stxOf(s.balance)} STX. Send it back${s.returnTo ? ` to ${deps.who(s.returnTo)}` : ''} first: nothing may be left in a player you are about to remove.`));
       if (s.returnTo || s.gift) out.push(button('Send everything back', deps.returnAll, 'primary'));
-      else out.push(el('p', 'There is nowhere set to send it. Connect a Stacks wallet (top right) and link it to this player, then come back here.', 'ppp-warn'));
+      else out.push(el('p', 'There is nowhere set to send it. Connect a Stacks wallet and link it to this player, then come back here.', 'ppp-warn'), button('Connect Stacks wallet', connectStacksWallet, 'primary'));
       out.push(stopButton());
       return out;
     }

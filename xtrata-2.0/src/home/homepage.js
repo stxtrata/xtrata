@@ -21,9 +21,11 @@ import { initMusicSupporters, stopMusicSupporters } from './music-supporters.js'
 import { initAudionautBanner, stopAudionautBanner } from './audionaut-banner.js';
 import { initArcadeChampion, stopArcadeChampion } from './arcade-champion.js';
 import { initGiveawayHero, stopGiveawayHero } from './giveaway-hero.js';
+import { buildFairPlayTile, fairPlayLive, msUntilFairPlay, previewFairPlay } from './fair-play-tile.js';
 
 const HOME_ACTION_EVENT = 'xtrata:homepage-action';
 const HOME_MOUNT_IDS = [
+  'homeFairPlay',
   'homeStrip',
   'featuredObjectStage',
   'homeNowPlaying',
@@ -383,6 +385,30 @@ const formatDuration = (seconds) => {
 
 // ---------------------------------------------------------------------------
 // Strip: one rotating line under the nav.
+// The Fair Play banner appears for everyone at 18:00 UK on 19 Nov 2026 (it redraws itself at that moment).
+let fairPlayTimer = null;
+const renderFairPlay = () => {
+  const mount = document.getElementById('homeFairPlay');
+  if (!mount) return;
+  window.clearTimeout(fairPlayTimer);
+  fairPlayTimer = null;
+  const now = nowMs();
+  const live = previewFairPlay(window.location.search) || fairPlayLive(now);
+  if (live) {
+    if (!mount.firstElementChild) mount.replaceChildren(buildFairPlayTile(element, actionLink));
+    mount.hidden = false;
+    return;
+  }
+  mount.replaceChildren();
+  mount.hidden = true;
+  const wait = msUntilFairPlay(now);
+  if (wait !== null) {
+    fairPlayTimer = window.setTimeout(() => {
+      if (document.documentElement.dataset.page === 'home') renderFairPlay();
+    }, wait);
+  }
+};
+
 const renderStrip = () => {
   const mount = document.getElementById('homeStrip');
   if (!mount) {
@@ -694,6 +720,7 @@ const renderWall = () => {
       if (!offset || document.documentElement.dataset.page !== 'home') return;
       const before = wallFeatureId(nowMs());
       clockOffset = offset;
+      renderFairPlay();
       if (wallFeatureId(nowMs()) !== before) renderWall();
       else if (wallMidnightTimer) {
         window.clearTimeout(wallMidnightTimer);
@@ -1150,6 +1177,8 @@ const clearHomepage = () => {
   wallTimer = null;
   window.clearTimeout(wallMidnightTimer);
   wallMidnightTimer = null;
+  window.clearTimeout(fairPlayTimer);
+  fairPlayTimer = null;
   wallState = null;
   HOME_MOUNT_IDS.forEach((id) => {
     const node = document.getElementById(id);
@@ -1184,6 +1213,7 @@ export const initHomepage = () => {
   initAudionautBanner();
   initArcadeChampion();
   initGiveawayHero();
+  renderFairPlay();
   renderStrip();
   renderWall();
   renderNowPlaying();

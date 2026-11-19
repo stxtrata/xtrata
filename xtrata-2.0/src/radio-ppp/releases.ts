@@ -12,6 +12,7 @@
  * showing the albums before the player is unlocked.
  */
 import { copyButton } from './feedback';
+import { connectStacksWallet } from './connect-stacks';
 import { isPlayerId, listedTracks, playerHash, validatePlayer, type PlayerView } from '../lib/listening-wallet/gift-players';
 import { parseStx, priceData, releaseData, stxText, validPrice, type OrderView, type PriceRequest, type ShelfAction } from '../lib/music-releases/release';
 import type { Audition } from './audition';
@@ -242,7 +243,7 @@ export function createReleases(deps: ReleasesDeps) {
         else if (!o) { const b = button(`Buy · ${cost}`, () => void buy(v), 'primary'); b.disabled = shelfBusy || !!working; row.append(b); }
         else {
           if (main) { const b = button(`Pay ${cost} from my wallet`, () => void payOrder(main, p.address!, o), 'primary'); b.disabled = !!working; row.append(b); }
-          else box.append(el('p', 'Connect a Stacks wallet (top right) to pay here. Or pay from any wallet, exactly like this:', 'ppp-mute'));
+          else { box.append(el('p', 'Connect a Stacks wallet to pay here. Or pay from any wallet, exactly like this:', 'ppp-mute')); row.append(button('Connect Stacks wallet', connectStacksWallet, 'primary')); }
           const how = el('div', '', 'ppp-rel-pay');
           const line = (label: string, value: string, key: string) => { const l = el('p'); l.append(el('span', label), el('code', value), copyButton(`order-${key}:${o.order}`, 'Copy', () => value, 'tiny', deps.changed)); return l; };
           how.append(line('Send', stxText(o.amount) + ' STX', 'amount'), line('To', o.to, 'to'), line('Memo', o.memo, 'memo'));

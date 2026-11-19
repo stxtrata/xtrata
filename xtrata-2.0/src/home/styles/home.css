@@ -9255,3 +9255,74 @@
   .home-tile__poster { flex: none; aspect-ratio: 1 / 1; }
   .home-tile__poster-cta { width: 100%; }
 }
+
+    /* ===== The Fair Play Experiment banner (appears 18:00 UK, Thu 19 Nov 2026; see fair-play-tile.js) ===== */
+    .home-fair { --fair-cyan: #8fe0f2; --fair-gold: #ffc46b; margin: 0 0 14px; }
+    .home-fair[hidden] { display: none; }
+    .home-fair__inner {
+      position: relative;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(280px, 440px);
+      align-items: center;
+      gap: 28px;
+      padding: 30px 34px;
+      border: 1px solid #2c3341;
+      border-radius: 22px;
+      color: #f2efe6;
+      text-decoration: none;
+      background:
+        radial-gradient(520px 260px at 100% 0%, rgba(143, 224, 242, 0.16), transparent 70%),
+        linear-gradient(135deg, #0c0e13 0%, #0e1218 55%, #0f1a22 100%);
+      overflow: hidden;
+      transition: border-color 160ms ease, transform 160ms ease;
+    }
+    .home-fair__inner:hover { border-color: rgba(143, 224, 242, 0.55); transform: translateY(-1px); }
+    .home-fair__inner:focus-visible { outline: 2px solid var(--fair-cyan); outline-offset: 3px; }
+    .home-fair__copy { display: flex; flex-direction: column; align-items: flex-start; gap: 10px; min-width: 0; }
+    .home-fair__kicker {
+      display: inline-flex; align-items: center; gap: 10px;
+      color: var(--fair-cyan); font: 800 13px/1.2 system-ui, sans-serif; letter-spacing: 0.1em; text-transform: uppercase;
+    }
+    .home-fair__dot {
+      width: 9px; height: 9px; border-radius: 50%; background: var(--fair-cyan);
+      box-shadow: 0 0 0 6px rgba(143, 224, 242, 0.16); animation: home-fair-pulse 2.4s ease-in-out infinite;
+    }
+    .home-fair__head { display: block; font-size: clamp(34px, 4.4vw, 54px); line-height: 1.04; font-weight: 800; letter-spacing: -0.02em; }
+    .home-fair__head em { font-style: normal; color: var(--fair-cyan); }
+    .home-fair__line { color: #a9b2bf; font-size: clamp(16px, 1.7vw, 20px); line-height: 1.45; max-width: 34em; }
+    .home-fair__foot { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; margin-top: 10px; }
+    .home-fair__cta {
+      display: inline-flex; align-items: center; min-height: 48px; padding: 0 26px; border-radius: 999px;
+      background: var(--fair-cyan); color: #06141a; font: 800 18px system-ui, sans-serif;
+    }
+    .home-fair__note { color: #a9b2bf; font-size: 16px; }
+    .home-fair__field {
+      display: grid; grid-template-columns: repeat(auto-fill, 10px); gap: 4.5px; justify-content: space-between; align-content: start;
+      max-height: 141px; overflow: hidden; width: 100%;
+    }
+    .home-fair__disc { display: block; width: 10px; height: 10px; border-radius: 50%; border: 1.5px solid rgba(255, 255, 255, 0.1); }
+    .home-fair__disc--claimed {
+      border-color: rgba(143, 224, 242, 0.85);
+      background: radial-gradient(circle, var(--fair-cyan) 0 1.6px, transparent 2.2px);
+    }
+    .home-fair__disc--gold {
+      border: 0; background: radial-gradient(circle at 35% 30%, #ffe3a3, var(--fair-gold) 55%, #c98a1f); box-shadow: 0 0 10px rgba(255, 196, 107, 0.7);
+    }
+    .home-fair__disc--diamond {
+      border: 0; width: 12px; height: 12px; margin: -1px;
+      background: conic-gradient(from 40deg, #fff, #c8f4ff, #f6d9ff, #fff, #d8ffe9, #fff);
+      box-shadow: 0 0 12px rgba(220, 245, 255, 0.95); animation: home-fair-twinkle 3.2s ease-in-out infinite;
+    }
+    .home-fair__disc--diamond:nth-of-type(odd) { animation-delay: -1.6s; }
+    @keyframes home-fair-pulse { 0%, 100% { box-shadow: 0 0 0 4px rgba(143, 224, 242, 0.14); } 50% { box-shadow: 0 0 0 8px rgba(143, 224, 242, 0.04); } }
+    @keyframes home-fair-twinkle { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.7; transform: scale(0.88); } }
+    @media (max-width: 760px) {
+      .home-fair__inner { grid-template-columns: minmax(0, 1fr); gap: 22px; padding: 24px 22px 26px; border-radius: 20px; }
+      .home-fair__field { max-height: 126px; }
+      .home-fair__cta { min-height: 52px; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .home-fair__dot, .home-fair__disc--diamond { animation: none; }
+      .home-fair__inner { transition: none; }
+      .home-fair__inner:hover { transform: none; }
+    }

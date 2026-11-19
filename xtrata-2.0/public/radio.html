@@ -1700,7 +1700,7 @@ d.setAttribute('data-skin','1');d.setAttribute('data-tab','listen');}catch(e){}}
 })();
 </script>
 <script src="/xtrata-radio.js?v=611164ac4d13" defer></script>
-<script type="module" src="/radio/wallet.js?v=62e654b3fd1c"></script>
+<script type="module" src="/radio/wallet.js?v=a6f0d7fef7a3"></script>
 <script>
 // On the pay-per-play radio host (radio.xtrata.xyz) only the radio's own pages run; everything
 // else there is sandboxed. Send links to the rest of Xtrata to the main site instead.
@@ -1724,7 +1724,7 @@ function showUnavailable(){
 fetch('/radio/listening-wallet/config',{cache:'no-store',signal:AbortSignal.timeout(15000)})
   .then(function(r){return r.ok?r.json():{}})
   .then(function(c){
-    if(c?.enabled && (!paidHost || c.here)) return import('/radio/ppp.js?v=e3ebe3b5324a');
+    if(c?.enabled && (!paidHost || c.here)) return import('/radio/ppp.js?v=3cfa24ff4771');
     showUnavailable();
   }).catch(showUnavailable);
 </script>

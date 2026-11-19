@@ -24,12 +24,16 @@ function render(){
  if(lastAddress!==session.address){lastAddress=session.address;window.dispatchEvent(new Event('xtrata:wallet-changed'));}
  // No wallet yet on a passkey-only radio: "Connect wallet" opens the pop-up with Xtrata Music Wallet first.
  // An Xtrata Music Wallet already in use here: the button is only for adding a Stacks wallet.
- connect.textContent=busy?'Please wait…':connected?'Switch':solo&&solo!=='new'?'More ways to connect':'Connect your player';
+ // A linked player already open on this device: the button is for its Stacks wallet (Xverse or Leather), which signs albums and releases.
+ connect.textContent=busy?'Please wait…':connected?'Switch':as?'Connect Stacks wallet':solo&&solo!=='new'?'More ways to connect':'Connect your player';
+ connect.title=as&&!connected?'Connect Xverse or Leather to see and manage what this player is linked to.':'';
  connect.disabled=busy;disconnect.hidden=!connected;disconnect.disabled=busy;
 }
 async function act(action:()=>Promise<unknown>){
  if(busy)return;busy=true;message.textContent='';render();
- try{await action();}catch(error){message.textContent=error instanceof Error?error.message:'That did not work. Please try again.';}
+ try{await action();}catch(error){message.textContent=error instanceof Error?error.message:'That did not work. Please try again.';
+  // The bar lives under "You" in the new look: bring that screen forward so the reason is seen, wherever the tap came from.
+  window.dispatchEvent(new Event('xtrata:radio-panel'));}
  finally{busy=false;render();}
 }
 const connectStacks=()=>void act(()=>adapter.connect());
@@ -38,9 +42,10 @@ const connectStacks=()=>void act(()=>adapter.connect());
 type Chooser=()=>Promise<'stacks'|'music'|null>;
 connect.onclick=async()=>{
  if(busy)return;
- const session=adapter.getSession(),connected=session.isConnected&&!!session.address,solo=soloMark();
+ const session=adapter.getSession(),connected=session.isConnected&&!!session.address,solo=soloMark(),linked=!connected&&!!document.documentElement.dataset.pppAs;
  const choose=(window as unknown as {XtrataRadioConnectChooser?:Chooser}).XtrataRadioConnectChooser;
- if(!connected&&(!solo||solo==='new')&&choose){
+ // A linked player is already open: the Xtrata Music Wallet pop-up has nothing to offer, so go straight to Xverse or Leather.
+ if(!connected&&!linked&&(!solo||solo==='new')&&choose){
   let choice:'stacks'|'music'|null='stacks';
   try{choice=await choose();}catch{choice='stacks';}
   if(choice!=='stacks')return;
