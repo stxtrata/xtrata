@@ -1,9 +1,53 @@
 # AudioNaut beta-pro — update testing notes
 
-This separate beta contains the workstation updates from commit `b45f7a9`, based
-on main commit `cd7e7f0`. Enter at `/audionaut-beta-pro/` through the same membership
-gate as the original. The production workstation and older prototypes are
-unchanged. `BETA.md` describes isolation and original-file compatibility.
+This workstation is isolated at `/audionaut-beta-pro/` behind the existing
+membership gate. The original AudioNaut and earlier beta are unchanged.
+`BETA.md` describes isolation and original-file compatibility.
+
+## Continuous timeline and shared keyboards — 19 November 2026
+
+- Timeline opens directly from the loaded song. There is no conversion step:
+  ordinary sequences appear consecutively on one scrollable timeline, including
+  empty sequences and sample tails that cross sequence boundaries.
+- Patterns and Timeline use the same song data, sample timing and cached waveform
+  drawing. Audio triggers appear as individual colored waveform regions; synth
+  notes appear individually. Missing sounds have a placeholder while loading.
+- The ruler shows bars and sequence boundaries. Track names, Mute, Solo and Volume
+  stay pinned while scrolling. Zoom and Fit song support detailed or whole-song
+  views. Only the visible canvas area is drawn; waveform peaks are cached.
+- Timeline has Play/Pause, Stop, Return to start, bar/beat position and a moving
+  playhead driven by the audio clock. Click the ruler to seek. Follow playhead is
+  optional; manually scrolling during playback turns Follow off.
+- Select a region to edit, delete or reverse it; drag to move and drag an audio
+  edge to trim. Sample moves can cross sequence boundaries, with collision
+  protection and one-step Undo/Redo. Double-click opens the existing step or
+  piano-roll editor. Returning to Patterns shows the same edits.
+- Existing custom clip arrangements retain their placement and timing. Advanced
+  arrangement, loop, punch, tempo and meter controls remain in a collapsed panel.
+  Editing a linked pattern changes its other appearances too. Linked note
+  continuations and sustained-sample gates use their existing editors rather
+  than being silently broken by a timeline trim.
+- All horizontal piano keyboards share one key layout and note mapping. Black
+  keys now align with white-key boundaries, including Cathedral's final octave.
+  Each instrument retains its visual theme. The vertical piano-roll keyboard
+  shares note identity and input handling while staying aligned with its rows.
+- Mouse, touch and pen use the same note lifecycle, including glissando,
+  independent held notes and release on cancellation, lost capture, blur or panel
+  disposal. Computer keys and MIDI continue through the central live-note path.
+
+Opening Timeline does not rewrite a song or change its playback mode. Existing
+Chain/sequence-loop, song-end and historical playback semantics are retained.
+Original AudioNaut files continue loading through the existing importer; there
+is no project schema change. No new external library or media was added. The
+prepared chain player remains `beta-pro-legacy-bridge-2`, with SHA-256
+`47c1f7ecc4cc6a4255310b2586cbcd91b76bb319239faa7663a9c45f48efd749` (1,356,875 bytes).
+It is still prepared, not newly inscribed by this update.
+
+Targeted validation: 121 timeline/geometry checks and 12 keyboard lifecycle/layout
+checks pass in Chromium, Firefox and WebKit. All 31 instrument panels pass layout
+checks; Cathedral and jiMS10 pass the deeper real-pointer, multitouch, typing,
+MIDI and audio checks. Synthetic local audio was used; real controller and iOS
+hardware testing remains community work. No wallet was used to sign or pay.
 
 ## Performance and editing
 

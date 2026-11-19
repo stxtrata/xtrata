@@ -15,6 +15,20 @@ Use `SOAK_SECONDS=600` for a ten-minute run or `SOAK_SECONDS=7200` for a two-hou
 
 `gate-test.mjs` delegates to `pro-gate-test.mjs`; the beta-pro suite also runs separate server authorization tests. Shared wallet helpers remain unchanged.
 
+## Timeline and keyboard regression checks
+
+`pro-unified-views-test.mjs` checks automatic pattern projection without project
+mutation, sample tails, cross-sequence moves, collision protection, source trims,
+printed effect tails across tempo changes, reverse waveform indexing, meter-aware
+rulers, audio-clock playhead/seek/pause, pinned controls, pointer editing,
+Undo/Redo, save/reopen, mobile overflow and view disposal. Set `SCREENSHOT_DIR` to
+save a populated synthetic timeline screenshot locally.
+
+`pro-keyboard-test.mjs` checks the shared pointer lifecycle and Cathedral key
+geometry at desktop and phone widths. `pro-faces-test.mjs` checks black-key
+alignment on every instrument panel. The full suite now has 36 groups; the two
+new suites also run in the Firefox/WebKit CI matrix.
+
 ## Inherited diagnostic tools
 
 Headless-Chromium checks for the synth bank and the DAW. No install step beyond Playwright

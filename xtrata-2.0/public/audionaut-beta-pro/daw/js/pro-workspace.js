@@ -24,7 +24,7 @@ export async function openWorkspace(next = 'sequence') {
   outlet.hidden = next === 'sequence';outlet.setAttribute('aria-labelledby',`workspace-tab-${next}`);
   document.querySelectorAll('[data-workspace]').forEach(n => n.setAttribute('aria-selected', String(n.dataset.workspace === next)));
   try { localStorage.setItem(KEY, next); } catch {}
-  if (next === 'sequence') return;
+  if (next === 'sequence') { const [arrange,ui]=await Promise.all([import('./arrange.js'),import('./ui.js')]);if(ticket!==mine)return;ui.renderPattern();ui.renderSequenceBar();for(let i=0;i<store.project.instruments.length;i++)ui.drawInstStrip(i);arrange.renderArrange();return; }
   outlet.replaceChildren(el('p', 'Opening workspace…'));
   try {
     const module = await VIEWS[next][1]();

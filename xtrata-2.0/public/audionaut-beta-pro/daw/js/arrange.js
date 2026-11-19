@@ -1,3 +1,5 @@
+import { sampleWindow, waveformIndex } from './song-regions.js';
+import { drawWaveformRegion } from './waveform-drawing.js';
 import { STORAGE_KEYS } from "./storage-config.js";
 import { midiName } from "./onboard-catalog.js";
 import { sustainDuration, sampleLoop } from "./onboard-library.js";
@@ -107,10 +109,8 @@ function channelRegions(ch) {
     const trimEnd = o?.trimEnd ?? c.trimEnd;
     const pitch = o?.pitch ?? c.pitch;
     const rev = o?.rev ?? !!c.reverse;
-    const regionSec = buffer
-      ? (sustainDuration(c, o, buffer, store.project.bpm) ??
-        Math.max(0.001, (trimEnd - trimStart) * buffer.duration) / pitch)
-      : sd;
+    const audioWindow = sampleWindow(store.project,c,o,buffer);
+    const regionSec = buffer ? audioWindow.duration : sd;
     const naturalSteps = afterSeconds(pos,regionSec)-pos;
     const next = triggers[i + 1] ?? null;
     const nextPos = next != null ? next + stepOff(row[next]) : null;
@@ -131,6 +131,7 @@ function channelRegions(ch) {
     }
     widthSteps = Math.min(widthSteps, NUM_STEPS - pos);
     return {
+      audioWindow,
       step: s,
       off,
       pos,
@@ -207,51 +208,7 @@ function drawStrip(ch) {
     }
 
     if (data) {
-      const startFrac = r.rev ? 1 - r.trimEnd : r.trimStart;
-      const endFrac = r.rev ? 1 - r.trimStart : r.trimEnd;
-      const i0 = Math.floor(startFrac * data.length);
-      const i1 = Math.max(i0 + 1, Math.floor(endFrac * data.length));
-      const span = i1 - i0;
-      const visibleFrac = Math.min(1, r.widthSteps / r.naturalSteps);
-      g.strokeStyle = r.rev ? "#ff9f43" : c.color;
-      g.beginPath();
-      const px = Math.max(1, Math.floor(w));
-      for (let xx = 0; xx < px; xx++) {
-        const frac = (xx / px) * visibleFrac;
-        const elapsed = secondsBetween(r.pos,r.pos+(xx/px)*r.widthSteps);
-        let idxF = r.rev ? i1 - 1 - frac * span : i0 + frac * span;
-        const loopStart = r.loop?.start * buffer.sampleRate,
-          loopEnd = r.loop?.end * buffer.sampleRate;
-        if (r.loop) {
-          idxF = i0 + elapsed * r.pitch * buffer.sampleRate;
-          if (idxF >= loopEnd)
-            idxF = loopStart + ((idxF - loopStart) % (loopEnd - loopStart));
-        }
-        const idx = Math.floor(Math.min(data.length - 1, Math.max(0, idxF)));
-        const chunk = Math.max(
-          1,
-          Math.floor(
-            r.loop
-              ? (r.widthSteps * stepDurSec() * r.pitch * buffer.sampleRate) / px
-              : (span * visibleFrac) / px,
-          ),
-        );
-        let min = 1,
-          max = -1;
-        for (let k = idx, e = Math.min(idx + chunk, data.length); k < e; k++) {
-          const at =
-            r.loop && k >= loopEnd
-              ? Math.floor(
-                  loopStart + ((k - loopStart) % (loopEnd - loopStart)),
-                )
-              : k;
-          if (data[at] < min) min = data[at];
-          if (data[at] > max) max = data[at];
-        }
-        g.moveTo(x + xx + 0.5, ((1 + min) * (H - 6)) / 2 + 3);
-        g.lineTo(x + xx + 0.5, ((1 + max) * (H - 6)) / 2 + 3);
-      }
-      g.stroke();
+      drawWaveformRegion(g,{buffer,x,width:w,height:H,loop:r.audioWindow.loop,reverse:r.audioWindow.reverse,color:r.rev?'#ff9f43':c.color,indexAt:f=>waveformIndex(r.audioWindow,buffer,secondsBetween(r.pos,r.pos+f*r.widthSteps))});
     }
 
     const regionLabel = r.wordSelection?.text || r.noteLabel;
@@ -299,7 +256,7 @@ function drawStrip(ch) {
 }
 
 export function renderArrange() {
-  if (!arrangeMode) return;
+  if (!arrangeMode || document.querySelector("#channels")?.hidden) return;
   for (let ch = 0; ch < store.numChannels; ch++) drawStrip(ch);
 }
 
@@ -1007,7 +964,7 @@ export function initArrange() {
   document.addEventListener(
     "keydown",
     (e) => {
-      if (!arrangeMode || !selection.size) return;
+      if (!arrangeMode || !selection.size || document.querySelector("#channels")?.hidden) return;
       const t = e.target;
       if (
         t &&
