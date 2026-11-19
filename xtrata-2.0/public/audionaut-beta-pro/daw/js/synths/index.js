@@ -31,6 +31,12 @@ import { PRISM_SYNTHS } from "./glass/prism.js";
 import { TIDALGLASS_SYNTHS } from "./glass/tidalglass.js";
 import { TIDELACE_SYNTHS } from "./glass/tidelace.js";
 
+import { PORTWHEEL_SYNTHS } from "./lead/portwheel.js";
+import { HUSHWIRE_SYNTHS } from "./pad/hushwire.js";
+import { CLATTERSTEP_SYNTHS } from "./mallet/clatterstep.js";
+import { SWITCHYARD_SYNTHS } from "./keys/switchyard.js";
+import { NEVEREND_SYNTHS } from "./fx/neverend.js";
+
 // stamp every synth in a module with the category of the folder it lives in
 const inFolder = (category, mods) =>
   Object.fromEntries(Object.entries(mods).map(([id, def]) => [id, { ...def, category }]));
@@ -58,4 +64,9 @@ export const EXTRA_SYNTHS = {
   ...inFolder("glass", PRISM_SYNTHS),
   ...inFolder("glass", TIDALGLASS_SYNTHS),
   ...inFolder("glass", TIDELACE_SYNTHS),
+  ...inFolder("lead", PORTWHEEL_SYNTHS),
+  ...inFolder("pad", HUSHWIRE_SYNTHS),
+  ...inFolder("mallet", CLATTERSTEP_SYNTHS),
+  ...inFolder("keys", SWITCHYARD_SYNTHS),
+  ...inFolder("fx", NEVEREND_SYNTHS),
 };

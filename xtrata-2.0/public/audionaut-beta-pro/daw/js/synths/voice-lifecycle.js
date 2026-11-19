@@ -79,6 +79,12 @@ function createNativeVoice(ctx, destination, synth, synthId, note, params, onEnd
   context.bindParam = (key, target, map = (v) => v) => {
     const list = bindings.get(key) || []; list.push({ target, map }); bindings.set(key, list);
   };
+  // Explicit pitch ownership also covers sub-20 Hz fundamentals. Legacy voices
+  // retain the heuristic that keeps slow modulation oscillators out of bends.
+  context.markPitched = node => {
+    const source = sources.find(record => record.node === node);
+    if (source) source.pitched = true;
+  };
   const names = new Set();
   for (let prototype = ctx; prototype; prototype = Object.getPrototypeOf(prototype)) for (const key of Object.getOwnPropertyNames(prototype)) names.add(key);
   for (const property of names) {
