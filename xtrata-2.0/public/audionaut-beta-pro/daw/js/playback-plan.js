@@ -1,17 +1,18 @@
 import { beatToSeconds, secondsToBeat, swingStep, hashSeed, meterAt } from './timeline.js';
 import { trackAddress } from './project-model.js';
+import { legacyPlaybackProfile, legacySamplePlayback } from './legacy-bridge/playback.js';
 export { beatToSeconds, secondsToBeat } from './timeline.js';
 const val = s => s && typeof s === 'object' ? s.v || 1 : s || 0;
 const off = s => s && typeof s === 'object' ? Math.max(0, Math.min(.999, Number(s.off) || 0)) : 0;
 
 // Compiled once per edit/transport start. Export and realtime consume these exact events.
 export function compilePlaybackPlan(project, { scope = 'song', range, buffers = [], seed = project.renderSeed || project.projectId || 'audionaut' } = {}) {
-  const timeline = project.timeline || {}, events = [];
+  const timeline = project.timeline || {}, events = [], legacy = legacyPlaybackProfile(project);
   const sequence = Math.max(0, Math.min(project.sequences.length - 1, project.currentSequence || 0));
   let startBeat = range?.start ?? (scope === 'sequence' ? sequence * 16 : 0);
   let endBeat = range?.end ?? (scope === 'sequence' ? (sequence + 1) * 16 : timeline.enabled ? Math.max(timeline.lengthBeats || 16, ...timeline.clips.map(c => c.start + c.duration)) : project.sequences.length * 16);
   if(!timeline.enabled&&scope==='song'&&!range){
-    if(!project.playEmptySequences){const empty=project.sequences.findIndex((s,i)=>i>0&&s.steps.every(r=>r.every(v=>!val(v)))&&(s.notes||[]).every(n=>!n.length));if(empty>=0)endBeat=Math.min(endBeat,empty*16);}
+    if(!legacy&&!project.playEmptySequences){const empty=project.sequences.findIndex((s,i)=>i>0&&s.steps.every(r=>r.every(v=>!val(v)))&&(s.notes||[]).every(n=>!n.length));if(empty>=0)endBeat=Math.min(endBeat,empty*16);}
     if(project.songEndStep>0)endBeat=Math.min(endBeat,project.songEndStep/4);
   }
   startBeat = Math.max(0, startBeat); endBeat = Math.max(startBeat + .001, endBeat);
@@ -36,7 +37,8 @@ export function compilePlaybackPlan(project, { scope = 'song', range, buffers = 
         const local = swingStep(step + off(raw), project.swing) / 4 - offset;
         if (local < 0 || local >= length) continue;
         const over=typeof raw==='object'?{...raw}:null,beat=baseBeat+local,bufferDuration=buffers[ch]?.duration||track.analysis?.duration||track.soundMetadata?.duration||0;
-        const duration=(over?.gateSteps??track.gateSteps)>0?(over?.gateSteps??track.gateSteps)*60/project.bpm/4:bufferDuration*((over?.trimEnd??track.trimEnd??1)-(over?.trimStart??track.trimStart??0))/(over?.pitch??track.pitch??1);
+        const historical=legacySamplePlayback(project,track,over,bufferDuration);
+        const duration=(over?.gateSteps??track.gateSteps)>0?(over?.gateSteps??track.gateSteps)*60/project.bpm/4:historical?historical.audibleDuration:bufferDuration*((over?.trimEnd??track.trimEnd??1)-(over?.trimStart??track.trimStart??0))/(over?.pitch??track.pitch??1);
         add({ type: 'sample', id: `${clipId}:${track.id}:${step}`, trackId: track.id, index: ch, sequenceIndex, step,
           beat,endBeat:secondsToBeat(project,beatToSeconds(project,beat)+duration),velocity: (val(raw) === 2 ? 1.25 : 1) * gain, over });
       }

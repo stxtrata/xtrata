@@ -23,6 +23,8 @@ import { initPerformanceControls } from "./performance-controls.js";
 import { initProjectLibrary } from "./project-library.js";
 import { initPublish } from "./publish.js";
 import { initWorkspace } from "./pro-workspace.js";
+import { openProjectFile } from './legacy-import-ui.js';
+import { preparedImportFailures } from './legacy-import-audio.js';
 
 const $ = (s) => document.querySelector(s);
 let sampleRestore = Promise.resolve([]);
@@ -245,9 +247,7 @@ function initFileOps() {
     if (!confirmReplace()) return;
     const unchanged = replacementGuard();
     try {
-      const text = await file.text();
-      if (!unchanged()) return ui.setStatus("The project changed while the file was opening. Load it again when ready.", true);
-      await persist.importProjectAsync(text,{guard:unchanged});
+      if(!await openProjectFile(file,{guard:unchanged,onStatus:ui.setStatus}))return;
       ui.setStatus("Project loaded. Fetching samples…");
       const failures = await sampleRestore;
       ui.refreshAllChannels();
@@ -382,6 +382,8 @@ function initSubscriptions() {
       sampleRestore = Promise.resolve([]);
       return;
     }
+    const preparedFailures=preparedImportFailures(project);
+    if(preparedFailures){sampleRestore=Promise.resolve(preparedFailures);return;}
     sampleRestore = reloadAllSamples().then((failures) => {
       if (project !== store.project) return [];
       ui.refreshAllChannels();

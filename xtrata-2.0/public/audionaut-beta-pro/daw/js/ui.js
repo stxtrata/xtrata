@@ -10,6 +10,7 @@ import {
   stepOff,
 } from "./state.js";
 import { engine } from "./engine.js";
+import { legacySamplePlayback } from "./legacy-bridge/playback.js";
 import { Kit as PluginFaces } from "./plugin-faces/index.js";
 import { loadSample, fetchAndDecode } from "./loader.js";
 import { SAMPLE_LIBRARY } from "./library.js";
@@ -147,7 +148,7 @@ export function buildChannels() {
     const vol = el("input", "ch-vol");
     vol.type = "range";
     vol.min = 0;
-    vol.max = store.project.songOrigin ? 3 : 1.5;
+    vol.max = store.project.songOrigin || store.project.legacyPlayback ? 3 : 1.5;
     vol.step = 0.01;
     vol.value = c.volume;
     vol.title = "Volume";
@@ -159,7 +160,7 @@ export function buildChannels() {
     const pitch = el("input", "ch-pitch");
     pitch.type = "number";
     pitch.min = 0.1;
-    pitch.max = store.project.songOrigin ? 100 : 4;
+    pitch.max = store.project.songOrigin || store.project.legacyPlayback ? 100 : 4;
     pitch.step = 0.05;
     pitch.value = c.pitch;
     pitch.title = "Pitch / playback rate";
@@ -1219,24 +1220,29 @@ function trimStartPlayback() {
   const p = editorParams();
   const buffer = p.rev ? engine.getReverseBuffer(ch) : engine.buffers[ch];
   if (!buffer) return;
+  const historical = legacySamplePlayback(store.project, store.channel(ch), p, buffer.duration);
+  if (historical && historical.sourceDuration <= 0) return;
   const src = engine.ctx.createBufferSource();
   src.buffer = buffer;
-  src.playbackRate.value = p.pitch;
-  src.connect(engine.channelGains[ch]);
+  const startedAt = engine.ctx.currentTime;
+  const pitch = historical?.rate ?? p.pitch;
+  if (historical && !historical.profile.divideSourceDuration)
+    src.playbackRate.setValueAtTime(pitch, startedAt);
+  else src.playbackRate.value = pitch;
+  let previewGain = null;
+  if (historical?.profile.schedulingFadeSeconds) {
+    previewGain = engine.ctx.createGain();
+    previewGain.gain.setValueAtTime(0, startedAt);
+    previewGain.gain.linearRampToValueAtTime(1, startedAt + historical.profile.schedulingFadeSeconds);
+    src.connect(previewGain).connect(engine.channelGains[ch]);
+  } else src.connect(engine.channelGains[ch]);
   let start = p.trimStart * buffer.duration;
   if (p.rev) start = (1 - p.trimEnd) * buffer.duration;
-  const regionSec = Math.max(
-    0.001,
-    (p.trimEnd - p.trimStart) * buffer.duration,
-  );
-  const sustain = sustainDuration(
-    store.channel(ch),
-    p,
-    buffer,
-    store.project.bpm,
-  );
-  const durSec = sustain ?? regionSec / p.pitch; // audible duration after pitch
-  const startedAt = engine.ctx.currentTime;
+  const trimSeconds = (p.trimEnd - p.trimStart) * buffer.duration;
+  const regionSec = historical?.sourceDuration ?? Math.max(0.001, trimSeconds);
+  if (historical) start = historical.offset;
+  const sustain = sustainDuration(store.channel(ch), p, buffer, store.project.bpm);
+  const durSec = sustain ?? regionSec / pitch;
   if (sustain) {
     src.loop = true;
     src.loopStart = sampleLoop(store.channel(ch)).start;
@@ -1246,6 +1252,8 @@ function trimStartPlayback() {
   } else src.start(startedAt, start, regionSec);
   trimPlaying = { src, startedAt, durSec, raf: 0 };
   src.onended = () => {
+    src.disconnect();
+    previewGain?.disconnect();
     if (trimPlaying?.src === src) {
       trimPlaying = null;
       drawWaveform();
@@ -1253,12 +1261,15 @@ function trimStartPlayback() {
   };
   const tick = () => {
     if (!trimPlaying) return;
-    const frac = (engine.ctx.currentTime - startedAt) / durSec;
-    if (frac >= 1) {
+    const elapsed = engine.ctx.currentTime - startedAt;
+    if (elapsed >= durSec) {
       trimPlaying = null;
       drawWaveform();
       return;
     }
+    // Standalone rates below1 can continue beyond the trim marker. Follow the
+    // actual buffer position rather than squeezing that extra audio into it.
+    const frac = historical && !sustain ? elapsed * pitch / trimSeconds : elapsed / durSec;
     drawWaveform(Math.max(0, frac));
     trimPlaying.raf = requestAnimationFrame(tick);
   };
@@ -1285,7 +1296,7 @@ function openTrim(ch, step = null) {
   $("#trim-start").value = Math.round(p.trimStart * 1000);
   $("#trim-end").value = Math.round(p.trimEnd * 1000);
   $("#trim-reverse").checked = p.rev;
-  $("#trim-pitch").max = store.project.songOrigin ? 100 : 4;
+  $("#trim-pitch").max = store.project.songOrigin || store.project.legacyPlayback ? 100 : 4;
   $("#trim-pitch").value = p.pitch;
   const root = c.soundMetadata?.rootMidi;
   $("#trim-note-wrap").hidden = root == null;
@@ -1342,7 +1353,7 @@ export function initTrimModal() {
       pitch: Math.max(
         0.1,
         Math.min(
-          store.project.songOrigin ? 100 : 4,
+          store.project.songOrigin || store.project.legacyPlayback ? 100 : 4,
           +$("#trim-pitch").value || 1,
         ),
       ),

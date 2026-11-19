@@ -14,6 +14,7 @@ import { SYNTH_BANK, synthDefaults } from "./synths.js";
 import { createVoice } from "./synths/voice-lifecycle.js";
 import { PLUGIN_TYPES, pluginDefaults, normalizeOwner, returnsOf, BEAT_DIVS, calibratePluginLatency } from "./plugins.js";
 import { compilePlaybackPlan } from './playback-plan.js';
+import { legacyPlaybackProfile, legacySamplePlayback } from './legacy-bridge/playback.js';
 import { beatToSeconds, secondsToBeat, swingStep, unswingStep, seededRandom, hashSeed, meterAt } from './timeline.js';
 import { trackAddress } from './project-model.js';
 import { syncMixer as applyMixer, disposeMixer, validateRouting } from './mixer-runtime.js';
@@ -897,15 +898,15 @@ export class Engine {
   async play({ fromBeat } = {}) {
     this.ensureContext();
     if (this.isPlaying) return;
+    const project=this.store.project,timeline=project.timeline,legacy=legacyPlaybackProfile(project);
     this.isPlaying = true;
     const generation=++this._transportGeneration;
-    const project=this.store.project,timeline=project.timeline;
     const sequenceStart=project.currentSequence*16;
     const songEnd=compilePlaybackPlan(project,{buffers:this.buffers}).endBeat;
-    const loop=timeline?.enabled?timeline.loop:{enabled:true,start:project.continuous?0:sequenceStart,end:project.continuous?songEnd:sequenceStart+16};
+    const loop=timeline?.enabled?timeline.loop:legacy?{enabled:false}:{enabled:true,start:project.continuous?0:sequenceStart,end:project.continuous?songEnd:sequenceStart+16};
     const start=fromBeat??this._pausedBeat??(timeline?.enabled?(loop?.enabled?loop.start:this.currentBeat||0):sequenceStart);
     this._loopRange=loop?.enabled?{start:loop.start,end:loop.end}:null;
-    this._playRange={start,end:loop?.enabled?loop.end:timeline?.enabled?Math.max(timeline.lengthBeats,...timeline.clips.map(c=>c.start+c.duration)):project.sequences.length*16};
+    this._playRange={start,end:loop?.enabled?loop.end:timeline?.enabled?Math.max(timeline.lengthBeats,...timeline.clips.map(c=>c.start+c.duration)):legacy?songEnd:project.sequences.length*16};
     if(this._playRange.start>=this._playRange.end)this._playRange.start=this._loopRange?.start||0;
     this._nextLoopPlan=null;this._lastTickTime=null;this._plan=compilePlaybackPlan(project,{range:this._playRange,seed:this.seed,buffers:this.buffers});
     try{await this.preparePlan(this._plan);}catch(error){this.isPlaying=false;throw error;}
@@ -1077,6 +1078,7 @@ export class Engine {
     }
     if(event.type==='sample'&&address?.kind==='sample'&&this.channelAudible(address.index)){
       if(event.clip)return this._triggerClip(address.index,event);
+      if(legacyPlaybackProfile(this.store.project)&&!address.track.clipSnapshot)return this.trigger(address.index,time,event.velocity,event.over,{chaseSeconds:event.chaseOffsetSeconds||0});
       let over=event.over;if(event.chaseOffsetSeconds>0){const c=address.track,b=this.buffers[address.index];if(!b)return;const pitch=over?.pitch??c.pitch??1,reverse=over?.rev??c.reverse,delta=event.chaseOffsetSeconds*pitch/b.duration;over={...over,...(reverse?{trimEnd:(over?.trimEnd??c.trimEnd)-delta}:{trimStart:(over?.trimStart??c.trimStart)+delta})};}
       return this.trigger(address.index,time,event.velocity,over);
     }
@@ -1212,13 +1214,15 @@ export class Engine {
 
   // Trigger a channel's sample at `time`. `over` = per-step overrides
   // ({rev, trimStart, trimEnd, pitch}) that take precedence over channel settings.
-  trigger(ch, time = 0, velocity = 1, over = null) {
+  trigger(ch, time = 0, velocity = 1, over = null, { chaseSeconds = 0 } = {}) {
     this.ensureContext();
     const c = this.store.channel(ch);
+    const historical = legacySamplePlayback(this.store.project,c,over,this.buffers[ch]?.duration||0,{chaseSeconds});
+    if(historical&&historical.sourceDuration<=0)return;
     const rev = over?.rev ?? c.reverse;
     const rawPitch = over?.pitch ?? c.pitch;
     const pitch = Number.isFinite(rawPitch)
-      ? Math.max(0.1, Math.min(this.store.project.songOrigin ? 100 : 4, rawPitch))
+      ? Math.max(0.1, Math.min(historical || this.store.project.songOrigin ? 100 : 4, rawPitch))
       : 1;
     const rawStart = over?.trimStart ?? c.trimStart,
       rawEnd = over?.trimEnd ?? c.trimEnd;
@@ -1240,13 +1244,17 @@ export class Engine {
 
     const src = this.ctx.createBufferSource();
     src.buffer = buffer;
-    src.playbackRate.value = pitch;
+    // Preserve each player's parameter API too: the native .value path can
+    // differ by one sample from an explicit time-zero event at non-unity rates.
+    if(historical&&!historical.profile.divideSourceDuration)src.playbackRate.setValueAtTime(pitch,this.ctx.currentTime);
+    else src.playbackRate.value = pitch;
 
     let start = trimStart * buffer.duration;
-    const dur = c.clipSnapshot
+    let dur = c.clipSnapshot
       ? (trimEnd - trimStart) * buffer.duration
       : Math.max(0.001, (trimEnd - trimStart) * buffer.duration);
     if (rev) start = (1 - trimEnd) * buffer.duration;
+    if(historical){start=historical.offset;dur=historical.sourceDuration;}
 
     const vg = this.ctx.createGain();
     vg.gain.value = velocity;
@@ -1269,7 +1277,7 @@ export class Engine {
       src.loopEnd = sampleLoop(c).end;
     }
     const audibleDuration = sustain ?? dur / pitch,
-      edgeFade = Math.min(0.005, audibleDuration / 3);
+      edgeFade = historical ? 0 : Math.min(0.005, audibleDuration / 3);
     let fadeIn = edgeFade;
     if (cutFadeSec != null && this._lastVoice?.[ch]) {
       const prev = this._lastVoice[ch];
@@ -1291,16 +1299,25 @@ export class Engine {
       }
     }
     (this._lastVoice ||= {})[ch] = { src, gain: vg };
-    vg.gain.setValueAtTime(0, t);
-    vg.gain.linearRampToValueAtTime(velocity, t + fadeIn);
-    vg.gain.setValueAtTime(velocity, t + audibleDuration - edgeFade);
-    vg.gain.linearRampToValueAtTime(0, t + audibleDuration);
+    if(historical&&!fadeIn){
+      // Standalone scheduled its 10ms fade at the scheduling clock, not note-on.
+      // With normal lookahead it completes before the source starts. The editor
+      // used a plain channel gain. Neither player faded sample endings.
+      const fade=historical.profile.schedulingFadeSeconds;
+      vg.gain.setValueAtTime(fade?0:velocity,this.ctx.currentTime);
+      if(fade)vg.gain.linearRampToValueAtTime(velocity,this.ctx.currentTime+fade);
+    }else{
+      vg.gain.setValueAtTime(0, t);
+      vg.gain.linearRampToValueAtTime(velocity, t + fadeIn);
+      vg.gain.setValueAtTime(velocity, t + audibleDuration - edgeFade);
+      vg.gain.linearRampToValueAtTime(0, t + audibleDuration);
+    }
 
     const voices = (this._voices ||= new Map()).get(ch) || new Set();
     this._voices.set(ch, voices);
     const voice = { src, gain: vg, time:t, endTime:t+audibleDuration };
     const active=[...voices].filter(v=>v.time<=t&&v.endTime>t);
-    if (active.length >= 32) {
+    if (!historical && active.length >= 32) {
       const oldest = active[0];
       try { oldest.src.stop(t); } catch {}
       oldest.endTime=t;

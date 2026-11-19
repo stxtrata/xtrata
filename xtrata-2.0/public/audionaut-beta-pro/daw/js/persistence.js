@@ -26,6 +26,8 @@ import { saveProjectRevision, listProjectRevisions, loadProjectRevision, clearAc
 import { normalizeArp } from "./arpeggiator.js";
 import { normalizeProjectModel, MODEL_LIMITS } from "./project-model.js";
 import { validateRouting } from './mixer-runtime.js';
+import { normalizeLegacyPlayback } from './legacy-bridge/playback.js';
+import { prepareLegacyDocumentSync, validateLegacyImport, detectFormat } from './legacy-bridge/index.js';
 
 // Display names the synths carried before the rename. A saved instrument whose name is still
 // the old stock name follows the synth to its new name; custom names are never touched.
@@ -96,7 +98,7 @@ export async function downloadProject() {
 
 export async function importProjectAsync(json,{guard=()=>true,...options}={}) {
   const data=typeof json==='string'?JSON.parse(json):json;
-  if(data?.format!=='audionaut-chain-song/1')return importProject(data);
+  if(data?.format!=='audionaut-chain-song/1')return commitPreparedProject(prepareProject(data),{guard});
   if(data.manifest?.runtime?.version!==RUNTIME_VERSION)throw Error('This song requires a different AudioNaut runtime version. Open its pinned chain player.');
   const {currentRuntime}=await import('./chain-publishing.js');
   const runtime=await currentRuntime(options);
@@ -108,25 +110,46 @@ export async function importProjectAsync(json,{guard=()=>true,...options}={}) {
   return project;
 }
 
-export function importProject(json) {
+// Preparation is side-effect free: an importer can validate and resolve every
+// sample before replacing the current project or its decoded audio.
+export function prepareProject(json) {
   const data = typeof json === "string" ? JSON.parse(json) : json;
   if (!data || typeof data !== "object")
     throw new Error("Choose an Audional project JSON.");
-  if (!Array.isArray(data.channels) && !data.projectSequences)
-    throw new Error("This file is not a supported Audional project.");
   validateDocument(data);
   const native=new Set(['audional-sequencer-x/1','audional-sequencer-l1xl2/1','audionaut-workstation/2','audionaut-workstation/3']);
   if(data.format && !native.has(data.format)) throw new Error(`Unsupported project version: ${String(data.format)}. The current project was retained.`);
-  if(!data.format && !data.projectSequences) throw new Error('This project has no supported format marker. The current project was retained.');
-  const project = normalizeProjectModel(native.has(data.format) ? normalizeNative(data) : convertLegacy(data));
+  if(!native.has(data.format)){
+    // The established synchronous API explicitly means the old editor. The file
+    // chooser uses the staged bridge and asks when a historical player is unknown.
+    const detection=detectFormat(data);
+    const profileId=detection.dense||detection.kind==='og'?undefined:'audionals-editor-v1';
+    const staged=prepareLegacyDocumentSync(data,{profileId});
+    if(!staged.project)throw new Error(staged.report.issues.map(issue=>issue.message).join(' ')||'This file is not a supported Audional project.');
+    return prepareProject(staged.project);
+  }
+  const project = normalizeProjectModel(normalizeNative(data));
   validateCandidate(project,data.format==='audionaut-workstation/3');
+  return project;
+}
+
+export function commitPreparedProject(project,{guard=()=>true}={}) {
+  if(!guard())throw new Error('The project changed while the song was opening. Your current work was retained.');
+  validateDocument(project);
+  validateCandidate(project,true);
   internProjectAssets(project);
   store.loadProject(project);
   pruneAssets();
   return project;
 }
 
+export function importProject(json) {
+  return commitPreparedProject(prepareProject(json));
+}
+
 function validateDocument(data) {
+  normalizeLegacyPlayback(data.legacyPlayback);
+  validateLegacyImport(data.legacyImport);
   let nodes=0;const seen=new WeakSet();
   function visit(value,depth=0){
     if(typeof value==='number'&&!Number.isFinite(value))throw new Error('Project contains a non-finite number.');
@@ -245,6 +268,8 @@ function validateCandidate(project,strict){
 function normalizeNative(data) {
   data=structuredClone(data);
   const p = makeProject();
+  const legacyPlayback=normalizeLegacyPlayback(data.legacyPlayback);
+  if(legacyPlayback)p.legacyPlayback=legacyPlayback;
   p.mixerVersion=data.format==='audionaut-workstation/3'?(data.mixerVersion??2):1;
   p.choke = !!data.choke;
   p.fadeMs = +data.fadeMs || 15;
@@ -301,10 +326,19 @@ function normalizeNative(data) {
         );
       channel.name = String(channel.name || `Channel ${i + 1}`).slice(0, 64);
       channel.sampleName = String(channel.sampleName || "").slice(0, 160);
-      channel.volume = finite(channel.volume, 0.9, 0, p.songOrigin ? 3 : 1.5);
-      channel.pitch = finite(channel.pitch, 1, 0.1, p.songOrigin ? 100 : 4);
-      channel.trimStart = finite(channel.trimStart, 0, 0, 1 - 1e-7);
-      channel.trimEnd = finite(channel.trimEnd, 1, channel.trimStart + 1e-7, 1);
+      if(legacyPlayback){
+        if(c.volume!=null)numeric(c.volume,'historical channel gain',0,3);
+        if(c.pitch!=null)numeric(c.pitch,'historical playback rate',.1,100);
+      }
+      channel.volume = finite(channel.volume, 0.9, 0, p.songOrigin || legacyPlayback ? 3 : 1.5);
+      channel.pitch = finite(channel.pitch, 1, 0.1, p.songOrigin || legacyPlayback ? 100 : 4);
+      if(legacyPlayback&&!c.clipSnapshot){
+        channel.trimStart=numeric(c.trimStart??0,'historical trim start',0,1);
+        channel.trimEnd=numeric(c.trimEnd??1,'historical trim end',channel.trimStart,1);
+      }else{
+        channel.trimStart = finite(channel.trimStart, 0, 0, 1 - 1e-7);
+        channel.trimEnd = finite(channel.trimEnd, 1, channel.trimStart + 1e-7, 1);
+      }
       channel.wordSelection = wordMetadata(c.wordSelection);
       channel.clipSnapshot = c.clipSnapshot
         ? validateClipSnapshot(c.clipSnapshot)
@@ -414,6 +448,11 @@ function normalizeNative(data) {
       (s.steps || []).slice(0, chCount).forEach((row, ch) => {
         row.slice(0, NUM_STEPS).forEach((v, st) => {
           if (v && typeof v === "object") {
+            if(legacyPlayback&&v.pitch!=null)numeric(v.pitch,'historical step playback rate',.1,100);
+            if(legacyPlayback&&!p.channels[ch].clipSnapshot){
+              const start=numeric(v.trimStart??p.channels[ch].trimStart,'historical step trim start',0,1);
+              numeric(v.trimEnd??p.channels[ch].trimEnd,'historical step trim end',start,1);
+            }
             seq.steps[ch][st] = {
               v: v.v === 2 ? 2 : 1,
               ...(v.rev != null && { rev: !!v.rev }),
@@ -472,70 +511,6 @@ function normalizeNative(data) {
 }
 
 // Convert the original Audional Sequencer (B64x / BETA_XI) preset format.
-function convertLegacy(data) {
-  const p = makeProject();
-  p.mixerVersion=1;
-  p.projectName = data.projectName || "Imported project";
-  p.artistName = data.artistName || "";
-  p.bpm = finite(data.projectBPM ?? data.bpm, 120, 20, 420);
-
-  const urls = data.channelURLs || [];
-  const vols = data.channelVolume || [];
-  const speeds = data.channelPlaybackSpeed || [];
-  const trims = data.trimSettings || [];
-  const names = data.projectChannelNames || [];
-
-  const legacyCount = Math.max(
-    NUM_CHANNELS,
-    Math.min(urls.length, MAX_CHANNELS),
-  );
-  while (p.channels.length < legacyCount)
-    p.channels.push(makeChannel(p.channels.length));
-  for (let i = 0; i < Math.min(urls.length, legacyCount); i++) {
-    const c = p.channels[i];
-    if (urls[i]) {
-      const isOrd = /ordinals\.com\/content\//.test(urls[i]);
-      c.source = isOrd
-        ? { type: "ordinal", value: urls[i].split("/content/")[1] }
-        : { type: "url", value: urls[i] };
-    }
-    if (names[i]) {
-      c.name = String(names[i]).slice(0, 24);
-      c.sampleName = names[i];
-    }
-    if (vols[i] != null) c.volume = Math.min(1.5, +vols[i]);
-    if (speeds[i] != null && +speeds[i] > 0) c.pitch = +speeds[i];
-    const t = trims[i];
-    if (t) {
-      // legacy trim values are percentages 0..100
-      c.trimStart = Math.max(0, Math.min(1, (+t.start || 0) / 100));
-      c.trimEnd = Math.max(c.trimStart, Math.min(1, (+t.end || 100) / 100));
-    }
-  }
-
-  const seqs = data.projectSequences || {};
-  const keys = Object.keys(seqs).sort(
-    (a, b) => parseInt(a.replace(/\D/g, "")) - parseInt(b.replace(/\D/g, "")),
-  );
-  p.sequences = [];
-  for (const key of keys.slice(0, MAX_SEQUENCES)) {
-    const seq = makeSequence(p.channels.length);
-    const chans = seqs[key] || {};
-    for (const chKey of Object.keys(chans)) {
-      const chIdx = parseInt(chKey.replace(/\D/g, ""), 10);
-      if (isNaN(chIdx) || chIdx >= p.channels.length) continue;
-      for (const s of chans[chKey].steps || []) {
-        // legacy steps are 1-based; may be numbers or {index, reverse} objects
-        const idx = (typeof s === "object" ? s.index : s) - 1;
-        if (idx >= 0 && idx < NUM_STEPS) seq.steps[chIdx][idx] = 1;
-      }
-    }
-    p.sequences.push(seq);
-  }
-  if (!p.sequences.length) p.sequences.push(makeSequence());
-  return p;
-}
-
 // --- async browser recovery ---
 let revision = 0, saveQueue = Promise.resolve(), clearedProject = null;
 const knownHeads=new Map(), sessionId=newProjectId();

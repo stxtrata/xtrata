@@ -7,7 +7,10 @@ import { reconstructXtrataInscription } from '../../../packages/xtrata-reconstru
 import { createChainLibrary, prepareChainSongImport } from '../daw/js/chain-library.js';
 import { validateChainReference } from '../daw/js/chain-manifest.js';
 import { RUNTIME_VERSION } from '../daw/js/runtime-version.js';
-import { importProject } from '../daw/js/persistence.js';
+import { importProject, prepareProject } from '../daw/js/persistence.js';
+import { readDocument } from '../daw/js/legacy-bridge/read-document.js';
+import { prepareLegacyImport } from '../daw/js/legacy-bridge/index.js';
+import { prepareImportedAudio, commitImportedAudio } from '../daw/js/legacy-import-audio.js';
 import { reloadAllSamples, setChainSourceLibrary } from '../daw/js/loader.js';
 import { engine } from '../daw/js/engine.js';
 import { store } from '../daw/js/state.js';
@@ -96,12 +99,35 @@ async function openSong(document) {
     loading = false;
   }
 }
+// Old Bitcoin instruction songs keep their original inscription IDs. This is a
+// separate reader, not a relaxation of the pinned chain-song/1 manifest format.
+async function openLegacySong(input,{profileId,signal}={}){
+  if(loading)throw Error('Wait for the current song to finish loading.');
+  loading=true;play.disabled=true;
+  const previous=store.project;
+  try{
+    const converted=await prepareLegacyImport(input,{profileId,signal});
+    if(converted.kind==='native')throw Error('Use a chain song instruction file, or an original Audional song.');
+    if(converted.requiresProfileChoice)throw Error('Choose the historical editor or standalone player below, then select the song again.');
+    if(!converted.project)throw Error(converted.report.issues.filter(issue=>issue.severity==='error').map(issue=>issue.message).join(' ')||'This legacy song needs additional import information.');
+    const project=prepareProject(converted.project);
+    if(project.channels.some(channel=>channel.source&&channel.source.type!=='ordinal'))throw Error('This standalone legacy player requires Bitcoin inscription sample references. Open other source types in beta-pro.');
+    const staged=await prepareImportedAudio(project,{signal,guard:()=>store.project===previous,onProgress:({completed,total})=>{status.textContent=`Reading original Bitcoin sounds: ${completed} of ${total}…`;}});
+    if(staged.failures.length)throw Error(`Some original sounds are unavailable (channels ${staged.failures.map(item=>item.channel).join(', ')}). The previous song was retained.`);
+    engine.stop();engine.buffers.fill(null);engine.reverseBuffers.fill(null);
+    commitImportedAudio(staged,{guard:()=>store.project===previous,installAudio:true});
+    loaded=true;status.textContent=`${project.projectName} · Ready. Original Bitcoin sample references and historical playback settings retained.`;
+    return converted.report;
+  }finally{loading=false;play.disabled=!loaded;}
+}
 document.querySelector('#song').onchange = async (event) => {
   try {
-    const file = event.target.files[0];
+    const file = event.target.files[0];event.target.value='';
     if (!file) return;
     if (file.size > 16 * 1024 * 1024) throw Error('Instruction file exceeds 16 MiB.');
-    await openSong(JSON.parse(await file.text()));
+    const parsed=await readDocument(file,{limits:{inputBytes:16*1024*1024,expandedBytes:16*1024*1024}});
+    if(parsed.document.format==='audionaut-chain-song/1')await openSong(parsed.document);
+    else await openLegacySong(file,{profileId:document.querySelector('#legacy-profile').value||undefined});
   } catch (error) {
     status.textContent = error.message;
   }
@@ -130,4 +156,4 @@ document.querySelector('#load-chain').onclick = async () => {
   }
 };
 // Exposed for reproducible offline transport tests; never signs or broadcasts.
-globalThis.AudioNautChainPlayer = { version: RUNTIME_VERSION, openSong, library, engine, store };
+globalThis.AudioNautChainPlayer = { version: RUNTIME_VERSION, openSong, openLegacySong, library, engine, store };

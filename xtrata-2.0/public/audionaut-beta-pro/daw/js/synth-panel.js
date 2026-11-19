@@ -577,6 +577,8 @@ const VIZ = {
 };
 
 function drawViz() {
+  // A queued refit can outlive a project load that removed this instrument.
+  if (!store.instrument(inst) || root?.dataset.built !== "1") return;
   const P = current();
   const synth = SYNTH_BANK[synthId];
   vizzes.forEach(({ canvas, id }) => VIZ[id]?.(canvas, P, synth));
@@ -1023,6 +1025,11 @@ function showDockInstrument() {
   hideDockPanel();
   paintTabs();
   const ins = store.instrument(inst);
+  if (!ins) {
+    lit.clear();
+    root.appendChild(el("p", "empty", "This project has no instrument tracks. Add an instrument to open its controls."));
+    return;
+  }
   const id = ins.synthId;
   lit.clear();
   build(id);
@@ -1119,11 +1126,13 @@ export function initSynthPanel() {
     if (!selfWrite && isOpen() && i === inst && prop === "params") syncAll();
   });
   // a new project, a loaded file or undo/redo: keep the dock on the same synth, rebuilt from the new state
-  store.on("load", () => {
+  const refreshInstruments = () => {
     if (!store.instrument(inst)) inst = 0;
     if (dockOpen()) showDockInstrument();
     else paintTabs();
-  });
+  };
+  store.on("load", refreshInstruments);
+  store.on("instruments", refreshInstruments);
   // names and synth swaps show on the tabs (and the face follows a swapped synth)
   store.on("instrument", ({ i, prop }) => {
     if (prop === "name") paintTabs();
