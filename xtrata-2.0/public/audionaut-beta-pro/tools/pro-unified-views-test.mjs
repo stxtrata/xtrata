@@ -189,11 +189,12 @@ try {
   );
   ok((await tab.locator('.song-playhead').count()) === 1, 'Playhead mounted');
   ok(
-    (await tab.locator('.song-transport select').first().inputValue()) === '0.25',
+    (await tab.locator('.song-transport select').first().inputValue()) === '1',
     'Default snap label is Step'
   );
   const box = await tab.locator('.song-canvas').boundingBox();
-  await tab.mouse.click(box.x + 220 + 4 * 56, box.y + 15);
+  const gutter = +(await tab.locator('.song-canvas').getAttribute('data-controls-width'));
+  await tab.mouse.click(box.x + gutter + 4 * 56, box.y + 15);
   await tab.waitForTimeout(50);
   ok(
     Math.abs((await tab.evaluate(() => testState.engine.getMusicalPosition().beat)) - 4) < 0.05,
@@ -263,7 +264,7 @@ try {
   const surface = await tab.locator('.song-canvas').boundingBox();
   const x =
     surface.x +
-    220 +
+    gutter +
     15.75 * 56 -
     (await tab.locator('.song-scroll').evaluate((n) => n.scrollLeft));
   await tab.mouse.move(x + 15, surface.y + 65);

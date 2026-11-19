@@ -165,7 +165,7 @@ try {
   assert.equal(await p.locator('#advanced-playback').getAttribute('open'), null);
   assert.equal(await p.locator('#legacy-profile').isVisible(), false);
   assert.equal(await p.locator('#legacy-profile').inputValue(), '');
-  assert.equal(result.version, 'beta-pro-legacy-bridge-2');
+  assert.equal(result.version, 'beta-pro-shared-audio-1');
   const fileSong = {
     projectName: 'Automatic file fixture',
     projectBPM: 120,

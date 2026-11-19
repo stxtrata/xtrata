@@ -4,7 +4,7 @@ let activeChainLibrary=defaultChainLibrary;
 export function setChainSourceLibrary(library){if(typeof library?.read!=='function')throw Error('Invalid chain reader.');activeChainLibrary=library;}
 // Shared, transactional L1/L2 audio loader. Remote preview cache is bounded.
 import { store, stepVal, makeChannel } from "./state.js";
-import {decodePcmWav} from './pcm-wav.js';
+import {decodeAudioBytes} from './audio-decode.js';
 import { engine } from "./engine.js";
 import { renderSynthSample, ALL_SYNTH_DRUMS } from "./synthdrums.js";
 import { SOUND_BY_KEY } from "./onboard-catalog.js";
@@ -70,7 +70,7 @@ export function resolveSource(source, settings = store.settings) {
 }
 function decodeBase64(value) {
   const raw = String(value)
-    .replace(/^data:[^,]*,/, "")
+    .replace(/^data:[^,]*,/i, "")
     .replace(/\s/g, "");
   if (raw.length > (MAX_BYTES * 4) / 3 + 8)
     throw new Error("Audio exceeds the 256 MB import limit.");
@@ -143,7 +143,7 @@ export async function extractAudio(
         : null,
     };
   }
-  if (ct.includes("html") || /^<(?:!doctype|html|head)/i.test(prefix)) {
+  if (ct.includes("html") || /^<(?:!doctype|html|head|body|audio|script|!--)/i.test(prefix)) {
     const html = new TextDecoder().decode(bytes),
       doc = new DOMParser().parseFromString(html, "text/html");
     if (
@@ -201,6 +201,27 @@ export async function extractAudio(
     throw new Error("Video extraction is unsupported in Samples & Loops.");
   return { arrayBuffer: bytes, sourceBytes: bytes, sampleName: fallback };
 }
+// Shared retrieval policy for catalogue, direct loads and historical imports.
+// Fallback gateways are tried only for transport failures, never to substitute
+// a different payload after an extraction/integrity error.
+export async function fetchSourceAudio(source,{signal,allowNested=true}={}) {
+  const primary=resolveSource(source),urls=[primary];
+  if(source.type==='ordinal') for(const gateway of (Array.isArray(store.settings.ordinalsFallbacks)?store.settings.ordinalsFallbacks:[])) {
+    if(typeof gateway==='string' && /^https?:\/\//i.test(gateway)) urls.push(gateway.replace(/\/?$/, '/')+ordinalId(source.value));
+  }
+  let last;
+  for(const url of new Set(urls)) {
+    abort(signal);let response;
+    try { response=await fetch(url,{signal}); if(!response.ok)throw Error(`Audio fetch failed (${response.status}).`); }
+    catch(error){abort(signal);last=Object.assign(error,{code:'GATEWAY'});continue;}
+    const fallback=source.label||decodeURIComponent(url.split('/').pop()?.split('?')[0]||'Sample');
+    let result;
+    try { result=await extractAudio(response,fallback,signal,0,allowNested); }
+    catch(error){abort(signal);throw Object.assign(error,{code:'FORMAT'});}
+    return {...result,retrievedVia:url};
+  }
+  throw last || Error('No valid audio source gateway.');
+}
 function keep(key, value) {
   cache.delete(key);
   cache.set(key, value);
@@ -242,7 +263,7 @@ async function decodeSource(
     const bytes=await verifyChainBytes(ref,await activeChainLibrary.read(ref,{signal}));
     const extracted=await extractAudio(new Response(bytes,{headers:{'content-type':ref.mediaType}}),source.label||'Chain sample',signal,0,false);
     if(source.audioSha256&&await audioHash(extracted.arrayBuffer)!==source.audioSha256)throw Error('Chain audio payload differs from its pinned hash.');
-    const audioBuffer=await decodePcmWav(context,extracted.arrayBuffer,{signal})||await context.decodeAudioData(extracted.arrayBuffer.slice(0));abort(signal);
+    const audioBuffer=await decodeAudioBytes(context,extracted.arrayBuffer,{signal});abort(signal);
     const result={audioBuffer,sampleName:extracted.sampleName,soundMetadata:extracted.soundMetadata,source:structuredClone(source)};keep(key,result);return result;
   }
   if(source.localAssetId){
@@ -250,7 +271,7 @@ async function decodeSource(
     if(cache.has(key))return cache.get(key);
     const blob=assetBlob(source.localAssetId);
     const bytes=await blob.arrayBuffer();
-    const audioBuffer=await decodePcmWav(context,bytes,{signal})||await context.decodeAudioData(bytes);abort(signal);
+    const audioBuffer=await decodeAudioBytes(context,bytes,{signal});abort(signal);
     const result={audioBuffer,sampleName:source.label||'Recorded audio',source};keep(key,result);return result;
   }
   if (source.type === "file") {
@@ -258,7 +279,7 @@ async function decodeSource(
       if (source.file.size > MAX_BYTES)
         throw new Error("Choose an audio file smaller than 256 MB.");
       const bytes = await source.file.arrayBuffer(),
-        audioBuffer = await decodePcmWav(context,bytes.slice(0),{signal}) || await context.decodeAudioData(bytes.slice(0));
+        audioBuffer = await decodeAudioBytes(context,bytes,{signal});
       abort(signal);
       return {
         audioBuffer,
@@ -299,25 +320,12 @@ async function decodeSource(
         sampleName: ALL_SYNTH_DRUMS[source.value].label,
       };
     else {
-      const response = await fetch(
-        source.type === "synth" ? key : resolveSource(source),
-        { signal },
-      );
-      if (!response.ok)
-        throw new Error(`Audio fetch failed (${response.status}).`);
-      const fallback =
-          source.label ||
-          decodeURIComponent(key.split("/").pop()?.split("?")[0] || "Sample"),
-        { arrayBuffer, sampleName, soundMetadata } = await extractAudio(
-          response,
-          fallback,
-          signal,
-        );
+      const {arrayBuffer,sampleName,soundMetadata}=await fetchSourceAudio(source,{signal});
       const expectedHash = soundMetadata?.audioSha256 || source.audioSha256;
       if (expectedHash && (await audioHash(arrayBuffer)) !== expectedHash)
         throw new Error("Audio failed its integrity check.");
       result = {
-        audioBuffer: await decodePcmWav(context,arrayBuffer.slice(0),{signal}) || await context.decodeAudioData(arrayBuffer.slice(0)),
+        audioBuffer: await decodeAudioBytes(context,arrayBuffer,{signal}),
         sampleName,
         soundMetadata:
           soundMetadata ||

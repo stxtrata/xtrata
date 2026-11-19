@@ -4,7 +4,7 @@ const MAX_DECODED_BYTES=256*1024*1024;
 export function inspectPcmWav(bytes){
   const v=new DataView(bytes),text=(at,n)=>String.fromCharCode(...new Uint8Array(bytes,at,n));
   if(v.byteLength<12||text(0,4)!=='RIFF'||text(8,4)!=='WAVE')return null;
-  let format=null,data=null;
+  let format=null,data=null,unsupportedLayout=false;
   for(let at=12;at+8<=v.byteLength;){
     const tag=text(at,4),size=v.getUint32(at+4,true),start=at+8;
     if(start+size>v.byteLength)throw new Error('The WAV file is truncated.');
@@ -13,11 +13,12 @@ export function inspectPcmWav(bytes){
       if(code===65534&&size>=40)code=v.getUint16(start+24,true);
       if(code!==1&&code!==3)return null;
       const channels=v.getUint16(start+2,true),sampleRate=v.getUint32(start+4,true),align=v.getUint16(start+12,true),bits=v.getUint16(start+14,true);
-      if(channels<1||channels>32||sampleRate<8000||sampleRate>384000||align!==channels*bits/8||!(code===1?[8,16,24,32]:[32,64]).includes(bits))throw new Error('Unsupported PCM WAV layout.');
+      if(channels<1||channels>32||sampleRate<8000||sampleRate>384000||align!==channels*bits/8||!(code===1?[8,16,24,32]:[32,64]).includes(bits))unsupportedLayout=true;
       format={code,channels,sampleRate,align,bits};
     }else if(tag==='data')data={start,size};
     at=start+size+(size&1);
   }
+  if(unsupportedLayout)throw Object.assign(new Error('Unsupported PCM WAV layout.'),{code:'UNSUPPORTED_PCM_LAYOUT'});
   if(!format||!data)return null;
   const frames=Math.floor(data.size/format.align);
   if(!frames||data.size%format.align)throw new Error('The PCM WAV has incomplete audio frames.');

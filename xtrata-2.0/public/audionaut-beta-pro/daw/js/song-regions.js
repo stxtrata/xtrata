@@ -34,18 +34,22 @@ export function waveformIndex(window, buffer, seconds) {
   return window.reverse ? buffer.length - 1 - frame : frame;
 }
 // A projection, not a conversion: viewing never enables/rebuilds stored clips.
-export function songRegions(project, buffers = []) {
-  const length = project.timeline.enabled
+export function songRegions(project, buffers = [], { patterns = false } = {}) {
+  const arranged = project.timeline.enabled && !patterns;
+  const length = arranged
     ? Math.max(
         project.timeline.lengthBeats,
         ...project.timeline.clips.map((c) => c.start + c.duration)
       )
     : Math.max(16, project.sequences.length * 16);
-  const plan = compilePlaybackPlan(project, { range: { start: 0, end: length }, buffers });
+  const source = patterns
+    ? { ...project, timeline: { ...project.timeline, enabled: false } }
+    : project;
+  const plan = compilePlaybackPlan(source, { range: { start: 0, end: length }, buffers });
   const regions = plan.events
     .filter((e) => e.type === 'sample' || e.type === 'note')
     .map((event) => {
-      const clip = project.timeline.enabled
+      const clip = arranged
         ? project.timeline.clips.find(
             (c) => c.id === event.clipId || event.id.startsWith(c.id + ':')
           )
@@ -85,6 +89,7 @@ export function songRegions(project, buffers = []) {
         ...event,
         start,
         end,
+        naturalEnd: end,
         window,
         buffer,
         track,
@@ -104,6 +109,7 @@ export function songRegions(project, buffers = []) {
           : project.choke
             ? Math.max(0.002, (project.fadeMs ?? 15) / 1000)
             : null;
+    if (old) old.next = r;
     if (old && fade != null && old.end > r.start) {
       old.end = Math.min(old.end, secondsToBeat(project, beatToSeconds(project, r.start) + fade));
       old.cut = true;
@@ -144,7 +150,7 @@ export function regionSource(project, region) {
   const notes = clip?.type === 'midi' ? clip.notes : sequence?.notes[region.index];
   return { sequence, notes, note: notes?.find((n) => n.id === region.noteId), clip };
 }
-export function editSongRegion(project, region, patch) {
+export function editSongRegion(project, region, patch, options = {}) {
   for (const key of ['start', 'end'])
     if (
       patch[key] != null &&
@@ -154,6 +160,7 @@ export function editSongRegion(project, region, patch) {
   if (patch.end != null && patch.end <= (patch.start ?? region.start))
     throw Error('A region must have a positive length.');
   const source = regionSource(project, region);
+  if (options.sourceValue !== undefined) source.value = options.sourceValue;
   if (region.clip) {
     if (!source.clip) throw Error('This clip no longer exists.');
     if (patch.remove) {
@@ -188,7 +195,7 @@ export function editSongRegion(project, region, patch) {
   if (region.type === 'sample') {
     if (!source.row || !source.value) throw Error('This region no longer exists.');
     if (patch.remove) {
-      source.row[region.step] = 0;
+      if (!options.sourceRemoved) source.row[region.step] = 0;
       return;
     }
     let value = typeof source.value === 'object' ? { ...source.value } : { v: source.value },
@@ -210,6 +217,12 @@ export function editSongRegion(project, region, patch) {
       value.off = Math.min(0.999, Math.max(0, local - step));
     }
     if (patch.reverse != null) value.rev = patch.reverse;
+    for (const key of ['trimStart', 'trimEnd', 'xfade'])
+      if (patch[key] != null) {
+        if (!Number.isFinite(patch[key]) || patch[key] < 0 || (key !== 'xfade' && patch[key] > 1))
+          throw Error('Invalid region adjustment.');
+        value[key] = patch[key];
+      }
     if (patch.end != null) {
       if (!region.buffer) throw Error('Load the sound before trimming it.');
       const seconds =
@@ -234,9 +247,10 @@ export function editSongRegion(project, region, patch) {
         value.trimEnd = Math.min(1, start + fraction);
       }
     }
-    source.row[region.step] = 0;
+    if (!options.sourceRemoved) source.row[region.step] = 0;
     row[step] = value;
-    return;
+    const sequence = project.sequences.find((s) => s.steps[region.index] === row);
+    return { ...region, sequenceId: sequence.id, step };
   }
   if (!source.note) throw Error('This note no longer exists.');
   if (source.note.tieId)
@@ -273,4 +287,59 @@ export function editSongRegion(project, region, patch) {
     throw Error('Keep this note within its pattern, or edit its continuation in the piano roll.');
   source.notes.splice(source.notes.indexOf(source.note), 1);
   notes.push(note);
+  const sequence = project.sequences.find((s) => s.notes[region.index] === notes);
+  return { ...region, sequenceId: sequence?.id ?? region.sequenceId };
+}
+
+// Stable source identities deduplicate linked appearances of the same pattern.
+export function regionKey(r) {
+  if (r.clip) return `clip:${r.clipId}`;
+  if (r.type === 'sample') return `step:${r.sequenceId}:${r.index}:${r.step}`;
+  return `note:${r.sourceClip?.type === 'midi' ? r.sourceClip.id : r.sequenceId}:${r.index}:${r.noteId}`;
+}
+export function sampleDestination(project, region, beat) {
+  const index = region.sourceClip
+    ? project.sequences.findIndex((s) => s.id === region.sequenceId)
+    : Math.floor(beat / 16);
+  const local = region.sourceClip
+    ? rawPosition(project, region, beat)
+    : unswingStep((beat - index * 16) * 4, project.swing);
+  if (!project.sequences[index] || local < 0 || local >= 64) return null;
+  return {
+    sequence: project.sequences[index],
+    step: Math.min(63, Math.floor(local + 1e-7)),
+    local
+  };
+}
+export function batchEditSongRegions(project, edits) {
+  const next = structuredClone(project),
+    unique = [...new Map(edits.map((e) => [regionKey(e.region), e])).values()],
+    values = new Map(),
+    keys = [];
+  // Vacate every moving source before writing destinations: selected neighbours
+  // can move together without overwriting each other or failing halfway through.
+  for (const { region: r, patch } of unique)
+    if (r.type === 'sample' && !r.clip && (patch.start != null || patch.remove)) {
+      const source = regionSource(next, r);
+      values.set(regionKey(r), source.value);
+      if (source.row) source.row[r.step] = 0;
+    }
+  for (const { region: r, patch } of unique) {
+    const removed = values.has(regionKey(r));
+    const result = editSongRegion(next, r, patch, {
+      sourceRemoved: removed,
+      sourceValue: values.get(regionKey(r))
+    });
+    if (!patch.remove) keys.push(regionKey(result || r));
+    if (r.clip && patch.remove)
+      for (const owner of [...next.channels, ...next.instruments]) {
+        for (const take of owner.takes || [])
+          if (take.clipIds) take.clipIds = take.clipIds.filter((id) => id !== r.clipId);
+        if (owner.freezeState?.clipId === r.clipId) {
+          owner.mute = owner.freezeState.wasMuted;
+          owner.freezeState = null;
+        }
+      }
+  }
+  return { project: next, keys };
 }

@@ -1335,7 +1335,7 @@ body.arrange-mode.arrange-zoomed
 }
 .ord-card {
   display: none;
-  position: absolute;
+  position: fixed;
   z-index: 60;
   left: -6px;
   top: 100%;
