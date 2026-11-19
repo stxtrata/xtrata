@@ -1,6 +1,7 @@
 // Reviewed corpus identities only; no private filenames, song payloads or samples.
 // The same sparse/compact bytes support two historically distinct players. A
-// null profileId deliberately requires a choice rather than inventing intent.
+// null profileId records no attested player. Automatic import uses the editor
+// default for those entries without claiming that their bytes identify intent.
 export const KNOWN_LEGACY_HASHES = Object.freeze({
   '3dc0cbd2cdbcac1cd3854b9866f28bda9a053e25134e052ca091c16d359574a4': {
     family: 'named-legacy',

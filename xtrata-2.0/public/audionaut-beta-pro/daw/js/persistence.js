@@ -120,8 +120,8 @@ export function prepareProject(json) {
   const native=new Set(['audional-sequencer-x/1','audional-sequencer-l1xl2/1','audionaut-workstation/2','audionaut-workstation/3']);
   if(data.format && !native.has(data.format)) throw new Error(`Unsupported project version: ${String(data.format)}. The current project was retained.`);
   if(!native.has(data.format)){
-    // The established synchronous API explicitly means the old editor. The file
-    // chooser uses the staged bridge and asks when a historical player is unknown.
+    // The established synchronous API retains old editor semantics. The staged
+    // file loader also defaults to editor playback when the format is ambiguous.
     const detection=detectFormat(data);
     const profileId=detection.dense||detection.kind==='og'?undefined:'audionals-editor-v1';
     const staged=prepareLegacyDocumentSync(data,{profileId});

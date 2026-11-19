@@ -285,16 +285,30 @@ const summary = {
   legacy: 0,
   dense: 0,
   profileCases: 0,
-  ambiguityChecks: 0,
+  automaticImports: 0,
+  editorDefaultChecks: 0,
   repairCases: 0,
   failures: []
 };
 const browserCases = [];
-async function checkProfile(row, decoded, repaired, detection, profileId, reference) {
+async function checkProfile(
+  row,
+  decoded,
+  repaired,
+  detection,
+  profileId,
+  reference,
+  { stagedResult = null, recordProfile = true } = {}
+) {
   const selection = selectLegacyProfile(detection, { profileId, sourceHash: decoded.sourceHash });
   assert.equal(selection.requiresProfileChoice, false);
-  const staged = await prepareLegacyImport(decoded.bytes, { profileId, useWorker: false });
+  assert.equal(selection.profileSelection, 'explicit');
+  const staged =
+    stagedResult || (await prepareLegacyImport(decoded.bytes, { profileId, useWorker: false }));
   const { report, normalized: song, project } = staged;
+  assert.equal(staged.requiresProfileChoice, false);
+  assert.equal(report.profileId, profileId);
+  if (!stagedResult) assert.equal(report.profileSelection, 'explicit');
   assert.equal(
     report.canImport,
     true,
@@ -387,8 +401,10 @@ async function checkProfile(row, decoded, repaired, detection, profileId, refere
     assert.equal(project.legacyImport.repairs.length, 1);
     assert.equal(project.legacyImport.repairs[0].originalSha256, row.sha256);
   }
-  browserCases.push({ row, profileId, reference });
-  summary.profileCases++;
+  if (recordProfile) {
+    browserCases.push({ row, profileId, reference });
+    summary.profileCases++;
+  }
 }
 
 for (let index = 0; index < inventory.length; index++) {
@@ -439,21 +455,41 @@ for (let index = 0; index < inventory.length; index++) {
       ? ['audionals-dense-v1']
       : ['audionals-editor-v1', 'audionals-standalone-v1'];
     const implicit = await prepareLegacyImport(bytes, { useWorker: false });
+    const automaticProfile = isDense ? 'audionals-dense-v1' : 'audionals-editor-v1';
+    assert.equal(
+      implicit.requiresProfileChoice,
+      false,
+      'Supported songs must load without a mandatory playback choice.'
+    );
+    assert.equal(implicit.report.profileId, automaticProfile);
+    assert.equal(implicit.report.canImport, true);
+    assert.ok(implicit.project);
+    assert.ok(!implicit.report.issues.some((issue) => issue.code === 'PROFILE_CHOICE_REQUIRED'));
     if (isDense) {
       summary.dense++;
-      assert.equal(implicit.report.profileId, 'audionals-dense-v1');
-      assert.equal(implicit.report.canImport, true);
+      assert.equal(implicit.report.profileSelection, 'format');
     } else {
       assert.equal(
-        implicit.requiresProfileChoice,
-        true,
-        'Ambiguous sparse/compact bytes must require a profile choice.'
+        implicit.report.profileSelection,
+        'editor-default',
+        'Shared sparse/compact bytes must use the documented editor default without claiming historical intent.'
       );
-      assert.equal(implicit.project, null);
-      assert.equal(implicit.report.canImport, false);
-      assert.ok(implicit.report.issues.some((issue) => issue.code === 'PROFILE_CHOICE_REQUIRED'));
-      summary.ambiguityChecks++;
+      assert.deepEqual(
+        implicit.profileChoices.map((profile) => profile.id),
+        profiles
+      );
+      summary.editorDefaultChecks++;
     }
+    await checkProfile(
+      row,
+      decoded,
+      repaired,
+      detection,
+      automaticProfile,
+      referenceSong(oracle.data, automaticProfile),
+      { stagedResult: implicit, recordProfile: false }
+    );
+    summary.automaticImports++;
     for (const profileId of profiles) {
       try {
         await checkProfile(
@@ -499,7 +535,8 @@ assert.equal(
   'Local corpus parity failed; inspect the per-profile findings.'
 );
 assert.equal(summary.profileCases, 173);
-assert.equal(summary.ambiguityChecks, 85);
+assert.equal(summary.automaticImports, 88);
+assert.equal(summary.editorDefaultChecks, 85);
 assert.equal(summary.inputs, 99);
 
 if (process.env.AUDIONAUT_LEGACY_CORPUS_BROWSER === '1') {

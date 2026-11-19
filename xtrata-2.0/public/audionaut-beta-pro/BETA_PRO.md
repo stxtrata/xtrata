@@ -20,9 +20,14 @@ The original `/audionaut` and `/audionaut-beta` directories are unchanged. This 
 
 ## File compatibility
 
-The [legacy bridge](LEGACY-BRIDGE.md) adds previewed JSON/gzip import, explicit
-historical playback profiles, verified repairs and sample preparation before
-replacing the current song. Original Bitcoin sample references are retained.
+The [legacy bridge](LEGACY-BRIDGE.md) opens supported JSON/gzip songs automatically,
+with verified repairs and sample preparation before replacing the current song.
+Shared sparse/compact files use the Audional editor's playback rules by default;
+their bytes cannot prove which historical player the author intended. Early boolean
+grids and OG instruction songs are detected from their structure. Missing samples
+or invalid data pause loading with recovery controls, including an advanced
+historical playback override where applicable. Original Bitcoin sample references
+are retained, and converted projects retain their selected playback rules.
 
 The importer accepts the original workstation format, the existing beta format, and supported legacy Audional formats. All 20 original starter songs, all 28 original synth patches, embedded WAV audio and pinned clip metadata are covered by compatibility tests. Version 3 preserves dynamic tracks, timeline clips, automation, routing, takes and original raw note timing. Unknown versions or invalid project structures are rejected before replacing the open project.
 

@@ -84,9 +84,12 @@ try {
         trimSettings: [{ startSliderValue: 10, endSliderValue: 60 }],
         projectSequences: { Sequence0: { ch0: { steps: [1, '64r'] } } }
       };
-      await reject(() => player.openLegacySong(song), /Choose the historical/);
-      ok(player.store.project === initial, 'Ambiguous legacy load preserved song');
-      const report = await player.openLegacySong(song, { profileId: 'audionals-editor-v1' });
+      const report = await player.openLegacySong(song);
+      ok(player.store.project !== initial, 'Automatic legacy load commits without a player choice');
+      ok(
+        report.profileId === 'audionals-editor-v1',
+        'Ambiguous sparse input defaults to editor playback'
+      );
       ok(
         report.canImport && player.store.project.legacyPlayback.id === 'audionals-editor-v1',
         'Legacy bridge bundled in cold runtime'
@@ -101,6 +104,31 @@ try {
         'Original audio decoded without website modules'
       );
       ok(player.store.project.sequences[0].steps[0][63].rev, 'Reverse event retained');
+      await player.openLegacySong(song, { profileId: 'audionals-standalone-v1' });
+      ok(
+        player.store.project.legacyPlayback.id === 'audionals-standalone-v1',
+        'Explicit standalone override retained'
+      );
+      ok(
+        !player.store.project.sequences[0].steps[0][0] &&
+          player.store.project.sequences[0].steps[0][1] &&
+          !player.store.project.sequences[0].steps[0][63],
+        'Standalone override keeps zero-based steps and inactive64'
+      );
+      const dense = {
+        ...song,
+        projectName: 'Detected boolean grid',
+        projectSequences: {
+          Sequence0: { ch0: { steps: Array.from({ length: 64 }, (_, i) => i === 0 || i === 63) } }
+        }
+      };
+      await player.openLegacySong(dense);
+      ok(
+        player.store.project.legacyImport.profileId === 'audionals-dense-v1' &&
+          player.store.project.sequences[0].steps[0][0] &&
+          player.store.project.sequences[0].steps[0][63],
+        'Dense input automatically retains its positional decoding'
+      );
       const saved = player.store.project;
       song.channelURLs = [other];
       await reject(
@@ -123,8 +151,8 @@ try {
       );
       // Exercise the embedded decoding worker as well as the small-file path.
       const large = { ...song, channelURLs: [id], projectName: 'Large JSON worker fixture' };
-      const bytes = new TextEncoder().encode(JSON.stringify(large)+' '.repeat(270000));
-      await player.openLegacySong(bytes, { profileId: 'audionals-editor-v1' });
+      const bytes = new TextEncoder().encode(JSON.stringify(large) + ' '.repeat(270000));
+      await player.openLegacySong(bytes);
       ok(
         player.store.project.channels[0].source.value === id,
         'Large legacy decode uses bundled worker'
@@ -133,6 +161,58 @@ try {
     },
     { id, other }
   );
+  // Exercise the normal downloaded player's file picker, not just its JS API.
+  assert.equal(await p.locator('#advanced-playback').getAttribute('open'), null);
+  assert.equal(await p.locator('#legacy-profile').isVisible(), false);
+  assert.equal(await p.locator('#legacy-profile').inputValue(), '');
+  assert.equal(result.version, 'beta-pro-legacy-bridge-2');
+  const fileSong = {
+    projectName: 'Automatic file fixture',
+    projectBPM: 120,
+    channelURLs: [id],
+    channelVolume: [2],
+    channelPlaybackSpeed: [0.5],
+    trimSettings: [{ startSliderValue: 10, endSliderValue: 60 }],
+    projectSequences: { Sequence0: { ch0: { steps: [1, '64r'] } } }
+  };
+  await p
+    .locator('#song')
+    .setInputFiles({
+      name: 'automatic.audx',
+      mimeType: 'application/json',
+      buffer: Buffer.from(JSON.stringify(fileSong))
+    });
+  await p.waitForFunction(
+    () =>
+      AudioNautChainPlayer.store.project.projectName === 'Automatic file fixture' &&
+      !document.querySelector('#play').disabled
+  );
+  assert.equal(
+    await p.evaluate(() => AudioNautChainPlayer.store.project.legacyPlayback.id),
+    'audionals-editor-v1'
+  );
+  assert.equal(await p.locator('#advanced-playback').getAttribute('open'), null);
+  await p.getByText('Advanced playback', { exact: true }).click();
+  await p.locator('#legacy-profile').selectOption('audionals-standalone-v1');
+  await p
+    .locator('#song')
+    .setInputFiles({
+      name: 'override.audx',
+      mimeType: 'application/json',
+      buffer: Buffer.from(JSON.stringify({ ...fileSong, projectName: 'Explicit file override' }))
+    });
+  await p.waitForFunction(
+    () =>
+      AudioNautChainPlayer.store.project.projectName === 'Explicit file override' &&
+      !document.querySelector('#play').disabled
+  );
+  const override = await p.evaluate(() => ({
+    profile: AudioNautChainPlayer.store.project.legacyPlayback.id,
+    first: AudioNautChainPlayer.store.project.sequences[0].steps[0][0],
+    second: AudioNautChainPlayer.store.project.sequences[0].steps[0][1]
+  }));
+  assert.deepEqual(override, { profile: 'audionals-standalone-v1', first: 0, second: 1 });
+  result.checks += 7;
   // A user gesture is required by some engines even in a local downloaded file.
   await p.getByRole('button', { name: 'Play', exact: true }).click();
   await p.waitForFunction(() => AudioNautChainPlayer.engine.isPlaying);

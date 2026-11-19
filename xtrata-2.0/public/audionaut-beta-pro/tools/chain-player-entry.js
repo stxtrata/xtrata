@@ -108,7 +108,6 @@ async function openLegacySong(input,{profileId,signal}={}){
   try{
     const converted=await prepareLegacyImport(input,{profileId,signal});
     if(converted.kind==='native')throw Error('Use a chain song instruction file, or an original Audional song.');
-    if(converted.requiresProfileChoice)throw Error('Choose the historical editor or standalone player below, then select the song again.');
     if(!converted.project)throw Error(converted.report.issues.filter(issue=>issue.severity==='error').map(issue=>issue.message).join(' ')||'This legacy song needs additional import information.');
     const project=prepareProject(converted.project);
     if(project.channels.some(channel=>channel.source&&channel.source.type!=='ordinal'))throw Error('This standalone legacy player requires Bitcoin inscription sample references. Open other source types in beta-pro.');
@@ -127,7 +126,7 @@ document.querySelector('#song').onchange = async (event) => {
     if (file.size > 16 * 1024 * 1024) throw Error('Instruction file exceeds 16 MiB.');
     const parsed=await readDocument(file,{limits:{inputBytes:16*1024*1024,expandedBytes:16*1024*1024}});
     if(parsed.document.format==='audionaut-chain-song/1')await openSong(parsed.document);
-    else await openLegacySong(file,{profileId:document.querySelector('#legacy-profile').value||undefined});
+    else await openLegacySong(file,{profileId:document.querySelector('#legacy-profile')?.value||undefined});
   } catch (error) {
     status.textContent = error.message;
   }

@@ -11,6 +11,8 @@ import {
   DOCUMENT_HARD_LIMITS
 } from '../daw/js/legacy-bridge/index.js';
 import { sha256Sync } from '../daw/js/legacy-bridge/hash-sync.js';
+import { selectLegacyProfile } from '../daw/js/legacy-bridge/profiles.js';
+import { KNOWN_LEGACY_HASHES } from '../daw/js/legacy-bridge/known-hashes.js';
 const textEncoder = new TextEncoder(),
   id = 'ab'.repeat(32) + 'i0',
   source = '/content/' + id,
@@ -108,16 +110,64 @@ await assert.rejects(
   (e) => e.name === 'AbortError'
 );
 checks++;
-const undecided = await prepareLegacyImport(original);
-check('unknown sparse requires actual choice', () => {
-  assert.equal(undecided.project, null);
-  assert.equal(undecided.requiresProfileChoice, true);
+const automatic = await prepareLegacyImport(original);
+check('unknown sparse automatically uses the editor default', () => {
+  assert.equal(automatic.report.canImport, true);
+  assert.equal(automatic.report.profileId, editor);
+  assert.equal(automatic.report.profileSelection, 'editor-default');
+  assert.equal(automatic.requiresProfileChoice, false);
+  assert.equal(automatic.project.sequences[0].steps[0][0], 1);
   assert.deepEqual(
-    undecided.profileChoices.map((x) => x.id),
+    automatic.profileChoices.map((x) => x.id),
     [editor, standalone]
   );
+  assert.ok(!automatic.report.issues.some((x) => x.code === 'PROFILE_CHOICE_REQUIRED'));
   assert.equal(JSON.stringify(original), before);
 });
+check('known bytes without an attested player remain an editor default', () => {
+  const hash = Object.keys(KNOWN_LEGACY_HASHES).find(
+    (key) => KNOWN_LEGACY_HASHES[key].profileId === null
+  );
+  const selection = selectLegacyProfile(
+    { kind: 'legacy', format: 'sparse-audx' },
+    { sourceHash: hash }
+  );
+  assert.ok(selection.knownHash);
+  assert.equal(selection.profile.id, editor);
+  assert.equal(selection.profileSelection, 'editor-default');
+  assert.equal(selection.requiresProfileChoice, false);
+});
+const explicit = await prepareLegacyImport(fixture([0, 1, 64]), { profileId: standalone });
+check('explicit standalone override remains faithful', () => {
+  assert.equal(explicit.report.profileSelection, 'explicit');
+  assert.equal(explicit.report.profileId, standalone);
+  assert.equal(explicit.requiresProfileChoice, false);
+  assert.deepEqual(
+    explicit.normalized.events.map((x) => x.step),
+    [0, 1]
+  );
+  assert.equal(explicit.project.legacyImport.inertEvents[0].index, 64);
+});
+const provenanced = await prepareLegacyImport(original, { provenance: { profileId: standalone } });
+check('provenance profile remains authoritative over the default', () => {
+  assert.equal(provenanced.report.profileSelection, 'provenance');
+  assert.equal(provenanced.report.profileId, standalone);
+  assert.equal(provenanced.project.sequences[0].steps[0][1], 1);
+});
+const overridden = await prepareLegacyImport(original, {
+  profileId: editor,
+  provenance: { profileId: standalone }
+});
+check('explicit profile takes precedence over provenance', () => {
+  assert.equal(overridden.report.profileSelection, 'explicit');
+  assert.equal(overridden.report.profileId, editor);
+  assert.equal(overridden.project.sequences[0].steps[0][0], 1);
+});
+await rejects(
+  'unknown explicit profile is rejected',
+  () => prepareLegacyImport(original, { profileId: 'unknown-player' }),
+  'PROFILE_MISMATCH'
+);
 const dense = Array(64).fill(false);
 dense[0] = dense[20] = dense[63] = true;
 const early = await prepareLegacyImport({
@@ -133,7 +183,19 @@ check('dense positions including edge64 preserved', () => {
   );
   assert.equal(early.project.channels[0].source.value, id);
   assert.equal(early.project.legacyImport.profileId, 'audionals-dense-v1');
+  assert.equal(early.report.profileSelection, 'format');
+  assert.equal(early.requiresProfileChoice, false);
 });
+await rejects(
+  'dense format rejects a sparse profile override',
+  () => prepareLegacyImport(early.document, { profileId: editor }),
+  'PROFILE_MISMATCH'
+);
+await rejects(
+  'dense format rejects incompatible provenance',
+  () => prepareLegacyImport(early.document, { provenance: { profileId: standalone } }),
+  'PROFILE_MISMATCH'
+);
 const arrangement = fixture([], {
   projectSequences: {
     Sequence3: { ch0: { steps: [1, '64r', { r: [2, 3] }] } },
@@ -267,12 +329,14 @@ check('contextual key decode preserves numeric user dictionaries', () => {
 });
 const recognized = structuredClone(compact);
 delete recognized.metadata;
-const compactProject = await load(recognized);
+const compactProject = await prepareLegacyImport(recognized);
 check('channel26 numeric alias and compressedranges', () => {
   assert.equal(compactProject.report.canImport, true);
   assert.equal(compactProject.project.channels.length, 27);
   assert.equal(compactProject.project.sequences[0].steps[26][1], 1);
   assert.equal(compactProject.project.sequences[0].steps[0][63].rev, true);
+  assert.equal(compactProject.report.profileSelection, 'editor-default');
+  assert.equal(compactProject.requiresProfileChoice, false);
 });
 const conflict = await load({ ...recognized, projectName: 'Conflicting' });
 check('conflicting aliases block', () =>
@@ -411,6 +475,16 @@ for (const format of [
     assert.equal(r.report.canImport, true);
   });
 }
+const nativeSaved = {
+  format: 'audionaut-workstation/3',
+  legacyPlayback: { version: 1, id: standalone }
+};
+const nativePreserved = await prepareLegacyImport(nativeSaved, { profileId: editor });
+check('native dispatch preserves the saved playback profile', () => {
+  assert.deepEqual(nativePreserved.document, nativeSaved);
+  assert.equal(nativePreserved.report.profileSelection, undefined);
+  assert.equal(nativePreserved.requiresProfileChoice, false);
+});
 const large = { format: 'audionaut-workstation/3', padding: 'x'.repeat(9 * 1024 * 1024) };
 await rejects('default byte limit', () => prepareLegacyImport(large), 'DOCUMENT_TOO_LARGE');
 const nativeLarge = await prepareLegacyImport(large, { limits: DOCUMENT_HARD_LIMITS });
@@ -431,6 +505,13 @@ check('sync migration agrees with independent hash and explicit profile', () => 
     createHash('sha256').update(JSON.stringify(settings)).digest('hex')
   );
   assert.deepEqual(sync.normalized, exact.normalized);
+  assert.equal(sync.report.profileSelection, 'explicit');
+});
+const syncAutomatic = prepareLegacyDocumentSync(settings);
+check('sync import shares the automatic editor default', () => {
+  assert.deepEqual(syncAutomatic.normalized, exact.normalized);
+  assert.equal(syncAutomatic.report.profileSelection, 'editor-default');
+  assert.equal(syncAutomatic.requiresProfileChoice, false);
 });
 const og = await prepareLegacyImport(
   {
@@ -446,7 +527,14 @@ check('OG wrapper dispatch preserves toggles and endpoints', () => {
   assert.equal(og.project.sequences[0].steps[0][63], 1);
   assert.ok(og.project.sequences[1].steps[0].every((v) => v === 0));
   assert.equal(og.project.masterVolume, 0.9);
+  assert.equal(og.report.profileSelection, 'format');
+  assert.equal(og.requiresProfileChoice, false);
 });
+await rejects(
+  'OG format rejects incompatible explicit profile',
+  () => prepareLegacyImport(og.document, { profileId: standalone }),
+  'PROFILE_MISMATCH'
+);
 console.log(
   `PASS ${checks} independent synthetic legacy decoder checks: bytes/gzip/bounds, contexts, dense/sparse/ranges, profiles, companions, source alignment, native/OG dispatch and retained provenance`
 );
