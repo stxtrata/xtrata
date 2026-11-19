@@ -4,7 +4,11 @@ import assert from 'node:assert/strict';
 // proves WebKit offline fidelity. Source processing and real-time audio remain
 // useful and supported when delivery APIs explicitly refuse final audio output.
 export async function checkOfflinePolicy(page, url) {
-  await page.goto(`${url}/audionaut-beta-pro/daw.html`);
+  const target = `${url}/audionaut-beta-pro/daw.html`;
+  // Fidelity/export callers already opened the workstation to probe support.
+  // Reuse that page: a second navigation can abort its sample downloads and
+  // surface spurious WebKit access-control errors from the discarded document.
+  if (page.url() !== target) await page.goto(target);
   await page.waitForFunction(() => document.querySelectorAll('.channel.instrument').length >= 4);
   const result = await page.evaluate(async () => {
     const base='/audionaut-beta-pro/daw/js/';
