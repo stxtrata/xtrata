@@ -1,4 +1,5 @@
 import { KEYMAP, isBlackKey as isBlack } from './keyboard-layout.js';
+import { drumKeyboard, performancePitch } from './instrument-keyboard.js';
 // pianoroll.js — canvas piano-roll MIDI editor for instrument channels.
 // Editing toolkit: marquee drag-selection, move (all directions), resize (drag right
 // edge), split (double-click), velocity editing (shift+wheel / shift+↑↓), nudge with
@@ -558,6 +559,7 @@ function onKeyDown(e) {
   if (e.repeat) return;
   const k = e.key.toLowerCase();
   if (mod) return; // let global shortcuts (undo/redo) through
+  if ((k === "z" || k === "x") && drumKeyboard(store.instrument(inst))) return;
   if (k === "z") {
     return setRollStatus(`Octave: C${setOctave(getOctave() - 1)}`);
   }
@@ -565,8 +567,8 @@ function onKeyDown(e) {
     return setRollStatus(`Octave: C${setOctave(getOctave() + 1)}`);
   }
   if (!(k in KEYMAP)) return;
-  const pitch = (getOctave() + 1) * 12 + KEYMAP[k];
-  if (pitch < LOW || pitch > HIGH) return;
+  const pitch = performancePitch(store.instrument(inst), KEYMAP[k], getOctave());
+  if (pitch == null || pitch < LOW || pitch > HIGH) return;
   e.preventDefault();
   e.stopImmediatePropagation();
   heldTyped.set(k, pitch);

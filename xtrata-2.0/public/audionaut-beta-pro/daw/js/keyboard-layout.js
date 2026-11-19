@@ -21,20 +21,20 @@ export const isBlackKey = (midi) => [1, 3, 6, 8, 10].includes(((midi % 12) + 12)
 export const keyName = (midi) =>
   ['C', 'C♯', 'D', 'D♯', 'E', 'F', 'F♯', 'G', 'G♯', 'A', 'A♯', 'B'][((midi % 12) + 12) % 12] +
   (Math.floor(midi / 12) - 1);
-export function pianoLayout(from = 48, octaves = 3) {
+export function pianoLayout(from = 48, octaves = 3, to = from + 12 * octaves) {
   if (
     !Number.isInteger(from) ||
     from % 12 ||
     !Number.isInteger(octaves) ||
     octaves < 1 ||
     from < 0 ||
-    from + 12 * octaves > 127
+    !Number.isInteger(to) || to < from || to > 127
   )
     throw Error('Invalid piano keyboard range');
-  const total = octaves * 7 + 1,
+  const total = Array.from({ length: to - from + 1 }, (_, i) => from + i).filter(n => !isBlackKey(n)).length + (isBlackKey(to) ? 0.31 : 0),
     keys = [];
   let white = 0;
-  for (let midi = from; midi <= from + 12 * octaves; midi++) {
+  for (let midi = from; midi <= to; midi++) {
     const black = isBlackKey(midi),
       width = (black ? 0.62 : 1) / total;
     keys.push({ midi, black, left: (white - (black ? 0.31 : 0)) / total, width });
@@ -42,7 +42,7 @@ export function pianoLayout(from = 48, octaves = 3) {
   }
   return keys;
 }
-export function buildPianoKeys(container, { from = 48, octaves = 3, classic = false } = {}) {
+export function buildPianoKeys(container, { from = 48, octaves = 3, to = from + 12 * octaves, classic = false } = {}) {
   container.replaceChildren();
   const style = document.createElement('style');
   style.textContent =
@@ -52,7 +52,7 @@ export function buildPianoKeys(container, { from = 48, octaves = 3, classic = fa
   kb.setAttribute('role', 'group');
   kb.setAttribute('aria-label', 'Piano keyboard');
   container.append(style, kb);
-  const keys = pianoLayout(from, octaves).map(({ midi, black, left, width }) => {
+  const keys = pianoLayout(from, octaves, to).map(({ midi, black, left, width }) => {
     const key = document.createElement('div');
     key.className = (black ? 'kb-b' : 'kb-w') + (classic ? ' sfp-key' + (black ? ' blk' : '') : '');
     key.dataset.base = String(midi);

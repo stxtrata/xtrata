@@ -2924,3 +2924,10 @@ body.arrange-mode #instruments-wrap {
 body.arrange-mode #instruments-wrap .section-label {
   margin: 8px 0 4px;
 }
+
+/* Shared fallback instrument panel: compact rows instead of a column of knobs. */
+.sfp-generic .sfp-body { grid-template-columns: minmax(0, 1fr); }
+.sfp-generic .sfp-sec-body { flex-direction: row; flex-wrap: wrap; align-items: flex-start; gap: 12px 24px; }
+.sfp-drum-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 10px; }
+.sfp-drum-tools select { max-width: 100%; min-width: 0; }
+.sfp-drumrack .sfp-key[aria-disabled="true"] { opacity: .35; }

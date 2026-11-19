@@ -4,6 +4,24 @@ This workstation is isolated at `/audionaut-beta-pro/` behind the existing
 membership gate. The original AudioNaut and earlier beta are unchanged.
 `BETA.md` describes isolation and original-file compatibility.
 
+## Drum Rack keyboard, library and panel — 19 November 2026
+
+- Drum Rack opens at C1 (MIDI 36) and shows its 16 mapped pad notes, with drum
+  names in key labels. Computer and piano-roll typing use the same mapping.
+  Stored notes and hardware MIDI pitches are unchanged. Other instruments keep
+  their existing octave behavior.
+- Generic instrument panels put their knobs side by side and wrap on smaller
+  screens. Drum Rack includes pad selection, audition and direct sample browsing.
+- Each pad can open the existing sample library, including the drum packs and
+  Ordinal sources. Assignment reuses the shared decoder and source references,
+  creates a sample channel without replacing existing audio, and supports undo.
+  Cancelled, failed and stale-project picks preserve the current song.
+- Existing packs remain web-hosted until inscribed. No external library or audio
+  engine change is introduced; saved pad mappings remain backward compatible.
+- Validation: actual keyboard/pad audio, Analog Kit loading, saved mappings,
+  failure/stale-project guards and responsive layout are covered in all three
+  browser engines; shared keyboard and device integration checks also pass.
+
 ## Timeline channel cleanup — 19 November 2026
 
 - Timeline sample channels omit trigger fill/cycle, shift-left, shift-right,

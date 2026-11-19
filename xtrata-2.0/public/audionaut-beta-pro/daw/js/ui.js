@@ -751,15 +751,29 @@ export function renderSequenceBar() {
 
 // ---------------------------------------------------------------- modals
 let loaderChannel = 0;
+let samplePicker = null;
 let activeTab = "library";
 let libraryAuditionTicket = 0;
 let libraryMigration = null;
 
 export function openLoader(ch) {
+  samplePicker = null;
   loaderChannel = ch;
   $("#loader-channel-label").textContent = `→ Channel ${ch + 1}`;
   $("#modal-loader").classList.remove("hidden");
   $("#modal-loader .modal-box").scrollTop = 0;
+}
+
+// Reuse the same catalogue, previews, source descriptors and decoder for instrument pads.
+export function openSamplePicker({ label, load }) {
+  openLoader(0);
+  samplePicker = { label, load };
+  $('#loader-channel-label').textContent = `→ ${label}`;
+  $('#library-search').value = '';
+  $('#modal-loader [data-tab="library"]').click();
+  const category = SAMPLE_LIBRARY.findIndex(c => c.pack === ANALOG_PACK_ID);
+  $('#library-category').value = Math.max(0, category);
+  populateLibrarySamples();
 }
 
 export function openLibraryItem(id, ch = 0) {
@@ -1120,6 +1134,7 @@ export function initLoaderModal() {
     });
   });
   $("#loader-cancel").addEventListener("click", () => {
+    samplePicker = null;
     libraryMigration?.abort();
     libraryAuditionTicket++;
     engine.stopPreview();
@@ -1146,8 +1161,16 @@ export function initLoaderModal() {
       if (!value) return setStatus("Enter an ID or URL first", true);
       source = { type: activeTab, value };
     }
+    const picker = samplePicker;
+    samplePicker = null;
     $("#modal-loader").classList.add("hidden");
     try {
+      if (picker) {
+        setStatus(`Loading sample for ${picker.label}…`);
+        const name = await picker.load(source);
+        setStatus(`Loaded "${name}" → ${picker.label}`);
+        return;
+      }
       setStatus(`Loading sample for channel ${loaderChannel + 1}…`);
       const name = await loadSample(loaderChannel, source);
       if (source.label) {
