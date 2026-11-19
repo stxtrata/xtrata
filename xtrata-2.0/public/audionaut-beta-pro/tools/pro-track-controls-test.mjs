@@ -46,7 +46,9 @@ try {
       ...document.querySelectorAll('#channels .channel-controls,#instruments .channel-controls')
     ].map((n) => ({
       id: n.dataset.trackId,
-      buttons: [...n.querySelectorAll('button')].map((b) => b.title)
+      buttons: [...n.querySelectorAll('button')]
+        .filter((b) => !b.closest('.ch-tools'))
+        .map((b) => b.title)
     }))
   );
   await p.getByRole('tab', { name: 'Timeline', exact: true }).click();
@@ -59,7 +61,7 @@ try {
   );
   ok(
     JSON.stringify(actual) === JSON.stringify(patterns),
-    'Every sample and synth button is shared with Patterns'
+    'Timeline retains shared sample and synth buttons except trigger-pattern tools'
   );
   const sample = p.locator('.song-track[data-kind="sample"]').first(),
     inst = p.locator('.song-track[data-kind="instrument"]').first();
@@ -84,9 +86,24 @@ try {
     n.dispatchEvent(new Event('input', { bubbles: true }));
   });
   ok((await p.locator('#channels .ch-vol').first().inputValue()) === '0.43', 'Volume synchronized');
-  await sample.locator('.ch-pitch').fill('1.5');
-  await sample.locator('.ch-pitch').press('Enter');
-  ok(await p.evaluate(() => test.store.channel(0).pitch === 1.5), 'Pitch control');
+  ok(
+    (await sample.locator('.ch-tools,.ch-pitch').count()) === 0,
+    'Timeline omits trigger tools and playback-rate input'
+  );
+  await p.getByRole('tab', { name: 'Patterns', exact: true }).click();
+  const patternSample = p.locator('#channels .channel[data-ch="0"]');
+  ok(await patternSample.locator('.ch-tools').isVisible(), 'Patterns retains trigger tools');
+  await patternSample.locator('.ch-pitch').fill('1.5');
+  await patternSample.locator('.ch-pitch').press('Enter');
+  ok(
+    await p.evaluate(() => test.store.channel(0).pitch === 1.5),
+    'Patterns retains playback-rate editing'
+  );
+  await p.getByRole('tab', { name: 'Timeline', exact: true }).click();
+  ok(
+    await p.evaluate(() => test.store.channel(0).pitch === 1.5),
+    'Opening Timeline preserves saved playback rate'
+  );
   for (const [selector, modal, close] of [
     ['.load', '#modal-loader', '#loader-cancel'],
     ['button[title="Trim / waveform"]', '#modal-trim', '#trim-close'],
@@ -108,7 +125,8 @@ try {
   );
   await sample.locator('.ord').click();
   await p.getByLabel('Edit sequence', { exact: true }).selectOption('1');
-  await sample.locator('.pattern').click();
+  await p.getByRole('tab', { name: 'Patterns', exact: true }).click();
+  await patternSample.locator('.pattern').click();
   ok(
     await p.evaluate(
       () =>
@@ -117,25 +135,30 @@ try {
     ),
     'Pattern fill targets explicit sequence only'
   );
+  await p.getByRole('tab', { name: 'Timeline', exact: true }).click();
   await p.getByRole('tab', { name: 'Patterns', exact: true }).click();
   await p.locator('#channels .pattern').first().click();
   ok(
     await p.evaluate(() => test.store.seq.steps[0].filter(Boolean).length === 32),
     'Pattern cycle continues across views from song data'
   );
-  await p.getByRole('tab', { name: 'Timeline', exact: true }).click();
-  await sample.locator('button[title="Shift pattern right"]').click();
+  await patternSample.locator('button[title="Shift pattern right"]').click();
   ok(
     await p.evaluate(() => test.store.seq.steps[0][1] === 1 && !test.store.seq.steps[0][0]),
     'Shift pattern targets current sequence'
   );
-  await sample.locator('button[title="Clear channel pattern"]').click();
+  await patternSample.locator('button[title="Clear channel pattern"]').click();
   ok(await p.evaluate(() => test.store.seq.steps[0].every((v) => !v)), 'Clear pattern');
   await p.evaluate(() => test.undo());
   await p.waitForTimeout(50);
   ok(
     await p.evaluate(() => test.store.seq.steps[0].filter(Boolean).length === 32),
     'Pattern control undo'
+  );
+  await p.getByRole('tab', { name: 'Timeline', exact: true }).click();
+  ok(
+    (await sample.locator('.ch-tools,.ch-pitch').count()) === 0,
+    'Removed Timeline controls stay absent after undo and view changes'
   );
   await inst.locator('.panel-open').click();
   ok(

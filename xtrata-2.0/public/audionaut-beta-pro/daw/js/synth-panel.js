@@ -1,4 +1,6 @@
-import { buildPianoKeys, KEYMAP, keyName } from './keyboard-layout.js';
+import { buildPianoKeys, KEYMAP } from './keyboard-layout.js';
+import { drumKeyboard, performancePitch, instrumentKeyName } from './instrument-keyboard.js';
+import { browseDrumPad } from './drum-library-ui.js';
 import { STORAGE_KEYS, ccStorageKey } from "./storage-config.js";
 // synth-panel.js — hardware-style front panels for the character synths
 // (jiMS10, Coinbase, Gm, Taproot). Each synth in synths.js carries a `ui` spec
@@ -168,7 +170,7 @@ function wire(elm, key, cfg, { vertical }) {
     if (e.key === "End") return (e.preventDefault(), set(p.max));
     if (e.key === "Enter") {
       e.preventDefault();
-      return play(48 + (baseOctave - 3) * 12);
+      return play(previewPitch());
     }
     if (!dir) return;
     e.preventDefault();
@@ -336,7 +338,7 @@ function makeXY(item) {
     pad.setPointerCapture(e.pointerId);
     pad.classList.add("drag");
     setFrom(e);
-    play(48 + (baseOctave - 3) * 12); // hear what you're moving
+    play(previewPitch()); // hear what you're moving
   });
   pad.addEventListener("pointermove", (e) => dragging && setFrom(e));
   const end = () => {
@@ -686,7 +688,7 @@ function build(id) {
   ccMap = loadCcMap();
   if (Kit.has(id)) return buildFace(id);
   const t = spec.theme;
-  root.className = `sfp sfp-${id}`;
+  root.className = `sfp sfp-${id}${synth.ui ? "" : " sfp-generic"}`;
   root.style.setProperty("--sfp-accent", t.accent);
   root.style.setProperty("--sfp-lcd", t.lcd);
   root.style.setProperty("--sfp-lcd-bg", t.lcdBg);
@@ -731,18 +733,31 @@ function build(id) {
   const sc = $("#sfp-scope-cv");
   if (sc) vizzes.push({ canvas: sc, id: bar });
 
+  if (id === 'drumrack') {
+    const track = store.instrument(inst), range = drumKeyboard(track);
+    const tools = document.createElement('div'); tools.className = 'sfp-drum-tools';
+    const select = document.createElement('select'); select.setAttribute('aria-label', 'Drum pad');
+    for (const pad of range.pads) select.add(new Option(`${pad.name} · ${instrumentKeyName(track, pad.note)} · MIDI ${pad.note}`, pad.note));
+    const browse = document.createElement('button'); browse.className = 'sfp-btn'; browse.textContent = 'Browse drum samples';
+    browse.onclick = () => browseDrumPad(track.id, +select.value).catch(error => setStatus(error.message));
+    const playPad = document.createElement('button'); playPad.className = 'sfp-btn'; playPad.textContent = 'Play pad';
+    playPad.onclick = () => play(+select.value);
+    tools.append(select, playPad, browse); body.after(tools);
+  }
   buildKeys();
   wireHeader();
 }
 
 function buildKeys() {
   const keys = $("#sfp-keys");
-  buildPianoKeys(keys,{from:48,octaves:2,classic:true});
+  const range = drumKeyboard(store.instrument(inst));
+  buildPianoKeys(keys,{from:range?.from ?? 48,to:range?.to ?? 72,octaves:2,classic:true});
   kbHandle = attachKeyboard(keys, {
     inst: () => inst,
     keyAt: (n) => {
       const k = n.closest?.(".sfp-key");
-      return k && keys.contains(k) ? { midi: baseOctave * 12 + 12 + +k.dataset.i, el: k } : null;
+      const midi = k && performancePitch(store.instrument(inst), +k.dataset.i, baseOctave);
+      return k && keys.contains(k) && midi != null ? { midi, el: k } : null;
     },
   });
 }
@@ -789,7 +804,7 @@ function wireHeader() {
     selfWrite = false;
     syncAll();
     $("#sfp-preset").value = e.target.value;
-    play(48 + (baseOctave - 3) * 12);
+    play(previewPitch());
     setStatus(`Preset: ${preset.name}`);
   });
   $("#sfp-learn")?.addEventListener("click", () => {
@@ -826,14 +841,14 @@ function syncAll() {
   Object.entries(widgets).forEach(([k, w]) => w.set(P[k]));
   afterSync(P);
   drawViz();
-  $("#sfp-oct-lbl").textContent = `C${baseOctave}`;
+  paintOctaveLabel();
   $("#sfp-inst").textContent = ` · ${store.instrument(inst).name}`;
 }
 
 function randomise() {
   if (faceH) {
     faceH.P.randomise();
-    play(48 + (baseOctave - 3) * 12);
+    play(previewPitch());
     return setStatus("Randomised — tweak to taste (INIT resets).");
   }
   const P = current();
@@ -851,11 +866,15 @@ function randomise() {
   store.setInstrumentProp(inst, "params", P);
   selfWrite = false;
   syncAll();
-  play(48 + (baseOctave - 3) * 12);
+  play(previewPitch());
   setStatus("Randomised — tweak to taste (INIT resets).");
 }
 
 // ------------------------------------------------------------ playing
+function previewPitch() {
+  const track = store.instrument(inst);
+  return performancePitch(track, 0, baseOctave) ?? drumKeyboard(track)?.pads[0].note;
+}
 function play(pitch, vel = 1) {
   engine.ensureContext();
   engine.triggerNote(inst, pitch, vel, 0, NOTE_LEN);
@@ -864,8 +883,16 @@ function play(pitch, vel = 1) {
 function paintKeys() {
   const keys = $("#sfp-keys")?.querySelectorAll("[data-i]");
   if (!keys) return;
-  const lo = baseOctave * 12 + 12;
-  for (let i = 0; i < keys.length; i++) { keys[i].dataset.midi=lo+i; keys[i].setAttribute("aria-label",keyName(lo+i)); keys[i].classList.toggle("on", lit.has(lo+i)); }
+  const track = store.instrument(inst), range = drumKeyboard(track), lo = range?.from ?? baseOctave * 12 + 12;
+  for (let i = 0; i < keys.length; i++) {
+    const pad = range?.pads.find(p => p.note === lo + i);
+    keys[i].dataset.midi = lo + i;
+    keys[i].setAttribute('aria-label', `${instrumentKeyName(track, lo + i)}${pad ? ` · ${pad.name} · MIDI ${lo + i}` : ''}`);
+    keys[i].setAttribute('aria-disabled', String(!!range && !pad));
+    keys[i].title = keys[i].getAttribute('aria-label');
+    keys[i].classList.toggle('on', lit.has(lo + i));
+  }
+  for (const id of ['#sfp-oct-dn', '#sfp-oct-up']) if ($(id)) $(id).hidden = !!range;
   let below = false;
   let above = false;
   for (const p of lit.keys()) {
@@ -881,9 +908,14 @@ function setLit(pitch, on) {
   else lit.delete(pitch);
   paintKeys();
 }
+function paintOctaveLabel() {
+  const track = store.instrument(inst), range = drumKeyboard(track);
+  $("#sfp-oct-lbl").textContent = range ? `${instrumentKeyName(track, range.from)} · MIDI ${range.from}` : `C${baseOctave}`;
+}
 function shiftOctave(d) {
+  if (drumKeyboard(store.instrument(inst))) return;
   baseOctave = setOctave(baseOctave + d);
-  $("#sfp-oct-lbl").textContent = `C${baseOctave}`;
+  paintOctaveLabel();
   paintKeys();
 }
 function setStatus(msg) {
@@ -910,7 +942,8 @@ function onKey(e) {
     e.stopImmediatePropagation();
     e.preventDefault();
     if (e.repeat) return;
-    noteOn(`key:${k}`, inst, baseOctave * 12 + 12 + KEYMAP[k], TYPED_VEL); // held until key-up
+    const pitch = performancePitch(store.instrument(inst), KEYMAP[k], baseOctave);
+    if (pitch != null) noteOn(`key:${k}`, inst, pitch, TYPED_VEL); // held until key-up
   }
 }
 function onKeyUp(e) {
@@ -1100,7 +1133,7 @@ export function initSynthPanel() {
   document.addEventListener("live-octave", (e) => {
     baseOctave = e.detail;
     if (isOpen()) {
-      $("#sfp-oct-lbl").textContent = `C${baseOctave}`;
+      paintOctaveLabel();
       paintKeys();
     }
   });

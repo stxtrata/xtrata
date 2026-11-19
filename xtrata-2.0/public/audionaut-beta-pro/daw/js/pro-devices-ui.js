@@ -1,4 +1,5 @@
-import {setMidiTarget} from './midi-input.js';
+import {setMidiTarget, getMidiTarget} from './midi-input.js';
+import { browseDrumPad } from './drum-library-ui.js';
 import { store } from './state.js';
 import { engine } from './engine.js';
 import { SYNTH_BANK, synthDefaults } from './synths.js';
@@ -14,7 +15,7 @@ import { el, action, row, number, choice, textField, status } from './pro-ui.js'
 import { openEffects } from './pro-mixer-ui.js';
 
 export function mount(root) {
-  let instrumentId = store.project.instruments.find((t) => isProInstrument(t.synthId))?.id,
+  let instrumentId = (isProInstrument(store.instrument(getMidiTarget())?.synthId) ? store.instrument(getMidiTarget()) : store.project.instruments.find((t) => isProInstrument(t.synthId)))?.id,
     disposed = false;
   const body = el('div'),
     input = el('input', null, { type: 'file', accept: 'audio/*', multiple: true, hidden: true });
@@ -164,6 +165,7 @@ export function mount(root) {
         };
         card.append(
           action(`${pad.name} · MIDI ${pad.note}`, () => audition(pad.note)),
+          action('Browse drum samples', () => browseDrumPad(instrument.id, pad.note, { onLoaded: () => { if (!disposed) paint(); } }), { 'aria-label': `Browse samples for ${pad.name}` }),
           choice('Pad sample', available(), sourceTrack(pad.sourceId), (v) =>
             set('sourceId', sourceId(v))
           ),
