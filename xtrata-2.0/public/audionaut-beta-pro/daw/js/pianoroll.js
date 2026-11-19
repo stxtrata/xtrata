@@ -1,3 +1,4 @@
+import { KEYMAP, isBlackKey as isBlack } from './keyboard-layout.js';
 // pianoroll.js — canvas piano-roll MIDI editor for instrument channels.
 // Editing toolkit: marquee drag-selection, move (all directions), resize (drag right
 // edge), split (double-click), velocity editing (shift+wheel / shift+↑↓), nudge with
@@ -11,7 +12,7 @@ import { ensureMidi, setMidiEnabled, isMidiOn, midiStatus, setMidiTarget } from 
 import { SYNTH_BANK, synthDefaults, parseLine } from "./synths.js";
 import { createSynthPicker } from "./synth-picker.js";
 import { changeSynth } from "./synth-selection.js";
-import { noteOn, noteOff, allOff, getOctave, setOctave, TYPED_VEL } from "./live-keys.js";
+import { attachKeyboard, noteOn, noteOff, allOff, getOctave, setOctave, TYPED_VEL } from "./live-keys.js";
 import { beginTransaction, endTransaction } from "./history.js";
 import { quantizeRecordedSpan } from "./performance-recorder.js";
 
@@ -41,7 +42,7 @@ let drag = null; // { mode:'move'|'resize'|'marquee', ... }
 let clipboard = null;
 let lastPlayStep = -1;
 
-const isBlack = (m) => [1, 3, 6, 8, 10].includes(m % 12);
+
 const NOTE_NAMES = [
   "C",
   "C#",
@@ -515,23 +516,7 @@ function renderLineSelect() {
 }
 
 // --------------------------------------------------------------- keyboard
-const KEYMAP = {
-  a: 0,
-  w: 1,
-  s: 2,
-  e: 3,
-  d: 4,
-  f: 5,
-  t: 6,
-  g: 7,
-  y: 8,
-  h: 9,
-  u: 10,
-  j: 11,
-  k: 12,
-  o: 13,
-  l: 14,
-};
+
 
 
 function onKeyDown(e) {
@@ -716,34 +701,12 @@ export function initPianoRoll() {
   canvas.height = ROWS * CELL_H;
   ctx2d = canvas.getContext("2d");
 
-  const pointers = new Map();
-  document.addEventListener("performance-reset", ({ detail }) => {
-    if (!detail?.prefix || "roll:".startsWith(detail.prefix)) pointers.clear();
+  attachKeyboard(canvas, {
+    inst:()=>inst, velAt:()=>TYPED_VEL, prefix:"roll:pointer:",
+    hitTest:e=>{const {x,y}=eventXY(e),pitch=gridPos(x,y).pitch;
+      return x>=0&&x<KEY_W&&y>=0&&pitch>=LOW&&pitch<=HIGH?{midi:pitch,el:canvas}:null;},
+    keyAt:()=>null
   });
-  const keyPointer = (e) => {
-    const { x, y } = eventXY(e), pitch = gridPos(x, y).pitch;
-    if (x >= KEY_W || x < 0 || pitch < LOW || pitch > HIGH) return null;
-    return pitch;
-  };
-  canvas.addEventListener("pointerdown", e => {
-    const pitch = keyPointer(e);
-    if (e.button > 0 || pitch == null) return;
-    e.preventDefault();
-    canvas.setPointerCapture(e.pointerId);
-    pointers.set(e.pointerId, pitch);
-    noteOn(`roll:pointer:${e.pointerId}`, inst, pitch, TYPED_VEL);
-  });
-  canvas.addEventListener("pointermove", e => {
-    if (!pointers.has(e.pointerId)) return;
-    if (e.pointerType === "mouse" && !e.buttons) { pointers.delete(e.pointerId); noteOff(`roll:pointer:${e.pointerId}`); return; }
-    const pitch = keyPointer(e);
-    if (pitch === pointers.get(e.pointerId)) return;
-    noteOff(`roll:pointer:${e.pointerId}`);
-    pointers.set(e.pointerId, pitch);
-    if (pitch != null) noteOn(`roll:pointer:${e.pointerId}`, inst, pitch, TYPED_VEL);
-  });
-  const pointerEnd = e => { pointers.delete(e.pointerId); noteOff(`roll:pointer:${e.pointerId}`); };
-  for (const type of ["pointerup", "pointercancel", "lostpointercapture"]) canvas.addEventListener(type, pointerEnd);
   canvas.addEventListener("mousedown", onMouseDown);
   canvas.addEventListener("mousemove", onMouseMove);
   window.addEventListener("mouseup", onMouseUp);

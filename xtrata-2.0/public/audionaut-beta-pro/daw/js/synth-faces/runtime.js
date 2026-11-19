@@ -1,3 +1,4 @@
+import { buildPianoKeys, keyName } from '../keyboard-layout.js';
 // synth-faces/runtime.js — hosts the full-size synth faces inside the DAW.
 //
 // Each face module registers itself with `Kit.register(synthId, { params, faces, ... })`
@@ -297,33 +298,12 @@ function makeP(synthId, inst, def, root) {
     keyboard(el, o) {
       o = o || {};
       const from = o.from == null ? 48 : o.from, oct = o.octaves || 3;
-      const whites = [0, 2, 4, 5, 7, 9, 11], blackAt = { 0: 1, 2: 3, 5: 6, 7: 8, 9: 10 };
-      el.innerHTML = "<style>.kb{position:relative;display:flex;width:100%;height:100%;user-select:none;-webkit-user-select:none;touch-action:none;-webkit-touch-callout:none}.kb-w{flex:1;position:relative;background:#f4f4f4;border:1px solid #444;border-top:0;border-radius:0 0 4px 4px;transition:background-color 60ms}.kb-w.on{background:#bbb;transition:none}.kb-b{position:absolute;top:0;height:62%;width:var(--bw,3.4%);background:#1a1a1a;border-radius:0 0 3px 3px;z-index:2;transition:background-color 60ms}.kb-b.on{background:#555;transition:none}</style>";
-      const kb = document.createElement("div");
-      kb.className = "kb";
-      el.appendChild(kb);
-      const total = oct * 7;
-      let wi = 0;
-      const mk = (cls, base) => { const d = document.createElement("div"); d.className = cls; d.dataset.base = base; return d; };
-      for (let k = 0; k < oct; k++) whites.forEach((semi) => {
-        const m = from + 12 * k + semi;
-        kb.appendChild(mk("kb-w", m));
-        if (blackAt[semi] != null) {
-          const b = mk("kb-b", m + 1);
-          b.style.left = ((wi + 1) / total) * 100 + "%";
-          b.style.marginLeft = "calc(var(--bw,3.4%) / -2)";
-          kb.appendChild(b);
-        }
-        wi++;
-      });
-      kb.appendChild(mk("kb-w", from + 12 * oct));
-      kb.style.setProperty("--bw", (100 / (total + 1)) * 0.62 + "%");
-      const keys = [...kb.children].filter((n) => n.dataset.base);
+      const {kb,keys}=buildPianoKeys(el,{from,octaves:oct});
       const lit = new Map(); // midi -> number of notes sounding it
       const paint = () => keys.forEach((n) => n.classList.toggle("on", (lit.get(+n.dataset.midi) || 0) > 0));
       const renumber = () => {
         const off = keyOffset();
-        keys.forEach((n) => { n.dataset.midi = +n.dataset.base + off; });
+        keys.forEach((n) => { n.dataset.midi = +n.dataset.base + off; n.setAttribute("aria-label", keyName(+n.dataset.midi)); });
         paint();
       };
       renumber();
@@ -426,7 +406,7 @@ function makeP(synthId, inst, def, root) {
       store.setInstrumentProp(inst, "params", r);
     },
     dispose() {
-      kbs.forEach((k) => k.release());
+      kbs.forEach((k) => k.dispose());
       allOff(`${src}:`);
       disposers.forEach((f) => f());
       disposers.length = 0;

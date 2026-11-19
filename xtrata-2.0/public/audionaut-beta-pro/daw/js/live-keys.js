@@ -86,7 +86,8 @@ store.on("instrument", ({ i, prop }) => {
 });
 export function noteOn(src, inst, pitch, vel = TYPED_VEL, options = {}) {
   noteOff(src);
-  if (!(pitch >= 0 && pitch <= 127) || !store.instrument(inst)) return 0;
+  if (!Number.isInteger(pitch) || pitch < 0 || pitch > 127 || !Number.isFinite(vel) || !store.instrument(inst)) return 0;
+  vel = Math.max(0, Math.min(1, vel));
   engine.ensureContext();
   const n = { inst, pitch, vel, bend: options.bend || 0, origin: src, id: 0, monitor:store.instrument(inst).monitor };
   held.set(src, n);
@@ -155,8 +156,8 @@ wireGlobal();
 //   keyAt(node) -> { midi, el } | null   which key a hit-tested node belongs to
 //   inst()      -> instrument slot to play
 //   velAt(e, el) optional; default: lower on the key = louder (0.45 … 1.0)
-export function attachKeyboard(el, { keyAt, inst, velAt }) {
-  const tag = `kb${++seq}`;
+export function attachKeyboard(el, { keyAt, inst, velAt, hitTest, prefix = "kb" }) {
+  const tag = `${prefix}${++seq}`;
   const ptrs = new Map(); // pointerId -> midi currently held by that pointer (or null when off the keys)
   const rootNode = el.getRootNode();
   const hitRoot = rootNode && rootNode.elementFromPoint ? rootNode : document;
@@ -169,6 +170,7 @@ export function attachKeyboard(el, { keyAt, inst, velAt }) {
     });
   const hit = (e) => {
     const n = hitRoot.elementFromPoint(e.clientX, e.clientY);
+    if (hitTest) return n && el.contains(n) ? hitTest(e) : null;
     return n && el.contains(n) ? keyAt(n) : null;
   };
   const press = (e, k) => {
@@ -183,7 +185,7 @@ export function attachKeyboard(el, { keyAt, inst, velAt }) {
   const onDown = (e) => {
     if (e.button > 0) return;
     const k = hit(e) || keyAt(e.target);
-    if (!k) return;
+    if (!k || !Number.isInteger(k.midi) || k.midi < 0 || k.midi > 127) return;
     e.preventDefault();
     try {
       el.setPointerCapture(e.pointerId);
@@ -203,18 +205,15 @@ export function attachKeyboard(el, { keyAt, inst, velAt }) {
     if (k) press(e, k);
     else ptrs.set(e.pointerId, null); // left the keys: silent until it comes back
   };
-  el.addEventListener("pointerdown", onDown);
-  el.addEventListener("pointermove", onMove);
-  el.addEventListener("pointerup", end);
-  el.addEventListener("pointercancel", end);
-  el.addEventListener("lostpointercapture", end);
-  el.addEventListener("contextmenu", (e) => e.preventDefault());
-  el.style.touchAction = "none";
-  return {
-    tag,
-    release() {
-      allOff(`${tag}:`);
-      ptrs.clear();
-    },
+  const context = e => e.preventDefault();
+  const reset = ({detail}={}) => {
+    const sources=detail?.sources;
+    for(const pointerId of ptrs.keys())if(!detail?.prefix&&!sources || detail?.prefix&&`${tag}:`.startsWith(detail.prefix) || sources?.includes(`${tag}:${pointerId}`))ptrs.delete(pointerId);
   };
+  const events={pointerdown:onDown,pointermove:onMove,pointerup:end,pointercancel:end,lostpointercapture:end,contextmenu:context};
+  for(const [name,fn] of Object.entries(events))el.addEventListener(name,fn);
+  document.addEventListener('performance-reset',reset);
+  const previousTouch=el.style.touchAction;el.style.touchAction='none';
+  const release=()=>{allOff(`${tag}:`);ptrs.clear();};
+  return {tag,release,dispose(){release();for(const [name,fn] of Object.entries(events))el.removeEventListener(name,fn);document.removeEventListener('performance-reset',reset);el.style.touchAction=previousTouch;}};
 }

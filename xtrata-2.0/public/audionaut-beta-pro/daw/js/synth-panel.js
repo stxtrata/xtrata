@@ -1,3 +1,4 @@
+import { buildPianoKeys, KEYMAP, keyName } from './keyboard-layout.js';
 import { STORAGE_KEYS, ccStorageKey } from "./storage-config.js";
 // synth-panel.js — hardware-style front panels for the character synths
 // (jiMS10, Coinbase, Gm, Taproot). Each synth in synths.js carries a `ui` spec
@@ -21,8 +22,7 @@ import { voxFormants, fmRoles, FM_MOD, FM_CARRIERS, FM_ALGOS, VOWEL_NAMES } from
 
 const $ = (s) => document.querySelector(s);
 const NOTE_LEN = 0.45; // seconds — preset / RANDOM audition length
-const KEYMAP = { a: 0, w: 1, s: 2, e: 3, d: 4, f: 5, t: 6, g: 7, y: 8, h: 9, u: 10, j: 11, k: 12, o: 13, l: 14 };
-const BLACK = new Set([1, 3, 6, 8, 10]);
+
 const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
 
 const hz = (v) => (v >= 1000 ? `${(v / 1000).toFixed(2)}k` : `${Math.round(v)}`);
@@ -667,7 +667,7 @@ function buildFace(id) {
 }
 
 function build(id) {
-  kbHandle?.release();
+  kbHandle?.dispose();
   kbHandle = null;
   disposeFace();
   synthId = id;
@@ -737,18 +737,7 @@ function build(id) {
 
 function buildKeys() {
   const keys = $("#sfp-keys");
-  let white = 0;
-  for (let i = 0; i < 25; i++) {
-    const k = el("button", `sfp-key${BLACK.has(i % 12) ? " blk" : ""}`);
-    k.dataset.i = i;
-    k.tabIndex = -1;
-    if (BLACK.has(i % 12)) k.style.left = `calc(${white} * var(--wk) - var(--wk) * .3)`;
-    else {
-      k.style.left = `calc(${white} * var(--wk))`;
-      white++;
-    }
-    keys.appendChild(k);
-  }
+  buildPianoKeys(keys,{from:48,octaves:2,classic:true});
   kbHandle = attachKeyboard(keys, {
     inst: () => inst,
     keyAt: (n) => {
@@ -873,10 +862,10 @@ function play(pitch, vel = 1) {
 }
 // Light every key that is sounding: held (typed / mouse / MIDI) or playing back.
 function paintKeys() {
-  const keys = $("#sfp-keys")?.children;
+  const keys = $("#sfp-keys")?.querySelectorAll("[data-i]");
   if (!keys) return;
   const lo = baseOctave * 12 + 12;
-  for (let i = 0; i < keys.length; i++) keys[i].classList.toggle("on", lit.has(lo + i));
+  for (let i = 0; i < keys.length; i++) { keys[i].dataset.midi=lo+i; keys[i].setAttribute("aria-label",keyName(lo+i)); keys[i].classList.toggle("on", lit.has(lo+i)); }
   let below = false;
   let above = false;
   for (const p of lit.keys()) {
@@ -1009,7 +998,7 @@ function paintTabs() {
 }
 
 function hideDockPanel() {
-  kbHandle?.release();
+  kbHandle?.dispose();
   kbHandle = null;
   allOff("key:");
   disposeFace();
