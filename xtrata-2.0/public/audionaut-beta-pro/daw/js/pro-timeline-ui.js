@@ -70,7 +70,7 @@ export function mount(root) {
   );
   const sequenceField = choice('Edit sequence', [], '0', (v) => store.selectSequence(+v));
   const sequenceSelect = sequenceField.querySelector('select');
-  sequenceSelect.title = 'Pattern fill, shift, clear and MIDI copy/paste affect this sequence.';
+  sequenceSelect.title = 'MIDI rolls and note copy/paste use this sequence.';
   toolbar.append(
     sequenceField,
     action('+ Audio channel', () => document.querySelector('#channels .ch-add').click()),
@@ -254,7 +254,7 @@ export function mount(root) {
         label.dataset.trackId = track.id;
         label.dataset.ownerIndex = index;
         label.dataset.kind = kind;
-        label.append(createTrackControls(track.id));
+        label.append(createTrackControls(track.id, { patternTools: false, playbackRate: false }));
         if (kind === 'sample') bindChannelDrop(label, index);
         headers.append(label);
       }

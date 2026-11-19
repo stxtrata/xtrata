@@ -4,6 +4,16 @@ This workstation is isolated at `/audionaut-beta-pro/` behind the existing
 membership gate. The original AudioNaut and earlier beta are unchanged.
 `BETA.md` describes isolation and original-file compatibility.
 
+## Timeline channel cleanup — 19 November 2026
+
+- Timeline sample channels omit trigger fill/cycle, shift-left, shift-right,
+  clear-pattern and pitch/playback-rate controls. These remain in Patterns.
+- Shared sample loading, preview, trim, FX/inserts, volume, mute/solo, provenance
+  and synth controls remain available. The sequence selector still targets MIDI
+  rolls and note copy/paste.
+- This is a presentation change: saved trigger patterns and playback rates are
+  preserved, with no change to song formats or the audio runtime.
+
 ## Shared track controls, region editing and historical audio loading — 19 November 2026
 
 - Timeline uses the same sample and synth control builders as Patterns: sample

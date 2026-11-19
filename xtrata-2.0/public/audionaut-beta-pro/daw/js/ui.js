@@ -101,12 +101,14 @@ function refreshPatternCycle(ch) {
   }
 }
 // Both workspaces instantiate these controls; callbacks, editors and state are shared.
-export function createTrackControls(trackId) {
+export function createTrackControls(trackId, { patternTools = true, playbackRate = true } = {}) {
   const sampleIndex = store.project.channels.findIndex(t => t.id === trackId);
   const isInstrument = sampleIndex < 0;
   const index = isInstrument ? store.project.instruments.findIndex(t => t.id === trackId) : sampleIndex;
   if (index < 0) throw Error('This track no longer exists.');
   const ctrl = isInstrument ? instrumentControls(index) : sampleControls(index);
+  if (!patternTools) ctrl.querySelector('.ch-tools')?.remove();
+  if (!playbackRate) ctrl.querySelector('.ch-pitch')?.remove();
   ctrl.dataset.trackId = trackId;
   ctrl.dataset.ownerIndex = index;
   ctrl.dataset.kind = isInstrument ? 'instrument' : 'sample';
@@ -143,8 +145,10 @@ export function refreshTrackControls(ctrl) {
   } else {
     refreshPatternCycle(+ctrl.dataset.ownerIndex);
     const pitch = value('.ch-pitch', owner.pitch);
-    pitch.max = store.project.songOrigin || store.project.legacyPlayback ? 100 : 4;
-    pitch.setAttribute('aria-label', `${owner.name} pitch / playback rate`);
+    if (pitch) {
+      pitch.max = store.project.songOrigin || store.project.legacyPlayback ? 100 : 4;
+      pitch.setAttribute('aria-label', `${owner.name} pitch / playback rate`);
+    }
     const sourceKey = JSON.stringify(owner.source);
     if (ctrl._sourceKey !== sourceKey) {
       ctrl._sourceKey = sourceKey;
