@@ -53,7 +53,7 @@ function voice(ctx, dest, note, patch) {
   bind('air', air.gain, (v) => v * (0.85 + 0.3 * velocity));
   noise.connect(air);
   for (const ratio of [1, 2]) {
-    const carrier = osc('sine', frequency * ratio);
+    const carrier = osc('sine', Math.min(frequency * ratio, ctx.sampleRate * 0.48));
     const product = ctx.createGain();
     product.gain.setValueAtTime(0, time);
     air.connect(product.gain);
