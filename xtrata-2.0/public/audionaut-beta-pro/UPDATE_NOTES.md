@@ -4,6 +4,29 @@ This workstation is isolated at `/audionaut-beta-pro/` behind the existing
 membership gate. The original AudioNaut and earlier beta are unchanged.
 `BETA.md` describes isolation and original-file compatibility.
 
+## Console Mixer — 20 November 2026
+
+- Mixer now presents narrow, equal-height channel strips with long vertical
+  volume faders and separate left/right level meters. The Master stays visible
+  while the channel bank scrolls horizontally, including on small screens.
+- Output, effects, sends and trim sit above aligned pan/fader/mute/solo controls.
+  Sends open in a compact inspector with level, pre/post-fader and removal controls.
+  Group and bus creation, routing validation, inserts and master mono are retained.
+- Faders support pointer/touch, consistent arrow/Home/End keys, double-click unity
+  and a true-silence bottom detent. Pan double-clicks back to centre. Control nodes
+  survive value updates, preserving drag/focus and one-step gesture undo.
+- Stereo meters use disposable post-fader analyser taps, a decaying dBFS display,
+  peak hold and click-to-reset overload indication. Taps disconnect on view changes,
+  track removal and audio-context replacement; they never feed the audible output.
+- Enabled volume/pan automation drives the displayed controls during playback
+  without changing stored base values. Editing uses the existing recording modes;
+  pointer cancellation, blur and leaving Mixer release active control gestures.
+- No audio-engine, song-format, dependency, gate, original AudioNaut or earlier beta
+  changes. Existing saved mixes keep their routing and legacy/post-insert fader order.
+- Coverage includes actual stereo signals/overload, pointer and keyboard edits,
+  undo/redo, routing/sends/effects, automation, file round trips, meter cleanup and
+  fixed-Master layouts at desktop, tablet and phone widths in all three browsers.
+
 ## Timeline automation overlay — 19 November 2026
 
 - Timeline has an Automation toggle that reveals editable curves over dimmed
