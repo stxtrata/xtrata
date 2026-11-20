@@ -1,0 +1,114 @@
+TAP version 13
+# (node:90942) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+# (Use `node --trace-deprecation ...` to show where the warning was created)
+# Subtest: three-way derivation: all-zero / mainnet
+ok 1 - three-way derivation: all-zero / mainnet
+  ---
+  duration_ms: 254.417167
+  type: 'test'
+  ...
+# Subtest: three-way derivation: all-zero / testnet
+ok 2 - three-way derivation: all-zero / testnet
+  ---
+  duration_ms: 106.914959
+  type: 'test'
+  ...
+# Subtest: three-way derivation: all-ff / mainnet
+ok 3 - three-way derivation: all-ff / mainnet
+  ---
+  duration_ms: 98.85225
+  type: 'test'
+  ...
+# Subtest: three-way derivation: all-ff / testnet
+ok 4 - three-way derivation: all-ff / testnet
+  ---
+  duration_ms: 96.37325
+  type: 'test'
+  ...
+# Subtest: three-way derivation: counter-0..31 / mainnet
+ok 5 - three-way derivation: counter-0..31 / mainnet
+  ---
+  duration_ms: 77.377417
+  type: 'test'
+  ...
+# Subtest: three-way derivation: counter-0..31 / testnet
+ok 6 - three-way derivation: counter-0..31 / testnet
+  ---
+  duration_ms: 68.288667
+  type: 'test'
+  ...
+# Subtest: three-way derivation: sha256-tagged / mainnet
+ok 7 - three-way derivation: sha256-tagged / mainnet
+  ---
+  duration_ms: 68.054417
+  type: 'test'
+  ...
+# Subtest: three-way derivation: sha256-tagged / testnet
+ok 8 - three-way derivation: sha256-tagged / testnet
+  ---
+  duration_ms: 62.800208
+  type: 'test'
+  ...
+# Subtest: reverse seed compatibility: Xtrata 24-word lock / mainnet
+ok 9 - reverse seed compatibility: Xtrata 24-word lock / mainnet
+  ---
+  duration_ms: 63.705417
+  type: 'test'
+  ...
+# Subtest: reverse seed compatibility: Xtrata 24-word lock / testnet
+ok 10 - reverse seed compatibility: Xtrata 24-word lock / testnet
+  ---
+  duration_ms: 64.875458
+  type: 'test'
+  ...
+# Subtest: reverse seed compatibility: Xtrata 12-word import / mainnet
+ok 11 - reverse seed compatibility: Xtrata 12-word import / mainnet
+  ---
+  duration_ms: 59.804417
+  type: 'test'
+  ...
+# Subtest: reverse seed compatibility: Xtrata 12-word import / testnet
+ok 12 - reverse seed compatibility: Xtrata 12-word import / testnet
+  ---
+  duration_ms: 57.870334
+  type: 'test'
+  ...
+# Subtest: negative controls: salt, account index, invalid words and network remain significant
+ok 13 - negative controls: salt, account index, invalid words and network remain significant
+  ---
+  duration_ms: 45.473209
+  type: 'test'
+  ...
+# Subtest: adapter verifies standard signature and preserves all reviewed fields
+ok 14 - adapter verifies standard signature and preserves all reviewed fields
+  ---
+  duration_ms: 35.31225
+  type: 'test'
+  ...
+# Subtest: sponsored result has no premature txid and preserves reserved origin nonce
+ok 15 - sponsored result has no premature txid and preserves reserved origin nonce
+  ---
+  duration_ms: 27.229209
+  type: 'test'
+  ...
+# Subtest: adapter refuses wrong passkey, changed bytes, mainnet, mixed chain, Allow mode, fee excess and foreign target
+ok 16 - adapter refuses wrong passkey, changed bytes, mainnet, mixed chain, Allow mode, fee excess and foreign target
+  ---
+  duration_ms: 104.60225
+  type: 'test'
+  ...
+# Subtest: record reproducible public compatibility results
+ok 17 - record reproducible public compatibility results
+  ---
+  duration_ms: 3.118292
+  type: 'test'
+  ...
+1..17
+# tests 17
+# suites 0
+# pass 17
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 1569.712084
