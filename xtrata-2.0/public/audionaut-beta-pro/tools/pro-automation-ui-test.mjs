@@ -1,3 +1,4 @@
+import { selectWorkspace } from './serve.mjs';
 import assert from 'node:assert/strict';
 import { serve, browser, page } from './serve.mjs';
 const {srv,url}=await serve(), b=await browser(), logs=[]; let checks=0;
@@ -5,12 +6,12 @@ const ok=(value,message)=>{assert.ok(value,message);checks++;};
 try {
   const p=await page(b,url,{logs}); await p.goto(url+'/audionaut-beta-pro/daw.html'); await p.waitForSelector('#pro-workspace-nav');
   await p.evaluate(async()=>{const base='/audionaut-beta-pro/daw/js/',{store,makeProject}=await import(base+'state.js');const project=makeProject();project.channels[0].name='Automation test';project.sequences[0].steps[0][4]=1;store.loadProject(project);window.autoTest={store,engine:(await import(base+'engine.js')).engine};});
-  await p.getByRole('tab',{name:'Automation',exact:true}).click();await p.getByRole('button',{name:'Add lane',exact:true}).click();
+  await selectWorkspace(p, 'Automation');await p.getByRole('button',{name:'Add lane',exact:true}).click();
   const chart=p.locator('.automation-detail-canvas');
   const colorCount=async(locator,from=0,to=1)=>locator.evaluate((c,{from,to})=>{const ctx=c.getContext('2d'),x=Math.floor(c.width*from),w=Math.max(1,Math.floor(c.width*to)-x),data=ctx.getImageData(x,0,w,c.height).data;let count=0;for(let i=0;i<data.length;i+=4)if(data[i]>210&&data[i+1]>145&&data[i+1]<235&&data[i+2]<140)count++;return count;},{from,to});
   ok(await colorCount(chart,.7,.9)>30,'Single-point lane draws a held line across the chart');
   const rowLabel='Automation test automation parameter';
-  await p.getByRole('tab',{name:'Timeline',exact:true}).click();
+  await selectWorkspace(p, 'Timeline');
   const toggle=p.getByRole('button',{name:'Automation',exact:true});
   const before=await p.evaluate(()=>JSON.stringify(autoTest.store.project));
   await toggle.click(); await p.getByLabel(rowLabel,{exact:true}).waitFor();
@@ -62,7 +63,7 @@ try {
   ok(await p.evaluate(value=>JSON.stringify(autoTest.store.project.timeline.automation)===value,laneBefore),'Hiding overlay preserves lane points and playback enablement');
   ok(await p.locator('.song-track .ch-vol').first().isVisible(),'Normal region/channel controls return when overlay is hidden');
   await toggle.click();
-  await p.getByRole('tab',{name:'Automation',exact:true}).click();
+  await selectWorkspace(p, 'Automation');
   ok(await p.getByLabel('Point 2 beat',{exact:true}).inputValue()==='6','Detailed editor shows the same Timeline points');
   await p.getByLabel('Point 1 curve',{exact:true}).selectOption('step');
   await p.getByLabel('Point 2 value',{exact:true}).fill('2.5');await p.getByLabel('Point 2 value',{exact:true}).dispatchEvent('change');
@@ -70,7 +71,7 @@ try {
   ok(await colorCount(chart,.7,.9)>30,'Curve remains visible after the last point');
   const roundtrip=await p.evaluate(async()=>{const{exportProjectAsync,prepareProject}=await import('/audionaut-beta-pro/daw/js/persistence.js');return JSON.stringify(prepareProject(await exportProjectAsync()).timeline.automation)===JSON.stringify(autoTest.store.project.timeline.automation);});
   ok(roundtrip,'Automation survives the existing song format round trip');
-  await p.getByRole('tab',{name:'Timeline',exact:true}).click();
+  await selectWorkspace(p, 'Timeline');
   ok(await toggle.getAttribute('aria-pressed')==='true','Overlay preference survives switching views');
   await p.getByLabel('Zoom',{exact:true}).selectOption('112');
   await p.locator('.song-scroll').evaluate(el=>{el.scrollLeft=250;});await p.waitForTimeout(80);
@@ -78,12 +79,12 @@ try {
   await p.screenshot({path:`/tmp/audionaut-automation-${process.env.AUDIONAUT_TEST_BROWSER||'chromium'}.png`,fullPage:false});
   await p.setViewportSize({width:390,height:844});
   ok(await p.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+2),'Automation overlay fits a phone viewport');
-  await p.getByRole('tab',{name:'Automation',exact:true}).click();
+  await selectWorkspace(p, 'Automation');
   ok(await p.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+2),'Detailed automation editor fits a phone viewport');
   await chart.scrollIntoViewIfNeeded();
   await p.screenshot({path:`/tmp/audionaut-automation-phone-${process.env.AUDIONAUT_TEST_BROWSER||'chromium'}.png`,fullPage:false});
   await p.setViewportSize({width:1400,height:900});
-  await p.getByRole('tab',{name:'Timeline',exact:true}).click();
+  await selectWorkspace(p, 'Timeline');
   await p.getByLabel('Zoom',{exact:true}).selectOption('56');
   await p.locator('.song-scroll').evaluate(el=>{el.scrollLeft=0;});await p.waitForTimeout(80);
   box=await geometry();

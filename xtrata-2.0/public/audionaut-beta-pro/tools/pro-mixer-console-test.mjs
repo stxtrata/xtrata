@@ -1,3 +1,4 @@
+import { selectWorkspace } from './serve.mjs';
 import assert from 'node:assert/strict';
 import { serve, browser, page } from './serve.mjs';
 const { srv, url } = await serve(), b = await browser(), logs = [];
@@ -14,7 +15,7 @@ try {
     mixTest.taps = []; const split = ctx.createChannelSplitter.bind(ctx);
     ctx.createChannelSplitter = (...args) => { const node = split(...args), disconnect = node.disconnect.bind(node), entry = { disconnected: false, meter: new Error().stack.includes('mixer-meter.js') }; mixTest.taps.push(entry); node.disconnect = (...a) => { entry.disconnected = true; return disconnect(...a); }; return node; };
   });
-  await p.getByRole('tab', { name: 'Mixer', exact: true }).click();
+  await selectWorkspace(p, 'Mixer');
   const strip = p.locator('.pro-strip').first(), fader = strip.getByRole('slider', { name: 'Kick volume dB', exact: true });
   const dimensions = await p.locator('.pro-strip').evaluateAll(nodes => nodes.map(n => { const r = n.getBoundingClientRect(), f = n.querySelector('.mixer-fader').getBoundingClientRect(); return { width: r.width, height: r.height, top: f.top, faderHeight: f.height, faderWidth: f.width }; }));
   ok(dimensions.every(d => d.width <= 130 && d.faderHeight > 190 && d.faderHeight > d.faderWidth * 4), 'Narrow strips have tall vertical faders');
@@ -92,12 +93,12 @@ try {
   await p.evaluate(() => mixTest.engine.stop());
   await p.waitForFunction(() => Number(document.querySelector('.mixer-fader').value) === 0);
   ok(true, 'Stopping restores the base fader display without leaving Mixer');
-  await p.getByRole('tab', { name: 'Timeline', exact: true }).click();
+  await selectWorkspace(p, 'Timeline');
   ok(await p.evaluate(() => mixTest.taps.some(t => t.meter) && mixTest.taps.filter(t => t.meter).every(t => t.disconnected)), 'Leaving Mixer disconnects every meter tap');
-  await p.getByRole('tab', { name: 'Mixer', exact: true }).click();
+  await selectWorkspace(p, 'Mixer');
   ok(Math.abs(Number(await fader.inputValue())) < .01, 'Returning to Mixer shows the stored stopped level');
   const before = await p.evaluate(() => JSON.stringify(mixTest.store.project));
-  await p.getByRole('tab', { name: 'Patterns', exact: true }).click(); await p.getByRole('tab', { name: 'Mixer', exact: true }).click();
+  await selectWorkspace(p, 'Sequences'); await selectWorkspace(p, 'Mixer');
   ok(await p.evaluate(value => JSON.stringify(mixTest.store.project) === value, before), 'Changing views never modifies the mix');
   ok(await p.evaluate(async () => { const { exportProjectAsync, prepareProject } = await import('/audionaut-beta-pro/daw/js/persistence.js'); const restored=prepareProject(await exportProjectAsync());return restored.channels[0].volume===mixTest.store.channel(0).volume&&restored.timeline.automation.length===1; }), 'Existing file format preserves mix and automation');
   await p.locator('.mixer-desk').scrollIntoViewIfNeeded();
@@ -120,7 +121,7 @@ try {
   await p.evaluate(async () => (await import('/audionaut-beta-pro/daw/js/pro-workspace.js')).openWorkspace('sequence'));
   await p.mouse.up();
   ok(await p.evaluate(() => !mixTest.engine._automationOverrides?.size), 'Switching views during a held gesture releases its override');
-  await p.getByRole('tab', { name: 'Patterns', exact: true }).click();
+  await selectWorkspace(p, 'Sequences');
   ok(await p.evaluate(() => !mixTest.engine._automationOverrides?.size), 'Leaving the mixer releases active control overrides');
   ok(!logs.some(l => l.startsWith('pageerror:')), logs.join('\n'));
   console.log(JSON.stringify({ checks, browser: process.env.AUDIONAUT_TEST_BROWSER || 'chromium' }));

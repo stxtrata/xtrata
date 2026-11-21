@@ -56,3 +56,10 @@ export async function page(b, url, { width = 1400, height = 900, logs = [] } = {
   p.on("response", (r) => { if (r.url().startsWith(url) && r.status() >= 400) logs.push(`http ${r.status()}: ${r.url().slice(url.length)}`); });
   return p;
 }
+
+// Follow the same visible navigation a member uses for secondary workspaces.
+export async function selectWorkspace(page, name) {
+  const tab = page.getByRole('tab', { name, exact: true });
+  if (!await tab.isVisible()) await page.locator('[popovertarget="studio-views"]').click();
+  await tab.click();
+}

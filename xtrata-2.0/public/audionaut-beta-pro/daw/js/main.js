@@ -53,6 +53,7 @@ function stopAll() {
 engine.onStep = (step) => {
   ui.movePlayhead(step);
   rollPlayhead(step);
+  if (document.body.dataset.workspace === "mobile") document.dispatchEvent(new Event("audionaut-display-step"));
   if (isArrangeMode()) arrangePlayhead(step);
 };
 
@@ -280,7 +281,7 @@ function initFileOps() {
     } catch (error) { return ui.setStatus(`Could not start a new project: ${error.message}`, true); }
     store.loadProject(makeProject());
     resetHistory();
-    ui.setStatus("New project.");
+    ui.setStatus("Blank project ready. Open Project for starter templates, or Library for beats and samples.");
   });
 }
 

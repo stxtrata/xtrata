@@ -1162,6 +1162,9 @@ export function initLoaderModal() {
       source = { type: activeTab, value };
     }
     const picker = samplePicker;
+    const channel = loaderChannel;
+    const button = $('#loader-load');
+    if (!picker) button.dispatchEvent(new Event('audionaut-sample-loading'));
     samplePicker = null;
     $("#modal-loader").classList.add("hidden");
     try {
@@ -1171,17 +1174,19 @@ export function initLoaderModal() {
         setStatus(`Loaded "${name}" → ${picker.label}`);
         return;
       }
-      setStatus(`Loading sample for channel ${loaderChannel + 1}…`);
-      const name = await loadSample(loaderChannel, source);
+      setStatus(`Loading sample for channel ${channel + 1}…`);
+      const name = await loadSample(channel, source);
       if (source.label) {
-        store.setChannelProp(loaderChannel, "sampleName", source.label);
-        store.setChannelProp(loaderChannel, "name", source.label.slice(0, 24));
+        store.setChannelProp(channel, "sampleName", source.label);
+        store.setChannelProp(channel, "name", source.label.slice(0, 24));
       }
-      refreshChannelRow(loaderChannel);
+      refreshChannelRow(channel);
       setStatus(
-        `Loaded "${source.label || name}" → channel ${loaderChannel + 1}`,
+        `Loaded "${source.label || name}" → channel ${channel + 1}`,
       );
+      button.dispatchEvent(new Event('audionaut-sample-ready'));
     } catch (err) {
+      button.dispatchEvent(new Event('audionaut-sample-failed'));
       setStatus(`Load failed: ${err.message}`, true);
     }
   });
@@ -1371,7 +1376,7 @@ function trimStartPlayback() {
   tick();
 }
 
-function openTrim(ch, step = null) {
+export function openTrim(ch, step = null) {
   trimStopPlayback();
   editorScope = { ch, step };
   const c = store.channel(ch);
@@ -1909,7 +1914,7 @@ function renderChain() {
   $("#chain-add-btn").textContent = `+ Add ${CHAIN_LABEL[chain.kind]}`;
 }
 
-function openChain(idx, isInst = false, kind = "inserts") {
+export function openChain(idx, isInst = false, kind = "inserts") {
   chain.idx = idx;
   chain.isInst = isInst;
   chain.kind = kind;

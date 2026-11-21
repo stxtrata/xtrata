@@ -1,3 +1,4 @@
+import { selectWorkspace } from './serve.mjs';
 import assert from 'node:assert/strict';
 import { serve, browser, page } from './serve.mjs';
 import { makeProject, makeSequence } from '../daw/js/state.js';
@@ -51,7 +52,7 @@ try {
         .map((b) => b.title)
     }))
   );
-  await p.getByRole('tab', { name: 'Timeline', exact: true }).click();
+  await selectWorkspace(p, 'Timeline');
   await p.waitForSelector('.song-track');
   const actual = await p.evaluate(() =>
     [...document.querySelectorAll('.song-track .channel-controls')].map((n) => ({
@@ -90,7 +91,7 @@ try {
     (await sample.locator('.ch-tools,.ch-pitch').count()) === 0,
     'Timeline omits trigger tools and playback-rate input'
   );
-  await p.getByRole('tab', { name: 'Patterns', exact: true }).click();
+  await selectWorkspace(p, 'Sequences');
   const patternSample = p.locator('#channels .channel[data-ch="0"]');
   ok(await patternSample.locator('.ch-tools').isVisible(), 'Patterns retains trigger tools');
   await patternSample.locator('.ch-pitch').fill('1.5');
@@ -99,7 +100,7 @@ try {
     await p.evaluate(() => test.store.channel(0).pitch === 1.5),
     'Patterns retains playback-rate editing'
   );
-  await p.getByRole('tab', { name: 'Timeline', exact: true }).click();
+  await selectWorkspace(p, 'Timeline');
   ok(
     await p.evaluate(() => test.store.channel(0).pitch === 1.5),
     'Opening Timeline preserves saved playback rate'
@@ -125,7 +126,7 @@ try {
   );
   await sample.locator('.ord').click();
   await p.getByLabel('Edit sequence', { exact: true }).selectOption('1');
-  await p.getByRole('tab', { name: 'Patterns', exact: true }).click();
+  await selectWorkspace(p, 'Sequences');
   await patternSample.locator('.pattern').click();
   ok(
     await p.evaluate(
@@ -135,8 +136,8 @@ try {
     ),
     'Pattern fill targets explicit sequence only'
   );
-  await p.getByRole('tab', { name: 'Timeline', exact: true }).click();
-  await p.getByRole('tab', { name: 'Patterns', exact: true }).click();
+  await selectWorkspace(p, 'Timeline');
+  await selectWorkspace(p, 'Sequences');
   await p.locator('#channels .pattern').first().click();
   ok(
     await p.evaluate(() => test.store.seq.steps[0].filter(Boolean).length === 32),
@@ -155,7 +156,7 @@ try {
     await p.evaluate(() => test.store.seq.steps[0].filter(Boolean).length === 32),
     'Pattern control undo'
   );
-  await p.getByRole('tab', { name: 'Timeline', exact: true }).click();
+  await selectWorkspace(p, 'Timeline');
   ok(
     (await sample.locator('.ch-tools,.ch-pitch').count()) === 0,
     'Removed Timeline controls stay absent after undo and view changes'
