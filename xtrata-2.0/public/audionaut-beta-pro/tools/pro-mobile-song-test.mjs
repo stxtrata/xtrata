@@ -53,6 +53,25 @@ try {
         testSong.engine.playingSequence === 1
     )
   );
+  // Keep a held live note and observe the scheduler across the mode changes.
+  await p.evaluate(async () => {
+    const { engine } = testSong;
+    const live = await import('/audionaut-beta-pro/daw/js/live-keys.js');
+    const scheduled = engine.scheduleEvent;
+    window.transition = {
+      live,
+      start: engine._transportStart,
+      generation: engine._transportGeneration,
+      stops: 0,
+      steps: []
+    };
+    document.addEventListener('transport-stop', () => transition.stops++);
+    engine.scheduleEvent = function (event) {
+      if (event.type === 'step') transition.steps.push({ beat: event.beat, time: event.time });
+      return scheduled.call(this, event);
+    };
+    live.noteOn('mode-test', 0, 60);
+  });
   await btn('Loop bar').click();
   await p.waitForFunction(
     () =>
@@ -61,16 +80,78 @@ try {
       testSong.engine._transportRuns.some((r) => r.repeats > 1)
   );
   await selected('Bar 3');
+  // Change the destination in the first half of a bar. The old final sixteenth
+  // and the new downbeat must be one step apart on the same audio clock.
+  await p.waitForFunction(() => {
+    const beat = testSong.engine.getMusicalPosition().beat;
+    return beat >= 8.25 && beat < 9.5;
+  });
+  await btn('Bar 1').click();
+  assert.match(await p.locator('.mobile-position').innerText(), /Queued sequence 1, bar 1/);
+  await p.waitForFunction(
+    () => testSong.engine._loopRange.start === 0 && testSong.engine.currentStep < 16
+  );
+  assert.ok(
+    await p.evaluate(() =>
+      transition.steps.some(
+        (s, i, a) =>
+          i &&
+          s.beat === 0 &&
+          a[i - 1].beat === 11.75 &&
+          Math.abs(s.time - a[i - 1].time - 0.0625) < 1e-5
+      )
+    ),
+    'Bar switch is quantized without a missing or duplicate beat'
+  );
   await btn('Loop sequence').click();
   await p.waitForFunction(
     () => testSong.engine._loopRange?.start === 0 && testSong.engine._loopRange.end === 16
   );
+  // Moving to another sequence while looping waits for the running sequence to finish.
+  await p.getByLabel('Sequence', { exact: true }).selectOption({ value: '1' });
+  await p.waitForFunction(
+    () => testSong.engine._loopRange.start === 16 && testSong.engine.playingSequence === 1
+  );
+  assert.ok(
+    await p.evaluate(() =>
+      transition.steps.some(
+        (s, i, a) =>
+          i &&
+          s.beat === 16 &&
+          a[i - 1].beat === 15.75 &&
+          Math.abs(s.time - a[i - 1].time - 0.0625) < 1e-5
+      )
+    )
+  );
   await btn('Play song').click();
   await p.waitForFunction(() => testSong.engine._loopRange?.end === 32);
   await btn('Follow playback').click();
+  assert.ok(
+    await p.evaluate(() => {
+      const { engine } = testSong;
+      const running =
+        engine.isPlaying &&
+        engine._transportStart === transition.start &&
+        engine._transportGeneration === transition.generation &&
+        transition.stops === 0 &&
+        transition.live.heldCount() === 1 &&
+        engine.getMusicalPosition().beat >= 16;
+      transition.live.noteOff('mode-test');
+      return running;
+    }),
+    'Follow, bar, sequence and song commands preserve the running transport and held note'
+  );
   await p.evaluate(() => testSong.engine.seekBeat(21));
   await p.waitForFunction(() => testSong.store.project.currentSequence === 1);
   await selected('Bar 2');
+  // The last command wins, including leaving a queued jump for linear playback.
+  await btn('Loop bar').click();
+  await btn('Bar 4').click();
+  await btn('Play song').click();
+  await p.waitForFunction(() => testSong.engine.getMusicalPosition().beat >= 24);
+  const afterCancel = await p.evaluate(() => testSong.engine.getMusicalPosition().beat);
+  assert.ok(afterCancel < 28, 'Song mode cancels the queued jump and continues into bar 3');
+  await btn('Follow playback').click();
   await p.locator('#btn-stop').click();
 
   // Start with real user material and make sure every navigation action is read-only.

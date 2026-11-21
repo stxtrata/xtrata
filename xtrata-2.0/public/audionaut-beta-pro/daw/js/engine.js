@@ -1057,6 +1057,7 @@ export class Engine {
       this.schedulerStats.skippedEvents+=this._plan.events.length-this._planCursor+cycles*next.events.length;
       this._appendTransportRun(firstClock,next.startBeat,next.endBeat,cycles+1);this._playRange={...this._loopRange};this._plan=next;this._nextLoopPlan=null;this._planOrigin=firstClock+cycles*next.duration;this._planCursor=0;this._scheduledEvents.clear();
     }
+    if (typeof AUDIONAUT_STANDALONE === 'undefined') this.editorTransport?.applyPendingRange?.(now);
     for(let cycles=0;cycles<128;cycles++){
       while(this._planCursor<this._plan.events.length){const event=this._plan.events[this._planCursor],time=this._planOrigin+event.time;if(time>=now+SCHEDULE_AHEAD)break;this._planCursor++;const key=`${event.id}:${event.time}`;if(this._scheduledEvents.has(key))continue;
         if(time<now-.01){this.schedulerStats.skippedEvents++;this.schedulerStats.maxLatenessMs=Math.max(this.schedulerStats.maxLatenessMs,(now-time)*1000);delete event.prepared;continue;}
