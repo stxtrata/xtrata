@@ -32,6 +32,44 @@ describe('AudioNaut Pro server gate',()=>{
   const opened=await middleware({env,request:new Request('https://xtrata.xyz/audionaut-beta-pro/daw.html',{headers:{cookie:signed.cookie}}),next:()=>new Response('protected workstation')} as any);expect(opened.status).toBe(200);expect(await opened.text()).toBe('protected workstation');expect(opened.headers.get('cache-control')).toContain('no-store');
   expect((await call({action:'verify',id:signed.challenge.id,signature:signed.signature})).status).toBe(400);
  });
+ it('allows beta and beta-pro to recheck the same session independently', async () => {
+  const signed = await signIn();
+  clearProMembershipCache();
+  vi.mocked(fetch).mockClear();
+  const { onRequest: beta } = await import('../../api/audionaut-beta/session');
+  const sessionRequest = (edition: string) => new Request(
+    'https://xtrata.xyz/api/' + edition + '/session', { headers: { cookie: signed.cookie } }
+  );
+  let failFirst!: (error: Error) => void;
+  vi.mocked(fetch).mockImplementationOnce(() => new Promise((_resolve, reject) => { failFirst = reject; }));
+  const first = beta({ env, request: sessionRequest('audionaut-beta') } as any);
+  await vi.waitFor(() => expect(failFirst).toBeTypeOf('function'));
+  const second = api({ env, request: sessionRequest('audionaut-beta-pro') } as any);
+  try {
+    await vi.waitFor(() => expect(vi.mocked(fetch).mock.calls.some(
+      ([input]) => String(input).includes('/get-token-mint-context')
+    )).toBe(true));
+    expect(await (await second).json()).toMatchObject({ signedIn: true, allowed: true });
+  } finally {
+    failFirst(new Error('Ownership service interrupted'));
+    expect((await first).status).toBe(503);
+  }
+  const requests = vi.mocked(fetch).mock.calls.length;
+  expect(await (await beta({ env, request: sessionRequest('audionaut-beta') } as any)).json())
+    .toMatchObject({ signedIn: true, allowed: true });
+  expect(fetch).toHaveBeenCalledTimes(requests);
+ });
+ it('retains a newer ownership decision when an older lookup finishes late', async () => {
+  const { address } = wallet();
+  let finishFirst!: (response: Response) => void;
+  vi.mocked(fetch).mockImplementationOnce(() => new Promise(resolve => { finishFirst = resolve; }));
+  const earlier = checkProMembership(env, address);
+  holds = false;
+  expect((await checkProMembership(env, address, { refresh: true })).holds).toBe(false);
+  finishFirst(Response.json({ total: 1, results: [{ value: { repr: 'u3061' } }] }));
+  expect((await earlier).holds).toBe(false);
+  expect((await checkProMembership(env, address)).holds).toBe(false);
+ });
  it('fails closed on non-holders, revoked ownership and gateway failure',async()=>{
   holds=false;const denied=await signIn();expect(denied.response.status).toBe(403);expect(denied.response.headers.get('set-cookie')).toBe(null);
   holds=true;const signed=await signIn();holds=false;await checkProMembership(env,signed.owner.address,{refresh:true});
