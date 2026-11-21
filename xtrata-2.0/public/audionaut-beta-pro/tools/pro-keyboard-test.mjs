@@ -143,6 +143,7 @@ try {
   await p.locator('#expand-synth-keys').tap();
   const dialog = p.locator('dialog.expanded-keyboard[open]'),
     bed = dialog.locator('.kb');
+  const ready = () => p.waitForFunction(() => document.querySelector('.live-ready')?.textContent === 'Ready');
   const span = dialog.getByLabel('Visible octaves'),
     pitches = bed.locator('[data-midi]');
   await pitches.first().waitFor();
@@ -200,6 +201,7 @@ try {
   const full = dialog.getByRole('button', {name:'Full screen',exact:true});
   await full.tap();
   await dialog.getByRole('button', {name:'Exit full screen'}).waitFor();
+  await ready();
   assert.equal(await dialog.evaluate(d => d.matches(':modal')), true);
   assert.ok((await bed.boundingBox()).height <= 305);
   await p.setViewportSize({width:1180, height:820});
@@ -246,6 +248,7 @@ try {
     await full.waitFor();
     await full.tap();
   }
+  await ready();
   await firstKey.focus();
   await p.keyboard.press('ArrowRight');
   await p.keyboard.down('Enter');
@@ -300,7 +303,6 @@ try {
     return liveEngine._transportGeneration;
   });
   await p.locator('.mobile-devices').getByRole('button',{name:'Play live',exact:true}).tap();
-  const ready = () => p.waitForFunction(() => document.querySelector('.live-ready')?.textContent === 'Ready');
   await ready();
   assert.equal(await dialog.evaluate(d => d.matches(':modal')), true);
   assert.equal(await dialog.locator('.live-pads [data-midi]').count(), 16);
