@@ -42,6 +42,7 @@ import { packSoundRow, packSoundNotice, prefetchPack } from "./pack-library.js";
 import { analogBeats, ANALOG_PERSONAS } from "./analog-kits.js";
 import { ANALOG_PACK_ID } from "./analog-pack.js";
 import { EXPANDED_COMBINED_BEAT_PRESETS as COMBINED_BEAT_PRESETS } from "./combined-beats.js";
+import { auditionBeat } from "./beat-audition.js";
 import { loadBeatPreset } from "./l1-beat-loader.js";
 import { SYNTH_BANK } from "./synths.js";
 import { createSynthPicker } from "./synth-picker.js";
@@ -1995,27 +1996,54 @@ const beatId = (preset) =>
   preset.id ||
   `original-${preset.name.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`;
 let pendingBeatId = null, beatDestination, focusedBeat;
-function syncBeatTransport() {
-  const play = $("#beats-play");
-  if (!play) return;
-  play.textContent = engine.isPlaying ? "❚❚ Pause" : "▶ Play";
-  play.classList.toggle("active", engine.isPlaying);
-  $("#beats-stop").disabled = !engine.isPlaying;
+let beatPreview = null;
+function stopBeatAudition(clearStatus = true) {
+  if (!beatPreview) return;
+  beatPreview.controller.abort();
+  beatPreview = null;
+  if (clearStatus) $("#beats-status").textContent = "";
+  syncBeatRows();
+}
+async function previewCatalogPreset(preset) {
+  const wasActive = beatPreview?.preset === preset;
+  stopBeatAudition();
+  if (wasActive || beatLoad) return;
+  const controller = new AbortController();
+  focusedBeat = beatId(preset);
+  beatPreview = {preset, controller, loading:true};
+  syncBeatRows();
+  const status = $("#beats-status");
+  status.textContent = `Preparing preview of ${preset.name}…`;
+  try {
+    await auditionBeat(preset, controller.signal, (loaded, total, name) => {
+      if (!controller.signal.aborted) status.textContent = `Preparing ${preset.name} · ${loaded}/${total} sounds · ${name}`;
+    });
+    if (controller.signal.aborted) return;
+    beatPreview.loading = false;
+    status.textContent = `Previewing ${preset.name} at ${store.project.bpm} BPM. Apply beat to add it to your song.`;
+  } catch (error) {
+    if (controller.signal.aborted) return;
+    stopBeatAudition(false);
+    status.textContent = `Could not preview ${preset.name}. ${error.message}`;
+  }
+  syncBeatRows();
 }
 function syncBeatRows() {
-  const loaded = focusedBeat;
   for (const row of $("#beats-list").children) {
-    row.classList.toggle("beat-current", row.dataset.beatId === loaded);
+    if (!row.beatPreset) continue;
+    const active = beatPreview?.preset === row.beatPreset;
+    row.classList.toggle("beat-current", row.dataset.beatId === focusedBeat);
     row.classList.toggle("beat-loading", row.dataset.beatId === pendingBeatId);
-    const button = row.querySelector("button");
-    if (button)
-      button.textContent =
-        row.dataset.beatId === pendingBeatId
-          ? "Loading…"
-          : "Apply beat";
+    const preview = row.querySelector(".beat-preview");
+    preview.textContent = active ? beatPreview.loading ? "Cancel" : "■ Stop" : "▶ Preview";
+    preview.setAttribute("aria-pressed", String(active));
+    preview.setAttribute("aria-label", (active ? "Stop preview of " : "Preview ") + row.beatPreset.name);
+    preview.disabled = !!beatLoad;
+    row.querySelector(".beat-apply").textContent = row.dataset.beatId === pendingBeatId ? "Loading…" : "Apply beat";
   }
 }
 async function applyCatalogPreset(preset) {
+  stopBeatAudition();
   beatLoad?.abort();
   const controller = new AbortController();
   beatLoad = controller;
@@ -2049,7 +2077,6 @@ async function applyCatalogPreset(preset) {
       pendingBeatId = null;
       $("#beats-cancel").hidden = true;
       syncBeatRows();
-      syncBeatTransport();
     }
   }
 }
@@ -2105,6 +2132,7 @@ function renderBeatsList() {
   }[key];
   $("#beats-summary").textContent =
     `${matches.length} of ${collection.length} beats · ${kitNote} ${isAnalog ? "The Analog Kit sample pack (7.9 MB) downloads the first time you load a beat from it." : "Local today / planned L2."}`;
+  if (beatPreview && !matches.includes(beatPreview.preset)) stopBeatAudition();
   const list = $("#beats-list");
   list.innerHTML = "";
   matches.forEach((preset) => {
@@ -2176,15 +2204,18 @@ function renderBeatsList() {
       }
       info.append(details);
     }
-    const loadBtn = el("button", "primary", "Apply beat");
+    const buttons = el("div", "beat-actions");
+    const preview = el("button", "beat-preview", "▶ Preview");
+    preview.addEventListener("click", () => previewCatalogPreset(preset));
+    const loadBtn = el("button", "primary beat-apply", "Apply beat");
     loadBtn.addEventListener("click", async () => {
       await applyCatalogPreset(preset);
     });
-    row.append(info, loadBtn);
+    buttons.append(preview, loadBtn);
+    row.append(info, buttons);
     list.appendChild(row);
   });
   syncBeatRows();
-  syncBeatTransport();
   $("#beats-prev").disabled = !matches.length;
   $("#beats-next").disabled = !matches.length;
   if (!matches.length)
@@ -2250,14 +2281,6 @@ export function initBeatsModal() {
     warmAnalogPack();
   };
   $("#btn-beats").addEventListener("click", () => open("drums-studio"));
-  $("#beats-play").addEventListener("click", () => {
-    $("#btn-play").click();
-    syncBeatTransport();
-  });
-  $("#beats-stop").addEventListener("click", () => {
-    $("#btn-stop").click();
-    syncBeatTransport();
-  });
   const advance = (direction) => {
     const rows = [...$("#beats-list").children].filter((row) => row.beatPreset);
     if (!rows.length) return;
@@ -2274,19 +2297,18 @@ export function initBeatsModal() {
     rows[next].scrollIntoView({ block: "nearest" });
     focusedBeat = rows[next].dataset.beatId;
     syncBeatRows();
-    rows[next].querySelector("button").focus({preventScroll:true});
+    rows[next].querySelector(".beat-preview").focus({preventScroll:true});
+    if (beatPreview && beatPreview.preset !== rows[next].beatPreset) void previewCatalogPreset(rows[next].beatPreset);
   };
   $("#beats-prev").addEventListener("click", () => advance(-1));
   $("#beats-next").addEventListener("click", () => advance(1));
-  for (const selector of ["#btn-play", "#btn-stop"])
-    $(selector).addEventListener("click", () =>
-      queueMicrotask(syncBeatTransport),
-    );
-  document.addEventListener("keydown", (event) => {
-    if (event.code === "Space") queueMicrotask(syncBeatTransport);
-  });
+  store.on("load", () => stopBeatAudition());
+  document.addEventListener("visibilitychange", () => { if (document.hidden) stopBeatAudition(); });
+  window.addEventListener("pagehide", () => stopBeatAudition());
+  document.addEventListener("transport-stop", () => stopBeatAudition());
   $("#beats-cancel").addEventListener("click", () => beatLoad?.abort());
   $("#beats-close").addEventListener("click", () => {
+    stopBeatAudition();
     beatLoad?.abort();
     $("#modal-beats").classList.add("hidden");
   });
@@ -2318,7 +2340,7 @@ export function initModalDismissal() {
   document.querySelectorAll(".modal").forEach((m) => {
     m.addEventListener("click", (e) => {
       if (e.target === m) {
-        if (m.id === "modal-beats") beatLoad?.abort();
+        if (m.id === "modal-beats") { stopBeatAudition(); beatLoad?.abort(); }
         engine.stopPreview();
         trimStopPlayback();
         m.classList.add("hidden");
@@ -2327,6 +2349,7 @@ export function initModalDismissal() {
   });
   document.addEventListener("keydown", (e) => {
     if (e.key === "Escape") {
+      stopBeatAudition();
       beatLoad?.abort();
       engine.stopPreview();
       trimStopPlayback();

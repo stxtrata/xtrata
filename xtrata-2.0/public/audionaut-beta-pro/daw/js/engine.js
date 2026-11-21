@@ -923,7 +923,7 @@ export class Engine {
     this._transportStart = this._planOrigin;
     this._transportEnd = Infinity;
     this._tick();
-    if(typeof document!=='undefined')document.dispatchEvent(new CustomEvent('transport',{detail:{playing:true,beat:this.currentBeat}}));
+    if(typeof document!=='undefined')(typeof AUDIONAUT_STANDALONE !== 'undefined' ? document : this.editorTransport?.events ?? document).dispatchEvent(new CustomEvent('transport',{detail:{playing:true,beat:this.currentBeat}}));
   }
 
   pause() {
@@ -931,7 +931,7 @@ export class Engine {
     this._transportEnd = this.ctx?.currentTime || 0;
     if(this.isPlaying)this._pausedBeat=this.getMusicalPosition(this._transportEnd).beat;
     this.currentBeat=this._pausedBeat??this.currentBeat;
-    if (!this.offline && typeof document !== "undefined") document.dispatchEvent(new CustomEvent("transport-stop", { detail: { time: this._transportEnd } }));
+    if (!this.offline && typeof document !== "undefined") (typeof AUDIONAUT_STANDALONE !== 'undefined' ? document : this.editorTransport?.events ?? document).dispatchEvent(new CustomEvent("transport-stop", { detail: { time: this._transportEnd } }));
     this.isPlaying = false;
     this._transportGeneration++;this._prefetchAbort?.abort();
     clearTimeout(this.timer);
@@ -940,17 +940,17 @@ export class Engine {
     for (const ch of this._voices?.keys() || []) this.silenceChannel(ch);
     this.releaseAll(null, { immediate: true });
     for(const node of this._clicks||[]){try{node.stop();}catch{}}this._clicks?.clear();this._automationOverrides?.clear();
-    if(typeof document!=='undefined')document.dispatchEvent(new CustomEvent('transport',{detail:{playing:false,beat:this.currentBeat}}));
+    if(typeof document!=='undefined')(typeof AUDIONAUT_STANDALONE !== 'undefined' ? document : this.editorTransport?.events ?? document).dispatchEvent(new CustomEvent('transport',{detail:{playing:false,beat:this.currentBeat}}));
   }
 
   _finishTransport() {
     // The musical cursor stops at the song end; finite sources and effect releases
     // already scheduled on the audio clock retain their natural tails.
     this._transportEnd=this._planOrigin+this._plan.duration;this.currentBeat=this._plan.endBeat;
-    if(!this.offline&&typeof document!=='undefined')document.dispatchEvent(new CustomEvent('transport-stop',{detail:{time:this._transportEnd}}));
+    if(!this.offline&&typeof document!=='undefined')(typeof AUDIONAUT_STANDALONE !== 'undefined' ? document : this.editorTransport?.events ?? document).dispatchEvent(new CustomEvent('transport-stop',{detail:{time:this._transportEnd}}));
     this.isPlaying=false;this._pausedBeat=null;this._transportGeneration++;this._prefetchAbort?.abort();clearTimeout(this.timer);this._automationOverrides?.clear();
     for(const timer of this._transportTimers)clearTimeout(timer);this._transportTimers.clear();
-    if(typeof document!=='undefined')document.dispatchEvent(new CustomEvent('transport',{detail:{playing:false,beat:this.currentBeat}}));
+    if(typeof document!=='undefined')(typeof AUDIONAUT_STANDALONE !== 'undefined' ? document : this.editorTransport?.events ?? document).dispatchEvent(new CustomEvent('transport',{detail:{playing:false,beat:this.currentBeat}}));
   }
 
   stop() {

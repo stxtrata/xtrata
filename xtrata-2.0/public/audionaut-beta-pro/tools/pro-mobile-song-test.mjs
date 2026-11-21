@@ -175,7 +175,7 @@ try {
   assert.ok(
     await p.evaluate(() => JSON.stringify(beforeBeats) === JSON.stringify(testSong.store.project))
   );
-  const apply = (i) => p.locator('#beats-list .beat-row button').nth(i).click();
+  const apply = (i) => p.locator('#beats-list .beat-apply').nth(i).click();
   const applied = () =>
     p.waitForFunction(
       () =>
@@ -301,12 +301,192 @@ try {
   );
   assert.equal(await p.evaluate(() => testSong.store.project.sequences.length), 2);
   await p.locator('#btn-stop').click();
+  // Auditioning uses real samples and a private output without editing or seeking the song.
+  await p.evaluate(async () => {
+    const base = '/audionaut-beta-pro/daw/js/';
+    const { Engine, engine } = await import(base + 'engine.js');
+    const { store, makeProject } = await import(base + 'state.js');
+    store.loadProject(makeProject());
+    engine.ensureContext();
+    const probe = (window.auditionProbe = {
+      before: JSON.stringify(store.project),
+      buffers: engine.buffers.slice(),
+      players: new Set(),
+      songHits: 0
+    });
+    const connect = engine.masterGain.connect.bind(engine.masterGain);
+    engine.masterGain.connect = (node, ...args) => {
+      probe.monitor = node;
+      return connect(node, ...args);
+    };
+    const schedule = Engine.prototype.scheduleEvent;
+    Engine.prototype.scheduleEvent = function (event) {
+      if (event.type === 'sample') {
+        if (this === engine) probe.songHits++;
+        else if (!probe.players.has(this)) {
+          probe.players.add(this);
+          probe.meter = this.ctx.createAnalyser();
+          this.masterGain.connect(probe.meter);
+        }
+      }
+      return schedule.call(this, event);
+    };
+    // Earlier timing checks observed the song instance. Delegate it to this probe now.
+    delete engine.scheduleEvent;
+  });
+  await btn('Add beat').click();
+  const rows = p.locator('#beats-list .beat-row'),
+    previews = rows.locator('.beat-preview');
+  await previews.first().click();
+  await p.waitForFunction(() =>
+    document.querySelector('#beats-status').textContent.startsWith('Previewing')
+  );
+  await p.waitForFunction(() => {
+    const m = auditionProbe.meter;
+    if (!m) return false;
+    const values = new Float32Array(m.fftSize);
+    m.getFloatTimeDomainData(values);
+    return values.some((v) => Math.abs(v) > 0.002);
+  });
+  assert.ok(
+    await p.evaluate(
+      () =>
+        !testSong.engine.isPlaying &&
+        auditionProbe.players.size === 1 &&
+        JSON.stringify(testSong.store.project) === auditionProbe.before &&
+        testSong.engine.buffers.every((b, i) => b === auditionProbe.buffers[i])
+    )
+  );
+  if (process.env.SCREENSHOT_DIR)
+    await p.screenshot({ path: process.env.SCREENSHOT_DIR + '/beat-audition-phone.png' });
+  for (const [width, height] of [
+    [320, 568],
+    [844, 390]
+  ]) {
+    await p.setViewportSize({ width, height });
+    const pair = rows.first().locator('.beat-actions button');
+    for (const control of await pair.all()) {
+      await control.scrollIntoViewIfNeeded();
+      const rect = await control.boundingBox();
+      assert.ok(rect && rect.x >= 0 && rect.x + rect.width <= width + 1 && rect.height >= 44);
+    }
+  }
+  await p.setViewportSize({ width: 390, height: 844 });
+  await previews.nth(1).click();
+  await p.waitForFunction(
+    () =>
+      auditionProbe.players.size === 2 &&
+      [...auditionProbe.players].filter((e) => e.isPlaying).length === 1
+  );
+  await previews.nth(1).click();
+  await p.waitForFunction(() => [...auditionProbe.players].every((e) => !e.isPlaying));
+  const previewReady = async (predicate) => {
+    await p.waitForFunction(predicate, undefined, { timeout: 30000 }).catch(async (error) => {
+      throw Error((await p.locator('#beats-status').textContent()) + ' / ' + error.message);
+    });
+  };
+  await p.locator('#beats-collection').selectOption({ value: 'tonal' });
+  await previews.first().click();
+  await previewReady(() =>
+    document.querySelector('#beats-status').textContent.startsWith('Previewing')
+  );
+  await btn('Next →').click();
+  await previewReady(() =>
+    document.querySelectorAll('.beat-preview')[1]?.textContent.includes('Stop')
+  );
+  await p.locator('#beats-search').fill('no matching audition');
+  await p.waitForFunction(() => [...auditionProbe.players].every((e) => !e.isPlaying));
+  await p.locator('#beats-search').fill('');
+  // The real gateway is outside this local test. Feed the normal Ordinal loader
+  // a PCM WAV long enough for the catalogue's trimmed loops and single hits.
+  const frames = 32 * 8000,
+    wav = Buffer.alloc(44 + frames * 2);
+  wav.write('RIFF', 0);
+  wav.writeUInt32LE(wav.length - 8, 4);
+  wav.write('WAVEfmt ', 8);
+  wav.writeUInt32LE(16, 16);
+  wav.writeUInt16LE(1, 20);
+  wav.writeUInt16LE(1, 22);
+  wav.writeUInt32LE(8000, 24);
+  wav.writeUInt32LE(16000, 28);
+  wav.writeUInt16LE(2, 32);
+  wav.writeUInt16LE(16, 34);
+  wav.write('data', 36);
+  wav.writeUInt32LE(frames * 2, 40);
+  for (let i = 0; i < 1600; i++) wav.writeInt16LE(Math.round(8000 * Math.sin(i / 12)), 44 + i * 2);
+  await p.route('**/preview-ordinal/**', (r) => r.fulfill({ contentType: 'audio/wav', body: wav }));
+  await p.route('**/preview-offline/**', (r) => r.fulfill({ status: 503, body: 'Unavailable' }));
+  await p.evaluate(() => {
+    testSong.store.settings.ordinalsGateway = location.origin + '/preview-offline/';
+    testSong.store.settings.ordinalsFallbacks = [];
+  });
+  const collection = p.locator('#beats-collection');
+  await collection.selectOption({ value: 'l1' });
+  await previews.first().click();
+  await previewReady(() =>
+    document.querySelector('#beats-status').textContent.startsWith('Could not preview')
+  );
+  assert.equal(await previews.first().getAttribute('aria-pressed'), 'false');
+  await p.evaluate(() => {
+    testSong.store.settings.ordinalsGateway = location.origin + '/preview-ordinal/';
+  });
+  for (const value of ['l1', 'combined', 'drums-l1', 'original', 'drums-analog']) {
+    await collection.selectOption({ value });
+    await previews.first().click();
+    await previewReady(() =>
+      document.querySelector('#beats-status').textContent.startsWith('Previewing')
+    );
+    await previews.first().click();
+  }
+  assert.ok(
+    await p.evaluate(
+      () =>
+        JSON.stringify(testSong.store.project) === auditionProbe.before &&
+        !testSong.engine.isPlaying
+    )
+  );
+  await collection.selectOption({ value: 'drums-studio' });
+  // Closing during preparation must never let a stale preview start later.
+  await p.evaluate(() => {
+    document.querySelector('#beats-list .beat-preview').click();
+    document.querySelector('#beats-close').click();
+  });
+  await btn('Play song').click();
+  const generation = await p.evaluate(() => testSong.engine._transportGeneration);
+  await btn('Add beat').click();
+  await previews.first().click();
+  await p.waitForFunction(
+    () =>
+      auditionProbe.monitor?.gain.value < 0.01 &&
+      [...auditionProbe.players].some((e) => e.isPlaying)
+  );
+  assert.ok(
+    await p.evaluate(
+      (g) =>
+        testSong.engine.isPlaying &&
+        testSong.engine._transportGeneration === g &&
+        JSON.stringify(testSong.store.project) === auditionProbe.before,
+      generation
+    )
+  );
+  // Apply ends the private preview and lets the running master play the real layer.
+  await rows.first().locator('.beat-apply').click();
+  await applied();
+  await p.waitForFunction(
+    () =>
+      auditionProbe.monitor.gain.value > 0.99 &&
+      auditionProbe.songHits > 0 &&
+      [...auditionProbe.players].every((e) => !e.isPlaying)
+  );
+  assert.equal(await p.evaluate(() => testSong.engine._transportGeneration), generation);
+  await p.keyboard.press('Escape');
+  await p.locator('#btn-stop').click();
   assert.deepEqual(
     logs.filter((s) => s.startsWith('pageerror:')),
     []
   );
   console.log(
-    'PASS live bar and sequence following, pinned edits, loop wrap and song mode; browsing, layering, protected tracks and undo'
+    'PASS mobile transport, isolated beat auditions, song monitoring, applying layers and undo'
   );
 } finally {
   await driver.close();

@@ -137,6 +137,24 @@ export async function prepareBeatPreset(
   });
 }
 
+export function configureBeatChannel(channel, { def, trimStart, trimEnd }) {
+  Object.assign(channel, {
+    name: (def.name || def.source.label).slice(0, 24),
+    sampleName: def.source.label,
+    volume: def.volume ?? 0.7,
+    pitch: def.pitch ?? 1,
+    reverse: !!def.reverse,
+    mute: false,
+    solo: false,
+    trimStart,
+    trimEnd,
+    inserts: [],
+    sends: {},
+    fx: { ...def.fx } // preset FX are written in the old object form…
+  });
+  normalizeOwner(channel); // …and become plugin chain slots here
+}
+
 export async function loadBeatPreset(preset, options = {}) {
   const collection = preset.collection || 'original';
   const project = store.project,
@@ -164,21 +182,7 @@ export async function loadBeatPreset(preset, options = {}) {
     prepared.forEach(({ def, result, steps, trimStart, trimEnd }, index) => {
       const i = targets[index];
       assignDecodedSample(i, def.source, result);
-      Object.assign(store.channel(i), {
-        name: (def.name || def.source.label).slice(0, 24),
-        sampleName: def.source.label,
-        volume: def.volume ?? 0.7,
-        pitch: def.pitch ?? 1,
-        reverse: !!def.reverse,
-        mute: false,
-        solo: false,
-        trimStart,
-        trimEnd,
-        inserts: [],
-        sends: {},
-        fx: { ...def.fx } // preset FX are written in the old object form…
-      });
-      normalizeOwner(store.channel(i)); // …and become plugin chain slots here
+      configureBeatChannel(store.channel(i), { def, trimStart, trimEnd });
       sequence.steps[i] = steps;
       let clip;
       if (timeline.enabled) {

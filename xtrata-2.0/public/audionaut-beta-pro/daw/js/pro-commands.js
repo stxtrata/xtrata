@@ -39,6 +39,8 @@ export function initCommands(){
     if(e.key==='Escape'){
       const menu=document.querySelector('.studio-menu:popover-open');
       if(menu){e.preventDefault();e.stopImmediatePropagation();menu.hidePopover();document.querySelector('[popovertarget="'+menu.id+'"]')?.focus();return;}
+      // WebKit can leave focus on the page after tapping a modal button.
+      if(document.querySelector('.modal:not(.hidden)'))return;
     }
     if(matches(e,shortcuts.palette)){e.preventDefault();e.stopImmediatePropagation();openCommands();return;}if(e.target?.closest?.('input,textarea,select,[contenteditable],dialog,.modal:not(.hidden)'))return;for(const[id,,fn]of commands)if(matches(e,shortcuts[id])){e.preventDefault();e.stopImmediatePropagation();Promise.resolve(fn()).catch(error=>status(error.message,true));return;}},true);
   modalAccessibility();
