@@ -2,9 +2,20 @@
 
 This file captures the core development rules and app constraints for V16. 
 
+## Read first
+
+Read [the repository AI development guide](../AI_DEVELOPMENT_GUIDE.md) before
+starting work. For Audionaut tasks, also read
+[AUDIONAUT_AI_GUIDE.md](AUDIONAUT_AI_GUIDE.md). These guides support informal
+requests with explicit completion checks and honest reporting of missing context.
+
 ## Development Rules
 
 1) Before making any decision or code change, read `docs/app-reference.md`.
+   If a sparse checkout excludes it, read the tracked version with
+   `git show HEAD:xtrata-2.0/docs/app-reference.md` from the repository root.
+   Use the working-tree file when present; disclose genuinely unavailable
+   references and follow the missing-context procedure in the AI development guide.
 2) Keep layout stable: avoid horizontal shifts when panels open/close; preserve scrollbar stability and responsive widths.
 3) Preserve square grid/preview behavior: 4x4 grids, square cells, square preview frame; metadata and actions stay outside the square; no scrolling needed to see the full asset inside the square.
 4) Avoid unnecessary network calls: prefer IndexedDB cache + React Query; reuse already-loaded grid content in previews.
