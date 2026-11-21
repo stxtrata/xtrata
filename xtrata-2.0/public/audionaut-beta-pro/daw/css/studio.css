@@ -214,7 +214,7 @@ body[data-workspace='mobile']:not(.synth-dock-open) #synth-dock {
   outline: 3px solid #ffd179 !important;
   outline-offset: 2px;
 }
-@media (max-width: 1150px) {
+@media (max-width: 1250px) {
   #top-bar {
     grid-template-columns: minmax(0, 1fr) auto;
   }
