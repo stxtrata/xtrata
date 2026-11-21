@@ -1,5 +1,14 @@
 # Repository working rules
 
+## Read first: AI development workflow
+
+Read [AI_DEVELOPMENT_GUIDE.md](AI_DEVELOPMENT_GUIDE.md) before beginning a new task.
+It defines how to turn short, informal requests into complete, verified work and
+how to report missing context. Apply it alongside the relevant project-level
+instructions. Read it once per session and again if it changes or context is lost.
+For Audionaut work, also read
+[the Audionaut supplement](xtrata-2.0/AUDIONAUT_AI_GUIDE.md).
+
 ## Wallet testing
 
 - Never use the user's personal wallets, hot wallets, deployer wallets, or sponsor
