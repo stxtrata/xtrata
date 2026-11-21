@@ -903,7 +903,8 @@ export class Engine {
     const generation=++this._transportGeneration;
     const sequenceStart=project.currentSequence*16;
     const songEnd=compilePlaybackPlan(project,{buffers:this.buffers}).endBeat;
-    const loop=timeline?.enabled?timeline.loop:legacy?{enabled:false}:{enabled:true,start:project.continuous?0:sequenceStart,end:project.continuous?songEnd:sequenceStart+16};
+    // Mobile can audition a range without changing the saved song or the published player.
+    const loop=(typeof AUDIONAUT_STANDALONE === 'undefined' && this.editorTransport?.loop(songEnd)) || (timeline?.enabled?timeline.loop:legacy?{enabled:false}:{enabled:true,start:project.continuous?0:sequenceStart,end:project.continuous?songEnd:sequenceStart+16});
     const start=fromBeat??this._pausedBeat??(timeline?.enabled?(loop?.enabled?loop.start:this.currentBeat||0):sequenceStart);
     this._loopRange=loop?.enabled?{start:loop.start,end:loop.end}:null;
     this._playRange={start,end:loop?.enabled?loop.end:timeline?.enabled?Math.max(timeline.lengthBeats,...timeline.clips.map(c=>c.start+c.duration)):legacy?songEnd:project.sequences.length*16};
@@ -1084,7 +1085,7 @@ export class Engine {
     }
     if(event.type==='automation')return this.scheduleAutomation(event);
     if(event.type==='metronome')return this._click(time,event.accent);
-    if(event.type==='step'&&!this.offline){const generation=this._transportGeneration;const timer=setTimeout(()=>{this._transportTimers.delete(timer);if(!this.isPlaying||generation!==this._transportGeneration)return;this.currentStep=event.step;this.playingSequence=event.sequenceIndex;if(!this.store.project.timeline.enabled&&this.store.project.currentSequence!==event.sequenceIndex){this._selectingSequence=true;try{this.store.selectSequence(event.sequenceIndex);}finally{this._selectingSequence=false;}}this.onStep?.(event.step,event.sequenceIndex,time);},Math.max(0,(time-this.ctx.currentTime)*1000));this._transportTimers.add(timer);}
+    if(event.type==='step'&&!this.offline){const generation=this._transportGeneration;const timer=setTimeout(()=>{this._transportTimers.delete(timer);if(!this.isPlaying||generation!==this._transportGeneration)return;this.currentStep=event.step;this.playingSequence=event.sequenceIndex;if((typeof AUDIONAUT_STANDALONE !== 'undefined' || !this.editorTransport) && !this.store.project.timeline.enabled&&this.store.project.currentSequence!==event.sequenceIndex){this._selectingSequence=true;try{this.store.selectSequence(event.sequenceIndex);}finally{this._selectingSequence=false;}}this.onStep?.(event.step,event.sequenceIndex,time);},Math.max(0,(time-this.ctx.currentTime)*1000));this._transportTimers.add(timer);}
   }
   _click(time,accent=false){if(this.offline)return;const osc=this.ctx.createOscillator(),g=this.ctx.createGain();(this._clicks||=new Set()).add(osc);osc.frequency.value=accent?1500:1000;g.gain.setValueAtTime(.12,time);g.gain.exponentialRampToValueAtTime(.0001,time+.04);osc.connect(g).connect(this.masterGain);osc.start(time);osc.stop(time+.045);osc.onended=()=>{this._clicks.delete(osc);osc.disconnect();g.disconnect();};}
   scheduleAutomation(event){

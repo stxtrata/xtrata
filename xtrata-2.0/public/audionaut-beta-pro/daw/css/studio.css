@@ -358,3 +358,15 @@ body[data-workspace='mobile'] #synth-dock {
   min-width: 0;
   max-width: 60%;
 }
+
+.mobile-playback {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin: 8px 0 12px;
+}
+.mobile-position {
+  flex-basis: 100%;
+  font-variant-numeric: tabular-nums;
+}

@@ -32,14 +32,12 @@ document.addEventListener('audio-error',event=>ui.setStatus(event.detail.message
 
 // ------------------------------------------------------------ transport
 async function togglePlay() {
-  if (engine.isPlaying) {
-    engine.pause();
-    $("#btn-play").textContent = "▶";
-    $("#btn-play").classList.remove("active");
-  } else {
-    try { await engine.play(); } catch (error) { ui.setStatus(error.message, true); return; }
-    $("#btn-play").textContent = "❚❚";
-    $("#btn-play").classList.add("active");
+  if (engine.isPlaying) return engine.pause();
+  try {
+    const fromBeat = engine._pausedBeat == null ? engine.editorTransport?.startBeat() : undefined;
+    await engine.play({ fromBeat });
+  } catch (error) {
+    ui.setStatus(error.message, true);
   }
 }
 
@@ -335,7 +333,7 @@ function initSubscriptions() {
   // running plays that sequence straight away (same step position, so it stays in
   // time). The engine's own chain-to-next-sequence sets this first, so it's a no-op there.
   store.on("sequence", () => {
-    if (engine.isPlaying && !engine._selectingSequence)
+    if (engine.isPlaying && !engine._selectingSequence && !engine.editorTransport)
       engine.playingSequence = store.project.currentSequence;
   });
   store.on("sequence", () => {
