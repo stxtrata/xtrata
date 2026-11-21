@@ -24,7 +24,7 @@ function check(cond, name) { assert(cond, name); passed++; console.log('  ✓ ' 
     args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist', '--autoplay-policy=no-user-gesture-required'] });
   const ctx = await browser.newContext({ viewport: { width: 1100, height: 700 } });
   await ctx.route(/^https?:\/\/(?!127\.0\.0\.1)/, (route) => route.abort('failed'));
-  await ctx.addInitScript((s) => { window.XA_WORLD_CONFIG = { screen: s }; window.__opened = []; window.open = function () { window.__opened.push(Array.prototype.slice.call(arguments)); return {}; }; }, SCREEN);
+  await ctx.addInitScript((s) => { window.XA_TEST = true; window.XA_WORLD_CONFIG = { screen: s }; window.__opened = []; window.open = function () { window.__opened.push(Array.prototype.slice.call(arguments)); return {}; }; }, SCREEN);
   const page = await ctx.newPage();
   const errors = []; page.on('pageerror', (e) => errors.push(e.message));
   await page.goto(base);
@@ -49,7 +49,8 @@ function check(cond, name) { assert(cond, name); passed++; console.log('  ✓ ' 
   check(!(await btnShown()), 'A: no link on the screen, the button is hidden');
   await setItems(['https://xtrata.xyz/arcade']); await waitFrames();
   check(await btnShown(), 'B: the item on the screen has a link, the OPEN LINK button shows');
-  check(/OPEN LINK/.test(await page.evaluate(() => document.getElementById('hlink').textContent)), 'B: the button says OPEN LINK');
+  check(/^OPEN: ITEM 1/.test(await page.evaluate(() => document.getElementById('hlink').textContent)), 'B: the button names what it opens (the item headline), not just OPEN LINK');
+  check(/xtrata\.xyz/.test(await page.evaluate(() => document.getElementById('hlink').title)), 'B: hovering the button tells you the site it opens');
   await page.click('#hlink');
   let o = await page.evaluate(() => window.__opened);
   check(o.length === 1 && o[0][0] === 'https://xtrata.xyz/arcade' && o[0][1] === '_blank' && /noopener/.test(o[0][2]), 'C: clicking opens the https link in a new tab with noopener');
@@ -62,6 +63,27 @@ function check(cond, name) { assert(cond, name); passed++; console.log('  ✓ ' 
   await page.keyboard.press('KeyL');
   o = await page.evaluate(() => window.__opened);
   check(o.length === 2 && o[1][0] === 'https://xtrata.xyz/arcade', 'C: walking, pressing L opens the link');
+
+  // E: aim at the big screen: the dot changes, a prompt names the link, E and a click open it; aim away and it goes
+  await setItems(['https://xtrata.xyz/arcade']); await waitFrames();
+  const aim = (yaw, pitch) => page.evaluate(([y, p]) => { XA.pose(0, XA.centreZ() + 5, y, p); }, [yaw, pitch]);
+  const cross = () => page.evaluate(() => document.getElementById('cross').classList.contains('link'));
+  const promptText = () => page.evaluate(() => { const e = document.getElementById('sprompt'); return e.hidden ? '' : e.textContent; });
+  await aim(Math.PI, 0); await page.waitForTimeout(400);
+  check(!(await cross()) && (await promptText()) === '', 'E: looking away from the screen: plain dot, no prompt');
+  await aim(0, 0.3); await page.waitForTimeout(400);
+  check(await cross(), 'E: aimed at the screen: the dot turns into a ring');
+  check(/OPEN LINK/.test(await promptText()) && /ITEM 1/.test(await promptText()) && /xtrata\.xyz/.test(await promptText()), 'E: the prompt names the link and the site: ' + await promptText());
+  const n0 = await page.evaluate(() => window.__opened.length);
+  await page.keyboard.press('KeyE'); await page.waitForTimeout(200);
+  check((await page.evaluate(() => window.__opened.length)) === n0 + 1, 'E: pressing E while aimed opens the link');
+  await page.mouse.click(550, 350); await page.waitForTimeout(200);
+  check((await page.evaluate(() => window.__opened.length)) === n0 + 2, 'E: clicking the screen opens the link');
+  await aim(Math.PI, 0); await page.waitForTimeout(400); await page.keyboard.press('KeyE');
+  check((await page.evaluate(() => window.__opened.length)) === n0 + 2, 'E: pressing E while looking away opens nothing');
+  await setItems([null]); await aim(0, 0.3); await waitFrames();
+  check(!(await cross()), 'E: an item with no link is not clickable');
+  await setItems(['https://xtrata.xyz/arcade']); await aim(0, 0.3); await page.waitForTimeout(400);
 
   await setItems(['javascript:alert(1)']); await waitFrames();
   check(!(await btnShown()), 'D: an unsafe link never shows the button');
