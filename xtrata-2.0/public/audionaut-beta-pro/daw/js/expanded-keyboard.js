@@ -8,7 +8,7 @@ import { store } from './state.js';
 
 let preferredSpan = 'auto';
 
-export function openExpandedKeyboard(slot) {
+export function openExpandedKeyboard(slot, opener = document.activeElement) {
   const track = store.instrument(slot);
   if (!track || document.querySelector('.expanded-keyboard')) return;
   setMidiTarget(slot);
@@ -18,7 +18,94 @@ export function openExpandedKeyboard(slot) {
   });
   const header = el('header'),
     name = el('h2', track.name, { id: 'expanded-instrument' });
-  const close = action('Done', () => dialog.close());
+  const player = el('section', null, { className: 'expanded-key-player' });
+  const close = action('Done', finish, { title: 'Close keyboard and return to the editor' });
+  const screen = action('Full screen', toggleScreen);
+  let playingFull = false, nativeActive = false, finished = false, viewId = 0;
+  const nativeElement = () => document.fullscreenElement || document.webkitFullscreenElement;
+  function exitNative() {
+    if (nativeElement() !== player) return;
+    const exit = document.exitFullscreen || document.webkitExitFullscreen;
+    Promise.resolve(exit?.call(document)).catch(() => {});
+  }
+  function setView(full) {
+    handle?.release();
+    releaseAccessibleKey();
+    viewId++;
+    nativeActive = false;
+    playingFull = full;
+    dialog.close();
+    dialog.classList.toggle('playing-full', full);
+    screen.textContent = full ? 'Exit full screen' : 'Full screen';
+    if (full) dialog.showModal();
+    else dialog.show();
+    measureDock();
+    screen.focus({ preventScroll: true });
+  }
+  function toggleScreen() {
+    if (playingFull) {
+      exitNative();
+      setView(false);
+      return;
+    }
+    setView(true);
+    // The player also fills the studio when the host cannot enter native fullscreen.
+    const request = player.requestFullscreen || player.webkitRequestFullscreen;
+    if (request) {
+      const id = viewId;
+      try {
+        const pending = request.call(player);
+        pending?.then(() => {
+          if (finished || id !== viewId) return;
+          nativeActive = true;
+          nativeChange();
+        }).catch(() => {});
+      } catch { /* The studio player is already open. */ }
+    }
+  }
+  function nativeChange() {
+    if (nativeElement() === player) {
+      nativeActive = true;
+      if (!playingFull || finished) exitNative();
+    } else if (nativeActive) {
+      nativeActive = false;
+      if (playingFull && !finished) setView(false);
+    }
+  }
+  function escape(event) {
+    if (event.key !== 'Escape' || !dialog.open ||
+        (!playingFull && document.querySelector('dialog:modal'))) return;
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    if (playingFull) toggleScreen();
+    else finish();
+  }
+  function measureDock() {
+    const height = playingFull ? 0 : dialog.offsetHeight;
+    if (!finished) document.body.style.setProperty('--keyboard-dock-height', height + 'px');
+  }
+  const observer = new ResizeObserver(measureDock);
+  function finish() {
+    if (finished) return;
+    finished = true;
+    exitNative();
+    dialog.close();
+    observer.disconnect();
+    document.body.classList.remove('keyboard-docked');
+    document.body.style.removeProperty('--keyboard-dock-height');
+    releaseAccessibleKey();
+    handle?.dispose();
+    wide.removeEventListener('change', resize);
+    document.removeEventListener('keydown', escape, true);
+    document.removeEventListener('fullscreenchange', nativeChange);
+    document.removeEventListener('webkitfullscreenchange', nativeChange);
+    document.removeEventListener('instrument-target', targetChanged);
+    document.removeEventListener('synth-note', voice);
+    document.removeEventListener('live-octave', render);
+    cleanup.forEach((off) => off());
+    dialog.remove();
+    if (opener?.isConnected) opener.focus({ preventScroll: true });
+  }
   const controls = el('div', null, { className: 'expanded-key-controls' });
   const span = el('select', null, { 'aria-label': 'Visible octaves' });
   for (const [value, label] of [
@@ -30,15 +117,16 @@ export function openExpandedKeyboard(slot) {
   ])
     span.add(new Option(label, value));
   span.value = preferredSpan;
-  const lower = action('−', () => setOctave(startOctave - 1), { 'aria-label': 'Lower octave' }),
-    higher = action('+', () => setOctave(startOctave + 1), { 'aria-label': 'Higher octave' });
+  const lower = action('− Oct', () => setOctave(startOctave - 1), { 'aria-label': 'Lower octave' }),
+    higher = action('+ Oct', () => setOctave(startOctave + 1), { 'aria-label': 'Higher octave' });
   const readout = el('output', '', { 'aria-label': 'Visible notes' });
   const zoom = el('label', 'Show ');
   zoom.append(span);
   controls.append(zoom, lower, readout, higher);
-  header.append(name, close);
+  header.append(name, screen, close);
   const bed = el('div', null, { className: 'expanded-keybed' });
-  dialog.append(header, controls, bed);
+  player.append(header, controls, bed);
+  dialog.append(player);
   document.body.append(dialog);
   const wide = matchMedia('(min-width: 580px)');
   let startOctave,
@@ -85,6 +173,7 @@ export function openExpandedKeyboard(slot) {
     const to = padRange?.to ?? from + 12 * octaves;
     const built = buildPianoKeys(bed, { from, to, octaves });
     keys = built.keys;
+    bed.style.setProperty('--key-depth', (4 * parseFloat(keys[0].style.width)) + 'vw');
     zoom.hidden = lower.hidden = higher.hidden = !!padRange;
     lower.disabled = startOctave === 0;
     higher.disabled = startOctave === highest;
@@ -143,7 +232,6 @@ export function openExpandedKeyboard(slot) {
   const resize = () => {
     if (!padRange && preferredSpan === 'auto') render();
   };
-  const finish = () => dialog.close();
   const instrumentChange = ({ i, prop }) => {
     if (i !== slot) return;
     if (prop === 'name') name.textContent = store.instrument(slot).name;
@@ -161,20 +249,17 @@ export function openExpandedKeyboard(slot) {
   document.addEventListener('synth-note', voice);
   document.addEventListener('live-octave', render);
   wide.addEventListener('change', resize);
-  dialog.addEventListener(
-    'close',
-    () => {
-      releaseAccessibleKey();
-      handle?.dispose();
-      wide.removeEventListener('change', resize);
-      document.removeEventListener('instrument-target', targetChanged);
-      document.removeEventListener('synth-note', voice);
-      document.removeEventListener('live-octave', render);
-      cleanup.forEach((off) => off());
-      dialog.remove();
-    },
-    { once: true }
-  );
-  dialog.showModal();
+  document.addEventListener('keydown', escape, true);
+  document.addEventListener('fullscreenchange', nativeChange);
+  document.addEventListener('webkitfullscreenchange', nativeChange);
+  dialog.addEventListener('cancel', (event) => {
+    event.preventDefault();
+    if (playingFull) toggleScreen();
+    else finish();
+  });
+  document.body.classList.add('keyboard-docked');
+  dialog.show();
   render();
+  measureDock();
+  observer.observe(dialog);
 }

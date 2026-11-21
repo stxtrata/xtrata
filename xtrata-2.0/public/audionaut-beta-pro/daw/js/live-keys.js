@@ -210,10 +210,13 @@ export function attachKeyboard(el, { keyAt, inst, velAt, hitTest, prefix = "kb" 
     const sources=detail?.sources;
     for(const pointerId of ptrs.keys())if(!detail?.prefix&&!sources || detail?.prefix&&`${tag}:`.startsWith(detail.prefix) || sources?.includes(`${tag}:${pointerId}`))ptrs.delete(pointerId);
   };
-  const events={pointerdown:onDown,pointermove:onMove,pointerup:end,pointercancel:end,lostpointercapture:end,contextmenu:context};
+  const events={pointerdown:onDown,pointermove:onMove,pointerup:end,pointercancel:end,lostpointercapture:end,contextmenu:context,dblclick:context};
   for(const [name,fn] of Object.entries(events))el.addEventListener(name,fn);
+  // Notes use pointer events. Suppress Safari's tap-to-zoom default only on the playing surface.
+  const touchEnd = e => { if (e.cancelable) e.preventDefault(); };
+  el.addEventListener('touchend', touchEnd, {passive:false});
   document.addEventListener('performance-reset',reset);
   const previousTouch=el.style.touchAction;el.style.touchAction='none';
   const release=()=>{allOff(`${tag}:`);ptrs.clear();};
-  return {tag,release,dispose(){release();for(const [name,fn] of Object.entries(events))el.removeEventListener(name,fn);document.removeEventListener('performance-reset',reset);el.style.touchAction=previousTouch;}};
+  return {tag,release,dispose(){release();el.removeEventListener('touchend',touchEnd);for(const [name,fn] of Object.entries(events))el.removeEventListener(name,fn);document.removeEventListener('performance-reset',reset);el.style.touchAction=previousTouch;}};
 }

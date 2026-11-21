@@ -158,6 +158,13 @@ try {
     [0, 49, true],
     [0, 49, false]
   ]);
+  const pitch = bed.locator('[data-midi="49"]');
+  const xy = await pitch.boundingBox();
+  await p.evaluate(() => { expandedNotes.length = 0; });
+  for (let n = 0; n < 5; n++) await p.touchscreen.tap(xy.x + xy.width/2, xy.y + 15);
+  assert.deepEqual(await p.evaluate(() => expandedNotes), Array.from({length:5}, () => [[0,49,true],[0,49,false]]).flat());
+  assert.equal(await p.evaluate(() => visualViewport.scale), 1);
+  assert.equal(await dialog.evaluate(d => d.matches(':modal')), false);
   await p.setViewportSize({ width: 844, height: 390 });
   await p.waitForFunction(
     () => document.querySelectorAll('.expanded-keybed [data-midi]').length === 25
@@ -165,6 +172,7 @@ try {
   await span.selectOption('1');
   for (const [width, height] of [
     [390, 844],
+    [820, 1180],
     [844, 390],
     [1180, 820]
   ]) {
@@ -172,12 +180,30 @@ try {
     const bounds = await bed.boundingBox();
     assert.ok(
       bounds.width >= width - 28 &&
-        bounds.height >= height * 0.52 &&
+        bounds.height >= 88 && bounds.height <= height * 0.3 &&
         bounds.y + bounds.height <= height + 1,
-      'Keyboard fills viewport at ' + width + 'x' + height
+      'Docked keyboard has full width and a bounded depth at ' + width + 'x' + height
     );
     assert.equal(await pitches.count(), 13, 'Manual one-octave range survives rotation');
   }
+  await p.setViewportSize({width:820, height:1180});
+  const dockBefore = await dialog.boundingBox();
+  const synth = await p.locator('#synth-front').boundingBox();
+  assert.ok(synth.y < dockBefore.y && synth.y + synth.height <= dockBefore.y + 2, 'Synth stays visible above portrait keys');
+  const dockSize = p.locator('#synth-dock-size');
+  await dockSize.tap();
+  if (process.env.SCREENSHOT_DIR)
+    await p.screenshot({ path: process.env.SCREENSHOT_DIR + '/docked-ipad-portrait.png' });
+  // Some Safari hosts provide only studio fullscreen. Keep the simulated viewport during rotation.
+  const player = dialog.locator('.expanded-key-player');
+  await player.evaluate(el => { el.requestFullscreen = undefined; el.webkitRequestFullscreen = undefined; });
+  const full = dialog.getByRole('button', {name:'Full screen',exact:true});
+  await full.tap();
+  await dialog.getByRole('button', {name:'Exit full screen'}).waitFor();
+  assert.equal(await dialog.evaluate(d => d.matches(':modal')), true);
+  assert.ok((await bed.boundingBox()).height <= 305);
+  await p.setViewportSize({width:1180, height:820});
+  assert.ok((await bed.boundingBox()).height > 520, 'Landscape playing surface fills the player');
   if (process.env.SCREENSHOT_DIR)
     await p.screenshot({ path: process.env.SCREENSHOT_DIR + '/expanded-ipad.png' });
   await dialog.getByRole('button', { name: 'Higher octave' }).tap();
@@ -207,6 +233,19 @@ try {
   });
   const held = () => p.evaluate(() => window.heldKeys());
   const firstKey = pitches.first();
+  await hold();
+  assert.equal(await held(), 2);
+  await dialog.getByRole('button', {name:'Exit full screen'}).tap();
+  await full.waitFor();
+  assert.equal(await held(), 0);
+  assert.equal(await dialog.evaluate(d => d.matches(':modal')), false);
+  await player.evaluate(el => { delete el.requestFullscreen; delete el.webkitRequestFullscreen; });
+  await full.tap();
+  if (await p.evaluate(() => Boolean(document.fullscreenElement))) {
+    await p.evaluate(() => document.exitFullscreen());
+    await full.waitFor();
+    await full.tap();
+  }
   await firstKey.focus();
   await p.keyboard.press('ArrowRight');
   await p.keyboard.down('Enter');
@@ -224,6 +263,14 @@ try {
   await dialog.getByRole('button', { name: 'Done' }).tap();
   await p.waitForSelector('dialog.expanded-keyboard', { state: 'detached' });
   assert.equal(await held(), 0);
+  await p.locator('#expand-synth-keys').tap();
+  await player.evaluate(el => { el.requestFullscreen = undefined; el.webkitRequestFullscreen = undefined; });
+  await full.tap();
+  await p.keyboard.press('Escape');
+  await full.waitFor();
+  await p.keyboard.press('Escape');
+  await dialog.waitFor({state:'detached'});
+  assert.equal(await p.evaluate(() => document.activeElement?.id), 'expand-synth-keys');
   // The Mobile shortcut uses the selected slot and the rack's actual note map.
   await p.setViewportSize({ width: 390, height: 844 });
   await selectWorkspace(p, 'Mobile');

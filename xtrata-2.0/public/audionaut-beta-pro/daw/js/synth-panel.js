@@ -1112,7 +1112,7 @@ export function initSynthPanel() {
   inst = Number.isInteger(pref.inst) && store.instrument(pref.inst) ? pref.inst : 0;
   setMidiTarget(inst);
   dockEl().classList.toggle("tall", !!pref.tall);
-  $("#expand-synth-keys").addEventListener("click", () => openExpandedKeyboard(inst));
+  $("#expand-synth-keys").addEventListener("click", (event) => openExpandedKeyboard(inst, event.currentTarget));
   $("#synth-dock-toggle").addEventListener("click", () => setDockOpen(!dockOpen()));
   $("#synth-dock-size").addEventListener("click", () => {
     const tall = dockEl().classList.toggle("tall");

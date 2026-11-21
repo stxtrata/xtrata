@@ -40,7 +40,7 @@ const topics = [
   ],
   [
     'Recording, sampler and instruments',
-    'More views contains Record & takes for input and punch recording, Sampler for processing and slicing a source, and New instruments for choosing sound generators. Open Play setup to choose the active keyboard instrument. Tap Expand keyboard in its synth panel or Mobile track controls to play across the screen. Auto fits one or two octaves. Choose a fixed span and use − or + to shift it.'
+    'More views contains Record & takes for input and punch recording, Sampler for processing and slicing a source, and New instruments for choosing sound generators. Open Play setup to choose the active keyboard instrument. Tap Expand keyboard in its synth panel or Mobile track controls to play across the screen. The keys open below the editor. Tap Full screen to focus on playing, Exit full screen to show the editor again, or Done to close the keys. Auto fits one or two octaves. Choose a fixed span and use − or + to shift it.'
   ],
   [
     'Save, restore and open older songs',

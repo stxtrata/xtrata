@@ -474,18 +474,30 @@ body[data-workspace='mobile']:not(.synth-dock-open) #synth-dock {
 }
 
 #expand-synth-keys {flex:none;min-height:44px}
+.keyboard-docked #app {padding-bottom:var(--keyboard-dock-height,0px);box-sizing:border-box}
+.keyboard-docked #synth-dock {bottom:var(--keyboard-dock-height,0px)}
+.keyboard-docked .synth-dock-body {max-height:calc(100dvh - var(--keyboard-dock-height,0px) - 60px)}
 .expanded-keyboard {
-  position:fixed;inset:0;box-sizing:border-box;margin:0;border:0;max-width:none;max-height:none;
-  width:100%;height:100%;height:100dvh;background:#101922;color:#f2f6fa;
-  padding:max(8px,env(safe-area-inset-top)) max(6px,env(safe-area-inset-right)) max(8px,env(safe-area-inset-bottom)) max(6px,env(safe-area-inset-left));
+  position:fixed;inset:auto 0 0;z-index:65;box-sizing:border-box;margin:0;border:0;border-top:1px solid #526570;
+  width:100%;max-width:none;max-height:100dvh;padding:0;background:#101922;color:#f2f6fa;
 }
-.expanded-keyboard[open] {display:flex;flex-direction:column;gap:6px}
+.expanded-key-player {
+  display:flex;flex-direction:column;gap:6px;box-sizing:border-box;background:#101922;color:#f2f6fa;
+  padding:6px max(6px,env(safe-area-inset-right)) max(8px,env(safe-area-inset-bottom)) max(6px,env(safe-area-inset-left));
+}
+.expanded-keyboard.playing-full {inset:0;height:100dvh}
+.playing-full .expanded-key-player {height:100%;padding-top:max(6px,env(safe-area-inset-top))}
 .expanded-keyboard header,.expanded-key-controls {display:flex;align-items:center;gap:8px}
 .expanded-keyboard h2 {font-size:clamp(16px,2vw,24px);margin:0 auto 0 4px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .expanded-keyboard button,.expanded-keyboard select {min-height:44px;min-width:44px}
 .expanded-key-controls {justify-content:center;flex-wrap:wrap;font-variant-numeric:tabular-nums}
 .expanded-key-controls [hidden] {display:none}
-.expanded-keybed {min-height:0;flex:1}
+.expanded-keybed {height:clamp(90px,min(var(--key-depth),28dvh),250px);min-height:0;touch-action:none;-webkit-touch-callout:none}
+.playing-full .expanded-keybed {height:auto;flex:1}
+@media (orientation:portrait) {
+  .playing-full .expanded-key-player {justify-content:center}
+  .playing-full .expanded-keybed {height:clamp(110px,min(var(--key-depth),35dvh),300px);flex:none}
+}
 .expanded-keybed [data-midi] {display:flex;align-items:flex-end;justify-content:center;overflow:hidden;color:#28323a}
 .expanded-keyboard select {background:#1b2b37;color:#eef4f8;border:1px solid #526570;border-radius:5px;padding-inline:6px}
 .expanded-keybed .kb-w {background:linear-gradient(#d2d5d6 0%,#f9f8f3 8%,#edece5 96%,#c7c8c2);border-color:#41474a}
@@ -494,11 +506,18 @@ body[data-workspace='mobile']:not(.synth-dock-open) #synth-dock {
 .expanded-keybed [data-midi].on {background:#61e1c1;color:#102a25}
 .expanded-keybed [aria-disabled=true] {opacity:.48}
 .expanded-keybed [data-midi]:focus-visible {outline:3px solid #327aee;outline-offset:-3px}
-@media(max-height:500px) and (min-width:600px) {
-  .expanded-keyboard[open] {display:grid;grid-template-columns:minmax(0,1fr) auto auto;grid-template-rows:auto minmax(0,1fr)}
+@media(min-width:640px) {
+  .expanded-key-player {display:grid;grid-template-columns:minmax(0,1fr) auto auto auto;align-items:center}
   .expanded-keyboard header {display:contents}
-  .expanded-keyboard h2 {grid-column:1;grid-row:1;align-self:center}
-  .expanded-keyboard header button {grid-column:3;grid-row:1}
-  .expanded-key-controls {grid-column:2;grid-row:1;justify-self:end;background:#101922}
+  .expanded-keyboard h2 {grid-column:1;grid-row:1}
+  .expanded-keyboard header button {grid-row:1}
+  .expanded-keyboard header button:first-of-type {grid-column:3}
+  .expanded-keyboard header button:last-of-type {grid-column:4}
+  .expanded-key-controls {grid-column:2;grid-row:1}
   .expanded-keybed {grid-column:1/-1;grid-row:2}
+  .playing-full .expanded-key-player {grid-template-rows:auto minmax(0,1fr)}
+  .playing-full .expanded-keybed {align-self:stretch}
+}
+@media(min-width:640px) and (orientation:portrait) {
+  .playing-full .expanded-key-player {align-content:center;grid-template-rows:auto auto}
 }
