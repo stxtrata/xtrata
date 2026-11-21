@@ -1,3 +1,4 @@
+import './mobile-track-groups.js';
 // main.js — bootstrap and wiring between store, engine, UI, and persistence.
 
 import { store, makeProject } from "./state.js";

@@ -174,7 +174,7 @@ function sampleControls(ch) {
   const loadBtn = el("button", "ch-btn load", "⊕");
   loadBtn.title = "Load sample";
   loadBtn.addEventListener("click", () => openLoader(ch));
-  const previewBtn = el("button", "ch-btn", "▹");
+  const previewBtn = el("button", "ch-btn preview", "▹");
   previewBtn.title = "Preview sample";
   previewBtn.addEventListener("click", () => engine.trigger(ch));
 
@@ -192,7 +192,7 @@ function sampleControls(ch) {
     soloBtn.classList.toggle("active", store.channel(ch).solo);
   });
 
-  const trimBtn = el("button", "ch-btn", "✂");
+  const trimBtn = el("button", "ch-btn trim", "✂");
   trimBtn.title = "Trim / waveform";
   trimBtn.addEventListener("click", () => openTrim(ch));
 
@@ -426,7 +426,7 @@ function instrumentControls(i) {
   insBtn.addEventListener("click", () => openChain(i, true, "inserts"));
   markChainButtons(instr, fxBtn, insBtn);
 
-  const previewBtn = el("button", "ch-btn", "▹");
+  const previewBtn = el("button", "ch-btn preview", "▹");
   previewBtn.title = "Preview (C3)";
   previewBtn.addEventListener("click", () => {
     setMidiTarget(i);

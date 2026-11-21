@@ -1,6 +1,9 @@
 import { store, stepVal, MAX_SEQUENCES } from './state.js';
 import { engine } from './engine.js';
-import { openLoader, openTrim, openChain, openStepEditor } from './ui.js';
+import { createTrackControls, refreshTrackControls, openStepEditor } from './ui.js';
+import { readGroups, toggleGroup } from './mobile-track-groups.js';
+import { editGroups } from './mobile-group-editor.js';
+import { setMidiTarget } from './midi-input.js';
 import { el, action, field } from './pro-ui.js';
 import { startLesson, endMobileLesson } from './pro-guide.js';
 
@@ -54,13 +57,10 @@ export function mount(host) {
   function browse() {
     if (engine.isPlaying) setFollowing(false);
   }
-  const channel = () =>
-    Math.max(
-      0,
-      store.project.channels.findIndex((c) => c.id === trackId)
-    );
+  const channel = () => store.project.channels.findIndex((c) => c.id === trackId);
+  const instrument = () => store.project.instruments.findIndex((c) => c.id === trackId);
   const sequence = el('select'),
-    track = el('select');
+    track = el('select', null, { id: 'mobile-track' });
   const bars = el('div', null, {
     className: 'mobile-bars',
     role: 'group',
@@ -81,7 +81,118 @@ export function mount(host) {
   });
   heading.append(el('h2', 'Step sequencer'), beat, guide);
   const selectors = el('div', null, { className: 'mobile-selectors' });
-  selectors.append(field('Sequence', sequence), field('Sample channel', track));
+  let groupId = null;
+  const remembered = new Map();
+  const groupsRow = el('div', null, {
+    className: 'mobile-groups',
+    role: 'group',
+    'aria-label': 'Track groups'
+  });
+  const chips = el('div', null, { className: 'mobile-group-chips' });
+  const manage = action('Groups', () => editGroups(host, groupId, trackId, chooseGroup), {
+    title: 'Create or edit track groups'
+  });
+  groupsRow.append(chips);
+  function tracksInGroup() {
+    const group = groupId && readGroups().list.find((g) => g.id === groupId);
+    return [...store.project.channels, ...store.project.instruments].filter(
+      (c) => !c.assetOnly && (!group || group.tracks.includes(c.id))
+    );
+  }
+  function selectTrack(id) {
+    if (!id) return;
+    trackId = id;
+    if (groupId) remembered.set(groupId, id);
+    track.value = id;
+    if (instrument() >= 0) setMidiTarget(instrument());
+    updateStrip();
+    syncPosition();
+    paint();
+  }
+  function chooseGroup(id) {
+    groupId = id;
+    const available = tracksInGroup();
+    const last = remembered.get(id);
+    const target =
+      available.find((t) => t.id === last) ||
+      available.find((t) => t.id === trackId) ||
+      available[0];
+    if (target) selectTrack(target.id);
+    rebuild();
+  }
+  function hop(direction) {
+    const owners = tracksInGroup(),
+      i = owners.findIndex((t) => t.id === trackId);
+    if (owners.length) selectTrack(owners[(i + direction + owners.length) % owners.length].id);
+  }
+  const previous = action('‹', () => hop(-1), {
+    'aria-label': 'Previous track',
+    title: 'Previous track in this group'
+  });
+  const next = action('›', () => hop(1), {
+    'aria-label': 'Next track',
+    title: 'Next track in this group'
+  });
+  const switcher = el('div', null, { className: 'mobile-track-switch' });
+  switcher.append(previous, field('Track', track), next);
+  selectors.append(field('Sequence', sequence), switcher);
+  const inspector = el('section', null, {
+    className: 'mobile-inspector',
+    'aria-label': 'Selected track controls'
+  });
+  const source = el('span', '', { className: 'mobile-source' });
+  const context = el('div', null, { className: 'mobile-track-context' });
+  context.append(source, manage);
+  inspector.append(selectors, context, groupsRow);
+  let strip;
+  function updateStrip() {
+    const i = channel(),
+      isSynth = i < 0,
+      owner = store.track(trackId);
+    if (!owner) return;
+    if (
+      strip?.dataset.trackId !== trackId ||
+      +strip.dataset.ownerIndex !== (isSynth ? instrument() : i)
+    ) {
+      strip?.remove();
+      strip = createTrackControls(trackId, { patternTools: false, playbackRate: false });
+      strip.classList.add('mobile-strip');
+      const mix = el('div', null, { className: 'mobile-mix' });
+      const devices = el('div', null, { className: 'mobile-devices' });
+      function moveButton(selector, caption, parent, id) {
+        const button = strip.querySelector(selector);
+        if (!button) return;
+        button.textContent = caption;
+        button.setAttribute('aria-label', caption + ' · ' + owner.name);
+        if (id) button.id = id;
+        parent.append(button);
+      }
+      moveButton('.solo', 'Solo', mix);
+      moveButton('.mute', 'Mute', mix);
+      moveButton('.preview', 'Preview', mix);
+      const volume = strip.querySelector('.ch-vol');
+      mix.append(field('Level', volume));
+      if (isSynth) {
+        devices.append(strip.querySelector('.synth-picker'));
+        moveButton('.panel-open', 'Synth panel', devices);
+        moveButton('.roll-open', 'Piano roll', devices);
+      } else {
+        moveButton('.load', 'Load sound', devices, 'mobile-load');
+        moveButton('.trim', 'Trim', devices, 'mobile-trim');
+      }
+      moveButton('.ins', 'Inserts', devices);
+      moveButton('.fxb', 'Effects', devices, 'mobile-effects');
+      strip.append(mix, devices);
+      inspector.append(strip);
+    }
+    refreshTrackControls(strip);
+    source.textContent = isSynth
+      ? 'Instrument'
+      : owner.sampleName || owner.source?.label || 'No sample loaded';
+    source.title = source.textContent;
+    source.hidden = isSynth;
+    tools.hidden = pads.hidden = isSynth;
+  }
   const playback = el('div', null, { className: 'mobile-playback' });
   const position = el('span', '', { className: 'mobile-position' });
   const follow = action(
@@ -111,7 +222,7 @@ export function mount(host) {
     title: 'Jump to the displayed sequence and repeat it'
   });
   playback.append(position, follow, song, loopBar, loopSeq);
-  host.append(heading, selectors, bars, pads, playback, tools);
+  host.append(heading, inspector, bars, pads, playback, tools);
   const welcomeKey = 'audionaut.beta-pro.mobile.introduction';
   let firstVisit = true;
   try {
@@ -152,9 +263,7 @@ export function mount(host) {
     selectEdit();
   };
   track.onchange = () => {
-    trackId = track.value;
-    syncPosition();
-    paint();
+    selectTrack(track.value);
   };
   const mode = action(
     'Accent',
@@ -174,13 +283,7 @@ export function mount(host) {
     },
     { title: 'Tap a pad to open its step editor' }
   );
-  tools.append(
-    mode,
-    detail,
-    action('Load sound', () => openLoader(channel()), { id: 'mobile-load' }),
-    action('Trim sound', () => openTrim(channel()), { id: 'mobile-trim' }),
-    action('Effects', () => openChain(channel(), false, 'fx'), { id: 'mobile-effects' })
-  );
+  tools.append(mode, detail);
   for (let i = 0; i < 4; i++)
     bars.append(
       action('Bar ' + (i + 1), () => {
@@ -193,6 +296,7 @@ export function mount(host) {
     pads.append(
       action('', () => {
         const step = bar * 16 + i;
+        if (channel() < 0) return;
         if (edit) {
           setFollowing(false);
           paint();
@@ -248,7 +352,7 @@ export function mount(host) {
   }
   function paint() {
     const ch = channel(),
-      track = store.channel(ch);
+      track = store.track(trackId);
     [...bars.children].forEach((node, i) => node.setAttribute('aria-pressed', String(i === bar)));
     [...pads.children].forEach((node, i) => {
       const step = bar * 16 + i,
@@ -269,25 +373,91 @@ export function mount(host) {
       button.setAttribute('aria-pressed', String(scope?.kind === kind));
     detail.setAttribute('aria-pressed', String(edit));
     mode.setAttribute('aria-pressed', String(accent));
-    host.style.setProperty('--track-color', track?.color || '#56d8cf');
+    host.style.setProperty(
+      '--track-color',
+      track?.color || strip?.style.getPropertyValue('--ch-color') || '#56d8cf'
+    );
     playhead();
   }
   function rebuild() {
-    trackId = store.channel(channel())?.id;
+    const { list, muted } = readGroups();
+    if (!list.some((g) => g.id === groupId && g.tracks.length)) groupId = null;
+    const available = tracksInGroup();
+    previous.disabled = next.disabled = available.length < 2;
+    const groups = [
+      available.filter((t) => t.kind === 'sample'),
+      available.filter((t) => t.kind === 'instrument')
+    ];
+    // Keep focused performance buttons mounted while playback advances.
+    groupsRow.hidden = !list.length;
+    const signature = JSON.stringify([list, groupId, muted]);
+    if (chips.dataset.signature !== signature) {
+      const focused =
+        chips.contains(document.activeElement) &&
+        (document.activeElement.getAttribute('aria-label') || document.activeElement.textContent);
+      chips.replaceChildren();
+      if (list.length)
+        chips.append(
+          action('All tracks', () => chooseGroup(null), { 'aria-pressed': String(!groupId) })
+        );
+      for (const g of list) {
+        const pair = el('span', null, { className: 'mobile-group-pair' });
+        const pick = action(g.name, () => chooseGroup(g.id), {
+          'aria-label': 'Select group ' + g.name,
+          'aria-pressed': String(groupId === g.id)
+        });
+        pick.disabled = !g.tracks.length;
+        const mutedNow = muted.includes(g.id);
+        const mute = action(mutedNow ? 'Muted' : 'Mute', () => toggleGroup(g.id), {
+          'aria-label': 'Mute group ' + g.name,
+          'aria-pressed': String(mutedNow),
+          title: (mutedNow ? 'Release ' : 'Mute ') + g.name
+        });
+        mute.disabled = !g.tracks.length && !mutedNow;
+        pair.append(pick, mute);
+        chips.append(pair);
+      }
+      chips.dataset.signature = signature;
+      if (focused)
+        [...chips.querySelectorAll('button')]
+          .find((b) => (b.getAttribute('aria-label') || b.textContent) === focused)
+          ?.focus({ preventScroll: true });
+    }
+    if (!groups.some((group) => group.some((c) => c.id === trackId)))
+      trackId = (groups[0][0] || groups[1][0])?.id;
     sequence.replaceChildren(
       ...store.project.sequences.map((s, i) => new Option(String(i + 1), String(i)))
     );
     if (store.project.sequences.length < MAX_SEQUENCES)
       sequence.append(new Option('+ Add sequence', String(store.project.sequences.length)));
     track.replaceChildren(
-      ...store.project.channels.map((c, i) => new Option(i + 1 + ' · ' + c.name, c.id))
+      ...groups.map((owners, index) => {
+        const group = el('optgroup', null, { label: index ? 'Instruments' : 'Samples' });
+        group.append(...owners.map((c) => new Option(c.name, c.id)));
+        return group;
+      })
     );
     track.value = trackId;
+    updateStrip();
     paint();
   }
+  function trackChanged(change) {
+    if (!change?.prop || ['name', 'assetOnly'].includes(change.prop)) return rebuild();
+    const owner = change.ch === undefined ? store.instrument(change.i) : store.channel(change.ch);
+    if (owner?.id === trackId) updateStrip();
+  }
+  host.addEventListener('sample-lesson', ({ detail: lesson }) => {
+    if (lesson === 'layer' && groupId) chooseGroup(null);
+    if (channel() >= 0) return;
+    chooseGroup(null);
+    selectTrack(store.project.channels.find((c) => !c.assetOnly)?.id);
+  });
   const cleanup = [
     store.on('load', ({ restore }) => {
+      host.querySelector('dialog[open]')?.close();
       if (!restore) {
+        groupId = null;
+        remembered.clear();
         scope = null;
         bar = 0;
       }
@@ -295,10 +465,12 @@ export function mount(host) {
     }),
     store.on('timeline', rebuild),
     store.on('channels', rebuild),
-    store.on('channel', rebuild),
+    store.on('instruments', rebuild),
+    store.on('instrument', trackChanged),
+    store.on('channel', trackChanged),
     store.on('sequence', rebuild),
     store.on('step', paint),
-    store.on('project', paint)
+    store.on('project', (change) => (change?.prop === 'extensions' ? rebuild() : paint()))
   ];
   document.addEventListener('audionaut-display-step', syncPosition);
   document.addEventListener('transport', syncPosition);

@@ -31,7 +31,7 @@ try {
   assert.notEqual(await pad.getAttribute('aria-pressed'), previous);
   const saved = await p.evaluate(async () => {
     const { store, stepVal } = await import('/audionaut-beta-pro/daw/js/state.js');
-    const id = document.querySelector('.mobile-selectors label:last-child select').value;
+    const id = document.querySelector('#mobile-track').value;
     return !!stepVal(store.seq.steps[store.project.channels.findIndex((c) => c.id === id)][32]);
   });
   assert.equal(saved, previous !== 'true');
