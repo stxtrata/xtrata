@@ -145,7 +145,7 @@ const sc = (v) => {
 export function renderLantern(Pin, pitch, velIn, durIn, sr, o = {}) {
   const p = settings(Pin);
   const vel = clamp(num(velIn, 0.8), 0, 1.5);
-  const gate = clamp(num(durIn, 0.5), 0.01, 60);
+  const gate = Math.max(0.01, num(durIn, 0.5));
   const f0 = 440 * Math.pow(2, (clamp(num(pitch, 60), 0, 127) - 69) / 12);
   if (vel < 0.002 || p.level === 0 || (p.strike === 0 && p.halo === 0)) return null;
 
@@ -168,7 +168,7 @@ export function renderLantern(Pin, pitch, velIn, durIn, sr, o = {}) {
   // audible end of the dry note: where the release has fallen ~ -100 dB
   const tEnd = relStart > 2e-5 ? gate + (R * Math.log(relStart / 2e-5)) / Math.log(relStart / EPS) : gate + 0.02;
   const tail = space > 0.004 ? 1.85 : 0.01;
-  const maxSec = o.maxSec || 8;
+  const maxSec = o.maxSec || tEnd + tail + 0.01;
   const n = Math.max(64, Math.min(Math.floor(maxSec * sr), Math.ceil((tEnd + tail) * sr)));
   const na = Math.min(n, Math.ceil(tEnd * sr) + 1); // samples that carry dry signal
   // velocity opens the filter a little (the page was velocity→level only; this is the "touch" amount)
@@ -523,7 +523,7 @@ const lantern = {
   live: { oneShot: true, gate: 0.6 }, // offline-rendered bloom: rings out, render stays short
   voice(ctx, dest, note, P) {
     const { pitch, vel, time, dur } = note;
-    const r = cached(settings({ ...DEFAULTS, ...P }), num(pitch, 60), clamp(num(vel, 0.8), 0, 1.5), clamp(num(dur, 0.5), 0.01, 60), ctx.sampleRate);
+    const r = cached(settings({ ...DEFAULTS, ...P }), num(pitch, 60), clamp(num(vel, 0.8), 0, 1.5), Math.max(0.01, num(dur, 0.5)), ctx.sampleRate);
     if (!r) return;
     // the bloom buffer is stored at the internal rate (the browser resamples it), the strike tick at full rate
     const play = (chans, rate) => {

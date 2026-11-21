@@ -54,13 +54,18 @@ export function parseLine(dsl) {
 function adsrGain(ctx, t, vel, a, d, s, r, dur) {
   const g = ctx.createGain();
   const peak = Math.max(0.001, vel);
+  a = Math.max(0.002, a); d = Math.max(0.002, d); r = Math.max(0.01, r);
+  const gate = Math.max(0.001, dur), sus = Math.max(0.0001, peak * s);
+  const at = (age) => age < a ? 0.0001 * Math.pow(peak / 0.0001, age / a) : age < a + d ? peak * Math.pow(sus / peak, (age - a) / d) : sus;
   g.gain.setValueAtTime(0.0001, t);
-  g.gain.exponentialRampToValueAtTime(peak, t + Math.max(0.002, a));
-  const sus = Math.max(0.0001, peak * s);
-  g.gain.exponentialRampToValueAtTime(sus, t + a + d);
-  const end = t + Math.max(dur, a + d);
-  g.gain.setValueAtTime(sus, end);
-  g.gain.exponentialRampToValueAtTime(0.0001, end + Math.max(0.01, r));
+  g.gain.exponentialRampToValueAtTime(at(Math.min(gate, a)), t + Math.min(gate, a));
+  if (gate > a) g.gain.exponentialRampToValueAtTime(at(Math.min(gate, a + d)), t + Math.min(gate, a + d));
+  const end = t + gate;
+  if (Number.isFinite(end)) {
+    g.gain.setValueAtTime(Math.max(0.0001, at(gate)), end);
+    g.gain.exponentialRampToValueAtTime(0.0001, end + r);
+    g.gain.setValueAtTime(0, end + r + .001);
+  }
   return { g, stopAt: end + r + 0.05 };
 }
 
@@ -200,6 +205,11 @@ export const SYNTH_BANK = {
       f.type = "lowpass";
       f.frequency.value = P.cutoff;
       f.Q.value = P.reso;
+      ctx.bindParam?.("cutoff", f.frequency);
+      ctx.bindParam?.("reso", f.Q);
+      ctx.bindParam?.("sub", sg.gain);
+      ctx.bindParam?.("tune", o.detune);
+      ctx.bindParam?.("tune", so.detune);
       if (P.fenv > 0) {
         // Filter envelope: opens to cutoff + amount, then decays back to cutoff.
         const top = Math.min(20000, P.cutoff + P.fenv);
@@ -810,4 +820,16 @@ export function synthDefaults(synthId) {
     out[p.key] = p.def;
   });
   return out;
+}
+
+// Conservative release/tail bound for offline planning, including stock instrument
+// internal echoes. Full voice handles report their actual scheduled source tail.
+export function synthTailSeconds(synthId, patch = {}) {
+  const p = {...synthDefaults(synthId),...patch}, release = Math.max(.01,+p.release || +p.rel || .25);
+  if (synthId === "fm4") return release*1.2+.03;
+  if (synthId === "kiln") return release*1.334+.02;
+  if (synthId === "lantern") return release+(p.space>.004?1.85:.01)+.02;
+  if (["modal","pluck"].includes(synthId)) return release*1.2+.1;
+  if (synthId === "kit") return Math.max(2,...Object.entries(p).filter(([k])=>/decay|length/i.test(k)).map(([,v])=>+v||0))+.1;
+  return release+1; // at most one second of stock native delay/filter ring-down
 }

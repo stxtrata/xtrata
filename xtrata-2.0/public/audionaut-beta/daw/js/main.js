@@ -1,13 +1,13 @@
 // main.js — bootstrap and wiring between store, engine, UI, and persistence.
 
-import { store, makeProject, NUM_INSTRUMENTS } from "./state.js";
+import { store, makeProject } from "./state.js";
 import { engine } from "./engine.js";
 import { reloadAllSamples } from "./loader.js";
 import * as ui from "./ui.js";
 import * as persist from "./persistence.js";
 import { initPianoRoll, rollPlayhead } from "./pianoroll.js";
 import { initSynthPanel } from "./synth-panel.js";
-import { initMidi } from "./midi-input.js";
+import { initMidi, getMidiTarget, setMidiTarget } from "./midi-input.js";
 import {
   initArrange,
   arrangePlayhead,
@@ -16,26 +16,28 @@ import {
   syncArrangeControls,
 } from "./arrange.js";
 import { initHistory, resetHistory, undo, redo } from "./history.js";
-import { initSourceBrowser } from "./source-browser.js";
-import { initSamplesLoops } from "./samples-loops-browser.js";
 import { initAudioTools } from "./audio-tools.js";
 import { renderOrdinalReferences } from "./ordinal-links.js";
 import { sourceIdentity } from "./assets.js";
 import { initPerformanceControls } from "./performance-controls.js";
 import { initProjectLibrary } from "./project-library.js";
 import { initPublish } from "./publish.js";
+import { initWorkspace } from "./pro-workspace.js";
+import { openProjectFile } from './legacy-import-ui.js';
+import { preparedImportFailures } from './legacy-import-audio.js';
 
 const $ = (s) => document.querySelector(s);
 let sampleRestore = Promise.resolve([]);
+document.addEventListener('audio-error',event=>ui.setStatus(event.detail.message,true));
 
 // ------------------------------------------------------------ transport
-function togglePlay() {
+async function togglePlay() {
   if (engine.isPlaying) {
     engine.pause();
     $("#btn-play").textContent = "▶";
     $("#btn-play").classList.remove("active");
   } else {
-    engine.play();
+    try { await engine.play(); } catch (error) { ui.setStatus(error.message, true); return; }
     $("#btn-play").textContent = "❚❚";
     $("#btn-play").classList.add("active");
   }
@@ -230,9 +232,9 @@ function initSequenceBar() {
 
 // ------------------------------------------------------------ file ops
 function initFileOps() {
-  $("#btn-save").addEventListener("click", () => {
+  $("#btn-save").addEventListener("click", async () => {
     try {
-      persist.downloadProject();
+      await persist.downloadProject();
       sessionState.edited = false;
       ui.setStatus("Project exported as JSON.");
     } catch (error) { ui.setStatus(`Export failed: ${error.message}`, true); }
@@ -245,9 +247,7 @@ function initFileOps() {
     if (!confirmReplace()) return;
     const unchanged = replacementGuard();
     try {
-      const text = await file.text();
-      if (!unchanged()) return ui.setStatus("The project changed while the file was opening. Load it again when ready.", true);
-      persist.importProject(text);
+      if(!await openProjectFile(file,{guard:unchanged,onStatus:ui.setStatus}))return;
       ui.setStatus("Project loaded. Fetching samples…");
       const failures = await sampleRestore;
       ui.refreshAllChannels();
@@ -297,6 +297,8 @@ const TEXT_FIELD =
 
 function initKeyboard() {
   document.addEventListener("keydown", (e) => {
+    if (e.target?.closest?.("dialog")) return;
+    if (e.defaultPrevented || (e.code === "Space" && e.target?.closest?.("button,dialog"))) return;
     // global undo/redo — works in every edit mode (grid, roll, arrange, modals),
     // but text fields keep their own native undo.
     if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "z") {
@@ -326,6 +328,7 @@ function sameAudioSources(a, b) {
 }
 
 function initSubscriptions() {
+  document.addEventListener('transport',({detail})=>{const playing=!!detail?.playing;$('#btn-play').textContent=playing?'❚❚':'▶';$('#btn-play').classList.toggle('active',playing);});
   store.on("step", ({ ch, step, val }) => ui.updateStep(ch, step, val));
   // Playback follows the display: choosing another sequence while the transport is
   // running plays that sequence straight away (same step position, so it stays in
@@ -359,14 +362,17 @@ function initSubscriptions() {
     if (engine.ctx)
       for (let i = 0; i < store.numChannels; i++) engine.rebuildInserts(i);
     if (engine.ctx)
-      for (let i = 0; i < NUM_INSTRUMENTS; i++) {
+      for (let i = 0; i < store.project.instruments.length; i++) {
         engine.applyFx(i, true);
         engine.rebuildInserts(i, true);
       }
     syncArrangeControls();
     syncHeaderFromProject();
-    ui.buildChannels();
-    ui.buildInstruments();
+    const channelsChanged = !restore || previous?.channels.length !== store.numChannels;
+    const instrumentsChanged = !restore || previous?.instruments.length !== store.project.instruments.length || previous?.instruments.some((s,i)=>s.synthId !== store.instrument(i)?.synthId);
+    if (channelsChanged) ui.buildChannels(); else { ui.refreshAllChannels(); ui.renderPattern(); }
+    if (instrumentsChanged) ui.buildInstruments(); else for (let i=0;i<store.project.instruments.length;i++) { ui.refreshInstrumentRow(i); ui.drawInstStrip(i); }
+    engine.syncMixer?.();
     ui.refreshChainPanel();
     ui.refreshSoloDim();
     if (engine.ctx) engine.applySolo();
@@ -376,6 +382,8 @@ function initSubscriptions() {
       sampleRestore = Promise.resolve([]);
       return;
     }
+    const preparedFailures=preparedImportFailures(project);
+    if(preparedFailures){sampleRestore=Promise.resolve(preparedFailures);return;}
     sampleRestore = reloadAllSamples().then((failures) => {
       if (project !== store.project) return [];
       ui.refreshAllChannels();
@@ -410,28 +418,11 @@ function initSubscriptions() {
     ui.refreshInstrumentRow(e.detail),
   );
   store.on("sequence", () => {
-    for (let i = 0; i < 4; i++) ui.drawInstStrip(i);
+    for (let i = 0; i < store.project.instruments.length; i++) ui.drawInstStrip(i);
   });
-  let saveTimer = null;
-  store.on("dirty", () => {
-    clearTimeout(saveTimer);
-    saveTimer = setTimeout(() => {
-      saveTimer = null;
-      persist.autosave().catch((error) => ui.setStatus(`Browser save failed: ${error.message}. Export a project file.`, true));
-    }, 800);
-  });
-  // Flush a pending autosave when the tab is hidden or closed so the last
-  // edits inside the debounce window are not lost.
-  const flushAutosave = () => {
-    if (saveTimer == null) return;
-    clearTimeout(saveTimer);
-    saveTimer = null;
-    persist.autosave().catch(() => {}); // persistent save-state indicator reports failures
-  };
-  addEventListener("pagehide", flushAutosave);
-  document.addEventListener("visibilitychange", () => {
-    if (document.visibilityState === "hidden") flushAutosave();
-  });
+  store.on("instruments", () => { engine.ensureInstrumentChains(); ui.buildInstruments(); setMidiTarget(Math.min(getMidiTarget(),store.project.instruments.length-1)); document.dispatchEvent(new CustomEvent("instrument-renamed")); });
+  store.on("project", () => { if (engine.ctx) engine.syncMixer?.(); });
+  persist.startCheckpoints({ idleMs: 800, maxMs: 10000 });
 }
 
 // ------------------------------------------------------------ boot
@@ -455,8 +446,12 @@ async function boot() {
   initProjectLibrary({ confirmReplace });
   initPublish({ samplesReady: () => sampleRestore });
   initArrange();
-  initSourceBrowser();
-  initSamplesLoops();
+  const sourceBrowser=detail=>import('./source-browser.js').then(m=>m.openSourceBrowser(detail)).catch(error=>ui.setStatus(error.message,true));
+  const sampleBrowser=detail=>import('./samples-loops-browser.js').then(m=>m.openSamplesLoops(detail)).catch(error=>ui.setStatus(error.message,true));
+  $('#btn-l1-audio').onclick=()=>sourceBrowser();$('#btn-l1-words').onclick=()=>sourceBrowser({mode:'words'});
+  $('#btn-samples-loops').onclick=()=>sampleBrowser();
+  document.addEventListener('l1xl2:library',event=>sourceBrowser(event.detail));
+  document.addEventListener('audionaut:samples-loops',event=>sampleBrowser(event.detail||{}));
   initAudioTools();
   ui.initSettingsModal(persist.saveSettings);
   ui.initModalDismissal();
@@ -468,6 +463,7 @@ async function boot() {
   $("#btn-redo").addEventListener("click", doRedo);
 
   ui.labelIconButtons();
+  initWorkspace();
   const bootProject = store.project;
   let restored = false;
   try { restored = await persist.restoreAutosave(); }
@@ -508,3 +504,14 @@ document.addEventListener("audionaut-panic", () => {
   ui.setStatus("All notes and playback stopped.");
 });
 document.addEventListener("DOMContentLoaded", () => boot().catch((error) => ui.setStatus(`Could not open the workstation: ${error.message}`, true)));
+
+// An expired membership check pauses audio and checkpoints the in-memory song.
+// The outer gate retains this frame so the member can reauthenticate or export.
+window.addEventListener('message', async event => {
+  if(event.origin!==location.origin||event.source!==window.parent)return;
+  if(event.data?.type==='audionaut-pro-export-project'){try{await persist.downloadProject();}catch(error){ui.setStatus(error.message,true);}return;}
+  if(event.data?.type!=='audionaut-pro-access-expired')return;
+  stopAll();
+  try { await persist.checkpoint({reason:'access-expired'}); } catch {}
+  ui.setStatus('Membership needs rechecking. Your project remains here; you can save a copy.',true);
+});

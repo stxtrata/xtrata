@@ -7,6 +7,8 @@
 // `scope`/helpers the panel uses for its live displays. No imports from synths.js
 // (synths.js imports this file), so the few helpers below are local.
 
+import { seededRandom } from "./synths/resources.js";
+
 const midiToFreq = (m) => 440 * Math.pow(2, (m - 69) / 12);
 const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
 const range = (key, label, min, max, step, def) => ({ key, label, type: "range", min, max, step, def });
@@ -82,7 +84,7 @@ function lru(max, maxSamples) {
 export function renderFm(P, pitch, vel, dur, sr) {
   const f0 = midiToFreq(pitch);
   const rel = Math.max(0.02, P.release);
-  let total = Math.min(8, Math.max(0.05, dur) + rel * 1.2 + 0.03);
+  let total = Math.max(0.05, dur) + rel * 1.2 + 0.03;
   const algo = Math.max(0, FM_ALGOS.indexOf(P.algo));
   const mods = FM_MOD[algo];
   const cars = FM_CARRIERS[algo];
@@ -395,12 +397,13 @@ const VOX_RMS = 0.11; // target note RMS (before velocity / level)
 
 const noiseCache = new WeakMap();
 function noiseBuffer(ctx) {
-  let b = noiseCache.get(ctx);
+  let b = noiseCache.get(ctx.resourceContext || ctx);
   if (!b) {
     b = ctx.createBuffer(1, ctx.sampleRate * 2, ctx.sampleRate);
     const d = b.getChannelData(0);
-    for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
-    noiseCache.set(ctx, b);
+    const random = seededRandom("audionaut-vox-noise");
+    for (let i = 0; i < d.length; i++) d[i] = random() * 2 - 1;
+    noiseCache.set(ctx.resourceContext || ctx, b);
   }
   return b;
 }
@@ -509,7 +512,7 @@ const vox = {
   presets: VOX_PRESETS,
   voice(ctx, dest, { pitch, vel, time, dur }, P) {
     const f0 = midiToFreq(pitch);
-    const end = time + Math.max(dur, P.attack + 0.05);
+    const end = time + Math.max(.001, dur);
     const stopAt = end + P.release + 0.1;
     // source: three detuned saws → brightness lowpass
     const src = ctx.createGain();
@@ -519,9 +522,14 @@ const vox = {
       o.type = "sawtooth";
       o.frequency.value = f0;
       o.detune.value = d * P.choir;
-      o.connect(src);
       return o;
     });
+    // Keep summation order explicit. Native junctions with three or more inputs
+    // may accumulate in different orders between graphs; resonant filtering can
+    // magnify that float32 rounding. Each junction below has exactly two inputs.
+    const oscPair = ctx.createGain();
+    oscs[0].connect(oscPair); oscs[1].connect(oscPair);
+    oscPair.connect(src); oscs[2].connect(src);
     // vibrato fades in after a short delay
     const lfo = ctx.createOscillator();
     lfo.frequency.value = P.vibRate;
@@ -562,6 +570,7 @@ const vox = {
         const mid = from.map((a, k) => ({ f: a.f + (to[k].f - a.f) * t, g: a.g + (to[k].g - a.g) * t, q: a.q + (to[k].q - a.q) * t }));
         bank.gain.linearRampToValueAtTime(norm(mid), time + P.morph * t);
       }
+    const formantOutputs = [];
     from.forEach((fm, k) => {
       const bp = ctx.createBiquadFilter();
       bp.type = "bandpass";
@@ -574,15 +583,23 @@ const vox = {
       const g = ctx.createGain();
       g.gain.setValueAtTime(fm.g, time);
       if (to !== from) g.gain.linearRampToValueAtTime(to[k].g, time + P.morph);
-      lp.connect(bp).connect(g).connect(bank);
+      lp.connect(bp).connect(g); formantOutputs.push(g);
     });
+    const formantPair = ctx.createGain();
+    formantOutputs[0].connect(formantPair); formantOutputs[1].connect(formantPair);
+    formantPair.connect(bank); formantOutputs[2].connect(bank);
     // amplitude envelope
     const g = ctx.createGain();
     const peak = Math.max(0.001, vel * P.level);
     g.gain.setValueAtTime(0.0001, time);
-    g.gain.exponentialRampToValueAtTime(peak, time + Math.max(0.01, P.attack));
-    g.gain.setValueAtTime(peak, Math.max(end, time + P.attack + 0.001));
-    g.gain.exponentialRampToValueAtTime(0.0001, end + Math.max(0.05, P.release));
+    const attack = Math.max(.01, P.attack), age = Math.min(attack, dur);
+    const atOff = .0001 * Math.pow(peak / .0001, age / attack);
+    g.gain.exponentialRampToValueAtTime(atOff, time + age);
+    if (Number.isFinite(end)) {
+      g.gain.setValueAtTime(atOff, end);
+      g.gain.exponentialRampToValueAtTime(.0001, end + Math.max(.05, P.release));
+      g.gain.setValueAtTime(0, end + Math.max(.05, P.release) + .001);
+    }
     bank.connect(g).connect(dest);
     oscs.forEach((o) => {
       o.start(time);

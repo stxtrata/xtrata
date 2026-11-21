@@ -30,7 +30,7 @@ try {
     store.project.masterVolume = 0.21; store.emit("project"); history.record(true);
     store.setChannelProp(0, "volume", 0.17); history.record(true);
     history.undo(); history.undo(); await wait(130);
-    result.gains = { original, master: engine.masterGain.gain.value, sample: engine.channelGains[0].gain.value,
+    result.gains = { original, master: engine.masterGain.gain.value, sample: (store.project.mixerVersion>=2?engine._mixer.strips.get(store.channel(0).id).fader:engine.channelGains[0]).gain.value,
       header: +document.querySelector("#master-volume").value };
     changeSynth(0, "fm4"); store.setInstrumentProp(0, "params", { algo: 3, mod: 0.48 });
     changeSynth(0, "vox"); store.setInstrumentProp(0, "params", { vowel: 2 });

@@ -62,7 +62,7 @@ export function renderAnneal(Pin, pitch, vel, dur, sr, opts = {}) {
   }
   const v = clamp(Number.isFinite(vel) ? vel : 1, 0, 1.4);
   if (!(v > 0) || P.level <= 0) return { l: new Float32Array(64), r: new Float32Array(64) };
-  dur = clamp(Number.isFinite(dur) ? dur : 0.5, 0.01, 30);
+  dur = Math.max(0.01, Number.isFinite(dur) ? dur : 0.5);
   const base = 440 * Math.pow(2, (pitch - 69) / 12);
   const seed = (pitch * 1.783 + v * 0.51) % TAU;
   const BL = opts.block || Math.max(16, Math.round(sr / 1378)); // 32 @ 44.1k, as on the page
@@ -94,7 +94,7 @@ export function renderAnneal(Pin, pitch, vel, dur, sr, opts = {}) {
   let releaseC = 1;
   const nOff = Math.max(1, Math.round(dur * sr));
 
-  const capSec = Math.min(8, dur + P.release + 0.1);
+  const capSec = dur + P.release + 0.1;
   const cap = Math.max(BL, opts.limit ? Math.min(opts.limit, Math.ceil(capSec * sr)) : Math.ceil(capSec * sr));
   const outL = new Float32Array(cap);
   const outR = new Float32Array(cap);

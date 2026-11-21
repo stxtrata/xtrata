@@ -23,7 +23,6 @@ const MEM_EXP = Array.from({ length: N_PART }, (_, j) => 0.68 + j * 0.095);
 const PAN_BASE = Array.from({ length: N_PART }, (_, j) => (j === 0 ? 0 : Math.sin(j * 2.399963) * 0.67));
 const LN2_12 = Math.LN2 / 12;
 
-const MAX_TOTAL = 8; // seconds, hard cap on rendered buffer
 const OUT_GAIN = 1.6; // the standalone page ran quiet (master 68%); bring it to host level
 
 /**
@@ -61,8 +60,8 @@ export function renderPalinode(P, pitch, vel, dur, sr, opts = {}) {
   const f0 = midiToFreq(pitch);
 
   // timeline: the gate is held for `hold`, then the cubic release runs for `rel`
-  const hold = Math.min(dur, MAX_TOTAL - 0.3);
-  const rel = Math.max(0.1, Math.min(releaseReq, (MAX_TOTAL - hold) / 0.93));
+  const hold = dur;
+  const rel = Math.max(0.1, releaseReq);
   const relSamples = Math.round(rel * sr);
   const nOff = Math.round(hold * sr);
   let total = nOff + Math.round(relSamples * 0.93);

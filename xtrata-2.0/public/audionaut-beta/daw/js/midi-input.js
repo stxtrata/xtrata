@@ -3,6 +3,7 @@ import { STORAGE_KEYS } from "./storage-config.js";
 // Editors observe input; they never compete to own a port's note handlers.
 import { noteOn, noteOff, allOff, bendNotes } from "./live-keys.js";
 import { store } from "./state.js";
+import { engine } from './engine.js';
 
 const PREF_KEY = STORAGE_KEYS.midi;
 const listeners = new Set();
@@ -17,7 +18,12 @@ const savePref = (on) => { try { localStorage.setItem(PREF_KEY, on ? "on" : "off
 const emit = () => document.dispatchEvent(new CustomEvent("midi-status", { detail: midiStatus() }));
 export function addMidiListener(fn) { listeners.add(fn); return () => listeners.delete(fn); }
 export const isMidiOn = () => status.on;
-export const midiStatus = () => ({ ...status, names: [...status.names] });
+export const midiStatus = () => ({ ...status, names: [...status.names], inputs:[...ports.values()].map(p=>({id:p.id,name:p.name||'MIDI controller'})) });
+export function midiEventAudioTime(msg) {
+  const ctx=engine.ensureContext(),stamp=Number(msg.receivedTime ?? msg.timeStamp);
+  const age=Number.isFinite(stamp)?Math.max(0,(performance.now()-stamp)/1000):0;
+  return Math.max(0,ctx.currentTime-age-(store.project.recording?.latencyMs||0)/1000);
+}
 export const getMidiTarget = () => target;
 export function setMidiTarget(i) {
   i = Number(i);
@@ -38,27 +44,33 @@ function onMessage(msg, portId) {
   if (!status.on) return;
   const data = msg.data || [], [s, pitch, velocity = 0] = data;
   const type = s & 0xf0, group = `${portPrefix(portId)}${s & 15}:`, src = `${group}${pitch}`;
+  const time=midiEventAudioTime(msg),release=held=>{for(const source of held?.sources||[src])noteOff(source,{time});};
   if (type === 0x90 && velocity > 0) {
-    pressed.set(src, { group, down: true });
-    noteOn(src, target, pitch, velocity / 127, { bend: bends.get(group) || 0 });
+    const matches=t=>!!t&&(!t.midiInput?.portId||t.midiInput.portId==='*'||t.midiInput.portId===portId)&&(!t.midiInput?.channel||t.midiInput.channel==='all'||+t.midiInput.channel===(s&15)+1);
+    const armed=store.project.instruments.map((t,i)=>({t,i})).filter(({t})=>t.armed&&matches(t));
+    const targets=armed.length?armed.map(x=>x.i):matches(store.instrument(target))?[target]:[];
+    release(pressed.get(src));const sources=targets.map(i=>`${src}@${i}`);
+    pressed.set(src, { group, down: true, sources });
+    targets.forEach((i,index)=>noteOn(sources[index],i,pitch,velocity/127,{bend:bends.get(group)||0,time}));
   } else if (type === 0x80 || (type === 0x90 && velocity === 0)) {
     const held = pressed.get(src);
     if (held) held.down = false;
-    if (!sustain.get(group)) { pressed.delete(src); noteOff(src); }
+    if (!sustain.get(group)) { pressed.delete(src); release(held); }
   } else if (type === 0xb0 && pitch === 64) {
     const on = velocity >= 64;
     sustain.set(group, on);
     if (!on) for (const [key, held] of pressed) if (held.group === group && !held.down) {
-      pressed.delete(key); noteOff(key);
+      pressed.delete(key); release(held);
     }
   } else if (type === 0xe0) {
     const value = (velocity << 7) | pitch;
     const semitones = (value - 8192) / (value < 8192 ? 8192 : 8191) * 2;
     bends.set(group, semitones);
-    bendNotes(group, semitones);
+    bendNotes(group, semitones,time);
   } else if (type === 0xb0 && (pitch === 120 || pitch === 123)) {
     releasePrefix(group);
   }
+  if(type===0xb0)document.dispatchEvent(new CustomEvent('live-expression',{detail:{prefix:group,type:'cc',controller:pitch,value:velocity,time}}));
   for (const fn of listeners) {
     try { fn({ data, portId, timeStamp: msg.timeStamp, receivedTime: msg.receivedTime }); }
     catch (e) { console.error(e); }
@@ -139,6 +151,7 @@ document.addEventListener("performance-reset", ({ detail }) => {
   for (const key of sustain.keys()) if (key.startsWith(prefix)) sustain.delete(key);
   for (const key of bends.keys()) if (key.startsWith(prefix)) bends.delete(key);
 });
+store.on("instruments", () => { if(!store.instrument(target))setMidiTarget(Math.max(0,store.project.instruments.length-1)); });
 store.on("load", () => {
   if (!store.instrument(target)) target = 0;
   document.dispatchEvent(new CustomEvent("instrument-target", { detail: { i: target } }));

@@ -13,7 +13,7 @@ try {
       import('/audionaut-beta/daw/js/synths.js'), import('/audionaut-beta/daw/js/synths/voice-lifecycle.js'),
       import('/audionaut-beta/daw/js/engine.js'), import('/audionaut-beta/daw/js/state.js'),
     ]);
-    const failures = [], baseline = [], sustained = [];
+    const failures = [], baseline = [], sustained = []; let panicCleanup;
     const check = (condition, label) => { if (!condition) failures.push(label); };
     const rms = (buffer, from, to) => {
       const a = buffer.getChannelData(0); let sum = 0, n = 0;
@@ -24,7 +24,7 @@ try {
       try {
         const ctx = new OfflineAudioContext(2, 44100 * 3, 44100);
         let done = false;
-        createVoice(ctx, ctx.destination, synth, id, { pitch: id === 'kit' ? 36 : 60, vel: 0.7, time: 0, dur: 0.4 }, synthDefaults(id), () => { done = true; });
+        createVoice(ctx, ctx.destination, synth, id, { pitch: ['kit','drumrack'].includes(id) ? 36 : 60, vel: 0.7, time: 0, dur: 0.4 }, synthDefaults(id), () => { done = true; });
         const buffer = await ctx.startRendering();
         const level = rms(buffer, 0, 1);
         baseline.push({ id, rms: level, done });
@@ -113,7 +113,14 @@ try {
       check([...engine._synthVoices.values()].filter(n => !n.stopping).length <= 4, 'instrument polyphony is bounded');
       const oldReturn = engine.reverbNode;
       engine.panic();
-      await new Promise(resolve => setTimeout(resolve, 100));
+      const panicAt=ctx.currentTime,started=performance.now();
+      check(engine._visualCounts.size===0&&engine.liveCount()===0,'panic immediately clears live and visual ownership');
+      check([...engine._synthVoices.values()].every(n=>n.stopping&&n.voice.sources.every(source=>source.ended||Number.isFinite(source.stopAt)&&source.stopAt<=panicAt+.025)),'panic schedules every owned source to stop on the audio clock');
+      // Native ended events follow audio processing, not wall-clock timers.
+      // A fresh device or busy browser may not advance 50 ms of audio in 100 ms.
+      while((ctx.currentTime<panicAt+.05||engine._synthVoices.size)&&performance.now()-started<2000)await new Promise(resolve=>setTimeout(resolve,10));
+      panicCleanup={audioSeconds:ctx.currentTime-panicAt,wallMs:performance.now()-started,remainingVoices:engine._synthVoices.size,state:ctx.state};
+      check(ctx.currentTime>=panicAt+.05,'panic cleanup check processes at least 50 ms of audio');
       check(engine._synthVoices.size === 0 && engine._visualCounts.size === 0, 'panic/stop clears voice and visual ownership');
       check(engine.reverbNode !== oldReturn, 'panic replaces effects containing old tails');
       const last = store.numChannels - 1;
@@ -123,7 +130,7 @@ try {
       document.removeEventListener('synth-note', listener);
       await ctx.close();
     }
-    return { failures, baseline, sustained };
+    return { failures, baseline, sustained, panicCleanup };
   });
   console.log(JSON.stringify(result, null, 2));
   assert.deepEqual(result.failures, []);

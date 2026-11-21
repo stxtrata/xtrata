@@ -26,6 +26,7 @@ try {
       "audionaut.midi": "off", "audionaut.dock": '{"open":false,"inst":2}',
       "audionaut.view": "grid", "audionaut.cc.jims10": '{"7":"cutoff"}',
     };
+    for (const [key,value] of Object.entries({...local})) local[key.replace('audionaut.','audionaut.beta-pro.')] = 'beta-pro sentinel ' + value;
     for (const [key, value] of Object.entries(local)) localStorage.setItem(key, value);
     const record = { id: "production-revision", projectId: project.projectId, projectName: project.projectName, updatedAt: 1, project, assetIds: [] };
     await new Promise((resolve, reject) => {

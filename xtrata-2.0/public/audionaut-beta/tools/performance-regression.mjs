@@ -7,8 +7,8 @@ import { quantizeRecordedSpan } from "../daw/js/performance-recorder.js";
 assert.deepEqual(normalizeArp(null), ARP_DEFAULTS);
 assert.deepEqual(arpOrder([{ pitch: 60 }, { pitch: 64 }], normalizeArp({ mode: "down", octaves: 2 })).map(n => n.pitch), [76, 72, 64, 60]);
 assert.deepEqual(quantizeRecordedSpan([{ sequenceIndex: 0, startStep: 63, endStep: 64 }, { sequenceIndex: 1, startStep: 0, endStep: 2 }], 60, 0.8), [
-  { sequenceIndex: 0, note: { step: 63, dur: 1, pitch: 60, vel: 0.8 } },
-  { sequenceIndex: 1, note: { step: 0, dur: 2, pitch: 60, vel: 0.8 } },
+  { sequenceIndex: 0, note: { step: 63, dur: 1, rawStep:63,rawDur:1,pitch: 60, vel: 0.8,expression:[] } },
+  { sequenceIndex: 1, note: { step: 0, dur: 2, rawStep:0,rawDur:2,pitch: 60, vel: 0.8,expression:[] } },
 ]);
 const { srv, url } = await serve();
 const b = await browser();
@@ -33,7 +33,8 @@ try {
     const dock = await import("/audionaut-beta/daw/js/synth-panel.js");
     const roll = await import("/audionaut-beta/daw/js/pianoroll.js");
     const { changeSynth } = await import("/audionaut-beta/daw/js/synth-selection.js");
-    const { Kit } = await import("/audionaut-beta/daw/js/synth-faces/runtime.js");
+    const { Kit } = await import("/audionaut-beta/daw/js/synth-faces/index.js");
+    await Kit.load('fm4');
     store.loadProject(makeProject());
     engine.ensureContext();
     changeSynth(0, "fm4"); dock.openSynthPanel(0);
@@ -129,9 +130,12 @@ try {
   assert.equal(result.hotplugReleased, 0); assert.equal(result.offReleased, 0); assert.equal(result.raceStayedOff, true);
   assert.ok(result.panels.every(p => p.built === "1" && p.controls > 0));
   assert.equal(result.restoredRoll.picker, "vox"); assert.ok(!result.restoredRoll.controls.includes("algo"));
-  assert.deepEqual(result.recordedAtAudioClock, { step: 5, dur: 2, pitch: 60, vel: 0.8 });
+  const coreNote=({step,dur,pitch,vel})=>({step,dur,pitch,vel});
+  assert.deepEqual(coreNote(result.recordedAtAudioClock), { step: 5, dur: 2, pitch: 60, vel: 0.8 });
+  assert.equal(result.recordedAtAudioClock.rawStep,5.1);assert.ok(Math.abs(result.recordedAtAudioClock.rawDur-2)<1e-9);assert.ok(result.recordedAtAudioClock.id);
   assert.deepEqual(result.nudge, { step: 6, sequence: 0 });
-  assert.deepEqual(result.wrapRecording, [{ step: 63, dur: 1, pitch: 64, vel: 0.7 }, { step: 0, dur: 2, pitch: 64, vel: 0.7 }]);
+  assert.deepEqual(result.wrapRecording.map(coreNote), [{ step: 63, dur: 1, pitch: 64, vel: 0.7 }, { step: 0, dur: 2, pitch: 64, vel: 0.7 }]);
+  assert.equal(result.wrapRecording[0].tieId,result.wrapRecording[1].tieId);
   assert.equal(result.cancelledPulseNotRecorded, true); assert.equal(result.loadCancelsRecording, true);
   assert.ok(result.arp.starts >= 3 && result.arp.finite && result.arp.stopped);
   assert.ok(result.arp.pitches.includes(72) || result.arp.pitches.includes(76));

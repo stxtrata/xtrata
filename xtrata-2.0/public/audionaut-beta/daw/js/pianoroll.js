@@ -1,23 +1,26 @@
+import { KEYMAP, isBlackKey as isBlack } from './keyboard-layout.js';
+import { drumKeyboard, performancePitch } from './instrument-keyboard.js';
 // pianoroll.js — canvas piano-roll MIDI editor for instrument channels.
 // Editing toolkit: marquee drag-selection, move (all directions), resize (drag right
 // edge), split (double-click), velocity editing (shift+wheel / shift+↑↓), nudge with
 // arrows, copy/paste, per-synth parameter panels, preset lines, keyboard playing and
 // live recording.
 
-import { store, NUM_STEPS } from "./state.js";
+import { store, NUM_STEPS, makeSequence } from "./state.js";
+import { newId } from './project-model.js';
 import { engine } from "./engine.js";
 import { ensureMidi, setMidiEnabled, isMidiOn, midiStatus, setMidiTarget } from "./midi-input.js";
 import { SYNTH_BANK, synthDefaults, parseLine } from "./synths.js";
 import { createSynthPicker } from "./synth-picker.js";
 import { changeSynth } from "./synth-selection.js";
-import { noteOn, noteOff, allOff, getOctave, setOctave, TYPED_VEL } from "./live-keys.js";
+import { attachKeyboard, noteOn, noteOff, allOff, getOctave, setOctave, TYPED_VEL } from "./live-keys.js";
 import { beginTransaction, endTransaction } from "./history.js";
 import { quantizeRecordedSpan } from "./performance-recorder.js";
 
 const $ = (s) => document.querySelector(s);
 
-const LOW = 21; // A0
-const HIGH = 96; // C7
+const LOW = 0;
+const HIGH = 127;
 const ROWS = HIGH - LOW + 1;
 const CELL_W = 14,
   CELL_H = 12,
@@ -25,6 +28,11 @@ const CELL_W = 14,
 const RESIZE_PX = 5; // grab zone at note's right edge
 
 let inst = 0;
+let editingClipId = null;
+const editingClip = () => store.project.timeline.clips.find(c=>c.id===editingClipId);
+const rollLength = () => editingClip()?Math.max(1,Math.ceil(editingClip().duration*4)):NUM_STEPS;
+const editOffset = () => (editingClip()?.offset||0)*4;
+const gridSteps = () => store.project.recording.quantize>0?store.project.recording.quantize*4:1/16;
 let noteDur = 2;
 let recArmed = false;
 let canvas, ctx2d;
@@ -35,7 +43,7 @@ let drag = null; // { mode:'move'|'resize'|'marquee', ... }
 let clipboard = null;
 let lastPlayStep = -1;
 
-const isBlack = (m) => [1, 3, 6, 8, 10].includes(m % 12);
+
 const NOTE_NAMES = [
   "C",
   "C#",
@@ -51,11 +59,13 @@ const NOTE_NAMES = [
   "B",
 ];
 const midiName = (m) => NOTE_NAMES[m % 12] + (Math.floor(m / 12) - 1);
-const notes = () => store.seq.notes[inst] || [];
+const notes = () => editingClip()?.notes || store.seq.notes[inst] || [];
+function setEditorNotes(value){if(editingClip()){editingClip().notes=value;commit();}else store.setNotes(inst,value);}
+function addEditorNote(note){note.id=newId('note');note.rawStep??=note.step;note.rawDur??=note.dur;note.expression||=[];notes().push(note);commit();}
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 
 function commit() {
-  store.emit("notes", inst);
+  editingClip()?store.emit('project',{prop:'timeline'}):store.emit("notes", inst);
 }
 
 // --------------------------------------------------------------- drawing
@@ -77,7 +87,7 @@ function setLit(pitch, on) {
 export function drawRoll(playStep = lastPlayStep) {
   lastPlayStep = playStep;
   if (!canvas || $("#modal-roll").classList.contains("hidden")) return;
-  const W = KEY_W + NUM_STEPS * CELL_W,
+  const W = KEY_W + rollLength() * CELL_W,
     H = ROWS * CELL_H;
   const synth = SYNTH_BANK[store.instrument(inst).synthId];
   ctx2d.clearRect(0, 0, W, H);
@@ -94,15 +104,15 @@ export function drawRoll(playStep = lastPlayStep) {
       ctx2d.fillText(midiName(midi), 4, y + 9);
     }
     ctx2d.fillStyle = isBlack(midi) ? "#0d1319" : "#121820";
-    ctx2d.fillRect(KEY_W, y, NUM_STEPS * CELL_W, CELL_H - 1);
+    ctx2d.fillRect(KEY_W, y, rollLength() * CELL_W, CELL_H - 1);
     if (on) {
       ctx2d.globalAlpha = 0.22;
       ctx2d.fillStyle = synth.color;
-      ctx2d.fillRect(KEY_W, y, NUM_STEPS * CELL_W, CELL_H - 1);
+      ctx2d.fillRect(KEY_W, y, rollLength() * CELL_W, CELL_H - 1);
       ctx2d.globalAlpha = 1;
     }
   }
-  for (let s = 0; s <= NUM_STEPS; s++) {
+  for (let s = 0; s <= rollLength(); s++) {
     const x = KEY_W + s * CELL_W;
     ctx2d.fillStyle =
       s % 16 === 0 ? "#39424e" : s % 4 === 0 ? "#242e3a" : "#1a222d";
@@ -113,7 +123,7 @@ export function drawRoll(playStep = lastPlayStep) {
   for (const n of notes()) {
     const r = HIGH - n.pitch;
     if (r < 0 || r >= ROWS) continue;
-    const x = KEY_W + n.step * CELL_W + 1,
+    const x = KEY_W + (n.step-editOffset()) * CELL_W + 1,
       y = r * CELL_H + 1;
     const w = n.dur * CELL_W - 2,
       h = CELL_H - 3;
@@ -169,7 +179,7 @@ function eventXY(e) {
 
 function gridPos(x, y) {
   return {
-    step: Math.floor((x - KEY_W) / CELL_W),
+    step: Math.floor((x-KEY_W)/CELL_W/gridSteps())*gridSteps()+editOffset(),
     pitch: HIGH - Math.floor(y / CELL_H),
   };
 }
@@ -184,7 +194,7 @@ function noteAtXY(x, y) {
 }
 
 function onRightEdge(n, x) {
-  const edgeX = KEY_W + (n.step + n.dur) * CELL_W;
+  const edgeX = KEY_W + (n.step + n.dur-editOffset()) * CELL_W;
   return x > edgeX - RESIZE_PX && x <= edgeX + 2;
 }
 
@@ -207,7 +217,7 @@ function onMouseDown(e) {
     // Alt/Option + drag = duplicate the selection and move the copies
     if (e.altKey && !onRightEdge(n, x)) {
       const clones = [...selection].map((m) => ({ ...m }));
-      for (const c of clones) store.seq.notes[inst].push(c);
+      for (const c of clones) {c.id=newId('note');notes().push(c);}
       selection = new Set(clones);
       commit();
       setRollStatus(
@@ -251,19 +261,19 @@ function onMouseMove(e) {
         : "cell";
   }
   if (!drag) return;
-  const dSteps = Math.round((x - (drag.startX ?? 0)) / CELL_W);
+  const dSteps = Math.round((x - (drag.startX ?? 0)) / CELL_W / gridSteps())*gridSteps();
   if (drag.mode === "move") {
     const dPitch = -Math.round((y - drag.startY) / CELL_H);
     if (dSteps || dPitch) drag.moved = true;
     for (const s of drag.snapshot) {
-      s.ref.step = clamp(s.step + dSteps, 0, NUM_STEPS - s.ref.dur);
+      s.ref.step = clamp(s.step + dSteps, editOffset(), editOffset()+rollLength() - s.ref.dur);
       s.ref.pitch = clamp(s.pitch + dPitch, LOW, HIGH);
     }
     drawRoll();
   } else if (drag.mode === "resize") {
     if (dSteps) drag.moved = true;
     for (const s of drag.snapshot) {
-      s.ref.dur = clamp(s.dur + dSteps, 1, NUM_STEPS - s.ref.step);
+      s.ref.dur = clamp(s.dur + dSteps, gridSteps(), editOffset()+rollLength() - s.ref.step);
     }
     drawRoll();
   } else if (drag.mode === "marquee") {
@@ -284,14 +294,14 @@ function onMouseUp(e) {
       // plain click on empty grid → add a note
       const { x, y } = eventXY(e);
       const { step, pitch } = gridPos(x, y);
-      if (step >= 0 && step < NUM_STEPS && pitch >= LOW && pitch <= HIGH) {
+      if (step >= editOffset() && step < editOffset()+rollLength() && pitch >= LOW && pitch <= HIGH) {
         const note = {
           step,
-          dur: Math.min(noteDur, NUM_STEPS - step),
+          dur: Math.min(noteDur, editOffset()+rollLength() - step),
           pitch,
           vel: e.shiftKey ? 1.27 : 1,
         };
-        store.addNote(inst, note);
+        addEditorNote(note);
         selection.clear();
         selection.add(note);
         engine.triggerNote(
@@ -310,7 +320,7 @@ function onMouseUp(e) {
       const sy = Math.min(d.y0, d.y1),
         ey = Math.max(d.y0, d.y1);
       for (const n of notes()) {
-        const nx0 = KEY_W + n.step * CELL_W,
+        const nx0 = KEY_W + (n.step-editOffset()) * CELL_W,
           nx1 = nx0 + n.dur * CELL_W;
         const ny0 = (HIGH - n.pitch) * CELL_H,
           ny1 = ny0 + CELL_H;
@@ -340,7 +350,7 @@ function onDblClick(e) {
     vel: n.vel,
   };
   n.dur = splitAt - n.step;
-  store.addNote(inst, tail);
+  addEditorNote(tail);
   selection.clear();
   selection.add(n);
   selection.add(tail);
@@ -361,7 +371,7 @@ function onContextMenu(e) {
     deleteSelection();
   } else {
     const idx = notes().indexOf(n);
-    if (idx >= 0) store.removeNote(inst, idx);
+    if (idx >= 0) {notes().splice(idx,1);commit();}
     selection.delete(n);
   }
   drawRoll();
@@ -391,10 +401,7 @@ function onWheel(e) {
 // --------------------------------------------------------------- selection ops
 function deleteSelection() {
   if (!selection.size) return;
-  store.setNotes(
-    inst,
-    notes().filter((n) => !selection.has(n)),
-  );
+  setEditorNotes(notes().filter((n) => !selection.has(n)));
   setRollStatus(`Deleted ${selection.size} notes.`);
   selection.clear();
   drawRoll();
@@ -410,7 +417,7 @@ function copySelection() {
 function pasteClipboard() {
   if (!clipboard?.length) return setRollStatus("Clipboard empty.");
   const pasted = clipboard.map((n) => ({ ...n }));
-  for (const n of pasted) store.addNote(inst, n);
+  for (const n of pasted) addEditorNote(n);
   selection = new Set(pasted);
   setRollStatus(`Pasted ${pasted.length} notes — drag to position them.`);
   drawRoll();
@@ -419,7 +426,7 @@ function pasteClipboard() {
 function nudgeSelection(dStep, dPitch, dVel) {
   if (!selection.size) return;
   for (const n of selection) {
-    if (dStep) n.step = clamp(n.step + dStep, 0, NUM_STEPS - n.dur);
+    if (dStep) n.step = clamp(n.step + dStep*gridSteps(), editOffset(), editOffset()+rollLength() - n.dur);
     if (dPitch) n.pitch = clamp(n.pitch + dPitch, LOW, HIGH);
     if (dVel) n.vel = clamp(+(n.vel + dVel).toFixed(2), 0.1, 1.27);
   }
@@ -510,23 +517,7 @@ function renderLineSelect() {
 }
 
 // --------------------------------------------------------------- keyboard
-const KEYMAP = {
-  a: 0,
-  w: 1,
-  s: 2,
-  e: 3,
-  d: 4,
-  f: 5,
-  t: 6,
-  g: 7,
-  y: 8,
-  h: 9,
-  u: 10,
-  j: 11,
-  k: 12,
-  o: 13,
-  l: 14,
-};
+
 
 
 function onKeyDown(e) {
@@ -568,6 +559,7 @@ function onKeyDown(e) {
   if (e.repeat) return;
   const k = e.key.toLowerCase();
   if (mod) return; // let global shortcuts (undo/redo) through
+  if ((k === "z" || k === "x") && drumKeyboard(store.instrument(inst))) return;
   if (k === "z") {
     return setRollStatus(`Octave: C${setOctave(getOctave() - 1)}`);
   }
@@ -575,8 +567,8 @@ function onKeyDown(e) {
     return setRollStatus(`Octave: C${setOctave(getOctave() + 1)}`);
   }
   if (!(k in KEYMAP)) return;
-  const pitch = (getOctave() + 1) * 12 + KEYMAP[k];
-  if (pitch < LOW || pitch > HIGH) return;
+  const pitch = performancePitch(store.instrument(inst), KEYMAP[k], getOctave());
+  if (pitch == null || pitch < LOW || pitch > HIGH) return;
   e.preventDefault();
   e.stopImmediatePropagation();
   heldTyped.set(k, pitch);
@@ -588,6 +580,7 @@ function setRollStatus(msg) {
 }
 
 const recording = new Map();
+const recordingTakes = new Map();
 let recordingTransaction = false;
 const rollVisible = () => !$("#modal-roll").classList.contains("hidden");
 function recordFinish(src, time = engine.ctx?.currentTime || 0) {
@@ -598,14 +591,29 @@ function recordFinish(src, time = engine.ctx?.currentTime || 0) {
   if (held.project !== store.project) return;
   const end = Math.min(time, held.end ?? Infinity);
   if (end < held.time) return; // queued arp pulse was cancelled before it sounded
-  const segments = engine.getTransportSegments?.(held.time, end) || [];
+  let segments = engine.getTransportSegments?.(held.time, end) || [];
   if (!segments.length && held.position?.playing) segments.push({ sequenceIndex: held.position.sequenceIndex, startStep: held.position.step, endStep: held.position.step + 1 });
-  const notes = quantizeRecordedSpan(segments, held.pitch, held.vel, NUM_STEPS);
+  const punch=store.project.timeline.punch;
+  if(punch.enabled)segments=segments.map(s=>({...s,startStep:Math.max(s.startStep,(punch.start-s.sequenceIndex*16)*4),endStep:Math.min(s.endStep,(punch.end-s.sequenceIndex*16)*4)})).filter(s=>s.endStep>s.startStep);
+  const settings=store.project.recording;
+  const notes = quantizeRecordedSpan(segments, held.pitch, held.vel, NUM_STEPS,{grid:settings.quantize,strength:settings.strength,tieId:held.noteId,expression:held.expression});
+  const owner=store.instrument(held.inst);let take=recordingTakes.get(owner.id);
+  if(!take){take={id:newId('take'),name:`Take ${(owner.takes?.length||0)+1}`,createdAt:Date.now(),notes:[],clipIds:[],cleared:[]};(owner.takes||=[]).push(take);owner.activeTakeId=take.id;recordingTakes.set(owner.id,take);}
   for (const { sequenceIndex, note } of notes) {
-    const seq = store.project.sequences[sequenceIndex];
-    if (seq?.notes?.[held.inst]) seq.notes[held.inst].push(note);
+    note.id=newId('note');take.notes.push({sequenceIndex,note:structuredClone(note)});
+    if(store.project.timeline.enabled){
+      let clip=store.project.timeline.clips.find(c=>c.takeId===take.id&&c.trackId===owner.id&&c.start===sequenceIndex*16);
+      if(!clip){clip=store.addClip({trackId:owner.id,type:'midi',start:sequenceIndex*16,duration:16,notes:[],takeId:take.id});take.clipIds.push(clip.id);}
+      clip.notes.push(note);
+    }else{
+      while(store.project.sequences.length<=sequenceIndex){const seq=makeSequence(store.numChannels);while(seq.notes.length<store.project.instruments.length)seq.notes.push([]);store.project.sequences.push(seq);}
+      const seq=store.project.sequences[sequenceIndex];
+      if(settings.mode!=='overdub'&&!take.cleared.includes(sequenceIndex)){seq.notes[held.inst]=[];take.cleared.push(sequenceIndex);}
+      seq.notes[held.inst].push(note);
+    }
   }
-  if (notes.length) store.emit("notes", held.inst);
+  if (notes.length) store.emit("notes", held.inst,{historyPaths:[['sequences'],['timeline'],['instruments',held.inst,'takes'],['instruments',held.inst,'activeTakeId']]});
+  if(!recording.size&&recordingTransaction){recordingTransaction=false;endTransaction();}
   drawRoll();
 }
 function finishRecording() {
@@ -614,10 +622,10 @@ function finishRecording() {
 }
 function onLiveNote({ detail: n }) {
   if (!n.on) return recordFinish(n.src, n.time);
-  if (!recArmed || !rollVisible() || !engine.isPlaying || n.inst !== inst) return;
+  if (!(store.instrument(n.inst)?.armed || (recArmed&&rollVisible()&&n.inst===inst)) || !engine.isPlaying || !engine.getTransportPosition(n.time).playing) return;
   recordFinish(n.src, n.time);
   if (!recordingTransaction) { beginTransaction(); recordingTransaction = true; }
-  const held = { ...n, project: store.project, position: engine.getTransportPosition?.(n.time), timer: 0 };
+  const held = { ...n, noteId:newId('performance'),expression:[{offset:0,type:'bend',value:n.bend||0}],project: store.project, position: engine.getTransportPosition?.(n.time), timer: 0 };
   if (Number.isFinite(n.duration)) {
     held.end = n.time + n.duration;
     held.timer = setTimeout(() => recordFinish(n.src, held.end), Math.max(0, (held.end - engine.ctx.currentTime) * 1000));
@@ -625,7 +633,7 @@ function onLiveNote({ detail: n }) {
   recording.set(n.src, held);
 }
 function releaseRollInputs() {
-  finishRecording();
+  for(const [src,held] of recording)if(src.startsWith('roll:')||!store.instrument(held.inst)?.armed)recordFinish(src);
   allOff("roll:");
   heldTyped.clear();
   lit.clear();
@@ -666,6 +674,7 @@ function paintMidi() {
 
 // --------------------------------------------------------------- modal lifecycle
 export function openRoll(i) {
+  editingClipId=null;
   if (inst !== i) releaseRollInputs();
   inst = i;
   setMidiTarget(i);
@@ -678,11 +687,15 @@ export function openRoll(i) {
   renderSynthPanel();
   renderLineSelect();
   $("#modal-roll").classList.remove("hidden");
+  canvas.width=KEY_W+rollLength()*CELL_W;
+  $('#roll-rec').classList.toggle('rec-on',store.instrument(i).armed);recArmed=!!store.instrument(i).armed;
+  $('.roll-scroll').scrollTop=(HIGH-76)*CELL_H;
   drawRoll(-1);
   setRollStatus(
     "Click = add · drag empty = select · drag note = move · alt+drag = duplicate · drag right edge = resize · dbl-click = split · right-click = delete · shift+wheel / shift+↑↓ = velocity · ⌘C/⌘V copy-paste · arrows nudge · A–L play (Z/X octave)",
   );
 }
+export function openClipRoll(clipId){const clip=store.project.timeline.clips.find(c=>c.id===clipId),i=store.project.instruments.findIndex(t=>t.id===clip?.trackId);if(!clip||i<0)return false;if(clip.type==='pattern'){const si=store.project.sequences.findIndex(s=>s.id===clip.sequenceId);if(si>=0)store.selectSequence(si);openRoll(i);return true;}if(clip.type!=='midi')return false;openRoll(i);editingClipId=clip.id;canvas.width=KEY_W+rollLength()*CELL_W;$('#roll-title').textContent=`${store.instrument(i).name} — MIDI clip`;drawRoll();return true;}
 
 export function initPianoRoll() {
   canvas = $("#roll-canvas");
@@ -690,34 +703,12 @@ export function initPianoRoll() {
   canvas.height = ROWS * CELL_H;
   ctx2d = canvas.getContext("2d");
 
-  const pointers = new Map();
-  document.addEventListener("performance-reset", ({ detail }) => {
-    if (!detail?.prefix || "roll:".startsWith(detail.prefix)) pointers.clear();
+  attachKeyboard(canvas, {
+    inst:()=>inst, velAt:()=>TYPED_VEL, prefix:"roll:pointer:",
+    hitTest:e=>{const {x,y}=eventXY(e),pitch=gridPos(x,y).pitch;
+      return x>=0&&x<KEY_W&&y>=0&&pitch>=LOW&&pitch<=HIGH?{midi:pitch,el:canvas}:null;},
+    keyAt:()=>null
   });
-  const keyPointer = (e) => {
-    const { x, y } = eventXY(e), pitch = gridPos(x, y).pitch;
-    if (x >= KEY_W || x < 0 || pitch < LOW || pitch > HIGH) return null;
-    return pitch;
-  };
-  canvas.addEventListener("pointerdown", e => {
-    const pitch = keyPointer(e);
-    if (e.button > 0 || pitch == null) return;
-    e.preventDefault();
-    canvas.setPointerCapture(e.pointerId);
-    pointers.set(e.pointerId, pitch);
-    noteOn(`roll:pointer:${e.pointerId}`, inst, pitch, TYPED_VEL);
-  });
-  canvas.addEventListener("pointermove", e => {
-    if (!pointers.has(e.pointerId)) return;
-    if (e.pointerType === "mouse" && !e.buttons) { pointers.delete(e.pointerId); noteOff(`roll:pointer:${e.pointerId}`); return; }
-    const pitch = keyPointer(e);
-    if (pitch === pointers.get(e.pointerId)) return;
-    noteOff(`roll:pointer:${e.pointerId}`);
-    pointers.set(e.pointerId, pitch);
-    if (pitch != null) noteOn(`roll:pointer:${e.pointerId}`, inst, pitch, TYPED_VEL);
-  });
-  const pointerEnd = e => { pointers.delete(e.pointerId); noteOff(`roll:pointer:${e.pointerId}`); };
-  for (const type of ["pointerup", "pointercancel", "lostpointercapture"]) canvas.addEventListener(type, pointerEnd);
   canvas.addEventListener("mousedown", onMouseDown);
   canvas.addEventListener("mousemove", onMouseMove);
   window.addEventListener("mouseup", onMouseUp);
@@ -742,7 +733,7 @@ export function initPianoRoll() {
     const synth = SYNTH_BANK[store.instrument(inst).synthId];
     const line = synth.lines[+e.target.value];
     if (!line) return;
-    store.setNotes(inst, parseLine(line.dsl));
+    setEditorNotes(parseLine(line.dsl));
     selection.clear();
     drawRoll();
     setRollStatus(`Loaded line "${line.name}" — press Play to hear it.`);
@@ -753,6 +744,7 @@ export function initPianoRoll() {
 
   $("#roll-rec").addEventListener("click", () => {
     recArmed = !recArmed;
+    store.setInstrumentProp(inst,'armed',recArmed);
     if (!recArmed) finishRecording();
     $("#roll-rec").classList.toggle("rec-on", recArmed);
     setRollStatus(
@@ -762,13 +754,17 @@ export function initPianoRoll() {
     );
   });
   $("#roll-clear").addEventListener("click", () => {
+    for(const [src,held] of recording)if(held.inst===inst){clearTimeout(held.timer);recording.delete(src);}
+    if(!recording.size&&recordingTransaction){recordingTransaction=false;endTransaction();}
     selection.clear();
-    store.clearNotes(inst);
+    setEditorNotes([]);
     drawRoll();
   });
   $("#roll-close").addEventListener("click", closeRoll);
   $("#roll-midi").addEventListener("click", () => setMidiEnabled(!isMidiOn()));
   document.addEventListener("live-note", onLiveNote);
+  document.addEventListener('live-expression',({detail:e})=>{for(const [src,held]of recording)if(src.startsWith(e.prefix)){const segments=engine.getTransportSegments(held.time,e.time),offset=segments.reduce((sum,s)=>sum+(s.endStep-s.startStep)/4,0);held.expression.push({offset,type:e.type,value:e.value,...(e.controller!=null&&{controller:e.controller})});}});
+  document.addEventListener('transport',({detail})=>{if(detail.playing)recordingTakes.clear();});
   document.addEventListener("midi-status", paintMidi);
   paintMidi();
 
@@ -787,7 +783,7 @@ export function initPianoRoll() {
   document.addEventListener("instrument-target", ({ detail }) => {
     if (rollVisible() && inst !== detail.i) { releaseRollInputs(); inst = detail.i; refreshRoll(); }
   });
-  store.on("load", () => { releaseRollInputs(); refreshRoll(); });
+  store.on("load", () => { for(const held of recording.values())clearTimeout(held.timer);recording.clear();recordingTakes.clear();if(recordingTransaction){recordingTransaction=false;endTransaction();}releaseRollInputs(); refreshRoll(); });
   store.on("instrument", ({ i, prop }) => {
     if (i !== inst || !rollVisible()) return;
     if (["synthId", "name"].includes(prop)) refreshRoll();
@@ -807,10 +803,11 @@ export function initPianoRoll() {
     drawRoll();
   });
   store.on("notes", () => drawRoll());
+  store.on('project',({prop}={})=>{if(prop==='timeline'&&editingClipId){if(!editingClip())editingClipId=null;drawRoll();}});
 }
 
 export function rollPlayhead(step) {
-  drawRoll(step);
+  drawRoll(editingClip()?(engine.getMusicalPosition().beat-editingClip().start)*4:step);
 }
 
 export function activeRollInstrument() {

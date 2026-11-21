@@ -31,7 +31,7 @@ const BODY = {
 // ---- noise (one second, shared per context) and PeriodicWave cache
 const noiseCache = new WeakMap();
 function noiseBuf(ctx) {
-  let b = noiseCache.get(ctx);
+  let b = noiseCache.get(ctx.resourceContext || ctx);
   if (!b) {
     const n = Math.round(ctx.sampleRate);
     b = ctx.createBuffer(1, n, ctx.sampleRate);
@@ -41,7 +41,7 @@ function noiseBuf(ctx) {
       s = (s * 1664525 + 1013904223) >>> 0;
       d[i] = (s / 4294967296) * 2 - 1;
     }
-    noiseCache.set(ctx, b);
+    noiseCache.set(ctx.resourceContext || ctx, b);
   }
   return b;
 }
@@ -62,10 +62,10 @@ function reedHarm(nasal) {
 }
 const waveCache = new WeakMap();
 function periodic(ctx, key, harm) {
-  let m = waveCache.get(ctx);
+  let m = waveCache.get(ctx.resourceContext || ctx);
   if (!m) {
     m = new Map();
-    waveCache.set(ctx, m);
+    waveCache.set(ctx.resourceContext || ctx, m);
   }
   let w = m.get(key);
   if (!w) {
@@ -267,7 +267,7 @@ function windsVoice(ctx, dest, note, P) {
   clip.connect(dest);
 
   for (const s of sources) {
-    if (s.buffer) s.start(time, Math.random() * 0.5);
+    if (s.buffer) s.start(time, (ctx.random || Math.random)() * 0.5);
     else s.start(time);
     s.stop(stopAt);
   }

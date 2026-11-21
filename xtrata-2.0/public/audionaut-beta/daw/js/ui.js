@@ -10,6 +10,7 @@ import {
   stepOff,
 } from "./state.js";
 import { engine } from "./engine.js";
+import { legacySamplePlayback } from "./legacy-bridge/playback.js";
 import { Kit as PluginFaces } from "./plugin-faces/index.js";
 import { loadSample, fetchAndDecode } from "./loader.js";
 import { SAMPLE_LIBRARY } from "./library.js";
@@ -43,7 +44,6 @@ import { ANALOG_PACK_ID } from "./analog-pack.js";
 import { EXPANDED_COMBINED_BEAT_PRESETS as COMBINED_BEAT_PRESETS } from "./combined-beats.js";
 import { loadBeatPreset } from "./l1-beat-loader.js";
 import { record as recordHistory } from "./history.js";
-import { NUM_INSTRUMENTS } from "./state.js";
 import { SYNTH_BANK } from "./synths.js";
 import { createSynthPicker } from "./synth-picker.js";
 import { changeSynth } from "./synth-selection.js";
@@ -86,8 +86,230 @@ export function setStatus(msg, isError = false) {
   s.classList.toggle("error", isError);
 }
 
+function triggerPatternMode(ch) {
+  const steps = store.seq.steps[ch] || [];
+  for (let mode=1; mode<=5; mode++)
+    if (steps.length && steps.every((v,s) => stepVal(v) === (s % (2 ** (mode-1)) ? 0 : 1))) return mode;
+  return 0;
+}
+function refreshPatternCycle(ch) {
+  const id=store.channel(ch)?.id, mode=triggerPatternMode(ch);
+  for (const ctrl of document.querySelectorAll('.channel-controls')) {
+    if (ctrl.dataset.trackId !== id) continue;
+    const button=ctrl.querySelector('.pattern');
+    if (button) { button.textContent=mode ? ['','1/1','1/2','1/4','1/8','1/16'][mode] : '◉';button.classList.toggle('active',mode>0); }
+  }
+}
+// Both workspaces instantiate these controls; callbacks, editors and state are shared.
+export function createTrackControls(trackId, { patternTools = true, playbackRate = true } = {}) {
+  const sampleIndex = store.project.channels.findIndex(t => t.id === trackId);
+  const isInstrument = sampleIndex < 0;
+  const index = isInstrument ? store.project.instruments.findIndex(t => t.id === trackId) : sampleIndex;
+  if (index < 0) throw Error('This track no longer exists.');
+  const ctrl = isInstrument ? instrumentControls(index) : sampleControls(index);
+  if (!patternTools) ctrl.querySelector('.ch-tools')?.remove();
+  if (!playbackRate) ctrl.querySelector('.ch-pitch')?.remove();
+  ctrl.dataset.trackId = trackId;
+  ctrl.dataset.ownerIndex = index;
+  ctrl.dataset.kind = isInstrument ? 'instrument' : 'sample';
+  refreshTrackControls(ctrl);
+  labelIconButtons(ctrl);
+  return ctrl;
+}
+export function refreshTrackControls(ctrl) {
+  const owner = store.track(ctrl.dataset.trackId);
+  if (!owner) return;
+  const isInstrument = ctrl.dataset.kind === 'instrument';
+  const value = (selector, next) => {
+    const input = ctrl.querySelector(selector);
+    if (input && document.activeElement !== input && String(input.value) !== String(next)) input.value = next;
+    return input;
+  };
+  const name = value('.ch-name', owner.name);
+  name.title = owner.sampleName || (isInstrument ? 'Instrument name' : 'Channel name');
+  name.setAttribute('aria-label', `${owner.name} name`);
+  const volume = value('.ch-vol', owner.volume);
+  volume.max = !isInstrument && (store.project.songOrigin || store.project.legacyPlayback) ? 3 : 1.5;
+  volume.setAttribute('aria-label', `${owner.name} volume`);
+  for (const prop of ['mute','solo']) {
+    const button = ctrl.querySelector('.'+prop);
+    button.classList.toggle('active', !!owner[prop]);
+    button.setAttribute('aria-pressed', String(!!owner[prop]));
+    button.setAttribute('aria-label', `${prop === 'mute' ? 'Mute' : 'Solo'} ${owner.name}`);
+  }
+  markChainButtons(owner, ctrl.querySelector('.fxb'), ctrl.querySelector('.ins'));
+  const synth = isInstrument && (SYNTH_BANK[owner.synthId] || SYNTH_BANK.jims10);
+  ctrl.style.setProperty('--ch-color', synth?.color || owner.color);
+  if (isInstrument) {
+    value('.inst-synth-select', owner.synthId);
+  } else {
+    refreshPatternCycle(+ctrl.dataset.ownerIndex);
+    const pitch = value('.ch-pitch', owner.pitch);
+    if (pitch) {
+      pitch.max = store.project.songOrigin || store.project.legacyPlayback ? 100 : 4;
+      pitch.setAttribute('aria-label', `${owner.name} pitch / playback rate`);
+    }
+    const sourceKey = JSON.stringify(owner.source);
+    if (ctrl._sourceKey !== sourceKey) {
+      ctrl._sourceKey = sourceKey;
+      renderOrdinalChip(ctrl.querySelector('.channel-source-links'), [{source:owner.source,label:'Sample inscription'}]);
+    }
+  }
+}
+
 // ---------------------------------------------------------------- channels
 const stepButtons = []; // [ch][step] -> button element
+
+function sampleControls(ch) {
+  const c = store.channel(ch);
+  const ctrl = el("div", "channel-controls");
+
+  const nameInput = el("input", "ch-name");
+  nameInput.value = c.name;
+  nameInput.spellcheck = false;
+  nameInput.title = c.sampleName || "Channel name";
+  nameInput.addEventListener("change", () =>
+    store.setChannelProp(ch, "name", nameInput.value),
+  );
+
+  const loadBtn = el("button", "ch-btn load", "⊕");
+  loadBtn.title = "Load sample";
+  loadBtn.addEventListener("click", () => openLoader(ch));
+  const previewBtn = el("button", "ch-btn", "▹");
+  previewBtn.title = "Preview sample";
+  previewBtn.addEventListener("click", () => engine.trigger(ch));
+
+  const muteBtn = el("button", "ch-btn toggle mute", "M");
+  muteBtn.title = "Mute";
+  muteBtn.addEventListener("click", () => {
+    store.setChannelProp(ch, "mute", !store.channel(ch).mute);
+    muteBtn.classList.toggle("active", store.channel(ch).mute);
+  });
+
+  const soloBtn = el("button", "ch-btn toggle solo", "S");
+  soloBtn.title = "Solo";
+  soloBtn.addEventListener("click", () => {
+    store.setChannelProp(ch, "solo", !store.channel(ch).solo);
+    soloBtn.classList.toggle("active", store.channel(ch).solo);
+  });
+
+  const trimBtn = el("button", "ch-btn", "✂");
+  trimBtn.title = "Trim / waveform";
+  trimBtn.addEventListener("click", () => openTrim(ch));
+
+  const fxBtn = el("button", "ch-btn fx fxb", "FX");
+  fxBtn.title = `FX chain: ${pluginNames("fx")}`;
+  fxBtn.addEventListener("click", () => openChain(ch, false, "fx"));
+
+  const insBtn = el("button", "ch-btn fx ins", "INS");
+  insBtn.title = `Insert chain: ${pluginNames("inserts")}`;
+  insBtn.addEventListener("click", () => openChain(ch, false, "inserts"));
+  markChainButtons(c, fxBtn, insBtn);
+
+  const vol = el("input", "ch-vol");
+  vol.type = "range";
+  vol.min = 0;
+  vol.max = store.project.songOrigin || store.project.legacyPlayback ? 3 : 1.5;
+  vol.step = 0.01;
+  vol.value = c.volume;
+  vol.title = "Volume";
+  vol.addEventListener("input", () => {
+    store.setChannelProp(ch, "volume", +vol.value);
+    engine.setChannelVolume(ch, +vol.value);
+  });
+
+  const pitch = el("input", "ch-pitch");
+  pitch.type = "number";
+  pitch.min = 0.1;
+  pitch.max = store.project.songOrigin || store.project.legacyPlayback ? 100 : 4;
+  pitch.step = 0.05;
+  pitch.value = c.pitch;
+  pitch.title = "Pitch / playback rate";
+  pitch.addEventListener("change", () =>
+    store.setChannelProp(
+      ch,
+      "pitch",
+      Math.max(0.1, Math.min(+pitch.max, +pitch.value || 1)),
+    ),
+  );
+
+  // pattern tools
+  const tools = el("div", "ch-tools");
+  const mk = (label, title, fn) => {
+    const b = el("button", "ch-btn tiny", label);
+    b.title = title;
+    b.addEventListener("click", fn);
+    tools.appendChild(b);
+  };
+  // Auto-pattern cycler (classic feature): every step → 2nd → 4th → 8th → 16th → clear.
+  const PAT_LABELS = ["", "1/1", "1/2", "1/4", "1/8", "1/16"];
+  const patBtn = el("button", "ch-btn tiny pattern", "◉");
+  patBtn.title =
+    "Cycle trigger pattern: all → every 2nd → 4th → 8th → 16th → clear (right-click resets)";
+  patBtn.addEventListener("click", () => {
+    const patMode = (triggerPatternMode(ch) + 1) % 6;
+    store.applyAutoPattern(ch, patMode);
+    patBtn.textContent = patMode ? PAT_LABELS[patMode] : "◉";
+    patBtn.classList.toggle("active", patMode > 0);
+  });
+  patBtn.addEventListener("contextmenu", (e) => {
+    e.preventDefault();
+    store.applyAutoPattern(ch, 0);
+    patBtn.textContent = "◉";
+    patBtn.classList.remove("active");
+  });
+  tools.appendChild(patBtn);
+
+  mk("⟲", "Shift pattern left", () => store.shiftChannelPattern(ch, -1));
+  mk("⟳", "Shift pattern right", () => store.shiftChannelPattern(ch, 1));
+  mk("✕", "Clear channel pattern", () => store.clearChannelPattern(ch));
+
+  // Inscription link: a small ORD button in the control row (no line of its own).
+  // The slot always exists so the sliders line up whether or not a sample has a source.
+  const sourceLinks = el("span", "channel-source-links ord-wrap");
+  renderOrdinalChip(sourceLinks, [
+    { source: c.source, label: "Sample inscription" },
+  ]);
+
+  ctrl.append(
+    nameInput,
+    loadBtn,
+    previewBtn,
+    muteBtn,
+    soloBtn,
+    trimBtn,
+    fxBtn,
+    insBtn,
+    sourceLinks,
+    vol,
+    pitch,
+    tools,
+  );
+  return ctrl;
+}
+
+export function bindChannelDrop(row, ch) {
+  // drag & drop audio files onto channel
+  row.addEventListener("dragover", (e) => {
+    e.preventDefault();
+    row.classList.add("drop");
+  });
+  row.addEventListener("dragleave", () => row.classList.remove("drop"));
+  row.addEventListener("drop", async (e) => {
+    e.preventDefault();
+    row.classList.remove("drop");
+    const file = e.dataTransfer.files[0];
+    if (!file) return;
+    try {
+      setStatus(`Loading ${file.name}…`);
+      await loadSample(ch, { type: "file", file });
+      refreshChannelRow(ch);
+      setStatus(`Loaded ${file.name} → channel ${ch + 1}`);
+    } catch (err) {
+      setStatus(`Load failed: ${err.message}`, true);
+    }
+  });
+}
 
 export function buildChannels() {
   const root = $("#channels");
@@ -100,132 +322,7 @@ export function buildChannels() {
     row.dataset.ch = ch;
     row.style.setProperty("--ch-color", c.color);
 
-    // --- controls block ---
-    const ctrl = el("div", "channel-controls");
-
-    const nameInput = el("input", "ch-name");
-    nameInput.value = c.name;
-    nameInput.spellcheck = false;
-    nameInput.title = c.sampleName || "Channel name";
-    nameInput.addEventListener("change", () =>
-      store.setChannelProp(ch, "name", nameInput.value),
-    );
-
-    const loadBtn = el("button", "ch-btn load", "⊕");
-    loadBtn.title = "Load sample";
-    loadBtn.addEventListener("click", () => openLoader(ch));
-    const previewBtn = el("button", "ch-btn", "▹");
-    previewBtn.title = "Preview sample";
-    previewBtn.addEventListener("click", () => engine.trigger(ch));
-
-    const muteBtn = el("button", "ch-btn toggle mute", "M");
-    muteBtn.title = "Mute";
-    muteBtn.addEventListener("click", () => {
-      store.setChannelProp(ch, "mute", !store.channel(ch).mute);
-      muteBtn.classList.toggle("active", store.channel(ch).mute);
-    });
-
-    const soloBtn = el("button", "ch-btn toggle solo", "S");
-    soloBtn.title = "Solo";
-    soloBtn.addEventListener("click", () => {
-      store.setChannelProp(ch, "solo", !store.channel(ch).solo);
-      soloBtn.classList.toggle("active", store.channel(ch).solo);
-    });
-
-    const trimBtn = el("button", "ch-btn", "✂");
-    trimBtn.title = "Trim / waveform";
-    trimBtn.addEventListener("click", () => openTrim(ch));
-
-    const fxBtn = el("button", "ch-btn fx fxb", "FX");
-    fxBtn.title = `FX chain: ${pluginNames("fx")}`;
-    fxBtn.addEventListener("click", () => openChain(ch, false, "fx"));
-
-    const insBtn = el("button", "ch-btn fx ins", "INS");
-    insBtn.title = `Insert chain: ${pluginNames("inserts")}`;
-    insBtn.addEventListener("click", () => openChain(ch, false, "inserts"));
-    markChainButtons(c, fxBtn, insBtn);
-
-    const vol = el("input", "ch-vol");
-    vol.type = "range";
-    vol.min = 0;
-    vol.max = store.project.songOrigin ? 3 : 1.5;
-    vol.step = 0.01;
-    vol.value = c.volume;
-    vol.title = "Volume";
-    vol.addEventListener("input", () => {
-      store.setChannelProp(ch, "volume", +vol.value);
-      engine.setChannelVolume(ch, +vol.value);
-    });
-
-    const pitch = el("input", "ch-pitch");
-    pitch.type = "number";
-    pitch.min = 0.1;
-    pitch.max = store.project.songOrigin ? 100 : 4;
-    pitch.step = 0.05;
-    pitch.value = c.pitch;
-    pitch.title = "Pitch / playback rate";
-    pitch.addEventListener("change", () =>
-      store.setChannelProp(
-        ch,
-        "pitch",
-        Math.max(0.1, Math.min(+pitch.max, +pitch.value || 1)),
-      ),
-    );
-
-    // pattern tools
-    const tools = el("div", "ch-tools");
-    const mk = (label, title, fn) => {
-      const b = el("button", "ch-btn tiny", label);
-      b.title = title;
-      b.addEventListener("click", fn);
-      tools.appendChild(b);
-    };
-    // Auto-pattern cycler (classic feature): every step → 2nd → 4th → 8th → 16th → clear.
-    let patMode = 0;
-    const PAT_LABELS = ["", "1/1", "1/2", "1/4", "1/8", "1/16"];
-    const patBtn = el("button", "ch-btn tiny pattern", "◉");
-    patBtn.title =
-      "Cycle trigger pattern: all → every 2nd → 4th → 8th → 16th → clear (right-click resets)";
-    patBtn.addEventListener("click", () => {
-      patMode = (patMode + 1) % 6;
-      store.applyAutoPattern(ch, patMode);
-      patBtn.textContent = patMode ? PAT_LABELS[patMode] : "◉";
-      patBtn.classList.toggle("active", patMode > 0);
-    });
-    patBtn.addEventListener("contextmenu", (e) => {
-      e.preventDefault();
-      patMode = 0;
-      store.applyAutoPattern(ch, 0);
-      patBtn.textContent = "◉";
-      patBtn.classList.remove("active");
-    });
-    tools.appendChild(patBtn);
-
-    mk("⟲", "Shift pattern left", () => store.shiftChannelPattern(ch, -1));
-    mk("⟳", "Shift pattern right", () => store.shiftChannelPattern(ch, 1));
-    mk("✕", "Clear channel pattern", () => store.clearChannelPattern(ch));
-
-    // Inscription link: a small ORD button in the control row (no line of its own).
-    // The slot always exists so the sliders line up whether or not a sample has a source.
-    const sourceLinks = el("span", "channel-source-links ord-wrap");
-    renderOrdinalChip(sourceLinks, [
-      { source: c.source, label: "Sample inscription" },
-    ]);
-
-    ctrl.append(
-      nameInput,
-      loadBtn,
-      previewBtn,
-      muteBtn,
-      soloBtn,
-      trimBtn,
-      fxBtn,
-      insBtn,
-      sourceLinks,
-      vol,
-      pitch,
-      tools,
-    );
+    const ctrl = createTrackControls(c.id);
 
     // --- step grid ---
     const grid = el("div", "steps");
@@ -251,26 +348,7 @@ export function buildChannels() {
     }
     stepButtons.push(rowButtons);
 
-    // drag & drop audio files onto channel
-    row.addEventListener("dragover", (e) => {
-      e.preventDefault();
-      row.classList.add("drop");
-    });
-    row.addEventListener("dragleave", () => row.classList.remove("drop"));
-    row.addEventListener("drop", async (e) => {
-      e.preventDefault();
-      row.classList.remove("drop");
-      const file = e.dataTransfer.files[0];
-      if (!file) return;
-      try {
-        setStatus(`Loading ${file.name}…`);
-        await loadSample(ch, { type: "file", file });
-        refreshChannelRow(ch);
-        setStatus(`Loaded ${file.name} → channel ${ch + 1}`);
-      } catch (err) {
-        setStatus(`Load failed: ${err.message}`, true);
-      }
-    });
+    bindChannelDrop(row, ch);
 
     const controlStack = el("div", "channel-control-stack");
     controlStack.append(ctrl);
@@ -303,12 +381,12 @@ export function buildChannels() {
       )
     )
       return;
-    if (store.removeChannel()) {
+    try { if (store.removeChannel()) {
       engine.buffers[last] = null;
       engine.reverseBuffers[last] = null;
       buildChannels();
       setStatus(`Channel ${last + 1} removed.`);
-    }
+    }} catch(error) { setStatus(error.message,true); }
   });
   bar.append(addBtn, remBtn);
   root.appendChild(bar);
@@ -320,10 +398,124 @@ export function buildChannels() {
 
 // ---------------------------------------------------------------- instrument channels
 let midiClipboard = null;
+function instrumentControls(i) {
+  const instr = store.instrument(i);
+  const ctrl = el("div", "channel-controls");
+
+  const nameInput = el("input", "ch-name");
+  nameInput.value = instr.name;
+  nameInput.spellcheck = false;
+  nameInput.addEventListener("focus", () => setMidiTarget(i));
+  nameInput.addEventListener("change", () =>
+    store.setInstrumentProp(i, "name", nameInput.value),
+  );
+
+  const rollBtn = el("button", "ch-btn roll-open", "♪");
+  rollBtn.title = "Open MIDI roll & synth editor";
+  rollBtn.addEventListener("click", () => openRoll(i));
+
+  const panelBtn = el("button", "ch-btn panel-open", "🎛");
+  panelBtn.title = "Open the synth panel (pots, faders & pads)";
+  panelBtn.addEventListener("click", () => openSynthPanel(i));
+
+  const fxBtn = el("button", "ch-btn fx fxb", "FX");
+  fxBtn.title = `FX chain: ${pluginNames("fx")}`;
+  fxBtn.addEventListener("click", () => openChain(i, true, "fx"));
+
+  const insBtn = el("button", "ch-btn fx ins", "INS");
+  insBtn.title = `Insert chain: ${pluginNames("inserts")}`;
+  insBtn.addEventListener("click", () => openChain(i, true, "inserts"));
+  markChainButtons(instr, fxBtn, insBtn);
+
+  const previewBtn = el("button", "ch-btn", "▹");
+  previewBtn.title = "Preview (C3)";
+  previewBtn.addEventListener("click", () => {
+    setMidiTarget(i);
+    engine.triggerNote(i, 48, 1, 0, 0.4);
+  });
+
+  const muteBtn = el("button", "ch-btn toggle mute", "M");
+  muteBtn.title = "Mute";
+  muteBtn.classList.toggle("active", instr.mute);
+  muteBtn.addEventListener("click", () => {
+    store.setInstrumentProp(i, "mute", !store.instrument(i).mute);
+    muteBtn.classList.toggle("active", store.instrument(i).mute);
+  });
+
+  const soloBtn = el("button", "ch-btn toggle solo", "S");
+  soloBtn.title = "Solo";
+  soloBtn.classList.toggle("active", instr.solo);
+  soloBtn.addEventListener("click", () => {
+    store.setInstrumentProp(i, "solo", !store.instrument(i).solo);
+    soloBtn.classList.toggle("active", store.instrument(i).solo);
+  });
+
+  const vol = el("input", "ch-vol");
+  vol.type = "range";
+  vol.min = 0;
+  vol.max = 1.5;
+  vol.step = 0.01;
+  vol.value = instr.volume;
+  vol.title = "Volume";
+  vol.addEventListener("input", () => {
+    store.setInstrumentProp(i, "volume", +vol.value);
+    engine.setInstrumentVolume(i, +vol.value);
+  });
+
+  // per-channel synth picker: any instrument channel can load any synth in the bank
+  const synthSel = el("select", "inst-synth-select");
+  synthSel.title = "Choose a synth. Each synth's last patch is kept on this instrument.";
+  synthSel.setAttribute("aria-label", `Instrument ${i + 1} synth`);
+  const synthPicker = createSynthPicker(synthSel, SYNTH_BANK); // folder tree: Bass, Leads, … Glass & Crystal
+  synthSel.value = instr.synthId in SYNTH_BANK ? instr.synthId : "jims10";
+  synthSel.addEventListener("change", () => {
+    const id = synthSel.value;
+    const next = SYNTH_BANK[id];
+    if (!next) return;
+    if (changeSynth(i, id)) setStatus(`${next.name} loaded on instrument ${i + 1}; its last patch is restored.`);
+    setMidiTarget(i);
+  });
+
+  const copyBtn = el("button", "ch-btn tiny", "⧉");
+  copyBtn.title = "Copy MIDI notes from this sequence";
+  copyBtn.addEventListener("click", () => {
+    midiClipboard = JSON.parse(JSON.stringify(store.seq.notes[i] || []));
+    setStatus(
+      `Copied ${midiClipboard.length} notes from ${store.instrument(i).name}.`,
+    );
+  });
+  const pasteBtn = el("button", "ch-btn tiny", "⇪");
+  pasteBtn.title = "Paste MIDI notes into this sequence";
+  pasteBtn.addEventListener("click", () => {
+    if (!midiClipboard) return setStatus("No MIDI notes copied yet.", true);
+    store.setNotes(i, JSON.parse(JSON.stringify(midiClipboard)));
+    drawInstStrip(i);
+    setStatus(
+      `Pasted ${midiClipboard.length} notes into ${store.instrument(i).name}.`,
+    );
+  });
+
+  ctrl.append(
+    nameInput,
+    rollBtn,
+    panelBtn,
+    previewBtn,
+    fxBtn,
+    insBtn,
+    muteBtn,
+    soloBtn,
+    vol,
+    copyBtn,
+    pasteBtn,
+    synthPicker,
+  );
+  return ctrl;
+}
+
 export function buildInstruments() {
   const root = $("#instruments");
   root.innerHTML = "";
-  for (let i = 0; i < NUM_INSTRUMENTS; i++) {
+  for (let i = 0; i < store.project.instruments.length; i++) {
     const instr = store.instrument(i);
     const synth = SYNTH_BANK[instr.synthId] || SYNTH_BANK.jims10;
     const row = el("div", "channel instrument");
@@ -331,115 +523,7 @@ export function buildInstruments() {
     row.classList.toggle("midi-target", getMidiTarget() === i);
     row.style.setProperty("--ch-color", synth.color);
 
-    const ctrl = el("div", "channel-controls");
-
-    const nameInput = el("input", "ch-name");
-    nameInput.value = instr.name;
-    nameInput.spellcheck = false;
-    nameInput.addEventListener("focus", () => setMidiTarget(i));
-    nameInput.addEventListener("change", () =>
-      store.setInstrumentProp(i, "name", nameInput.value),
-    );
-
-    const rollBtn = el("button", "ch-btn roll-open", "♪");
-    rollBtn.title = "Open MIDI roll & synth editor";
-    rollBtn.addEventListener("click", () => openRoll(i));
-
-    const panelBtn = el("button", "ch-btn panel-open", "🎛");
-    panelBtn.title = "Open the synth panel (pots, faders & pads)";
-    panelBtn.addEventListener("click", () => openSynthPanel(i));
-
-    const fxBtn = el("button", "ch-btn fx fxb", "FX");
-    fxBtn.title = `FX chain: ${pluginNames("fx")}`;
-    fxBtn.addEventListener("click", () => openChain(i, true, "fx"));
-
-    const insBtn = el("button", "ch-btn fx ins", "INS");
-    insBtn.title = `Insert chain: ${pluginNames("inserts")}`;
-    insBtn.addEventListener("click", () => openChain(i, true, "inserts"));
-    markChainButtons(instr, fxBtn, insBtn);
-
-    const previewBtn = el("button", "ch-btn", "▹");
-    previewBtn.title = "Preview (C3)";
-    previewBtn.addEventListener("click", () => {
-      setMidiTarget(i);
-      engine.triggerNote(i, 48, 1, 0, 0.4);
-    });
-
-    const muteBtn = el("button", "ch-btn toggle mute", "M");
-    muteBtn.title = "Mute";
-    muteBtn.classList.toggle("active", instr.mute);
-    muteBtn.addEventListener("click", () => {
-      store.setInstrumentProp(i, "mute", !store.instrument(i).mute);
-      muteBtn.classList.toggle("active", store.instrument(i).mute);
-    });
-
-    const soloBtn = el("button", "ch-btn toggle solo", "S");
-    soloBtn.title = "Solo";
-    soloBtn.classList.toggle("active", instr.solo);
-    soloBtn.addEventListener("click", () => {
-      store.setInstrumentProp(i, "solo", !store.instrument(i).solo);
-      soloBtn.classList.toggle("active", store.instrument(i).solo);
-    });
-
-    const vol = el("input", "ch-vol");
-    vol.type = "range";
-    vol.min = 0;
-    vol.max = 1.5;
-    vol.step = 0.01;
-    vol.value = instr.volume;
-    vol.title = "Volume";
-    vol.addEventListener("input", () => {
-      store.setInstrumentProp(i, "volume", +vol.value);
-      engine.setInstrumentVolume(i, +vol.value);
-    });
-
-    // per-channel synth picker: any instrument channel can load any synth in the bank
-    const synthSel = el("select", "inst-synth-select");
-    synthSel.title = "Choose a synth. Each synth's last patch is kept on this instrument.";
-    synthSel.setAttribute("aria-label", `Instrument ${i + 1} synth`);
-    const synthPicker = createSynthPicker(synthSel, SYNTH_BANK); // folder tree: Bass, Leads, … Glass & Crystal
-    synthSel.value = instr.synthId in SYNTH_BANK ? instr.synthId : "jims10";
-    synthSel.addEventListener("change", () => {
-      const id = synthSel.value;
-      const next = SYNTH_BANK[id];
-      if (!next) return;
-      if (changeSynth(i, id)) setStatus(`${next.name} loaded on instrument ${i + 1}; its last patch is restored.`);
-      setMidiTarget(i);
-    });
-
-    const copyBtn = el("button", "ch-btn tiny", "⧉");
-    copyBtn.title = "Copy MIDI notes from this sequence";
-    copyBtn.addEventListener("click", () => {
-      midiClipboard = JSON.parse(JSON.stringify(store.seq.notes[i] || []));
-      setStatus(
-        `Copied ${midiClipboard.length} notes from ${store.instrument(i).name}.`,
-      );
-    });
-    const pasteBtn = el("button", "ch-btn tiny", "⇪");
-    pasteBtn.title = "Paste MIDI notes into this sequence";
-    pasteBtn.addEventListener("click", () => {
-      if (!midiClipboard) return setStatus("No MIDI notes copied yet.", true);
-      store.setNotes(i, JSON.parse(JSON.stringify(midiClipboard)));
-      drawInstStrip(i);
-      setStatus(
-        `Pasted ${midiClipboard.length} notes into ${store.instrument(i).name}.`,
-      );
-    });
-
-    ctrl.append(
-      nameInput,
-      rollBtn,
-      panelBtn,
-      previewBtn,
-      fxBtn,
-      insBtn,
-      muteBtn,
-      soloBtn,
-      vol,
-      copyBtn,
-      pasteBtn,
-      synthPicker,
-    );
+    const ctrl = createTrackControls(instr.id);
 
     // mini note overview strip
     const strip = el("canvas", "inst-strip");
@@ -535,12 +619,7 @@ export function refreshInstrumentRow(i) {
   const instr = store.instrument(i);
   const synth = SYNTH_BANK[instr.synthId] || SYNTH_BANK.jims10;
   row.style.setProperty("--ch-color", synth.color);
-  row.querySelector(".ch-name").value = instr.name;
-  const ss = row.querySelector(".inst-synth-select");
-  if (ss && ss.value !== instr.synthId && instr.synthId in SYNTH_BANK) ss.value = instr.synthId;
-  markChainButtons(instr, row.querySelector(".fxb"), row.querySelector(".ins"));
-  const pb = row.querySelector(".panel-open");
-  if (pb) pb.hidden = false;
+  refreshTrackControls(row.querySelector(".channel-controls"));
   drawInstStrip(i);
 }
 
@@ -548,11 +627,7 @@ export function refreshChannelRow(ch) {
   const row = $(`#channels .channel[data-ch="${ch}"]`);
   if (!row) return;
   const c = store.channel(ch);
-  renderOrdinalChip(row.querySelector(".channel-source-links"), [
-    { source: c.source, label: "Sample inscription" },
-  ]);
-  row.querySelector(".ch-name").value = c.name;
-  row.querySelector(".ch-name").title = c.sampleName || "Channel name";
+  refreshTrackControls(row.querySelector(".channel-controls"));
   row.classList.toggle("unresolved-source", !!c.unresolvedSource);
   let clipInfo = row.querySelector(".channel-clip-info");
   if (c.clipSnapshot) {
@@ -573,12 +648,7 @@ export function refreshChannelRow(ch) {
       );
     clipInfo.append(info, browse);
   } else clipInfo?.remove();
-  row.querySelector(".ch-vol").value = c.volume;
-  row.querySelector(".ch-pitch").value = c.pitch;
-  row.querySelector(".mute").classList.toggle("active", c.mute);
-  row.querySelector(".solo").classList.toggle("active", c.solo);
   row.classList.toggle("has-sample", !!c.sampleName);
-  markChainButtons(c, row.querySelector(".fxb"), row.querySelector(".ins"));
 }
 
 export function refreshAllChannels() {
@@ -628,11 +698,13 @@ export function renderPattern() {
     for (let s = 0; s < NUM_STEPS; s++) {
       paintStep(stepButtons[ch][s], seq.steps[ch][s]);
     }
+    refreshPatternCycle(ch);
   }
 }
 
 export function updateStep(ch, s, v) {
   paintStep(stepButtons[ch][s], v);
+  refreshPatternCycle(ch);
 }
 
 // forward declaration wrapper (openStepEditor defined in the editor section below)
@@ -679,15 +751,29 @@ export function renderSequenceBar() {
 
 // ---------------------------------------------------------------- modals
 let loaderChannel = 0;
+let samplePicker = null;
 let activeTab = "library";
 let libraryAuditionTicket = 0;
 let libraryMigration = null;
 
 export function openLoader(ch) {
+  samplePicker = null;
   loaderChannel = ch;
   $("#loader-channel-label").textContent = `→ Channel ${ch + 1}`;
   $("#modal-loader").classList.remove("hidden");
   $("#modal-loader .modal-box").scrollTop = 0;
+}
+
+// Reuse the same catalogue, previews, source descriptors and decoder for instrument pads.
+export function openSamplePicker({ label, load }) {
+  openLoader(0);
+  samplePicker = { label, load };
+  $('#loader-channel-label').textContent = `→ ${label}`;
+  $('#library-search').value = '';
+  $('#modal-loader [data-tab="library"]').click();
+  const category = SAMPLE_LIBRARY.findIndex(c => c.pack === ANALOG_PACK_ID);
+  $('#library-category').value = Math.max(0, category);
+  populateLibrarySamples();
 }
 
 export function openLibraryItem(id, ch = 0) {
@@ -1048,6 +1134,7 @@ export function initLoaderModal() {
     });
   });
   $("#loader-cancel").addEventListener("click", () => {
+    samplePicker = null;
     libraryMigration?.abort();
     libraryAuditionTicket++;
     engine.stopPreview();
@@ -1074,8 +1161,16 @@ export function initLoaderModal() {
       if (!value) return setStatus("Enter an ID or URL first", true);
       source = { type: activeTab, value };
     }
+    const picker = samplePicker;
+    samplePicker = null;
     $("#modal-loader").classList.add("hidden");
     try {
+      if (picker) {
+        setStatus(`Loading sample for ${picker.label}…`);
+        const name = await picker.load(source);
+        setStatus(`Loaded "${name}" → ${picker.label}`);
+        return;
+      }
       setStatus(`Loading sample for channel ${loaderChannel + 1}…`);
       const name = await loadSample(loaderChannel, source);
       if (source.label) {
@@ -1220,24 +1315,29 @@ function trimStartPlayback() {
   const p = editorParams();
   const buffer = p.rev ? engine.getReverseBuffer(ch) : engine.buffers[ch];
   if (!buffer) return;
+  const historical = legacySamplePlayback(store.project, store.channel(ch), p, buffer.duration);
+  if (historical && historical.sourceDuration <= 0) return;
   const src = engine.ctx.createBufferSource();
   src.buffer = buffer;
-  src.playbackRate.value = p.pitch;
-  src.connect(engine.channelGains[ch]);
+  const startedAt = engine.ctx.currentTime;
+  const pitch = historical?.rate ?? p.pitch;
+  if (historical && !historical.profile.divideSourceDuration)
+    src.playbackRate.setValueAtTime(pitch, startedAt);
+  else src.playbackRate.value = pitch;
+  let previewGain = null;
+  if (historical?.profile.schedulingFadeSeconds) {
+    previewGain = engine.ctx.createGain();
+    previewGain.gain.setValueAtTime(0, startedAt);
+    previewGain.gain.linearRampToValueAtTime(1, startedAt + historical.profile.schedulingFadeSeconds);
+    src.connect(previewGain).connect(engine.channelGains[ch]);
+  } else src.connect(engine.channelGains[ch]);
   let start = p.trimStart * buffer.duration;
   if (p.rev) start = (1 - p.trimEnd) * buffer.duration;
-  const regionSec = Math.max(
-    0.001,
-    (p.trimEnd - p.trimStart) * buffer.duration,
-  );
-  const sustain = sustainDuration(
-    store.channel(ch),
-    p,
-    buffer,
-    store.project.bpm,
-  );
-  const durSec = sustain ?? regionSec / p.pitch; // audible duration after pitch
-  const startedAt = engine.ctx.currentTime;
+  const trimSeconds = (p.trimEnd - p.trimStart) * buffer.duration;
+  const regionSec = historical?.sourceDuration ?? Math.max(0.001, trimSeconds);
+  if (historical) start = historical.offset;
+  const sustain = sustainDuration(store.channel(ch), p, buffer, store.project.bpm);
+  const durSec = sustain ?? regionSec / pitch;
   if (sustain) {
     src.loop = true;
     src.loopStart = sampleLoop(store.channel(ch)).start;
@@ -1247,6 +1347,8 @@ function trimStartPlayback() {
   } else src.start(startedAt, start, regionSec);
   trimPlaying = { src, startedAt, durSec, raf: 0 };
   src.onended = () => {
+    src.disconnect();
+    previewGain?.disconnect();
     if (trimPlaying?.src === src) {
       trimPlaying = null;
       drawWaveform();
@@ -1254,12 +1356,15 @@ function trimStartPlayback() {
   };
   const tick = () => {
     if (!trimPlaying) return;
-    const frac = (engine.ctx.currentTime - startedAt) / durSec;
-    if (frac >= 1) {
+    const elapsed = engine.ctx.currentTime - startedAt;
+    if (elapsed >= durSec) {
       trimPlaying = null;
       drawWaveform();
       return;
     }
+    // Standalone rates below1 can continue beyond the trim marker. Follow the
+    // actual buffer position rather than squeezing that extra audio into it.
+    const frac = historical && !sustain ? elapsed * pitch / trimSeconds : elapsed / durSec;
     drawWaveform(Math.max(0, frac));
     trimPlaying.raf = requestAnimationFrame(tick);
   };
@@ -1286,7 +1391,7 @@ function openTrim(ch, step = null) {
   $("#trim-start").value = Math.round(p.trimStart * 1000);
   $("#trim-end").value = Math.round(p.trimEnd * 1000);
   $("#trim-reverse").checked = p.rev;
-  $("#trim-pitch").max = store.project.songOrigin ? 100 : 4;
+  $("#trim-pitch").max = store.project.songOrigin || store.project.legacyPlayback ? 100 : 4;
   $("#trim-pitch").value = p.pitch;
   const root = c.soundMetadata?.rootMidi;
   $("#trim-note-wrap").hidden = root == null;
@@ -1343,7 +1448,7 @@ export function initTrimModal() {
       pitch: Math.max(
         0.1,
         Math.min(
-          store.project.songOrigin ? 100 : 4,
+          store.project.songOrigin || store.project.legacyPlayback ? 100 : 4,
           +$("#trim-pitch").value || 1,
         ),
       ),

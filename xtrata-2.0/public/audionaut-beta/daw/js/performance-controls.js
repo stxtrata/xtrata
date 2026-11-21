@@ -1,4 +1,4 @@
-import { store, NUM_INSTRUMENTS } from "./state.js";
+import { store } from "./state.js";
 import { getMidiTarget, setMidiTarget, midiStatus, setMidiEnabled } from "./midi-input.js";
 import { getArpSettings, setArpSettings, panic } from "./live-keys.js";
 
@@ -7,7 +7,7 @@ export function initPerformanceControls() {
   const target = $("live-instrument");
   const syncTarget = () => {
     const selected = getMidiTarget();
-    target.replaceChildren(...Array.from({ length: NUM_INSTRUMENTS }, (_, i) =>
+    target.replaceChildren(...Array.from({ length: store.project.instruments.length }, (_, i) =>
       new Option(`${i + 1} · ${store.instrument(i).name}`, String(i))));
     target.value = String(selected);
     document.querySelectorAll(".channel.instrument").forEach(row => {
@@ -49,5 +49,6 @@ export function initPerformanceControls() {
   document.addEventListener("midi-status", syncMidi);
   store.on("load", syncTarget);
   store.on("instrument", syncTarget);
+  store.on('instruments',syncTarget);
   syncTarget(); syncMidi();
 }

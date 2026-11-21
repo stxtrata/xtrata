@@ -14,6 +14,7 @@
 import { engine } from "./engine.js";
 import { store } from "./state.js";
 import { createArpeggiator, normalizeArp } from "./arpeggiator.js";
+import { beatToSeconds } from "./timeline.js";
 
 export const TYPED_VEL = 0.8;
 const held = new Map(); // physical source -> { id, inst, pitch, vel, bend }
@@ -25,10 +26,10 @@ const emit = (detail) => document.dispatchEvent(new CustomEvent("live-note", { d
 export const getArpSettings = (i) => normalizeArp(store.instrument(i)?.arp);
 function startOutput(src, n, options = {}) {
   const time = options.time ?? engine.ensureContext().currentTime;
-  const id = engine.startNote(n.inst, n.pitch, n.vel, { ...options, source: src, bend: n.bend || 0 });
+  const id = n.monitor === false ? `silent:${++pulse}` : engine.startNote(n.inst, n.pitch, n.vel, { ...options, source: src, bend: n.bend || 0 });
   if (id) {
     outputs.set(id, { src, ...n });
-    emit({ src, inst: n.inst, pitch: n.pitch, vel: n.vel, on: true, time, duration: options.duration });
+    emit({ src, inst: n.inst, pitch: n.pitch, vel: n.vel, bend:n.bend||0, on: true, time, duration: options.duration });
   }
   return id;
 }
@@ -39,9 +40,18 @@ function releaseOutput(id, time = engine.ctx?.currentTime || 0) {
   engine.releaseNote(id, time);
   emit({ ...n, on: false, time });
 }
+function beatInterval(time,beats){
+  const project=store.project,pos=engine.getMusicalPosition(time);if(!pos.playing)return beats*60/project.bpm;
+  const loop=engine._loopRange,beat=pos.beat;
+  if(!loop||beat+beats<=loop.end)return beatToSeconds(project,beat+beats)-beatToSeconds(project,beat);
+  const first=Math.max(0,loop.end-beat),remaining=beats-first,length=loop.end-loop.start,cycles=Math.floor(remaining/length),rest=remaining-cycles*length;
+  return beatToSeconds(project,loop.end)-beatToSeconds(project,beat)+cycles*(beatToSeconds(project,loop.end)-beatToSeconds(project,loop.start))+beatToSeconds(project,loop.start+rest)-beatToSeconds(project,loop.start);
+}
 const arp = createArpeggiator({
   now: () => engine.ensureContext().currentTime,
   bpm: () => store.project.bpm,
+  intervalAt:(time,rate)=>beatInterval(time,1/rate),
+  grid:(time,rate)=>{const pos=engine.getMusicalPosition(time);if(!pos.playing)return null;const beat=pos.beat,nextBeat=(Math.floor(beat*rate+1e-8)+1)/rate;return {next:time+beatInterval(time,nextBeat-beat),key:JSON.stringify([store.project.bpm,store.project.timeline.enabled,store.project.timeline.tempo])};},
   settings: getArpSettings,
   notes: (inst) => [...held.values()].filter(n => n.inst === inst),
   play: (inst, n, time, duration) => startOutput(`arp:${inst}:${++pulse}`, { ...n, inst }, { time, duration }),
@@ -76,25 +86,27 @@ store.on("instrument", ({ i, prop }) => {
 });
 export function noteOn(src, inst, pitch, vel = TYPED_VEL, options = {}) {
   noteOff(src);
-  if (!(pitch >= 0 && pitch <= 127) || !store.instrument(inst)) return 0;
+  if (!Number.isInteger(pitch) || pitch < 0 || pitch > 127 || !Number.isFinite(vel) || !store.instrument(inst)) return 0;
+  vel = Math.max(0, Math.min(1, vel));
   engine.ensureContext();
-  const n = { inst, pitch, vel, bend: options.bend || 0, origin: src, id: 0 };
+  const n = { inst, pitch, vel, bend: options.bend || 0, origin: src, id: 0, monitor:store.instrument(inst).monitor };
   held.set(src, n);
   if (getArpSettings(inst).enabled) arp.update(inst);
-  else n.id = startOutput(src, n);
+  else n.id = startOutput(src, n, {time:options.time});
   return n.id || 1;
 }
-export function noteOff(src) {
+export function noteOff(src, options = {}) {
   const n = held.get(src);
   if (!n) return;
   held.delete(src);
-  if (n.id) releaseOutput(n.id);
-  for (const [id, output] of outputs) if (output.origin === src) releaseOutput(id);
+  if (n.id) releaseOutput(n.id,options.time);
+  for (const [id, output] of outputs) if (output.origin === src) releaseOutput(id,options.time);
   arp.update(n.inst);
 }
-export function bendNotes(prefix, semitones) {
+export function bendNotes(prefix, semitones, time = engine.ctx?.currentTime || 0) {
   for (const [src, n] of held) if (src.startsWith(prefix)) n.bend = semitones;
   for (const [id, n] of outputs) if (n.src.startsWith(prefix) || (n.origin && n.origin.startsWith(prefix))) engine.setNotePitchBend?.(id, semitones);
+  document.dispatchEvent(new CustomEvent('live-expression',{detail:{prefix,type:'bend',value:semitones,time}}));
 }
 export function allOff(prefix = "") {
   for (const src of [...held.keys()]) if (src.startsWith(prefix)) noteOff(src);
@@ -112,6 +124,7 @@ document.addEventListener("synth-voice-ended", ({ detail }) => {
   if (n) { outputs.delete(detail.id); emit({ ...n, on: false, time: engine.ctx?.currentTime || 0 }); }
   arp.ended(detail.id);
 });
+store.on("instruments", () => allOff());
 store.on("load", () => {
   allOff();
   for (const id of [...outputs.keys()]) releaseOutput(id);
@@ -143,8 +156,8 @@ wireGlobal();
 //   keyAt(node) -> { midi, el } | null   which key a hit-tested node belongs to
 //   inst()      -> instrument slot to play
 //   velAt(e, el) optional; default: lower on the key = louder (0.45 … 1.0)
-export function attachKeyboard(el, { keyAt, inst, velAt }) {
-  const tag = `kb${++seq}`;
+export function attachKeyboard(el, { keyAt, inst, velAt, hitTest, prefix = "kb" }) {
+  const tag = `${prefix}${++seq}`;
   const ptrs = new Map(); // pointerId -> midi currently held by that pointer (or null when off the keys)
   const rootNode = el.getRootNode();
   const hitRoot = rootNode && rootNode.elementFromPoint ? rootNode : document;
@@ -157,6 +170,7 @@ export function attachKeyboard(el, { keyAt, inst, velAt }) {
     });
   const hit = (e) => {
     const n = hitRoot.elementFromPoint(e.clientX, e.clientY);
+    if (hitTest) return n && el.contains(n) ? hitTest(e) : null;
     return n && el.contains(n) ? keyAt(n) : null;
   };
   const press = (e, k) => {
@@ -171,7 +185,7 @@ export function attachKeyboard(el, { keyAt, inst, velAt }) {
   const onDown = (e) => {
     if (e.button > 0) return;
     const k = hit(e) || keyAt(e.target);
-    if (!k) return;
+    if (!k || !Number.isInteger(k.midi) || k.midi < 0 || k.midi > 127) return;
     e.preventDefault();
     try {
       el.setPointerCapture(e.pointerId);
@@ -191,18 +205,15 @@ export function attachKeyboard(el, { keyAt, inst, velAt }) {
     if (k) press(e, k);
     else ptrs.set(e.pointerId, null); // left the keys: silent until it comes back
   };
-  el.addEventListener("pointerdown", onDown);
-  el.addEventListener("pointermove", onMove);
-  el.addEventListener("pointerup", end);
-  el.addEventListener("pointercancel", end);
-  el.addEventListener("lostpointercapture", end);
-  el.addEventListener("contextmenu", (e) => e.preventDefault());
-  el.style.touchAction = "none";
-  return {
-    tag,
-    release() {
-      allOff(`${tag}:`);
-      ptrs.clear();
-    },
+  const context = e => e.preventDefault();
+  const reset = ({detail}={}) => {
+    const sources=detail?.sources;
+    for(const pointerId of ptrs.keys())if(!detail?.prefix&&!sources || detail?.prefix&&`${tag}:`.startsWith(detail.prefix) || sources?.includes(`${tag}:${pointerId}`))ptrs.delete(pointerId);
   };
+  const events={pointerdown:onDown,pointermove:onMove,pointerup:end,pointercancel:end,lostpointercapture:end,contextmenu:context};
+  for(const [name,fn] of Object.entries(events))el.addEventListener(name,fn);
+  document.addEventListener('performance-reset',reset);
+  const previousTouch=el.style.touchAction;el.style.touchAction='none';
+  const release=()=>{allOff(`${tag}:`);ptrs.clear();};
+  return {tag,release,dispose(){release();for(const [name,fn] of Object.entries(events))el.removeEventListener(name,fn);document.removeEventListener('performance-reset',reset);el.style.touchAction=previousTouch;}};
 }
