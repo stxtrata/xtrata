@@ -76,6 +76,45 @@ describe('AudioNaut Pro server gate',()=>{
   expect((await authorizePro(new Request(url,{headers:{cookie:signed.cookie}}),env)).status).toBe(403);
   clearProMembershipCache();unavailable=true;expect((await authorizePro(new Request(url,{headers:{cookie:signed.cookie}}),env)).status).toBe(503);
  });
+ it('pairs one device to the dedicated tester wallet and keeps its scope and lifetime tied to that Mac', async()=>{
+  const {onRequest:pair}=await import('../../audionaut-beta-pro/pair');
+  const {onRequest:earlierBeta}=await import('../../audionaut-beta/_middleware');
+  env.DB.sqlite.exec(readFileSync(new URL('../../migrations/034_audionaut_device_pairing.sql',import.meta.url),'utf8'));
+  const signed=await signIn(), other=await signIn();
+  const origin='https://xtrata.xyz', path=origin+'/audionaut-beta-pro/pair';
+  const post=(action:string,cookie='',code='',caller=origin)=>pair({env,request:new Request(path,{
+    method:'POST',headers:{Origin:caller,'content-type':'application/json',Cookie:cookie},body:JSON.stringify({action,code})})} as any);
+  const takeCookie=(r:Response)=>r.headers.get('set-cookie')?.split(';')[0]||'';
+  const body=(r:Response)=>r.json() as Promise<any>;
+  const asset=(cookie:string)=>middleware({env,request:new Request(origin+'/audionaut-beta-pro/daw.html',{headers:{Cookie:cookie}}),next:()=>new Response('studio')} as any);
+  expect((await post('start')).status).toBe(404);
+  env.AUDIONAUT_PAIRING_WALLET=signed.owner.address;
+  const ipad=await post('start'), pending=takeCookie(ipad), {code}=await body(ipad);
+  expect(code).toHaveLength(16);
+  expect(await body(await post('claim',pending))).toEqual({waiting:true});
+  expect((await post('approve',other.cookie,code)).status).toBe(403);
+  expect((await post('approve',signed.cookie,code,'https://another.example')).status).toBe(403);
+  expect((await post('approve',signed.cookie,code)).status).toBe(200);
+  const second=await post('start');
+  expect(await body(await post('claim',takeCookie(second)))).toEqual({waiting:true});
+  const claim=await post('claim',pending),device=takeCookie(claim);
+  expect(await body(claim)).toEqual({ready:true});
+  expect(claim.headers.get('set-cookie')).toContain('Path=/audionaut-beta-pro/');
+  expect(claim.headers.get('set-cookie')).toContain('HttpOnly; Secure; SameSite=Strict');
+  expect(await body(await post('claim',pending))).toEqual({waiting:true});
+  expect(await (await asset(device)).text()).toBe('studio');
+  expect((await post('approve',device,code)).status).toBe(403);
+  expect((await earlierBeta({env,request:new Request(origin+'/audionaut-beta/daw.html',{headers:{Cookie:device}}),next:()=>new Response('studio')} as any)).status).toBe(303);
+  expect((await authorizePro(new Request(url,{headers:{Cookie:device}}),env)).allowed).toBe(false);
+  holds=false;clearProMembershipCache();expect((await asset(device)).status).toBe(303);
+  holds=true;clearProMembershipCache();
+  const issue=async()=>{const start=await post('start');const {code}=await body(start);
+    await post('approve',signed.cookie,code);return takeCookie(await post('claim',takeCookie(start)));};
+  const next=await issue();expect((await asset(device)).status).toBe(303);expect((await asset(next)).status).toBe(200);
+  expect((await post('revoke',signed.cookie)).status).toBe(200);expect((await asset(next)).status).toBe(303);
+  const final=await issue();env.DB.sqlite.exec('UPDATE creator_sessions SET revoked_at=1');
+  expect((await asset(final)).status).toBe(303);
+ });
  it('protects encoded direct assets while leaving only Pro gate assets public',async()=>{
   for(const path of ['/audionaut-beta-pro/%64aw.html','/audionaut-beta-pro/%2564aw.html','/audionaut-beta-pro/daw/js/main.js','/audionaut-beta-pro/tools/pro-export-test.mjs']){
    const response=await middleware({env,request:new Request('https://xtrata.xyz'+path),next:()=>new Response('secret')} as any);expect([401,303]).toContain(response.status);

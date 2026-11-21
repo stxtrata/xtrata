@@ -1,3 +1,4 @@
+import {authorizePairedStudio} from '../lib/audionaut-device-pairing';
 import {authorizePro,PRO_NO_STORE} from '../lib/audionaut-pro-auth';
 // The gate and marketing remain public. Every actual workstation asset is protected,
 // including direct HTML/module URLs; a client-side claimed address cannot bypass this.
@@ -8,9 +9,14 @@ export const onRequest:PagesFunction=async(context)=>{
   // a downstream static handler could normalize into the protected workstation.
   if(/[\\\u0000%]/.test(path)||path.split('/').some(segment=>segment==='.'||segment==='..'))return new Response('Invalid path',{status:400,headers:PRO_NO_STORE});
   const publicPath=['/audionaut-beta-pro','/audionaut-beta-pro/','/audionaut-beta-pro/index.html','/audionaut-beta-pro/audionaut-pro-gate.js'].includes(path)||path.startsWith('/audionaut-beta-pro/sell/');
-  if(publicPath)return context.next();
+  if(publicPath || path==='/audionaut-beta-pro/pair')return context.next();
   const result=await authorizePro(context.request,context.env);
-  if(!result.allowed){
+  let paired=false;
+  if(!result.allowed && result.status===401 && ['GET','HEAD'].includes(context.request.method)){
+    try{paired=await authorizePairedStudio(context.request,context.env);}
+    catch{return new Response('Session verification unavailable',{status:503,headers:PRO_NO_STORE});}
+  }
+  if(!result.allowed && !paired){
     if(path.endsWith('.html')&&result.status===401)return new Response(null,{status:303,headers:{...PRO_NO_STORE,Location:'/audionaut-beta-pro/'}});
     return new Response(JSON.stringify({error:result.error}),{status:result.status,headers:{...PRO_NO_STORE,'Content-Type':'application/json'}});
   }
