@@ -18,6 +18,22 @@ try {
   const strip = p.locator('.mobile-strip'),
     track = p.getByLabel('Track', { exact: true });
   const sample = await track.inputValue();
+  const bank = p.getByRole('region', { name: 'Track pads' });
+  const trackPads = bank.locator('.mobile-track-pad');
+  const padFor = (id) => bank.locator('.mobile-track-pad[data-track-id="' + id + '"]');
+  assert.equal(await trackPads.count(), 16);
+  const selectedId = await track.inputValue();
+  await bank.getByRole('button', { name: 'Next track bank' }).tap();
+  assert.equal(await track.inputValue(), selectedId, 'Paging only browses');
+  assert.equal(await padFor(selectedId).count(), 0);
+  const lastId = await trackPads.last().getAttribute('data-track-id');
+  await trackPads.last().tap();
+  assert.equal(await track.inputValue(), lastId);
+  await track.selectOption(sample);
+  assert.equal(await padFor(sample).getAttribute('aria-pressed'), 'true');
+  await bank.getByRole('button', { name: 'Track pads', exact: true }).tap();
+  assert.equal(await trackPads.first().isVisible(), false);
+  await bank.getByRole('button', { name: 'Track pads', exact: true }).tap();
   await strip.locator('.solo').tap();
   assert.equal(await p.evaluate((id) => testStore.track(id).solo, sample), true);
   await strip.locator('.solo').tap();
@@ -51,18 +67,45 @@ try {
         })
       );
     assert.deepEqual(outside, [], 'Sample controls fit at ' + width);
+    const padsFit = await trackPads.evaluateAll((nodes) =>
+      nodes.every((node) => {
+        const r = node.getBoundingClientRect();
+        return r.left >= 0 && r.right <= innerWidth + 1 && r.width >= 44 && r.height >= 44;
+      })
+    );
+    assert.ok(padsFit, 'Every track pad fits at ' + width);
     if (process.env.SCREENSHOT_DIR && width === 390)
       await p
         .locator('.mobile-inspector')
         .screenshot({ path: process.env.SCREENSHOT_DIR + '/mobile-track.png' });
   }
   await p.setViewportSize({ width: 390, height: 844 });
+  const dockTop = await bank.evaluate((n) => n.getBoundingClientRect().top);
+  await p.locator('.mobile-pads button').last().scrollIntoViewIfNeeded();
+  const layout = await p.evaluate(() => {
+    const area = document.querySelector('.mobile-edit-area').getBoundingClientRect();
+    const pads = document.querySelector('.mobile-track-bank').getBoundingClientRect();
+    return {
+      editorBottom: area.bottom,
+      padTop: pads.top,
+      padBottom: pads.bottom,
+      height: innerHeight
+    };
+  });
+  assert.ok(
+    Math.abs(dockTop - layout.padTop) < 2 &&
+      layout.padTop >= layout.editorBottom - 1 &&
+      layout.padBottom <= layout.height + 1,
+    'Editing steps leaves the entire track bank accessible'
+  );
+  if (process.env.SCREENSHOT_DIR)
+    await p.screenshot({ path: process.env.SCREENSHOT_DIR + '/track-bank-phone.png' });
   await p.getByRole('button', { name: 'Loop bar', exact: true }).tap();
   const second = await p.evaluate(() => testStore.channel(1).id);
-  await p.getByRole('button', { name: 'Next track' }).tap();
+  await p.getByRole('button', { name: 'Next track', exact: true }).tap();
   assert.equal(await track.inputValue(), second);
   await strip.locator('.mute').tap();
-  await p.getByRole('button', { name: 'Previous track' }).tap();
+  await p.getByRole('button', { name: 'Previous track', exact: true }).tap();
   assert.equal(await track.inputValue(), sample);
   await p.getByRole('button', { name: 'Groups', exact: true }).tap();
   const dialog = p.getByRole('dialog', { name: 'Track groups' });
@@ -84,6 +127,19 @@ try {
     );
   }
   await waitForKickGain(false);
+  assert.equal(await trackPads.count(), 2);
+  assert.equal(await padFor(sample).getAttribute('data-sound'), 'muted');
+  await track.selectOption(second);
+  assert.equal(await padFor(second).getAttribute('data-sound'), 'muted', 'Picker selects silently');
+  await padFor(sample).tap();
+  await waitForKickGain(true);
+  assert.equal(await track.inputValue(), sample);
+  assert.equal(await muteGroup.getAttribute('aria-pressed'), 'true');
+  assert.equal(await padFor(sample).getAttribute('data-sound'), 'live');
+  assert.equal(await padFor(second).getAttribute('data-sound'), 'muted');
+  assert.ok(await p.evaluate(() => testStore.channel(1).mute));
+  await p.evaluate(async () => (await import('/audionaut-beta-pro/daw/js/history.js')).undo());
+  await waitForKickGain(false);
   if (process.env.SCREENSHOT_DIR)
     await p
       .locator('.mobile-inspector')
@@ -95,8 +151,8 @@ try {
     await p.evaluate(() => !testStore.channel(0).mute && testStore.channel(1).mute),
     'Release preserves an individually muted track'
   );
-  await p.getByRole('button', { name: 'Next track' }).tap();
-  await p.getByRole('button', { name: 'Next track' }).tap();
+  await p.getByRole('button', { name: 'Next track', exact: true }).tap();
+  await p.getByRole('button', { name: 'Next track', exact: true }).tap();
   assert.equal(await track.inputValue(), sample);
   const loop = await p.evaluate(async () => {
     const { engine } = await import('/audionaut-beta-pro/daw/js/engine.js');
@@ -106,7 +162,8 @@ try {
   await p.locator('#btn-stop').tap();
   await p.getByRole('button', { name: 'All tracks', exact: true }).tap();
   const synth = await p.evaluate(() => testStore.project.instruments[1].id);
-  await track.selectOption(synth);
+  await padFor(synth).tap();
+  assert.equal(await track.inputValue(), synth);
   assert.equal(await p.locator('.mobile-pads').isVisible(), false);
   await strip.locator('.solo').tap();
   assert.ok(
@@ -115,6 +172,10 @@ try {
       [synth, sample]
     )
   );
+  assert.equal(await padFor(sample).getAttribute('data-sound'), 'outside-solo');
+  await padFor(sample).tap();
+  assert.ok(await p.evaluate((id) => testStore.track(id).solo, synth));
+  await padFor(synth).tap();
   await strip.locator('.synth-picker-btn').tap();
   await p.waitForSelector('.synth-pop');
   await p.keyboard.press('Escape');
