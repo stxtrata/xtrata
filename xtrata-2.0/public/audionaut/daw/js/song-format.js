@@ -1,8 +1,8 @@
 // Song instruction compatibility, verified against the original on-chain samplers.
 import {
-  makeProject,
-  makeChannel,
-  makeSequence,
+  makeLegacyProject as makeProject,
+  makeLegacyChannel as makeChannel,
+  makeLegacySequence as makeSequence,
   MAX_CHANNELS,
   MAX_SEQUENCES,
 } from "./state.js";

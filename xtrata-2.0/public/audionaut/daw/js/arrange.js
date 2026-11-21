@@ -1,10 +1,10 @@
 import { midiName } from "./onboard-catalog.js";
 import { sustainDuration, sampleLoop } from "./onboard-library.js";
 // arrange.js — Logic-style arrange view (the default): waveform regions, with the step grid as the alternative view.
-// Regions render their real audible length; choke cuts at the next trigger; per-step
+// Regions render their real audible length; choke cuts at the next trigger; per-region
 // crossfades (xfade, ms) blend a region into the next one — drag the boundary to set.
 // Drag region edges to trim, drag a region's body to move it. Regions sit at their true
-// position (step + fractional offset); the Snap menu picks the move grid (Step … 1/16 of a
+// position (region.pos, in steps); the Snap menu picks the move grid (Step … 1/16 of a
 // step, or Off) and Alt bypasses it; hold Ctrl while dragging for an instant 1/16-step
 // grid. Zoom widens the steps so fine moves are visible.
 // Drag on empty space to marquee-select regions (Shift adds); drag a selected region to
@@ -16,14 +16,7 @@ import { sustainDuration, sampleLoop } from "./onboard-library.js";
 // edge of one of them trims the same edge of every selected region by the same amount.
 // Click = edit, right-click = reverse, click empty = add.
 
-import {
-  store,
-  NUM_STEPS,
-  stepVal,
-  stepObj,
-  stepOff,
-  withStepOff,
-} from "./state.js";
+import { store, NUM_STEPS } from "./state.js";
 import { engine } from "./engine.js";
 import { openStepEditor, setStatus } from "./ui.js";
 
@@ -40,8 +33,8 @@ let lastCtrlDown = 0; // Ctrl+click is a right-click on macOS: don't treat it as
 const cw = () => CELL_W * zoom;
 let playheadStep = -1;
 let drag = null; // { kind:'trimL'|'trimR'|'xfade'|'maybeClick'|'pending'|'move'|'marquee', ch, ... }
-let selection = new Set(); // "ch:step" keys of selected regions
-const selKey = (ch, step) => `${ch}:${step}`;
+let selection = new Set(); // ids of the selected regions (unique across channels)
+const cellKey = (ch, step) => `${ch}:${step}`;
 const stripFor = (ch) =>
   document.querySelector(`#channels .channel[data-ch="${ch}"] .arrange-strip`);
 
@@ -86,36 +79,35 @@ function setArrangeMode(on, { save = true } = {}) {
 
 const stepDurSec = () => 60 / store.project.bpm / 4;
 
-// Regions for one channel: geometry + playback params + boundary info.
+// Regions for one channel: geometry + playback params + boundary info. Each region plays its
+// own pool sample (region.sample); overrides on the region win over the sample's settings.
 function channelRegions(ch) {
-  const row = store.seq.steps[ch];
-  const buffer = engine.buffers?.[ch];
+  const row = store.regions(ch);
   const c = store.channel(ch);
   const sd = stepDurSec();
-  const triggers = [];
-  for (let s = 0; s < NUM_STEPS; s++) if (stepVal(row[s])) triggers.push(s);
-  return triggers.map((s, i) => {
-    const o = stepObj(row[s]);
-    const off = stepOff(row[s]);
-    const pos = s + off;
-    const trimStart = o?.trimStart ?? c.trimStart;
-    const trimEnd = o?.trimEnd ?? c.trimEnd;
-    const pitch = o?.pitch ?? c.pitch;
-    const rev = o?.rev ?? !!c.reverse;
+  const bpm = store.project.bpm;
+  return row.map((reg, i) => {
+    const sample = store.sampleById(reg.sample) || c;
+    const buffer = engine.bufferFor(sample);
+    const pos = reg.pos;
+    const trimStart = reg.trimStart ?? sample.trimStart;
+    const trimEnd = reg.trimEnd ?? sample.trimEnd;
+    const pitch = reg.pitch ?? sample.pitch;
+    const rev = reg.rev ?? !!sample.reverse;
+    const sustain = buffer ? sustainDuration(sample, reg, buffer, bpm) : null;
     const regionSec = buffer
-      ? (sustainDuration(c, o, buffer, store.project.bpm) ??
+      ? (sustain ??
         Math.max(0.001, (trimEnd - trimStart) * buffer.duration) / pitch)
       : sd;
     const naturalSteps = regionSec / sd;
-    const next = triggers[i + 1] ?? null;
-    const nextPos = next != null ? next + stepOff(row[next]) : null;
-    const nextObj = next != null ? stepObj(row[next]) : null;
-    const nextXfadeSteps = nextObj?.xfade ? nextObj.xfade / 1000 / sd : 0;
+    const next = row[i + 1] ?? null;
+    const nextPos = next ? next.pos : null;
+    const nextXfadeSteps = next?.xfade ? next.xfade / 1000 / sd : 0;
 
     let widthSteps = naturalSteps;
     let cut = false,
       xfaded = false;
-    if (next != null && pos + naturalSteps > nextPos) {
+    if (next && pos + naturalSteps > nextPos) {
       if (nextXfadeSteps > 0) {
         widthSteps = Math.min(naturalSteps, nextPos - pos + nextXfadeSteps);
         xfaded = true;
@@ -126,32 +118,30 @@ function channelRegions(ch) {
     }
     widthSteps = Math.min(widthSteps, NUM_STEPS - pos);
     return {
-      step: s,
-      off,
+      id: reg.id,
+      step: Math.floor(pos),
       pos,
       nextPos,
+      nextId: next ? next.id : null,
       widthSteps,
       naturalSteps,
       cut,
       xfaded,
-      next,
       nextXfadeSteps,
       trimStart,
       trimEnd,
       pitch,
       rev,
-      wordSelection: o?.wordSelection ?? c.wordSelection,
-      loop:
-        buffer && sustainDuration(c, o, buffer, store.project.bpm) != null
-          ? sampleLoop(c)
-          : null,
+      buffer,
+      wordSelection: reg.wordSelection ?? sample.wordSelection,
+      loop: sustain != null ? sampleLoop(sample) : null,
       noteLabel:
-        c.soundMetadata?.rootMidi != null
+        sample.soundMetadata?.rootMidi != null
           ? midiName(
-              Math.round(c.soundMetadata.rootMidi + 12 * Math.log2(pitch)),
+              Math.round(sample.soundMetadata.rootMidi + 12 * Math.log2(pitch)),
             )
           : null,
-      accent: stepVal(row[s]) === 2,
+      accent: reg.v === 2,
     };
   });
 }
@@ -180,10 +170,9 @@ function drawStrip(ch) {
     g.fillRect(s * cw(), 0, 1, H);
   }
 
-  const buffer = engine.buffers?.[ch];
-  const data = buffer?.getChannelData(0);
-
   for (const r of channelRegions(ch)) {
+    const buffer = r.buffer;
+    const data = buffer?.getChannelData(0);
     const x = r.pos * cw();
     const w = Math.max(3, r.widthSteps * cw());
     g.fillStyle = r.accent
@@ -192,7 +181,7 @@ function drawStrip(ch) {
     g.fillRect(x, 1, w, H - 2);
     g.strokeStyle = r.cut ? "#ff9f43" : c.color;
     g.strokeRect(x + 0.5, 1.5, w - 1, H - 3);
-    if (selection.has(selKey(ch, r.step))) {
+    if (selection.has(r.id)) {
       g.fillStyle = "rgba(67,255,164,0.16)";
       g.fillRect(x, 1, w, H - 2);
       g.strokeStyle = "#43ffa4";
@@ -272,7 +261,7 @@ function drawStrip(ch) {
     }
 
     // crossfade wedge: diagonal out/in lines over the fade span before the boundary
-    if (r.xfaded && r.next != null && r.nextXfadeSteps > 0) {
+    if (r.xfaded && r.nextId != null && r.nextXfadeSteps > 0) {
       const bx = r.nextPos * cw();
       const fx = r.nextXfadeSteps * cw();
       g.strokeStyle = "#22d3ee";
@@ -313,7 +302,7 @@ function hitTest(ch, x) {
   const regions = channelRegions(ch);
   // crossfade handle: near a boundary where the previous region reaches the next trigger
   for (const r of regions) {
-    if (r.next == null) continue;
+    if (r.nextId == null) continue;
     const overlaps = r.pos + r.naturalSteps > r.nextPos;
     if (!overlaps) continue;
     const bx = r.nextPos * cw();
@@ -337,30 +326,35 @@ function hitTest(ch, x) {
 // Per-region limits come from the regions that are NOT selected (they stay put); the
 // selected ones move together, so a collision between two of them just freezes the drag
 // at the last valid position.
+// The step slots a region may slide between: the neighbours' slots bound it (one region per
+// step slot until overlap lands). `skip` is the set of ids that move with it.
+function slideLimits(ch, step, skip) {
+  let lo = 0,
+    hi = NUM_STEPS - 0.001;
+  for (const o of store.regions(ch)) {
+    if (skip.has(o.id)) continue;
+    const t = Math.floor(o.pos);
+    if (t < step) lo = Math.max(lo, t + 1);
+    else hi = Math.min(hi, t - 0.001);
+  }
+  return { lo, hi };
+}
+
 function startGroupTrim(ch, cv, h, e) {
   const sd = stepDurSec();
   const items = selectedItems();
-  const memberKeys = new Set(items.map((it) => selKey(it.ch, it.step)));
+  const memberIds = new Set(items.map((it) => it.id));
   const members = [];
   for (const it of items) {
-    const buffer = engine.buffers?.[it.ch];
-    if (!buffer) continue;
-    const region = channelRegions(it.ch).find((r) => r.step === it.step);
-    if (!region) continue;
-    const row = store.seq.steps[it.ch];
-    let lo = 0,
-      hi = NUM_STEPS - 0.001;
-    for (let t = 0; t < NUM_STEPS; t++) {
-      if (!stepVal(row[t]) || memberKeys.has(selKey(it.ch, t))) continue;
-      if (t < it.step) lo = Math.max(lo, t + 1);
-      else hi = Math.min(hi, t - 0.001);
-    }
+    const region = channelRegions(it.ch).find((r) => r.id === it.id);
+    if (!region?.buffer) continue;
+    const { lo, hi } = slideLimits(it.ch, it.step, memberIds);
     members.push({
       ch: it.ch,
+      id: it.id,
       step: it.step,
-      val: it.val,
       region,
-      buffer,
+      buffer: region.buffer,
       sd,
       trimStart0: region.trimStart,
       trimEnd0: region.trimEnd,
@@ -380,7 +374,6 @@ function startGroupTrim(ch, cv, h, e) {
     scale: cv.width / cv.getBoundingClientRect().width,
     moved: false,
     members,
-    orig: origRows(members),
   };
 }
 
@@ -438,24 +431,13 @@ function applyGroupTrim(d, delta) {
   if (left) {
     const used = new Set();
     for (const p of plans) {
-      p.slot = Math.floor(p.pos);
-      const key = selKey(p.m.ch, p.slot);
+      const key = cellKey(p.m.ch, Math.floor(p.pos));
       if (used.has(key)) return; // two selected regions would share a step slot
       used.add(key);
     }
-    const rows = new Map([...d.orig].map(([ch, row]) => [ch, row.slice()]));
-    for (const p of plans) rows.get(p.m.ch)[p.m.step] = 0;
-    for (const p of plans)
-      rows.get(p.m.ch)[p.slot] = withStepOff(p.m.val, r3(p.pos - p.slot));
-    for (const [ch, row] of rows) store.seq.steps[ch] = row;
-    for (const p of plans)
-      if (p.slot !== p.m.step)
-        store.emit("step", { ch: p.m.ch, step: p.m.step, val: store.seq.steps[p.m.ch][p.m.step] });
-  } else {
-    for (const p of plans) p.slot = p.m.step;
   }
-  for (const p of plans) store.setStepProps(p.m.ch, p.slot, p.props);
-  selection = new Set(plans.map((p) => selKey(p.m.ch, p.slot)));
+  for (const p of plans)
+    store.setRegionProps(p.m.ch, p.m.id, left ? { ...p.props, pos: p.pos } : p.props);
   d.moved = true;
   renderArrange();
 }
@@ -468,7 +450,7 @@ function onStripDown(ch, cv, e) {
   if (
     (h.kind === "trimL" || h.kind === "trimR") &&
     selection.size > 1 &&
-    selection.has(selKey(ch, h.region.step))
+    selection.has(h.region.id)
   ) {
     const g = startGroupTrim(ch, cv, h, e);
     if (g) {
@@ -481,14 +463,7 @@ function onStripDown(ch, cv, e) {
   }
   if (h.kind === "trimL" || h.kind === "trimR" || h.kind === "xfade") {
     // the left edge may slide between the neighbouring triggers' step slots
-    const row = store.seq.steps[ch];
-    let lo = 0,
-      hi = NUM_STEPS - 0.001;
-    for (let t = 0; t < NUM_STEPS; t++) {
-      if (t === h.region.step || !stepVal(row[t])) continue;
-      if (t < h.region.step) lo = Math.max(lo, t + 1);
-      else hi = Math.min(hi, t - 0.001);
-    }
+    const { lo, hi } = slideLimits(ch, h.region.step, new Set([h.region.id]));
     drag = {
       kind: h.kind,
       ch,
@@ -497,7 +472,6 @@ function onStripDown(ch, cv, e) {
       moved: false,
       trimStart0: h.region.trimStart,
       trimEnd0: h.region.trimEnd,
-      at: h.region.step,
       pos0: h.region.pos,
       lo,
       hi,
@@ -526,70 +500,44 @@ function onStripDown(ch, cv, e) {
 // ------------------------------------------------- selection, marquee, group move
 const r3 = (n) => Math.round(n * 1000) / 1000;
 
-// Put the trigger at step `from` at the fractional position `pos` (step slot + offset).
-// Returns the step slot it ends up in.
-function relocate(ch, from, pos) {
-  const row = store.seq.steps[ch];
-  const to = Math.floor(pos);
-  const val = withStepOff(row[from], r3(pos - to));
-  if (to !== from) {
-    row[from] = 0;
-    store.emit("step", { ch, step: from, val: 0 });
-  }
-  row[to] = val;
-  store.emit("step", { ch, step: to, val });
-  return to;
-}
-
 function selectedItems() {
   const items = [];
-  for (const k of selection) {
-    const [ch, step] = k.split(":").map(Number);
-    const val = store.seq.steps[ch]?.[step];
-    if (stepVal(val)) items.push({ ch, step, val, pos: step + stepOff(val) });
-  }
+  for (let ch = 0; ch < store.numChannels; ch++)
+    for (const r of store.regions(ch))
+      if (selection.has(r.id)) items.push({ ch, id: r.id, step: Math.floor(r.pos), pos: r.pos });
   return items;
 }
 
-function origRows(items) {
-  const orig = new Map();
-  for (const it of items)
-    if (!orig.has(it.ch)) orig.set(it.ch, store.seq.steps[it.ch].slice());
-  return orig;
+// Step slots held by regions that are not part of the group (they stay put while it moves).
+function occupiedSlots(items) {
+  const moving = new Set(items.map((it) => it.id));
+  const occ = new Set();
+  for (const ch of new Set(items.map((it) => it.ch)))
+    for (const r of store.regions(ch)) if (!moving.has(r.id)) occ.add(cellKey(ch, Math.floor(r.pos)));
+  return occ;
 }
 
 // Can the whole group sit `delta` steps from where it started? It must stay on the
 // timeline and may not land in a step slot held by a region that is not selected
 // (or by another member of the group).
-function groupFits(items, orig, delta) {
-  const moving = new Set(items.map((it) => selKey(it.ch, it.step)));
+function groupFits(items, occ, delta) {
   const used = new Set();
   for (const it of items) {
     const p = r3(it.pos + delta);
     if (p < 0 || p > NUM_STEPS - 0.001) return false;
-    const to = Math.floor(p);
-    const key = selKey(it.ch, to);
-    if (used.has(key)) return false;
+    const key = cellKey(it.ch, Math.floor(p));
+    if (used.has(key) || occ.has(key)) return false;
     used.add(key);
-    if (stepVal(orig.get(it.ch)[to]) && !moving.has(key)) return false;
   }
   return true;
 }
 
-// Rebuild the touched rows from their originals with the group shifted by `delta`.
-// Returns the moved items (new step, new value) for selection and change events.
-function applyMove(items, orig, delta) {
-  const rows = new Map([...orig].map(([ch, row]) => [ch, row.slice()]));
-  for (const it of items) rows.get(it.ch)[it.step] = 0;
-  const moved = items.map((it) => {
-    const p = r3(it.pos + delta);
-    const step = Math.floor(p);
-    const val = withStepOff(it.val, r3(p - step));
-    rows.get(it.ch)[step] = val;
-    return { ch: it.ch, step, val, pos: p };
-  });
-  for (const [ch, row] of rows) store.seq.steps[ch] = row;
-  return moved;
+// Shift the group to `delta` steps from where it started (quietly: the engine follows, the
+// rest of the app hears about it in commitMove once the move has settled).
+function applyMove(items, delta) {
+  const moves = items.map((it) => ({ ch: it.ch, id: it.id, pos: r3(it.pos + delta) }));
+  store.placeRegions(moves, { quiet: true });
+  return moves;
 }
 
 // Walk the delta toward `target` in snap-sized steps and stop at the first position
@@ -599,7 +547,7 @@ function walkDelta(d, target) {
   let cur = d.delta;
   while (Math.abs(target - cur) > 1e-9) {
     const next = r3(cur + Math.sign(target - cur) * Math.min(inc, Math.abs(target - cur)));
-    if (!groupFits(d.items, d.orig, next)) break;
+    if (!groupFits(d.items, d.occ, next)) break;
     cur = next;
   }
   return cur;
@@ -607,13 +555,10 @@ function walkDelta(d, target) {
 
 // Tell the rest of the app (step grid, history) once the move has settled.
 function commitMove(items, moved) {
-  const cells = new Set();
-  for (const it of items) cells.add(selKey(it.ch, it.step));
-  for (const it of moved) cells.add(selKey(it.ch, it.step));
-  for (const k of cells) {
-    const [ch, step] = k.split(":").map(Number);
-    store.emit("step", { ch, step, val: store.seq.steps[ch][step] });
-  }
+  const cells = new Map();
+  for (const it of items) (cells.get(it.ch) || cells.set(it.ch, []).get(it.ch)).push(it.step);
+  for (const m of moved) (cells.get(m.ch) || cells.set(m.ch, []).get(m.ch)).push(Math.floor(m.pos));
+  for (const [ch, steps] of cells) store.announceRegions(ch, steps);
 }
 
 const plural = (n) => `${n} region${n === 1 ? "" : "s"}`;
@@ -623,12 +568,10 @@ function nudgeSelection(dir, big) {
   const items = selectedItems();
   if (!items.length) return;
   const unit = snap > 0 ? snap : 1 / 16;
-  const orig = origRows(items);
-  const d = { items, orig, grid: unit, delta: 0 };
+  const d = { items, occ: occupiedSlots(items), grid: unit, delta: 0 };
   const delta = walkDelta(d, dir * unit * (big ? 4 : 1));
   if (!delta) return;
-  const moved = applyMove(items, orig, delta);
-  selection = new Set(moved.map((it) => selKey(it.ch, it.step)));
+  const moved = applyMove(items, delta);
   commitMove(items, moved);
   renderArrange();
   setStatus(`Moved ${plural(items.length)} ${delta > 0 ? "right" : "left"} ${stepsLabel(delta)}.`);
@@ -637,9 +580,8 @@ function nudgeSelection(dir, big) {
 function deleteSelection() {
   const items = selectedItems();
   if (!items.length) return;
-  for (const it of items) store.seq.steps[it.ch][it.step] = 0;
   selection.clear();
-  for (const it of items) store.emit("step", { ch: it.ch, step: it.step, val: 0 });
+  for (const it of items) store.removeRegion(it.ch, it.id);
   renderArrange();
   setStatus(`Deleted ${plural(items.length)}.`);
 }
@@ -667,7 +609,7 @@ function marqueeHits(r) {
     for (const reg of channelRegions(ch)) {
       const x0 = box.left + reg.pos * cw() * k;
       const x1 = x0 + Math.max(3, reg.widthSteps * cw()) * k;
-      if (x1 >= r.left && x0 <= r.right) hits.push(selKey(ch, reg.step));
+      if (x1 >= r.left && x0 <= r.right) hits.push(reg.id);
     }
   }
   return hits;
@@ -683,14 +625,14 @@ function onGlobalMove(e) {
     if (Math.hypot(dx, dy) <= (e.ctrlKey ? 1 : 3)) return;
     d.moved = true;
     if (d.kind === "pending") {
-      const key = selKey(d.ch, d.region.step);
+      const key = d.region.id;
       if (!selection.has(key)) {
         if (!d.shift) selection.clear();
         selection.add(key);
       }
       d.kind = "move";
       d.items = selectedItems();
-      d.orig = origRows(d.items);
+      d.occ = occupiedSlots(d.items);
       d.delta = 0;
       const cv = stripFor(d.ch);
       d.scale = cv.width / cv.getBoundingClientRect().width;
@@ -715,8 +657,7 @@ function onGlobalMove(e) {
     const delta = walkDelta(d, r3(snapped - d.region.pos));
     if (delta === d.delta && d.movedItems) return;
     d.delta = delta;
-    d.movedItems = applyMove(d.items, d.orig, delta);
-    selection = new Set(d.movedItems.map((it) => selKey(it.ch, it.step)));
+    d.movedItems = applyMove(d.items, delta);
     renderArrange();
   } else if (d.kind === "marquee") {
     const r = {
@@ -776,7 +717,7 @@ function onGlobalUp(e) {
   }
   // plain click
   if (d.kind === "pending") {
-    const key = selKey(d.ch, d.region.step);
+    const key = d.region.id;
     if (d.shift) {
       if (selection.has(key)) selection.delete(key);
       else selection.add(key);
@@ -818,8 +759,8 @@ function onStripMove(ch, cv, e) {
   if (Math.abs(dx) > 3) drag.moved = true;
   if (!drag.moved) return;
 
-  const buffer = engine.buffers?.[ch];
   const r = drag.region;
+  const buffer = r.buffer;
   const sd = stepDurSec();
 
   if (drag.kind === "trimR" && buffer) {
@@ -827,9 +768,9 @@ function onStripMove(ch, cv, e) {
     // range backwards, so its right edge is the start of the range
     const newSteps = Math.max(0.1, r.naturalSteps + dx / cw());
     const frac = (newSteps * sd * r.pitch) / buffer.duration;
-    store.setStepProps(
+    store.setRegionProps(
       ch,
-      r.step,
+      r.id,
       r.rev
         ? {
             trimStart: Math.max(0, drag.trimEnd0 - frac),
@@ -849,7 +790,7 @@ function onStripMove(ch, cv, e) {
         drag.trimEnd0 - 1e-7,
         Math.max(0, drag.trimStart0 + (dx / cw()) * k),
       );
-      store.setStepProps(ch, r.step, {
+      store.setRegionProps(ch, r.id, {
         trimStart: newTrimStart,
         trimEnd: drag.trimEnd0,
       });
@@ -863,15 +804,12 @@ function onStripMove(ch, cv, e) {
       const hi = Math.min(span, drag.hi - drag.pos0);
       const pos = r3(drag.pos0 + Math.max(lo, Math.min(hi, dx / cw())));
       const dS = pos - drag.pos0;
-      const key = selKey(ch, drag.at);
-      drag.at = relocate(ch, drag.at, pos);
-      if (selection.delete(key)) selection.add(selKey(ch, drag.at));
-      store.setStepProps(
+      store.setRegionProps(
         ch,
-        drag.at,
+        r.id,
         r.rev
-          ? { trimStart: drag.trimStart0, trimEnd: drag.trimEnd0 - dS * k }
-          : { trimStart: drag.trimStart0 + dS * k, trimEnd: drag.trimEnd0 },
+          ? { pos, trimStart: drag.trimStart0, trimEnd: drag.trimEnd0 - dS * k }
+          : { pos, trimStart: drag.trimStart0 + dS * k, trimEnd: drag.trimEnd0 },
       );
     }
     renderArrange();
@@ -881,7 +819,7 @@ function onStripMove(ch, cv, e) {
     const spanSteps = Math.max(0, (x - bx) / cw());
     const maxSteps = Math.max(0, r.pos + r.naturalSteps - r.nextPos);
     const ms = Math.round(Math.min(spanSteps, maxSteps) * sd * 1000);
-    store.setStepProps(ch, r.next, ms > 5 ? { xfade: ms } : { xfade: 0 });
+    store.setRegionProps(ch, r.nextId, ms > 5 ? { xfade: ms } : { xfade: 0 });
     renderArrange();
   }
 }
@@ -906,16 +844,18 @@ function onStripUp(ch, cv, e) {
       }
     }
   } else if (d.kind === "xfade" && d.moved) {
-    const o = stepObj(store.seq.steps[ch][d.region.next]);
+    const o = store.regions(ch).find((x) => x.id === d.region.nextId);
     setStatus(
       o?.xfade
-        ? `Crossfade set: ${o.xfade} ms into step ${d.region.next + 1}.`
+        ? `Crossfade set: ${o.xfade} ms into step ${Math.floor(o.pos) + 1}.`
         : "Crossfade removed.",
     );
   } else if (d.kind === "trimL" && d.moved) {
-    const o = stepOff(store.seq.steps[ch][d.at]);
+    const now = store.regions(ch).find((x) => x.id === d.region.id);
+    const at = Math.floor(now?.pos ?? d.pos0);
+    const o = (now?.pos ?? d.pos0) - at;
     setStatus(
-      `Step ${d.at + 1} trimmed from the left, audio stays in place (start at step ${d.at + 1}${o ? ` + ${o.toFixed(3)}` : ""}).`,
+      `Step ${at + 1} trimmed from the left, audio stays in place (start at step ${at + 1}${o ? ` + ${o.toFixed(3)}` : ""}).`,
     );
   } else if (d.kind === "trimR" && d.moved) {
     setStatus(`Step ${d.region.step + 1} trimmed (per-step override).`);
@@ -1026,7 +966,7 @@ export function initArrange() {
     true,
   );
 
-  ["step", "sequence", "channel", "channels", "load", "project"].forEach((ev) =>
+  ["step", "regions", "samples", "sequence", "channel", "channels", "load", "project"].forEach((ev) =>
     store.on(ev, () => {
       if (arrangeMode) {
         attachStrips();

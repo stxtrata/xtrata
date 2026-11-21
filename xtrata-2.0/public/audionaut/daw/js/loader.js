@@ -1,5 +1,6 @@
 // Shared, transactional L1/L2 audio loader. Remote preview cache is bounded.
-import { store, stepVal, makeChannel } from "./state.js";
+import { store, makeChannel } from "./state.js";
+import { blankSample, ensureDefaultSample, REGION_OVERRIDES } from "./region-model.js";
 import { engine } from "./engine.js";
 import { renderSynthSample, ALL_SYNTH_DRUMS } from "./synthdrums.js";
 import { SOUND_BY_KEY } from "./onboard-catalog.js";
@@ -305,12 +306,32 @@ export async function fetchAndDecode(
     if (pending.get(key) === request) pending.delete(key);
   }
 }
+// Puts a decoded sound into channel `ch`: it becomes (or replaces) the channel's default sample.
+// When regions on other channels share that pool entry it gets a fresh copy instead, so loading
+// a sound into this channel never changes what a region on another channel plays.
+// `reset` (a new sound chosen by the person, as opposed to a project being reloaded) returns the
+// sample's trim, pitch, reverse and gate to the sound's own defaults and strips the per-region
+// overrides from this channel's regions that play it.
 export function assignDecodedSample(ch, source, result, { reset = true } = {}) {
   const channel = store.channel(ch);
   if (!channel) throw new Error("This sample channel no longer exists.");
   tickets.set(ch, Symbol());
   engine.silenceChannel(ch);
-  engine.setBuffer(ch, result.audioBuffer);
+  const project = store.project;
+  let sample = ensureDefaultSample(project, channel);
+  const sharedElsewhere = project.sequences.some((seq) =>
+    seq.regions.some((row, other) => other !== ch && row.some((r) => r.sample === sample.id)),
+  ) || project.channels.some((c, other) => other !== ch && c.defaultSample === sample.id);
+  if (sharedElsewhere) {
+    const copy = { ...sample, id: undefined };
+    delete copy.id;
+    const id = store.addSample(copy);
+    for (const seq of project.sequences)
+      for (const r of seq.regions[ch] || []) if (r.sample === sample.id) r.sample = id;
+    channel.defaultSample = id;
+    sample = store.sampleById(id);
+    store.regionRev++;
+  }
   channel.source = result.source || {
     type: source.type,
     value: source.type === "ordinal" ? ordinalId(source.value) : source.value,
@@ -340,14 +361,23 @@ export function assignDecodedSample(ch, source, result, { reset = true } = {}) {
     channel.pitch = 1;
     channel.wordSelection = null;
     channel.clipSnapshot = null;
-    for (const seq of store.project.sequences)
-      seq.steps[ch] = seq.steps[ch].map((s) => stepVal(s));
+    // A new sound starts clean: regions on this channel that play it lose their overrides and
+    // any fractional start, as the old per-step overrides did.
+    for (const seq of project.sequences)
+      for (const r of seq.regions[ch] || [])
+        if (r.sample === sample.id) {
+          for (const k of REGION_OVERRIDES) delete r[k];
+          r.pos = Math.floor(r.pos);
+        }
+    store.regionRev++;
   }
   channel.analysis = {
     duration: result.audioBuffer.duration,
     sampleRate: result.audioBuffer.sampleRate,
     channels: result.audioBuffer.numberOfChannels,
   };
+  engine.setBuffer(ch, result.audioBuffer);
+  engine.pruneBuffers();
   if (channel.name.startsWith("Channel "))
     channel.name = String(channel.sampleName)
       .replace(/\.[a-z0-9]+$/i, "")
@@ -357,15 +387,24 @@ export function assignDecodedSample(ch, source, result, { reset = true } = {}) {
 }
 // Empties a channel: stops its voices, drops the decoded audio and returns every sample-related
 // setting to a fresh channel's defaults. A load still in flight for this channel is discarded.
-// Steps are left to the caller (they live per sequence).
+// Regions are left to the caller (they live per sequence); the ones that play this channel's
+// sample stay and are silent until a sample is loaded, as steps were.
 export function unloadChannelSample(ch) {
   const channel = store.channel(ch);
   if (!channel) return false;
   tickets.set(ch, Symbol());
   engine.silenceChannel(ch);
-  engine.setBuffer(ch, null);
+  const sampleId = channel.defaultSample;
+  // Mixer settings back to a fresh channel's; the default sample is emptied in place.
   for (const key of Object.keys(channel)) delete channel[key];
-  Object.assign(channel, makeChannel(ch));
+  Object.assign(channel, makeChannel(ch), { defaultSample: sampleId });
+  const sample = store.sampleById(sampleId);
+  if (sample) {
+    const fresh = blankSample(sample.id);
+    for (const key of Object.keys(sample)) delete sample[key];
+    Object.assign(sample, fresh);
+  }
+  engine.pruneBuffers();
   engine.rebuildInserts?.(ch);
   store.emit("channel", { ch });
   return true;
@@ -399,30 +438,52 @@ export async function loadSample(
 // slow gateway fetches overlap instead of forming a waterfall at start-up.
 export async function reloadAllSamples(onProgress, concurrency = 3) {
   const project = store.project,
-    failures = [],
+    failures = new Set(),
     queue = [];
-  project.channels.forEach((channel, ch) => {
-    if (channel.source) queue.push(ch);
-    else engine.setBuffer(ch, null);
-  });
-  const restore = async (ch) => {
-    const channel = project.channels[ch],
-      source = channel.source;
+  const owner = new Map(); // pool id → the channel it is the default sample of
+  project.channels.forEach((c, ch) => c.defaultSample && owner.set(c.defaultSample, ch));
+  // Every pool entry with audio: channel defaults and any other entry regions point at.
+  for (const sample of project.samples) if (sample.source) queue.push(sample.id);
+  const failedChannels = (id) => {
+    if (owner.has(id)) return [owner.get(id) + 1];
+    const out = [];
+    project.sequences.forEach((seq) =>
+      seq.regions.forEach((row, ch) => row.some((r) => r.sample === id) && out.push(ch + 1)),
+    );
+    return out;
+  };
+  const restore = async (id) => {
+    const sample = project.samples.find((s) => s.id === id),
+      source = sample?.source,
+      ch = owner.get(id);
+    if (!source) return;
     try {
-      onProgress?.(ch, channel.sampleName || source.value);
-      if (channel.clipSnapshot) {
+      onProgress?.(ch ?? -1, sample.sampleName || source.value);
+      if (sample.clipSnapshot) {
+        if (ch == null) throw new Error("A pinned clip needs its channel to restore.");
         const { restoreClipChannel } = await import("./clip-actions.js");
         await restoreClipChannel(ch);
-      } else await loadSample(ch, source, { preserve: true });
+      } else if (ch != null) await loadSample(ch, source, { preserve: true });
+      else {
+        // Not any channel's default: decode and cache it for the regions that play it.
+        const result = await fetchAndDecode(source);
+        if (project !== store.project) return;
+        engine.setSampleBuffer(sample, result.audioBuffer);
+        sample.analysis = {
+          duration: result.audioBuffer.duration,
+          sampleRate: result.audioBuffer.sampleRate,
+          channels: result.audioBuffer.numberOfChannels,
+        };
+      }
     } catch (error) {
       if (project !== store.project || error.name === "AbortError") return;
-      engine.setBuffer(ch, null);
-      if (channel.clipSnapshot)
-        channel.unresolvedSource = {
+      engine.setSampleBuffer(sample, null);
+      if (sample.clipSnapshot)
+        sample.unresolvedSource = {
           message: error.message,
           source: structuredClone(source),
         };
-      failures.push(ch + 1);
+      for (const n of failedChannels(id)) failures.add(n);
     }
   };
   const worker = async () => {
@@ -431,5 +492,5 @@ export async function reloadAllSamples(onProgress, concurrency = 3) {
   await Promise.all(
     Array.from({ length: Math.min(concurrency, queue.length) }, worker),
   );
-  return failures.sort((a, b) => a - b);
+  return [...failures].sort((a, b) => a - b);
 }

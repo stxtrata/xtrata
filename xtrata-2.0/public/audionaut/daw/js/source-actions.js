@@ -63,20 +63,25 @@ export async function importSelection(
         reverse: false,
       });
     } else {
-      const old = sequence.steps[ch][step];
-      sequence.steps[ch][step] = {
-        v: stepVal(old) || 1,
-        ...(old && typeof old === "object" && old.off ? { off: old.off } : {}),
-        ...region,
-        pitch: 1,
-        rev: false,
-        wordSelection: metadata,
-      };
+      const old = store.stepAt(ch, step, sequence);
+      store.setStep(
+        ch,
+        step,
+        {
+          v: stepVal(old) || 1,
+          ...(old && typeof old === "object" && old.off ? { off: old.off } : {}),
+          ...region,
+          pitch: 1,
+          rev: false,
+          wordSelection: metadata,
+        },
+        sequence,
+      );
     }
   }
-  if (step !== null && !bounds) sequence.steps[ch][step] = 1;
-  if (bounds && step === null && sequence.steps[ch].every((s) => !stepVal(s)))
-    sequence.steps[ch][0] = 1;
+  if (step !== null && !bounds) store.setStep(ch, step, 1, sequence);
+  if (bounds && step === null && !store.regions(ch, sequence).length)
+    store.setStep(ch, 0, 1, sequence);
   store.emit("channel", { ch, prop: "wordSelection" });
   store.emit("sequence", store.project.currentSequence);
   return result;
