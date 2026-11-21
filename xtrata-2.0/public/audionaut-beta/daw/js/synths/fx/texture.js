@@ -33,10 +33,10 @@ const CHORDS = {
 // ---------------------------------------------------------------- noise buffers (4 s, per context and colour)
 const noiseCache = new WeakMap();
 function noiseBuf(ctx, kind) {
-  let m = noiseCache.get(ctx);
+  let m = noiseCache.get(ctx.resourceContext || ctx);
   if (!m) {
     m = {};
-    noiseCache.set(ctx, m);
+    noiseCache.set(ctx.resourceContext || ctx, m);
   }
   if (m[kind]) return m[kind];
   const n = Math.round(ctx.sampleRate * 4);
@@ -260,7 +260,7 @@ function renderCloud(sr, f0, gate, A, R, P, variant, seed) {
 
 function cloudBuffer(ctx, f0, gate, A, R, P, pitch) {
   const sr = ctx.sampleRate;
-  const variant = cloudCounter++ % 3;
+  const variant = ctx.seed == null ? cloudCounter++ % 3 : ctx.seed % 3;
   const key = [pitch, Math.round(gate * 20), sr, P.density, P.grain, P.spread, P.tone, P.res, P.tonal, P.chord, Math.round(A * 100), Math.round(R * 100), variant].join("|");
   let r = cloudCache.get(key);
   if (r) {
@@ -339,7 +339,7 @@ function textureVoice(ctx, dest, note, P) {
         bp.type = "bandpass";
         bp.frequency.value = hz;
         bp.Q.value = Qres;
-        bp.detune.value = (Math.random() * 2 - 1) * 500 * P.motion; // so notes don't all start at the same spot
+        bp.detune.value = ((ctx.random || Math.random)() * 2 - 1) * 500 * P.motion; // so notes don't all start at the same spot
         lfoTo(bp.detune, P.rate * (side < 0 ? 0.87 : 1.13), P.motion * 1500);
         const cg = mkGain(lv * bandComp(Qres, hz) * 1.6);
         nz.connect(bp);
@@ -508,7 +508,7 @@ function textureVoice(ctx, dest, note, P) {
   }
 
   for (const s of sources) {
-    if (s.buffer && s.loop) s.start(time, Math.random() * 3);
+    if (s.buffer && s.loop) s.start(time, (ctx.random || Math.random)() * 3);
     else s.start(time);
     s.stop(stopAt);
   }

@@ -91,7 +91,6 @@ export function kilnLatticeFactors(type, out, rnd) {
 }
 
 // ------------------------------------------------------------------ renderer
-const MAX_LEN = 8; // seconds, hard cap on a rendered note
 const LEVEL_K = 1.0; // output calibration (tuned against the harness: default A3 → rms ≈ 0.07)
 
 const xorshift = (seed) => {
@@ -161,12 +160,12 @@ export function renderKiln(P, pitch, vel, dur, sr, seed = 1, opts = {}) {
 
   // ---- timeline
   const attack = Math.max(0.002, P.attack);
-  const tOff = clamp(dur, 0.02, MAX_LEN - 0.4);
+  const tOff = Math.max(0.02, dur);
   const relBase = Math.max(0.02, P.release);
-  const rel = Math.min(relBase, (MAX_LEN - tOff) / 1.334); // env reaches 1e-4 inside the cap
+  const rel = relBase; // env reaches 1e-4 inside the cap
   const relCoef = 6.9078 / rel;
   const envOff = Math.min(1, tOff / attack);
-  let tEnd = Math.min(MAX_LEN, tOff + rel * 1.334 + 0.01);
+  let tEnd = tOff + rel * 1.334 + 0.01;
   // when nothing is held (hold≈0) the struck decay ends the note on its own
   const tSil = new Float64Array(KMAX);
   let tSilMax = 0;
@@ -314,7 +313,7 @@ let cacheBytes = 0;
 
 const KEYS = ["lattice", "partials", "shatter", "touch", "anneal", "cascade", "quench", "melt", "heat", "tilt", "odd", "damp", "attack", "body", "hold", "release", "track", "spread", "drive", "level"];
 
-function cachedNote(P, pitch, vel, dur, sr) {
+function cachedNote(P, pitch, vel, dur, sr, seed = null) {
   const q = (v) => Math.round(v * 1000) / 1000;
   const dq = Math.round(dur * 100) / 100; // gate quantised to 10 ms
   const vq = Math.round(vel * 100) / 100;
@@ -327,7 +326,7 @@ function cachedNote(P, pitch, vel, dur, sr) {
     e = { variants: [], next: 0, bytes: 0 };
     cache.set(key, e);
   }
-  const vi = e.next % VARIANTS;
+  const vi = seed == null ? e.next % VARIANTS : (seed >>> 0) % VARIANTS;
   e.next++;
   if (!e.variants[vi]) {
     const r = renderKiln(P, pitch, vq, dq, sr, vi + 1);
@@ -393,7 +392,7 @@ const kiln = {
   ],
   voice(ctx, dest, { pitch, vel, time, dur }, P) {
     const p = { ...DEFAULTS, ...P };
-    const r = cachedNote(p, pitch, vel, Math.max(0.02, dur), ctx.sampleRate);
+    const r = cachedNote(p, pitch, vel, Math.max(0.02, dur), ctx.sampleRate, ctx.seed);
     const buf = ctx.createBuffer(r.mono ? 1 : 2, r.L.length, ctx.sampleRate);
     buf.getChannelData(0).set(r.L);
     if (!r.mono) buf.getChannelData(1).set(r.R);

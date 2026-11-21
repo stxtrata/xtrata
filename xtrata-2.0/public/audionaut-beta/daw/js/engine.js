@@ -12,7 +12,16 @@ import {
 } from "./state.js";
 import { SYNTH_BANK, synthDefaults } from "./synths.js";
 import { createVoice } from "./synths/voice-lifecycle.js";
-import { PLUGIN_TYPES, pluginDefaults, normalizeOwner, returnsOf, BEAT_DIVS } from "./plugins.js";
+import { PLUGIN_TYPES, pluginDefaults, normalizeOwner, returnsOf, BEAT_DIVS, calibratePluginLatency } from "./plugins.js";
+import { compilePlaybackPlan } from './playback-plan.js';
+import { legacyPlaybackProfile, legacySamplePlayback } from './legacy-bridge/playback.js';
+import { beatToSeconds, secondsToBeat, swingStep, unswingStep, seededRandom, hashSeed, meterAt } from './timeline.js';
+import { trackAddress } from './project-model.js';
+import { syncMixer as applyMixer, disposeMixer, validateRouting } from './mixer-runtime.js';
+import { createSamplerVoice } from './sampler-voice.js';
+import {isProInstrument,createProInstrumentVoice} from './pro-instruments.js';
+import { voiceAutomation } from './automation-runtime.js';
+import { assertOfflineRenderSupported } from './audio-render-support.js';
 
 const LOOKAHEAD_MS = 25; // scheduler tick
 const SCHEDULE_AHEAD = 0.12; // seconds scheduled in advance
@@ -21,10 +30,21 @@ const SCHEDULE_AHEAD = 0.12; // seconds scheduled in advance
 const sendBusId = (id) => (typeof id === "string" && id.startsWith("send:") ? id.slice(5) : null);
 
 export class Engine {
-  constructor({ store: projectStore = store, contextFactory = null, offline = false } = {}) {
+  constructor({ store: projectStore = store, contextFactory = null, offline = false, seed = projectStore.project.renderSeed || projectStore.project.projectId } = {}) {
+    if(offline)assertOfflineRenderSupported();
     this.store = projectStore;
     this.contextFactory = contextFactory;
     this.offline = offline;
+    this.seed = seed; this.random = seededRandom(seed);
+    this.currentBeat = 0; this._pausedBeat = null; this._planDirty = true; this._transportRuns = [];
+    this.schedulerStats = { lateTicks: 0, skippedEvents: 0, maxLatenessMs: 0 };
+    if (!offline) this.store.on('dirty', ({ event, payload } = {}) => {
+      this._planDirty = true;
+      if (this.ctx && (['channel','instrument','channels','instruments','load'].includes(event)||event==='project'&&['buses','master','mixerVersion','masterVolume'].includes(payload?.prop))) {
+        this.ensureChannelChains(); this.ensureInstrumentChains(); this.syncMixer();
+        if(event==='instrument' && payload?.prop==='params')for(const n of this._synthVoices.values())if(n.i===payload.i)n.voice.setParameters?.(this.store.instrument(n.i).params||{},this.ctx.currentTime);
+      }
+    });
     this._synthVoices = new Map();
     this._live = new Map();
     this._voiceSeq = 0;
@@ -49,8 +69,11 @@ export class Engine {
   }
 
   ensureContext() {
+    if(this.offline||typeof this.ctx?.startRendering==='function')assertOfflineRenderSupported();
     if (!this.ctx) {
-      this.ctx = this.contextFactory ? this.contextFactory() : new (window.AudioContext || window.webkitAudioContext)();
+      const context = this.contextFactory ? this.contextFactory() : new (window.AudioContext || window.webkitAudioContext)({latencyHint:'interactive'});
+      if(typeof context.startRendering==='function')assertOfflineRenderSupported();
+      this.ctx=context;
       this.masterGain = this.ctx.createGain();
       this.masterGain.gain.value = this.store.project.masterVolume;
       this.masterGain.connect(this.ctx.destination);
@@ -72,6 +95,7 @@ export class Engine {
 
       this.instrumentGains = [];
       this.ensureInstrumentChains();
+      this.syncMixer();
     }
     if (!this.offline && this.ctx.state === "suspended") this.ctx.resume();
     this.ensureChannelChains();
@@ -183,13 +207,14 @@ export class Engine {
       for (const n of Object.values(send.inst.taps || {})) { try { n.disconnect(); } catch {} }
       send.amt.disconnect(); send.en.disconnect();
     }
-    chain.input.disconnect(); chain.out.disconnect();
+    chain.input.disconnect(); chain.preDelay?.disconnect();chain.out.disconnect();
     this.chains.delete(key);
     this._ensureGateLoop();
   }
 
   _flushEffects() {
     if (!this.ctx) return;
+    disposeMixer(this);
     for (const key of [...this.chains.keys()]) this._disposeChain(key);
     clearTimeout(this.reverbFx?.timer);
     const seen = new Set();
@@ -204,6 +229,7 @@ export class Engine {
     this.channelGains = []; this.instrumentGains = [];
     this._createReturns();
     this.ensureChannelChains(); this.ensureInstrumentChains();
+    this.syncMixer();
   }
 
   resetProjectAudio() {
@@ -217,13 +243,17 @@ export class Engine {
 
   _makeChain(key, input) {
     const out = this.ctx.createGain();
+    const preDelay=this.ctx.createDelay(10);
     out.connect(this.masterGain);
-    input.connect(out); // empty chain until syncChain wires plugins in
+    input.connect(preDelay).connect(out); // stable input preserves analyser taps while inserts change
     // The strip's delay and reverb sends tap the chain output (after the last plugin):
     //   out → amount → on/off → shared bus      (levels come from owner.sends, see syncChain)
     // "inst" is a stand-in for the plugin instance a slot would have, so faces can meter it.
     const sendFx = {};
-    for (const [bus, node] of [
+    // Shared returns enter the master. Even a zero-gain send back into those
+    // returns forms a graph cycle; Firefox then adds a 128-frame cycle delay.
+    // The master therefore has no strip sends to its own return inputs.
+    for (const [bus, node] of key === 'master' ? [] : [
       ["delay", this.delayNode],
       ["reverb", this.reverbNode],
     ]) {
@@ -234,7 +264,7 @@ export class Engine {
       out.connect(amt).connect(en).connect(node);
       sendFx[bus] = { amt, en, on: true, inst: { inp: out, out, nodes: null, taps: null } };
     }
-    this.chains.set(key, { input, out, slots: new Map(), sig: "", sendFx });
+    this.chains.set(key, { input, preDelay, out, slots: new Map(), sig: "", sendFx });
   }
 
   // Bring a strip's two send values in line with owner.sends. Amount moves at once (as the
@@ -246,6 +276,7 @@ export class Engine {
     chain.owner = owner;
     for (const bus of ["delay", "reverb"]) {
       const f = chain.sendFx[bus];
+      if (!f) continue;
       const rec = owner.sends?.[bus];
       const on = !!rec && rec.enabled !== false;
       const amount = rec ? rec.amount : 0;
@@ -276,6 +307,8 @@ export class Engine {
     const nodes = type.create(ctx, {
       delayBus: this.delayNode,
       reverbBus: this.reverbNode,
+      irSource: def.irSource,
+      resolveImpulseResponse: source => {const a=trackAddress(this.store.project,source?.sourceTrackId);return a?.kind==='sample'?this.buffers[a.index]:null;},
     });
     const inp = ctx.createGain();
     const feed = ctx.createGain();
@@ -342,28 +375,35 @@ export class Engine {
   // rewires, a bypass only crossfades, and a param change only re-applies params.
   syncChain(idx, inst = false) {
     if (!this.ctx) return;
-    const chain = this.chains?.get((inst ? "i" : "c") + idx);
-    const owner = inst ? this.store.instrument(idx) : this.store.channel(idx);
+    const key = typeof idx === 'string' ? idx : (inst ? 'i' : 'c') + idx;
+    const chain = this.chains?.get(key);
+    const owner = key === 'master' ? this.store.project.master : /^i\d+$/.test(key) ? this.store.instrument(+key.slice(1)) : /^c\d+$/.test(key) ? this.store.channel(+key.slice(1)) : this.store.project.buses?.find(b=>b.id===key);
     if (!chain || !owner) return;
     normalizeOwner(owner);
     const defs = [...owner.inserts, ...owner.fx].filter(
       (d) => PLUGIN_TYPES[d.type],
     );
-    const sig = defs.map((d) => `${d.id}:${d.type}`).join("|");
+    const resourceKey = d => {const a=d.irSource&&trackAddress(this.store.project,d.irSource.sourceTrackId);return JSON.stringify(d.irSource ? [d.irSource,a?.index??-1,!!this.buffers[a?.index],this._bufferRevisions?.get(d.irSource.sourceTrackId)||0] : null);};
+    const sig = defs.map((d) => `${d.id}:${d.type}:${resourceKey(d)}`).join("|");
     if (sig !== chain.sig) {
       const next = new Map();
       for (const d of defs) {
         let it = chain.slots.get(d.id);
-        if (it && it.typeId !== d.type) {
-          this._disposeInstance(it);
-          it = null;
+        if (it && it.typeId !== d.type) it=null;
+        if(it && it.resourceKey!==resourceKey(d)){
+          if(it.nodes.updateImpulseResponse){
+            it.nodes.updateImpulseResponse(d.irSource,source=>{const a=trackAddress(this.store.project,source?.sourceTrackId);return a?.kind==='sample'?this.buffers[a.index]:null;}).catch(error=>{
+              if(!this.offline&&typeof document!=='undefined')document.dispatchEvent(new CustomEvent('audio-error',{detail:{message:error.message}}));
+            });
+          }else it=null;
         }
-        next.set(d.id, it || this._makeInstance(d));
+        it ||= this._makeInstance(d);it.resourceKey=resourceKey(d);
+        next.set(d.id, it);
       }
       for (const [id, it] of chain.slots)
         if (next.get(id) !== it) this._disposeInstance(it);
       try {
-        chain.input.disconnect();
+        chain.preDelay.disconnect();
       } catch {
         /* noop */
       }
@@ -373,7 +413,7 @@ export class Engine {
         } catch {
           /* noop */
         }
-      let node = chain.input;
+      let node = chain.preDelay;
       for (const it of next.values()) {
         node.connect(it.inp);
         node = it.out;
@@ -412,7 +452,7 @@ export class Engine {
   slotInstance(idx, inst, id) {
     const chain = this.chains?.get((inst ? "i" : "c") + idx);
     const bus = sendBusId(id);
-    if (bus) return chain?.sendFx[bus].inst || null; // a strip send ("send:delay")
+    if (bus) return chain?.sendFx[bus]?.inst || null; // a strip send ("send:delay")
     return chain?.slots.get(id) || null;
   }
   // Input/output analysers on a slot, created on first ask (side branches, never in the path).
@@ -558,7 +598,7 @@ export class Engine {
     const sr = this.ctx.sampleRate;
     const max = Math.ceil(sr * 8);
     if (!this._noise || this._noise[0].length !== max) {
-      this._noise = [0, 1].map(() => Float32Array.from({ length: max }, () => Math.random() * 2 - 1));
+      this._noise = [0, 1].map(() => Float32Array.from({ length: max }, () => this.random() * 2 - 1));
     }
     const len = Math.ceil(sr * decay);
     const buf = this.ctx.createBuffer(2, len, sr);
@@ -599,6 +639,7 @@ export class Engine {
   }
 
   setBuffer(ch, buffer) {
+    const id=this.store.channel(ch)?.id;if(id){this._bufferRevisions ||= new Map();this._bufferRevisions.set(id,(this._bufferRevisions.get(id)||0)+1);}
     this.buffers[ch] = buffer;
     this.reverseBuffers[ch] = null;
   }
@@ -633,8 +674,9 @@ export class Engine {
   }
 
   setChannelVolume(ch, v) {
-    if (this.channelGains[ch])
-      this.offline ? this.channelGains[ch].gain.value = v : this.channelGains[ch].gain.setTargetAtTime(v, this.ctx.currentTime, 0.01);
+    const owner=this.store.channel(ch),strip=this._mixer?.strips.get(owner?.id),post=this.store.project.mixerVersion>=2;
+    const param=post&&strip?strip.fader.gain:this.channelGains[ch]?.gain;
+    if(param){const value=this.channelAudible(ch)?v*(post?1:Math.pow(10,(owner.inputTrimDb||0)/20)):0;this.offline?param.value=value:param.setTargetAtTime(value,this.ctx.currentTime,.008);}
   }
 
   // Solo is global: if ANY sample channel or synth is soloed, only soloed ones
@@ -659,20 +701,20 @@ export class Engine {
     if (!this.ctx) return;
     for (let i = 0; i < this.store.project.instruments.length; i++)
       this.setInstrumentVolume(i, this.store.instrument(i).volume);
+    for(let ch=0;ch<this.store.numChannels;ch++)this.setChannelVolume(ch,this.store.channel(ch).volume);
     if (cut)
       for (let ch = 0; ch < this.store.numChannels; ch++)
         if (!this.channelAudible(ch)) this.silenceChannel(ch);
   }
 
   setInstrumentVolume(i, v) {
-    if (this.offline && this.instrumentGains?.[i]) this.instrumentGains[i].gain.value = this.instrumentAudible(i) ? v : 0;
-    else if (this.instrumentGains?.[i])
-      this.instrumentGains[i].gain.setTargetAtTime(
-        this.instrumentAudible(i) ? v : 0,
-        this.ctx.currentTime,
-        0.01,
-      );
+    const owner=this.store.instrument(i),strip=this._mixer?.strips.get(owner?.id),post=this.store.project.mixerVersion>=2;
+    const param=post&&strip?strip.fader.gain:this.instrumentGains?.[i]?.gain;
+    if(param){const value=this.instrumentAudible(i)?v*(post?1:Math.pow(10,(owner.inputTrimDb||0)/20)):0;this.offline?param.value=value:param.setTargetAtTime(value,this.ctx.currentTime,.008);}
   }
+
+  syncMixer() { try { applyMixer(this); } catch(error) { this.routingError=error.message; console.warn(error.message); } }
+  validateRouting() { return validateRouting(this.store.project); }
 
   // Sequenced and live notes use the same ownership ledger. The synth still receives its
   // original finite gate for transport playback, so existing arrangements keep their sound.
@@ -705,36 +747,47 @@ export class Engine {
     const instrument = this.store.instrument(i);
     const synth = SYNTH_BANK[instrument?.synthId];
     if (!synth || !this.instrumentGains?.[i]) return 0;
-    const active = () => [...this._synthVoices.values()].filter(n => !n.stopping);
-    if (!this.offline) {
+    const time = Math.max(this.ctx.currentTime, Number.isFinite(options.time) ? options.time : this.ctx.currentTime);
+    const active = () => [...this._synthVoices.values()].filter(n => !n.stopping && n.time <= time && (n.endTime ?? Infinity) > time);
+    {
       while (active().length >= this.maxSynthVoices || active().filter(n => n.i === i).length >= this.maxInstrumentVoices) {
         const voices = active();
         const victim = voices.find(n => n.i === i && n.voice.released) || voices.find(n => n.i === i) || voices[0];
         if (!victim) break;
         victim.stopping = true;
-        victim.voice.stop();
+        victim.voice.stop(time);
         this._live.delete(victim.id);
         this._voiceVisual(victim, false);
       }
     }
+    const automation=options.automation||[];
     const P = { ...synthDefaults(instrument.synthId), ...(instrument.params || {}) };
-    const time = Math.max(this.ctx.currentTime, Number.isFinite(options.time) ? options.time : this.ctx.currentTime);
+    for(const point of automation)if(point.atStart&&point.target.kind==='synthParam')P[point.target.param]=point.value;
     const duration = Number.isFinite(options.duration) ? Math.max(0.001, options.duration) : null;
     const held = !!options.held;
     const live = synth.live || {};
     let release = typeof live.release === "function" ? live.release(P) : P.release ?? P.rel ?? 0.25;
     release = Math.max(0.01, Math.min(12, Number.isFinite(+release) ? +release : 0.25));
-    const n = { id: ++this._voiceSeq, i, pitch, time, source: options.source || "live", release, timers: [], visual: false, ended: false, stopping: false };
+    const n = { id: ++this._voiceSeq, i, pitch, time, endTime: duration == null ? Infinity : time+duration+release, source: options.source || "live", release, timers: [], visual: false, ended: false, stopping: false };
     try {
-      n.voice = createVoice(this.ctx, this.instrumentGains[i], synth, instrument.synthId,
-        { pitch, vel, time, dur: duration ?? live.gate ?? 0.6, held: held && duration == null }, P, () => this._voiceEnded(n));
+      const note={ pitch, vel, time, dur: duration ?? live.gate ?? 0.6, held: held && duration == null, offset:options.chaseOffsetSeconds || 0 };
+      n.voice = isProInstrument(instrument.synthId)
+        ? createProInstrumentVoice(this.ctx,this.instrumentGains[i],instrument,note,P,()=>this._voiceEnded(n),{seed:options.seed ?? hashSeed(`${this.seed}:${n.id}:${pitch}`),offline:this.offline,bufferForSource:entry=>{const a=trackAddress(this.store.project,entry.sourceTrackId);return a?.kind==='sample'?this.buffers[a.index]:null;}})
+        : instrument.sampler?.enabled
+        ? createSamplerVoice(this.ctx,this.instrumentGains[i],instrument.sampler,note,id=>{const a=trackAddress(this.store.project,id);return a?.kind==='sample'?this.buffers[a.index]:null;},()=>this._voiceEnded(n))
+        : createVoice(this.ctx, this.instrumentGains[i], synth, instrument.synthId,note,P,()=>this._voiceEnded(n),{seed:options.seed ?? hashSeed(`${this.seed}:${n.id}:${pitch}`),prepared:options.prepared});
     } catch (error) {
+      if(this.offline)throw error;
+      this.lastVoiceError=error.message;
+      if(typeof document!=='undefined')document.dispatchEvent(new CustomEvent('audio-error',{detail:{message:error.message}}));
       console.warn("voice error", error);
       return 0;
     }
+    if(Number.isFinite(n.voice.endTime))n.endTime=n.voice.endTime;
     this._synthVoices.set(n.id, n);
     if (held) this._live.set(n.id, n);
     if (options.bend) n.voice.setBend(options.bend, time);
+    for(const point of automation){if(this._automationOverrides?.has(JSON.stringify(point.target)))continue;const end=time+point.relativeEnd,start=time+point.relativeStart;if(point.target.kind==='bend'){if(point.curve==='linear')n.voice.setBend(point.fromValue,start);n.voice.setBend(point.value,end);}else n.voice.setParameters?.({[point.target.param]:point.value},end,{curve:point.curve,startTime:start,fromValues:{[point.target.param]:point.fromValue}});}
     if (!this.offline) {
       const later = (at, fn) => {
         if (at <= this.ctx.currentTime) fn();
@@ -762,12 +815,13 @@ export class Engine {
       return;
     }
     n.voice.release(atTime, n.release);
+    n.endTime=Number.isFinite(n.voice.endTime)?n.voice.endTime:atTime+n.release;
     const off = () => this._voiceVisual(n, false);
     if (atTime <= this.ctx.currentTime || this.offline) off();
     else n.timers.push(setTimeout(off, (atTime - this.ctx.currentTime) * 1000));
   }
 
-  setNotePitchBend(id, semitones) { this._synthVoices.get(id)?.voice.setBend(semitones); }
+  setNotePitchBend(id, semitones, atTime=this.ctx?.currentTime) { this._synthVoices.get(id)?.voice.setBend(semitones,atTime); }
 
   releaseAll(i = null, { immediate = false } = {}) {
     const voices = immediate ? this._synthVoices : this._live;
@@ -787,8 +841,17 @@ export class Engine {
   async effectsReady() {
     const pending = [];
     for (const chain of this.chains?.values() || [])
-      for (const it of chain.slots.values()) if (it.nodes.ready) pending.push(it.nodes.ready);
-    return Promise.all(pending);
+      for (const it of chain.slots.values()) if (it.on && it.nodes.ready) pending.push(it.nodes.ready);
+    const results = await Promise.all(pending);
+    this.assertEffectsHealthy();
+    return results;
+  }
+
+  assertEffectsHealthy() {
+    for (const chain of this.chains?.values() || [])
+      for (const it of chain.slots.values())
+        if (it.on && it.nodes.processorError)
+          throw new Error(`${PLUGIN_TYPES[it.typeId]?.name || 'Audio effect'} stopped processing: ${it.nodes.processorError}`);
   }
 
   setMasterVolume(v) {
@@ -802,37 +865,97 @@ export class Engine {
     return 60 / this.store.project.bpm / 4; // 16th notes
   }
 
-  play() {
+  _eventAutomation(event) {
+    if(this.store.project.automationMode==='write')return [];
+    const project=this.store.project,start=secondsToBeat(project,beatToSeconds(project,event.beat)+(event.rangeChaseSeconds||0));
+    return voiceAutomation(project,event.trackId,start,event.endBeat).map(p=>({...p,atStart:p.beat===start,relativeStart:beatToSeconds(project,p.beat)-beatToSeconds(project,start),relativeEnd:beatToSeconds(project,p.endBeat)-beatToSeconds(project,start)}));
+  }
+  _prepareRequest(event) {
+    const owner=this.store.instrument(event.index);if(!owner||owner.sampler?.enabled||!['fm4','kiln','anneal','palinode','lantern'].includes(owner.synthId))return null;
+    const params={...synthDefaults(owner.synthId),...owner.params};
+    for(const point of this._eventAutomation(event))if(point.atStart&&point.target.kind==='synthParam')params[point.target.param]=point.value;
+    return {event,synthId:owner.synthId,note:{pitch:event.pitch,vel:event.velocity,time:event.time,dur:event.duration+(event.chaseOffsetSeconds||0),held:false},params,sampleRate:this.ctx.sampleRate,seed:event.seed};
+  }
+  async preparePlan(plan, { all = this.offline, signal, onProgress } = {}) {
+    this.ensureContext(); await calibratePluginLatency(this.ctx.sampleRate);this.syncMixer();await this.effectsReady();
+    const pool=await import('./synths/render-pool.js');this._prefetchSynthVoices=pool.prefetchSynthVoices;
+    const notes=plan.events.filter(e=>e.type==='note'&&(all||e.time<2));
+    if(!all&&pool.prefetchSynthVoices){await pool.prefetchSynthVoices(notes.map(e=>this._prepareRequest(e)).filter(Boolean),{signal,onPrepared:(r,layers)=>{r.event.prepared=layers;}});return;}
+    let preparedBytes=0;
+    for(let offset=0;offset<notes.length;offset+=4){if(signal?.aborted)throw new DOMException('Preparation cancelled.','AbortError');await Promise.all(notes.slice(offset,offset+4).map(async e=>{const request=this._prepareRequest(e);if(!request)return;e.prepared=await pool.prepareSynthVoice(request.synthId,request.note,request.params,request.sampleRate,{seed:request.seed,signal});preparedBytes+=(e.prepared||[]).reduce((sum,l)=>sum+l.channels.reduce((n,c)=>n+c.byteLength,0),0);if(preparedBytes>192*1024*1024)throw new Error('Prepared synth audio exceeds 192 MB. Export a shorter range or freeze dense tracks.');}));onProgress?.(Math.min(1,(offset+4)/notes.length));}
+  }
+  _prefetchUpcoming(now) {
+    if(this.offline||!this._prefetchSynthVoices||this._prefetchPending)return;
+    const windows=[{plan:this._plan,origin:this._planOrigin,cursor:this._planCursor}],requests=[];
+    const nextOrigin=this._planOrigin+this._plan.duration;
+    if(this._loopRange&&nextOrigin<now+2){this._nextLoopPlan||=compilePlaybackPlan(this.store.project,{range:this._loopRange,seed:this.seed,buffers:this.buffers});windows.push({plan:this._nextLoopPlan,origin:nextOrigin,cursor:0});}
+    for(const window of windows)for(let i=window.cursor;i<window.plan.events.length;i++){const e=window.plan.events[i];if(e.time+window.origin>now+2)break;if(e.type!=='note'||e.preparing||e.time+window.origin<now)continue;const request=this._prepareRequest(e);if(request){requests.push({...request,plan:window.plan,origin:window.origin});if(requests.length>=32)break;}}
+    if(!requests.some(r=>!r.event.prepared))return;for(const r of requests)r.event.preparing=true;
+    const controller=this._prefetchAbort=new AbortController();
+    this._prefetchPending=this._prefetchSynthVoices(requests,{signal:controller.signal,onPrepared:(r,layers)=>{if((r.plan===this._plan||r.plan===this._nextLoopPlan)&&r.event.time+r.origin>this.ctx.currentTime)r.event.prepared=layers;}}).then(report=>{if(report.errors.length)this.schedulerStats.preparationError=report.errors[0].message;}).catch(error=>{if(error.name!=='AbortError')this.schedulerStats.preparationError=error.message;}).finally(()=>{for(const r of requests)delete r.event.preparing;this._prefetchPending=null;});
+  }
+
+  async play({ fromBeat } = {}) {
     this.ensureContext();
     if (this.isPlaying) return;
+    const project=this.store.project,timeline=project.timeline,legacy=legacyPlaybackProfile(project);
     this.isPlaying = true;
-    this._transportGeneration++;
-    this.currentStep = 0;
-    this._elapsedSteps = 0;
+    const generation=++this._transportGeneration;
+    const sequenceStart=project.currentSequence*16;
+    const songEnd=compilePlaybackPlan(project,{buffers:this.buffers}).endBeat;
+    const loop=timeline?.enabled?timeline.loop:legacy?{enabled:false}:{enabled:true,start:project.continuous?0:sequenceStart,end:project.continuous?songEnd:sequenceStart+16};
+    const start=fromBeat??this._pausedBeat??(timeline?.enabled?(loop?.enabled?loop.start:this.currentBeat||0):sequenceStart);
+    this._loopRange=loop?.enabled?{start:loop.start,end:loop.end}:null;
+    this._playRange={start,end:loop?.enabled?loop.end:timeline?.enabled?Math.max(timeline.lengthBeats,...timeline.clips.map(c=>c.start+c.duration)):legacy?songEnd:project.sequences.length*16};
+    if(this._playRange.start>=this._playRange.end)this._playRange.start=this._loopRange?.start||0;
+    this._nextLoopPlan=null;this._lastTickTime=null;this._plan=compilePlaybackPlan(project,{range:this._playRange,seed:this.seed,buffers:this.buffers});
+    try{await this.preparePlan(this._plan);}catch(error){this.isPlaying=false;throw error;}
+    if(generation!==this._transportGeneration||!this.isPlaying)return;
+    const meter=meterAt(project,start),countBeats=this._pausedBeat==null?(project.recording?.countIn||0)*meter.numerator*4/meter.denominator:0;
+    const countSeconds=countBeats*60/(project.bpm||120);
+    this._pausedBeat=null;this.currentBeat=this._playRange.start;
+    this._planOrigin=this.ctx.currentTime+.05+countSeconds;this._planCursor=0;this._planDirty=false;this._scheduledEvents=new Map();
+    this._transportRuns=[{clock:this._planOrigin,startBeat:this._playRange.start,endBeat:this._playRange.end,project:structuredClone({bpm:project.bpm,swing:project.swing,timeline:{enabled:timeline?.enabled,tempo:timeline?.tempo}})}];
+    for(let n=0;n<countBeats;n++)this._click(this.ctx.currentTime+.05+n*60/project.bpm,n%(meter.numerator*4/meter.denominator)===0);
     this._timeline = [];
-    this.playingSequence = this.store.project.currentSequence;
-    this.nextStepTime = this.ctx.currentTime + 0.05;
-    this._transportStart = this.nextStepTime;
+    this.playingSequence=Math.floor(this.currentBeat/16);this.currentStep=Math.floor(this.currentBeat*4)%64;
+    this._transportStart = this._planOrigin;
     this._transportEnd = Infinity;
     this._tick();
+    if(typeof document!=='undefined')document.dispatchEvent(new CustomEvent('transport',{detail:{playing:true,beat:this.currentBeat}}));
   }
 
   pause() {
     // Notify recorders while their final audio-clock position is still available.
     this._transportEnd = this.ctx?.currentTime || 0;
+    if(this.isPlaying)this._pausedBeat=this.getMusicalPosition(this._transportEnd).beat;
+    this.currentBeat=this._pausedBeat??this.currentBeat;
     if (!this.offline && typeof document !== "undefined") document.dispatchEvent(new CustomEvent("transport-stop", { detail: { time: this._transportEnd } }));
     this.isPlaying = false;
-    this._transportGeneration++;
+    this._transportGeneration++;this._prefetchAbort?.abort();
     clearTimeout(this.timer);
     for (const timer of this._transportTimers) clearTimeout(timer);
     this._transportTimers.clear();
     for (const ch of this._voices?.keys() || []) this.silenceChannel(ch);
     this.releaseAll(null, { immediate: true });
+    for(const node of this._clicks||[]){try{node.stop();}catch{}}this._clicks?.clear();this._automationOverrides?.clear();
+    if(typeof document!=='undefined')document.dispatchEvent(new CustomEvent('transport',{detail:{playing:false,beat:this.currentBeat}}));
+  }
+
+  _finishTransport() {
+    // The musical cursor stops at the song end; finite sources and effect releases
+    // already scheduled on the audio clock retain their natural tails.
+    this._transportEnd=this._planOrigin+this._plan.duration;this.currentBeat=this._plan.endBeat;
+    if(!this.offline&&typeof document!=='undefined')document.dispatchEvent(new CustomEvent('transport-stop',{detail:{time:this._transportEnd}}));
+    this.isPlaying=false;this._pausedBeat=null;this._transportGeneration++;this._prefetchAbort?.abort();clearTimeout(this.timer);this._automationOverrides?.clear();
+    for(const timer of this._transportTimers)clearTimeout(timer);this._transportTimers.clear();
+    if(typeof document!=='undefined')document.dispatchEvent(new CustomEvent('transport',{detail:{playing:false,beat:this.currentBeat}}));
   }
 
   stop() {
     this.pause();
     this.currentStep = 0;
+    this._pausedBeat=null;this.currentBeat=0;
     if (this.onStep) this.onStep(-1, this.playingSequence);
   }
 
@@ -842,7 +965,17 @@ export class Engine {
     this._flushEffects();
   }
 
+  seekBeat(beat) { const playing=this.isPlaying;if(playing)this.pause();this.currentBeat=this._pausedBeat=Math.max(0,Number(beat)||0);if(playing)return this.play({fromBeat:this.currentBeat});this.onStep?.(Math.floor(this.currentBeat*4)%64,Math.floor(this.currentBeat/16)); }
+  getMusicalPosition(atTime=this.ctx?.currentTime||0) {
+    const time=Math.min(atTime,this._transportEnd??Infinity),run=this._transportRuns.filter(r=>r.clock<=time).at(-1)||this._transportRuns[0];
+    if(!run||!this.isPlaying)return {beat:this._pausedBeat??this.currentBeat,time,playing:false};
+    const cycle=beatToSeconds(run.project,run.endBeat)-beatToSeconds(run.project,run.startBeat),elapsed=Math.max(0,time-run.clock),local=run.repeats>1?elapsed-Math.min(run.repeats-1,Math.floor(elapsed/cycle))*cycle:elapsed;
+    const seconds=beatToSeconds(run.project,run.startBeat)+local;
+    return {beat:Math.min(run.endBeat,secondsToBeat(run.project,seconds)),time,playing:time>=this._transportStart};
+  }
+
   getTransportPosition(atTime = this.ctx?.currentTime || 0) {
+    if(this._plan){const p=this.getMusicalPosition(atTime),sequenceIndex=Math.floor(p.beat/16),step=unswingStep((p.beat-sequenceIndex*16)*4,this.store.project.swing);return {...p,sequenceIndex,step,elapsedSteps:p.beat*4};}
     const time = Math.min(atTime, this._transportEnd ?? Infinity);
     if (this.isPlaying && this.ctx) this._catchUp(Math.min(time, this.ctx.currentTime));
     const spans = this._timeline;
@@ -854,6 +987,18 @@ export class Engine {
   }
 
   getTransportSegments(startTime, endTime = this.ctx?.currentTime || 0) {
+    if(this._plan){
+      const result=[],end=Math.min(endTime,this._transportEnd??Infinity);
+      for(let i=0;i<this._transportRuns.length;i++){
+        const run=this._transportRuns[i],cycle=beatToSeconds(run.project,run.endBeat)-beatToSeconds(run.project,run.startBeat),repeats=run.repeats||1;
+        const first=Math.max(0,Math.floor((startTime-run.clock)/cycle)),last=Math.min(repeats-1,Math.floor((end-run.clock)/cycle));
+        for(let repeat=first;repeat<=last;repeat++){
+          const clock=run.clock+repeat*cycle,runEnd=Math.min(this._transportRuns[i+1]?.clock??Infinity,clock+cycle),from=Math.max(startTime,clock),to=Math.min(end,runEnd);if(to<=from)continue;
+          let beat=secondsToBeat(run.project,beatToSeconds(run.project,run.startBeat)+from-clock),lastBeat=secondsToBeat(run.project,beatToSeconds(run.project,run.startBeat)+to-clock);
+          while(beat<lastBeat-1e-9){const sequenceIndex=Math.floor(beat/16),boundary=Math.min(lastBeat,(sequenceIndex+1)*16);result.push({sequenceIndex,startStep:unswingStep((beat-sequenceIndex*16)*4,run.project.swing),endStep:unswingStep((boundary-sequenceIndex*16)*4,run.project.swing),startTime:clock+beatToSeconds(run.project,beat)-beatToSeconds(run.project,run.startBeat),endTime:clock+beatToSeconds(run.project,boundary)-beatToSeconds(run.project,run.startBeat)});beat=boundary;}
+        }
+      }return result;
+    }
     const out = [];
     const end = Math.min(endTime, this._transportEnd ?? Infinity);
     if (this.isPlaying && this.ctx) this._catchUp(Math.min(end, this.ctx.currentTime));
@@ -872,6 +1017,7 @@ export class Engine {
 
   _tick() {
     if (!this.isPlaying) return;
+    if(this._plan){this._tickPlan();return;}
     const now = this.ctx.currentTime;
     // Missed audio cannot be recovered. Advance the musical cursor without firing a burst
     // of old notes; the next event is scheduled on the first future step boundary.
@@ -882,6 +1028,98 @@ export class Engine {
       this._advance();
     }
     if (!this.offline) this.timer = setTimeout(() => this.isPlaying && this._tick(), LOOKAHEAD_MS);
+  }
+
+  _appendTransportRun(clock,startBeat,endBeat,repeats=1) {
+    const project=this.store.project,snapshot={bpm:project.bpm,swing:project.swing,timeline:{enabled:project.timeline.enabled,tempo:project.timeline.tempo}},previous=this._transportRuns.at(-1);
+    const cycle=beatToSeconds(snapshot,endBeat)-beatToSeconds(snapshot,startBeat);
+    if(previous&&previous.startBeat===startBeat&&previous.endBeat===endBeat&&JSON.stringify(previous.project)===JSON.stringify(snapshot)&&Math.abs(previous.clock+cycle*(previous.repeats||1)-clock)<1e-6)previous.repeats=(previous.repeats||1)+repeats;
+    else this._transportRuns.push({clock,startBeat,endBeat,repeats,project:structuredClone(snapshot)});
+  }
+  _tickPlan() {
+    const now=this.ctx.currentTime;
+    if(this._lastTickTime!=null&&now-this._lastTickTime>.1){this.schedulerStats.lateTicks++;this.schedulerStats.maxLatenessMs=Math.max(this.schedulerStats.maxLatenessMs,(now-this._lastTickTime)*1000);}this._lastTickTime=now;
+    if(this._planDirty){
+      const previous=this._transportRuns.at(-1)?.project,project=this.store.project;
+      const clockChanged=previous&&(previous.bpm!==project.bpm||previous.swing!==project.swing||JSON.stringify(previous.timeline)!==JSON.stringify({enabled:project.timeline.enabled,tempo:project.timeline.tempo}));
+      const beat=clockChanged?this.getMusicalPosition(now).beat:null;
+      for(const n of this._synthVoices.values())if(n.source==='transport'&&(clockChanged||n.time>now+.005))n.voice.stop(now);
+      for(const voices of this._voices?.values()||[])for(const v of voices)if(clockChanged||v.time>now+.005){try{v.src.stop(now);}catch{}}
+      for(const [key,time] of this._scheduledEvents)if(clockChanged||time>now+.005)this._scheduledEvents.delete(key);
+      if(clockChanged){this._playRange={start:Math.min(beat,this._playRange.end-.001),end:this._playRange.end};this._planOrigin=now;this._appendTransportRun(now,this._playRange.start,this._playRange.end);}
+      this._prefetchAbort?.abort();this._nextLoopPlan=null;this._plan=compilePlaybackPlan(project,{range:this._playRange,seed:this.seed,buffers:this.buffers});this._planCursor=0;this._planDirty=false;
+    }
+    // Skip whole missed cycles arithmetically. Keep compact clock history so a held
+    // recording still receives the correct loop continuations after a stalled UI.
+    if(this._loopRange&&now>=this._planOrigin+this._plan.duration){
+      const firstClock=this._planOrigin+this._plan.duration,next=this._nextLoopPlan||compilePlaybackPlan(this.store.project,{range:this._loopRange,seed:this.seed,buffers:this.buffers}),cycles=Math.floor((now-firstClock)/next.duration);
+      this.schedulerStats.skippedEvents+=this._plan.events.length-this._planCursor+cycles*next.events.length;
+      this._appendTransportRun(firstClock,next.startBeat,next.endBeat,cycles+1);this._playRange={...this._loopRange};this._plan=next;this._nextLoopPlan=null;this._planOrigin=firstClock+cycles*next.duration;this._planCursor=0;this._scheduledEvents.clear();
+    }
+    for(let cycles=0;cycles<128;cycles++){
+      while(this._planCursor<this._plan.events.length){const event=this._plan.events[this._planCursor],time=this._planOrigin+event.time;if(time>=now+SCHEDULE_AHEAD)break;this._planCursor++;const key=`${event.id}:${event.time}`;if(this._scheduledEvents.has(key))continue;
+        if(time<now-.01){this.schedulerStats.skippedEvents++;this.schedulerStats.maxLatenessMs=Math.max(this.schedulerStats.maxLatenessMs,(now-time)*1000);delete event.prepared;continue;}
+        this.scheduleEvent({...event,time});delete event.prepared;this._scheduledEvents.set(key,time);
+      }
+      if(this._loopRange&&now+SCHEDULE_AHEAD>=this._planOrigin+this._plan.duration){const nextClock=this._planOrigin+this._plan.duration;this._playRange={...this._loopRange};this._plan=this._nextLoopPlan||compilePlaybackPlan(this.store.project,{range:this._playRange,seed:this.seed,buffers:this.buffers});this._nextLoopPlan=null;this._planOrigin=nextClock;this._planCursor=0;this._scheduledEvents.clear();this._appendTransportRun(nextClock,this._playRange.start,this._playRange.end);continue;}
+      if(!this._loopRange&&now>=this._planOrigin+this._plan.duration){this._finishTransport();return;}break;
+    }
+    this._prefetchUpcoming(now);this.currentBeat=this.getMusicalPosition(now).beat;
+    this.timer=setTimeout(()=>this.isPlaying&&this._tick(),LOOKAHEAD_MS);
+  }
+
+  scheduleEvent(event) {
+    const address=trackAddress(this.store.project,event.trackId),time=event.time;
+    if(event.type==='note'&&address?.kind==='instrument'&&this.instrumentAudible(address.index)){
+      const automation=this._eventAutomation(event);
+      const id=this._startVoice(address.index,event.pitch,event.velocity,{time,duration:event.duration,source:'transport',held:false,seed:event.seed,chaseOffsetSeconds:event.chaseOffsetSeconds,prepared:event.prepared,automation});
+      for(const p of event.expression||[])if(p.type==='bend')this.setNotePitchBend(id,p.value,Math.max(time,time+beatToSeconds(this.store.project,event.beat+(p.offset||0))-beatToSeconds(this.store.project,event.beat)-(event.rangeChaseSeconds||0)));
+      return id;
+    }
+    if(event.type==='sample'&&address?.kind==='sample'&&this.channelAudible(address.index)){
+      if(event.clip)return this._triggerClip(address.index,event);
+      if(legacyPlaybackProfile(this.store.project)&&!address.track.clipSnapshot)return this.trigger(address.index,time,event.velocity,event.over,{chaseSeconds:event.chaseOffsetSeconds||0});
+      let over=event.over;if(event.chaseOffsetSeconds>0){const c=address.track,b=this.buffers[address.index];if(!b)return;const pitch=over?.pitch??c.pitch??1,reverse=over?.rev??c.reverse,delta=event.chaseOffsetSeconds*pitch/b.duration;over={...over,...(reverse?{trimEnd:(over?.trimEnd??c.trimEnd)-delta}:{trimStart:(over?.trimStart??c.trimStart)+delta})};}
+      return this.trigger(address.index,time,event.velocity,over);
+    }
+    if(event.type==='automation')return this.scheduleAutomation(event);
+    if(event.type==='metronome')return this._click(time,event.accent);
+    if(event.type==='step'&&!this.offline){const generation=this._transportGeneration;const timer=setTimeout(()=>{this._transportTimers.delete(timer);if(!this.isPlaying||generation!==this._transportGeneration)return;this.currentStep=event.step;this.playingSequence=event.sequenceIndex;if(!this.store.project.timeline.enabled&&this.store.project.currentSequence!==event.sequenceIndex){this._selectingSequence=true;try{this.store.selectSequence(event.sequenceIndex);}finally{this._selectingSequence=false;}}this.onStep?.(event.step,event.sequenceIndex,time);},Math.max(0,(time-this.ctx.currentTime)*1000));this._transportTimers.add(timer);}
+  }
+  _click(time,accent=false){if(this.offline)return;const osc=this.ctx.createOscillator(),g=this.ctx.createGain();(this._clicks||=new Set()).add(osc);osc.frequency.value=accent?1500:1000;g.gain.setValueAtTime(.12,time);g.gain.exponentialRampToValueAtTime(.0001,time+.04);osc.connect(g).connect(this.masterGain);osc.start(time);osc.stop(time+.045);osc.onended=()=>{this._clicks.delete(osc);osc.disconnect();g.disconnect();};}
+  scheduleAutomation(event){
+    if(this._automationOverrides?.has(JSON.stringify(event.target))||this.store.project.automationMode==='write')return;
+    const {target,value,curve}=event,time=event.time+(curve==='linear'?(event.duration||0):0),owner=this.store.project.channels.concat(this.store.project.instruments,this.store.project.buses||[]).find(t=>t.id===target.trackId),address=trackAddress(this.store.project,target.trackId),strip=target.trackId==='master'?{chain:this.chains.get('master'),pan:this._mixer.master.pan,fader:this.masterGain}:this._mixer?.strips.get(target.trackId);
+    const apply=param=>{if(!param)return;if(curve==='linear'){if(event.duration)param.setValueAtTime(event.fromValue??param.value,event.time);else param.setValueAtTime(param.value,this.ctx.currentTime);param.linearRampToValueAtTime(value,time);}else param.setValueAtTime(value,time);};
+    if(target.kind==='volume')return apply(target.trackId==='master'?this.masterGain.gain:this.store.project.mixerVersion>=2?strip?.fader.gain:strip?.chain.input.gain);
+    if(target.kind==='pan')return apply(strip?.pan.pan);
+    if(target.kind==='bend'&&address?.kind==='instrument'){for(const n of this._synthVoices.values())if(n.i===address.index)this.setNotePitchBend(n.id,value,time);return;}
+    if(target.kind==='synthParam'&&address?.kind==='instrument'){for(const n of this._synthVoices.values())if(n.i===address.index)n.voice.setParameters?.({[target.param]:value},time,{curve,startTime:event.time,fromValues:{[target.param]:event.fromValue}});return;}
+    if(target.kind==='effectParam'){
+      const it=strip?.chain.slots.get(target.slotId);if(!it)return;
+      const param=it.nodes[target.param];if(param&&typeof param.setValueAtTime==='function')return apply(param);
+      // Plugins can supply an audio-clock automation hook for mapped/compound controls.
+      it.type.automate?.(this.ctx,it.nodes,target.param,value,time,curve);
+    }
+  }
+  beginAutomationGesture(target){(this._automationOverrides||=new Set()).add(JSON.stringify(target));const strip=target.trackId==='master'?{pan:this._mixer?.master.pan,fader:this.masterGain,chain:this.chains?.get('master')}:this._mixer?.strips.get(target.trackId),param=target.kind==='pan'?strip?.pan.pan:target.kind==='volume'?(target.trackId==='master'||this.store.project.mixerVersion>=2?strip?.fader.gain:strip?.chain.input.gain):null;param?.cancelAndHoldAtTime?.(this.ctx?.currentTime||0);}
+  endAutomationGesture(target){if(this.store.project.automationMode!=='latch')this._automationOverrides?.delete(JSON.stringify(target));}
+  _triggerClip(ch,event){
+    const source=trackAddress(this.store.project,event.sourceTrackId),buffer=source&&this.buffers[source.index];if(!buffer)return;
+    const src=this.ctx.createBufferSource(),gain=this.ctx.createGain(),time=event.time,rate=event.playbackRate||1;
+    const offset=(event.sourceOffsetSeconds||0)+(event.chaseOffsetSeconds||0)*rate,duration=Math.min(event.duration,(buffer.duration-offset)/rate);if(duration<=0)return;
+    src.buffer=buffer;src.playbackRate.value=rate;src.connect(gain).connect(this.channelGains[ch]);
+    const fadeIn=Math.min(duration/2,Math.max(0,beatToSeconds(this.store.project,event.beat+(event.fadeIn||0))-beatToSeconds(this.store.project,event.beat))),fadeOut=Math.min(duration/2,Math.max(0,beatToSeconds(this.store.project,event.endBeat)-beatToSeconds(this.store.project,event.endBeat-(event.fadeOut||0))));
+    gain.gain.setValueAtTime(0,time);gain.gain.linearRampToValueAtTime(event.velocity,time+fadeIn);gain.gain.setValueAtTime(event.velocity,time+duration-fadeOut);gain.gain.linearRampToValueAtTime(0,time+duration);
+    const voice={src,gain,time};const voices=(this._voices||=new Map()).get(ch)||new Set();this._voices.set(ch,voices);voices.add(voice);src.onended=()=>{voices.delete(voice);src.disconnect();gain.disconnect();};src.start(time,offset,duration*rate);return voice;
+  }
+  dispose(){
+    this.isPlaying=false;this._transportGeneration++;this._prefetchAbort?.abort();clearTimeout(this.timer);clearTimeout(this._gateTimer);clearTimeout(this.reverbFx?.timer);
+    for(const timer of this._transportTimers)clearTimeout(timer);this._transportTimers.clear();
+    this.releaseAll(null,{immediate:true});for(const ch of this._voices?.keys()||[])this.silenceChannel(ch);this.stopPreview();disposeMixer(this);
+    for(const key of [...this.chains?.keys()||[]])this._disposeChain(key);
+    const seen=new Set(),disconnect=value=>{if(!value||typeof value!=='object'||seen.has(value))return;seen.add(value);if(typeof value.disconnect==='function'){try{value.disconnect();}catch{}}else for(const v of Object.values(value))disconnect(v);};
+    for(const node of [this.delayNode,this.delayR,this.reverbNode,this.delayFx,this.reverbFx,this.masterGain])disconnect(node);
   }
 
   _catchUp(time) {
@@ -976,13 +1214,15 @@ export class Engine {
 
   // Trigger a channel's sample at `time`. `over` = per-step overrides
   // ({rev, trimStart, trimEnd, pitch}) that take precedence over channel settings.
-  trigger(ch, time = 0, velocity = 1, over = null) {
+  trigger(ch, time = 0, velocity = 1, over = null, { chaseSeconds = 0 } = {}) {
     this.ensureContext();
     const c = this.store.channel(ch);
+    const historical = legacySamplePlayback(this.store.project,c,over,this.buffers[ch]?.duration||0,{chaseSeconds});
+    if(historical&&historical.sourceDuration<=0)return;
     const rev = over?.rev ?? c.reverse;
     const rawPitch = over?.pitch ?? c.pitch;
     const pitch = Number.isFinite(rawPitch)
-      ? Math.max(0.1, Math.min(this.store.project.songOrigin ? 100 : 4, rawPitch))
+      ? Math.max(0.1, Math.min(historical || this.store.project.songOrigin ? 100 : 4, rawPitch))
       : 1;
     const rawStart = over?.trimStart ?? c.trimStart,
       rawEnd = over?.trimEnd ?? c.trimEnd;
@@ -1004,13 +1244,17 @@ export class Engine {
 
     const src = this.ctx.createBufferSource();
     src.buffer = buffer;
-    src.playbackRate.value = pitch;
+    // Preserve each player's parameter API too: the native .value path can
+    // differ by one sample from an explicit time-zero event at non-unity rates.
+    if(historical&&!historical.profile.divideSourceDuration)src.playbackRate.setValueAtTime(pitch,this.ctx.currentTime);
+    else src.playbackRate.value = pitch;
 
     let start = trimStart * buffer.duration;
-    const dur = c.clipSnapshot
+    let dur = c.clipSnapshot
       ? (trimEnd - trimStart) * buffer.duration
       : Math.max(0.001, (trimEnd - trimStart) * buffer.duration);
     if (rev) start = (1 - trimEnd) * buffer.duration;
+    if(historical){start=historical.offset;dur=historical.sourceDuration;}
 
     const vg = this.ctx.createGain();
     vg.gain.value = velocity;
@@ -1033,7 +1277,7 @@ export class Engine {
       src.loopEnd = sampleLoop(c).end;
     }
     const audibleDuration = sustain ?? dur / pitch,
-      edgeFade = Math.min(0.005, audibleDuration / 3);
+      edgeFade = historical ? 0 : Math.min(0.005, audibleDuration / 3);
     let fadeIn = edgeFade;
     if (cutFadeSec != null && this._lastVoice?.[ch]) {
       const prev = this._lastVoice[ch];
@@ -1055,19 +1299,28 @@ export class Engine {
       }
     }
     (this._lastVoice ||= {})[ch] = { src, gain: vg };
-    vg.gain.setValueAtTime(0, t);
-    vg.gain.linearRampToValueAtTime(velocity, t + fadeIn);
-    vg.gain.setValueAtTime(velocity, t + audibleDuration - edgeFade);
-    vg.gain.linearRampToValueAtTime(0, t + audibleDuration);
+    if(historical&&!fadeIn){
+      // Standalone scheduled its 10ms fade at the scheduling clock, not note-on.
+      // With normal lookahead it completes before the source starts. The editor
+      // used a plain channel gain. Neither player faded sample endings.
+      const fade=historical.profile.schedulingFadeSeconds;
+      vg.gain.setValueAtTime(fade?0:velocity,this.ctx.currentTime);
+      if(fade)vg.gain.linearRampToValueAtTime(velocity,this.ctx.currentTime+fade);
+    }else{
+      vg.gain.setValueAtTime(0, t);
+      vg.gain.linearRampToValueAtTime(velocity, t + fadeIn);
+      vg.gain.setValueAtTime(velocity, t + audibleDuration - edgeFade);
+      vg.gain.linearRampToValueAtTime(0, t + audibleDuration);
+    }
 
     const voices = (this._voices ||= new Map()).get(ch) || new Set();
     this._voices.set(ch, voices);
-    const voice = { src, gain: vg };
-    if (!this.offline && voices.size >= 32) {
-      const oldest = voices.values().next().value;
-      try { oldest.src.stop(); } catch {}
-      oldest.gain.disconnect();
-      voices.delete(oldest);
+    const voice = { src, gain: vg, time:t, endTime:t+audibleDuration };
+    const active=[...voices].filter(v=>v.time<=t&&v.endTime>t);
+    if (!historical && active.length >= 32) {
+      const oldest = active[0];
+      try { oldest.src.stop(t); } catch {}
+      oldest.endTime=t;
     }
     voices.add(voice);
     src.onended = () => {

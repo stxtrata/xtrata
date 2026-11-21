@@ -73,6 +73,7 @@ function closeChips(except = null) {
 function listenForChipDismiss() {
   if (chipListeners) return;
   chipListeners = true;
+  document.addEventListener("scroll", () => closeChips(), true);
   document.addEventListener("click", (e) => {
     if (!(e.target instanceof Element) || !e.target.closest(".ord-wrap"))
       closeChips();
@@ -102,6 +103,11 @@ export function renderOrdinalChip(container, references = []) {
     closeChips(container);
     container.classList.toggle("open", opening);
     button.setAttribute("aria-expanded", String(opening));
+    if (opening) {
+      const anchor=button.getBoundingClientRect(),box=card.getBoundingClientRect();
+      card.style.left=Math.max(8,Math.min(anchor.left,innerWidth-box.width-8))+'px';
+      card.style.top=(anchor.bottom+box.height < innerHeight-8 ? anchor.bottom : Math.max(8,anchor.top-box.height))+'px';
+    }
   });
   const card = document.createElement("div");
   card.className = "ord-card";

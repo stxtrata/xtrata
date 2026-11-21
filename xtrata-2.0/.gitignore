@@ -107,4 +107,5 @@ public/casino-machines/*/src/qa/browser/*.log
 tools/*/shots/
 
 # Reproducible inscribable runtime, built from beta-pro source with bundled notices.
+/public/audionaut-beta/chain-runtime/
 /public/audionaut-beta-pro/chain-runtime/

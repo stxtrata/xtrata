@@ -1,8 +1,24 @@
-// Registers the custom front-panel face for each plugin model that has one.
-export { Kit } from "./runtime.js";
-import "./eq3.js"; import "./tilt.js"; import "./comp.js"; import "./opto.js";
-import "./limiter.js"; import "./clipper.js"; import "./gate.js"; import "./transient.js";
-import "./filter.js"; import "./formant.js"; import "./drive.js"; import "./tape.js";
-import "./dist.js"; import "./crush.js"; import "./chorus.js"; import "./flanger.js";
-import "./phaser.js"; import "./trem.js";
-import "./delay.js"; import "./reverb.js";
+import { Kit as runtime } from "./runtime.js";
+import { lazyFaces } from "../lazy-faces.js";
+export const Kit = lazyFaces(runtime, {
+  "eq3": () => import("./eq3.js"),
+  "tilt": () => import("./tilt.js"),
+  "comp": () => import("./comp.js"),
+  "opto": () => import("./opto.js"),
+  "limiter": () => import("./limiter.js"),
+  "clipper": () => import("./clipper.js"),
+  "gate": () => import("./gate.js"),
+  "transient": () => import("./transient.js"),
+  "filter": () => import("./filter.js"),
+  "formant": () => import("./formant.js"),
+  "drive": () => import("./drive.js"),
+  "tape": () => import("./tape.js"),
+  "dist": () => import("./dist.js"),
+  "crush": () => import("./crush.js"),
+  "chorus": () => import("./chorus.js"),
+  "flanger": () => import("./flanger.js"),
+  "phaser": () => import("./phaser.js"),
+  "trem": () => import("./trem.js"),
+  "delaySend": () => import("./delay.js"),
+  "reverbSend": () => import("./reverb.js")
+});

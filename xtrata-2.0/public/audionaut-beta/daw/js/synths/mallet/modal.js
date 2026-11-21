@@ -202,13 +202,13 @@ function keyFor(P, pitch, vel, gate, sr) {
 // ---- phase-locked vibraphone tremolo
 const lfoCache = new WeakMap();
 function lfoBuffer(ctx) {
-  let b = lfoCache.get(ctx);
+  let b = lfoCache.get(ctx.resourceContext || ctx);
   if (!b) {
     const n = Math.max(2048, Math.round(ctx.sampleRate));
     b = ctx.createBuffer(1, n, ctx.sampleRate);
     const d = b.getChannelData(0);
     for (let i = 0; i < n; i++) d[i] = Math.sin((2 * Math.PI * i) / n);
-    lfoCache.set(ctx, b);
+    lfoCache.set(ctx.resourceContext || ctx, b);
   }
   return b;
 }

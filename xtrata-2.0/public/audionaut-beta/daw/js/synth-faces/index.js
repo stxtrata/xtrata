@@ -1,6 +1,18 @@
-// Registers the custom front-panel face for every stock synth except jiMS10.
-export { Kit } from "./runtime.js";
-import "./fm4.js"; import "./vox.js"; import "./pluck.js"; import "./jibass.js";
-import "./ensemble.js"; import "./tine.js"; import "./kit.js"; import "./tonewheel.js";
-import "./morph.js"; import "./texture.js"; import "./winds.js"; import "./modal.js";
-import "./lantern.js"; import "./prism.js";
+import { Kit as runtime } from "./runtime.js";
+import { lazyFaces } from "../lazy-faces.js";
+export const Kit = lazyFaces(runtime, {
+  "fm4": () => import("./fm4.js"),
+  "vox": () => import("./vox.js"),
+  "pluck": () => import("./pluck.js"),
+  "jibass": () => import("./jibass.js"),
+  "ensemble": () => import("./ensemble.js"),
+  "tine": () => import("./tine.js"),
+  "kit": () => import("./kit.js"),
+  "tonewheel": () => import("./tonewheel.js"),
+  "morph": () => import("./morph.js"),
+  "texture": () => import("./texture.js"),
+  "winds": () => import("./winds.js"),
+  "modal": () => import("./modal.js"),
+  "lantern": () => import("./lantern.js"),
+  "prism": () => import("./prism.js")
+});

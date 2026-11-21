@@ -22,7 +22,7 @@ export function arpOrder(notes, settings) {
   if (settings.mode === "updown" && list.length > 2) list.push(...list.slice(1, -1).reverse());
   return list;
 }
-export function createArpeggiator({ now, bpm, settings, notes, play, stop, position = () => null }) {
+export function createArpeggiator({ now, bpm, settings, notes, play, stop, position = () => null, grid = null, intervalAt = null }) {
   const runs = new Map();
   let timer = null;
   function tick() {
@@ -31,21 +31,22 @@ export function createArpeggiator({ now, bpm, settings, notes, play, stop, posit
     for (const [inst, run] of runs) {
       const cfg = settings(inst), list = arpOrder(notes(inst), cfg);
       if (!cfg.enabled || !list.length) { cancel(inst); continue; }
-      const interval = 60 / Math.max(20, bpm()) / cfg.rate;
-      const pos = position(t);
-      if (pos?.playing && (!run.transport || run.interval !== interval)) {
+      const interval = intervalAt?.(t,cfg.rate) ?? 60 / Math.max(20, bpm()) / cfg.rate;
+      const pos = position(t),sync=grid?.(t,cfg.rate),clockKey=sync?.key??interval;
+      if (pos?.playing && (!run.transport || run.clockKey !== clockKey)) {
         const phase = ((pos.elapsedSteps / 4 * cfg.rate) % 1 + 1) % 1;
-        run.next = t + (1 - phase) * interval;
+        run.next = sync?.next ?? t + (1 - phase) * interval;
       }
       run.transport = !!pos?.playing;
-      run.interval = interval;
+      run.interval = interval;run.clockKey=clockKey;
       // Skip missed ticks after suspension; never burst a backlog of notes.
       if (run.next < t - 0.02) run.next = t + 0.005;
       while (run.next < t + 0.1) {
         const index = cfg.mode === "random" ? Math.floor(Math.random() * list.length) : run.cursor++ % list.length;
-        const id = play(inst, list[index], run.next, interval * cfg.gate);
+        const gap=intervalAt?.(run.next,cfg.rate)??interval;
+        const id = play(inst, list[index], run.next, gap * cfg.gate);
         if (id) run.voices.add(id);
-        run.next += interval;
+        run.next += gap;
       }
     }
     if (runs.size) timer = setTimeout(tick, 20);
@@ -63,11 +64,11 @@ export function createArpeggiator({ now, bpm, settings, notes, play, stop, posit
       if (!cfg.enabled || !notes(inst).length) return cancel(inst);
       if (!runs.has(inst)) {
         // First key speaks immediately. Later ticks follow an audio-clock beat grid.
-        const t = now(), pos = position(t), interval = 60 / Math.max(20, bpm()) / cfg.rate;
+        const t = now(), pos = position(t), sync=grid?.(t,cfg.rate),interval = intervalAt?.(t,cfg.rate) ?? 60 / Math.max(20, bpm()) / cfg.rate;
         const phase = pos?.playing ? ((pos.elapsedSteps / 4 * cfg.rate) % 1 + 1) % 1 : 0;
         const first = arpOrder(notes(inst), cfg)[0];
         const id = play(inst, first, t + 0.005, interval * cfg.gate);
-        runs.set(inst, { next: t + (phase > 0.001 ? (1 - phase) * interval : interval), cursor: 1, voices: new Set(id ? [id] : []), transport: !!pos?.playing, interval });
+        runs.set(inst, { next: sync?.next ?? t + (phase > 0.001 ? (1 - phase) * interval : interval), cursor: 1, voices: new Set(id ? [id] : []), transport: !!pos?.playing, interval,clockKey:sync?.key??interval });
       }
       if (!timer) tick();
     },

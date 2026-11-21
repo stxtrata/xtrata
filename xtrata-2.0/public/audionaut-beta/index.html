@@ -105,6 +105,13 @@ body[data-view="seq"] .stage{opacity:0;visibility:hidden;pointer-events:none;tra
 .stage[data-fault="1"] #get{display:none}
 .addr{color:#6d8282;font:10px monospace;letter-spacing:1.6px;min-height:12px;text-align:center}
 
+/* The shared story layer injects fixed cards after this stylesheet. Pro's longer
+ * sign-in explanation needs those cards in the scroll flow, below every action. */
+#stage>.panel,#stage>.controls,#stage>.sell-card,#stage>.sell-music{flex-shrink:0}
+#stage>.controls{margin-bottom:0}
+#stage>.sell-card{position:relative;left:auto;bottom:auto;transform:none;width:420px;max-width:100%;margin:0 auto}
+#stage>.sell-music{position:static;max-width:100%;flex-wrap:wrap;justify-content:center;margin:0 auto auto}
+
 /* ===== SEQUENCER (mounted under the access screen once access is granted) ===== */
 #state-granted{display:flex;flex-direction:column;flex:1;min-height:0}
 .bar{display:flex;align-items:center;gap:12px;padding:8px 14px;border-bottom:1px solid var(--edge);background:rgba(5,8,13,.9);font-size:12.5px;color:var(--muted);position:relative}
@@ -171,6 +178,7 @@ body[data-view="seq"] .stage{opacity:0;visibility:hidden;pointer-events:none;tra
   </section>
 
   <div class="controls">
+    <p style="max-width:460px;color:var(--muted);font-size:12px;line-height:1.5">Beta uses Xtrata’s shared message sign-in, then verifies Audionaut ownership on the server. The wallet may label the message “Collection studio sign-in”; it grants no spending permission and sends no transaction.</p>
     <div class="status"><span class="status-dot" aria-hidden="true"></span><span id="statusText">SEALED · AWAITING AUDIONAUT</span></div>
     <div class="row">
       <button class="action" id="action" type="button"><span id="actionLabel">CONNECT WALLET</span><svg viewBox="0 0 20 20" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.2" aria-hidden="true"><path d="M4 10h11m-5-5 5 5-5 5"/></svg></button>
@@ -188,7 +196,7 @@ body[data-view="seq"] .stage{opacity:0;visibility:hidden;pointer-events:none;tra
   </div>
 </main>
 
-<script type="module" src="/audionaut/audionaut-gate.js"></script>
+<script type="module" src="/audionaut-beta/audionaut-pro-gate.js"></script>
 <script type="module" src="/audionaut/sell/audionaut-sell.js"></script>
 </body>
 </html>

@@ -1335,7 +1335,7 @@ body.arrange-mode.arrange-zoomed
 }
 .ord-card {
   display: none;
-  position: absolute;
+  position: fixed;
   z-index: 60;
   left: -6px;
   top: 100%;
@@ -2451,6 +2451,18 @@ button:disabled {
   opacity: 0.85;
 }
 
+/* The five performance panels flow from three sections to a single touch column. */
+:is(.sfp-portwheel,.sfp-hushwire,.sfp-clatterstep,.sfp-switchyard,.sfp-neverend) .sfp-body {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 225px), 1fr));
+}
+:is(.sfp-portwheel,.sfp-hushwire,.sfp-clatterstep,.sfp-switchyard,.sfp-neverend) .sfp-row {
+  flex-wrap: wrap;
+}
+:is(.sfp-portwheel,.sfp-hushwire,.sfp-clatterstep,.sfp-switchyard,.sfp-neverend) .sfp-xy {
+  min-height: 92px;
+  max-height: 155px;
+}
+
 /* ---- new synths (synths/index.js): panels are laid out as auto-fitting section tiles ---- */
 .sfp-jibass .sfp-body,
 .sfp-kiln .sfp-body,
@@ -2924,3 +2936,10 @@ body.arrange-mode #instruments-wrap {
 body.arrange-mode #instruments-wrap .section-label {
   margin: 8px 0 4px;
 }
+
+/* Shared fallback instrument panel: compact rows instead of a column of knobs. */
+.sfp-generic .sfp-body { grid-template-columns: minmax(0, 1fr); }
+.sfp-generic .sfp-sec-body { flex-direction: row; flex-wrap: wrap; align-items: flex-start; gap: 12px 24px; }
+.sfp-drum-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 10px; }
+.sfp-drum-tools select { max-width: 100%; min-width: 0; }
+.sfp-drumrack .sfp-key[aria-disabled="true"] { opacity: .35; }

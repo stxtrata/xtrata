@@ -1,5 +1,10 @@
+import {chainLibrary as defaultChainLibrary,verifyChainBytes} from './chain-library.js';
+import {validateChainReference,chainRefKey} from './chain-manifest.js';
+let activeChainLibrary=defaultChainLibrary;
+export function setChainSourceLibrary(library){if(typeof library?.read!=='function')throw Error('Invalid chain reader.');activeChainLibrary=library;}
 // Shared, transactional L1/L2 audio loader. Remote preview cache is bounded.
 import { store, stepVal, makeChannel } from "./state.js";
+import {decodeAudioBytes} from './audio-decode.js';
 import { engine } from "./engine.js";
 import { renderSynthSample, ALL_SYNTH_DRUMS } from "./synthdrums.js";
 import { SOUND_BY_KEY } from "./onboard-catalog.js";
@@ -13,10 +18,10 @@ import {
 import { loadPackAudio } from "./pack-library.js";
 import { LANDMARKS } from "./song-format.js";
 import { fetchCatalogueAudio } from "./catalogue-retrieval.js";
-import { base64ToBytes } from "./audio-utils.js";
-import { assetSource, assetData } from "./assets.js";
+import { base64ToBytes, encodeWavAsync } from "./audio-utils.js";
+import { assetSource, assetData, assetBlob, registerBlob, portableProjectAsync, retainAssets, retainAssetIds, pruneAssets } from "./assets.js";
 const ORDINAL = /^[a-f0-9]{64}i\d+$/i,
-  MAX_BYTES = 50 * 1024 * 1024,
+  MAX_BYTES = 256 * 1024 * 1024,
   CACHE_BYTES = 64 * 1024 * 1024;
 const cache = new Map(),
   pending = new Map(),
@@ -65,10 +70,10 @@ export function resolveSource(source, settings = store.settings) {
 }
 function decodeBase64(value) {
   const raw = String(value)
-    .replace(/^data:[^,]*,/, "")
+    .replace(/^data:[^,]*,/i, "")
     .replace(/\s/g, "");
   if (raw.length > (MAX_BYTES * 4) / 3 + 8)
-    throw new Error("Audio exceeds the 50 MB import limit.");
+    throw new Error("Audio exceeds the 256 MB import limit.");
   return base64ToBytes(raw);
 }
 function inlineBytes(buffer) {
@@ -80,11 +85,11 @@ function inlineBytes(buffer) {
 }
 async function responseBytes(response) {
   if (Number(response.headers.get("content-length")) > MAX_BYTES)
-    throw new Error("Audio exceeds the 50 MB import limit.");
+    throw new Error("Audio exceeds the 256 MB import limit.");
   if (!response.body?.getReader) {
     const bytes = await response.arrayBuffer();
     if (bytes.byteLength > MAX_BYTES)
-      throw new Error("Audio exceeds the 50 MB import limit.");
+      throw new Error("Audio exceeds the 256 MB import limit.");
     return bytes;
   }
   const reader = response.body.getReader(),
@@ -96,7 +101,7 @@ async function responseBytes(response) {
     size += value.byteLength;
     if (size > MAX_BYTES) {
       await reader.cancel();
-      throw new Error("Audio exceeds the 50 MB import limit.");
+      throw new Error("Audio exceeds the 256 MB import limit.");
     }
     chunks.push(value);
   }
@@ -138,7 +143,7 @@ export async function extractAudio(
         : null,
     };
   }
-  if (ct.includes("html") || /^<(?:!doctype|html|head)/i.test(prefix)) {
+  if (ct.includes("html") || /^<(?:!doctype|html|head|body|audio|script|!--)/i.test(prefix)) {
     const html = new TextDecoder().decode(bytes),
       doc = new DOMParser().parseFromString(html, "text/html");
     if (
@@ -196,6 +201,27 @@ export async function extractAudio(
     throw new Error("Video extraction is unsupported in Samples & Loops.");
   return { arrayBuffer: bytes, sourceBytes: bytes, sampleName: fallback };
 }
+// Shared retrieval policy for catalogue, direct loads and historical imports.
+// Fallback gateways are tried only for transport failures, never to substitute
+// a different payload after an extraction/integrity error.
+export async function fetchSourceAudio(source,{signal,allowNested=true}={}) {
+  const primary=resolveSource(source),urls=[primary];
+  if(source.type==='ordinal') for(const gateway of (Array.isArray(store.settings.ordinalsFallbacks)?store.settings.ordinalsFallbacks:[])) {
+    if(typeof gateway==='string' && /^https?:\/\//i.test(gateway)) urls.push(gateway.replace(/\/?$/, '/')+ordinalId(source.value));
+  }
+  let last;
+  for(const url of new Set(urls)) {
+    abort(signal);let response;
+    try { response=await fetch(url,{signal}); if(!response.ok)throw Error(`Audio fetch failed (${response.status}).`); }
+    catch(error){abort(signal);last=Object.assign(error,{code:'GATEWAY'});continue;}
+    const fallback=source.label||decodeURIComponent(url.split('/').pop()?.split('?')[0]||'Sample');
+    let result;
+    try { result=await extractAudio(response,fallback,signal,0,allowNested); }
+    catch(error){abort(signal);throw Object.assign(error,{code:'FORMAT'});}
+    return {...result,retrievedVia:url};
+  }
+  throw last || Error('No valid audio source gateway.');
+}
 function keep(key, value) {
   cache.delete(key);
   cache.set(key, value);
@@ -208,7 +234,17 @@ function keep(key, value) {
     cache.delete(id);
   }
 }
-export async function fetchAndDecode(
+export async function fetchAndDecode(source,{signal=null,catalogue=false,timeoutMs=30000}={}) {
+  const controller=new AbortController();
+  const abortRequest=()=>controller.abort(signal?.reason);
+  if(signal?.aborted)abortRequest();else signal?.addEventListener('abort',abortRequest,{once:true});
+  const timer=setTimeout(()=>controller.abort(new DOMException('Audio loading timed out. Retry or relink the source.','TimeoutError')),timeoutMs);
+  let rejectAbort;
+  const cancelled=new Promise((_,reject)=>{rejectAbort=()=>reject(controller.signal.reason||new DOMException('Audio loading cancelled.','AbortError'));controller.signal.addEventListener('abort',rejectAbort,{once:true});if(controller.signal.aborted)rejectAbort();});
+  try{return await Promise.race([decodeSource(source,{signal:controller.signal,catalogue}),cancelled]);}
+  finally{clearTimeout(timer);signal?.removeEventListener('abort',abortRequest);controller.signal.removeEventListener('abort',rejectAbort);}
+}
+async function decodeSource(
   source,
   { signal = null, catalogue = false } = {},
 ) {
@@ -219,12 +255,31 @@ export async function fetchAndDecode(
       "This inscription is a song or application. Open Songs & historic applications to audition or export a song session.",
     );
   const context = engine.ensureContext();
+  if(source.chainRef){
+    const ref=validateChainReference(source.chainRef);
+    if(source.type!=='xtrata'||String(source.value)!==ref.tokenId||source.network!==ref.network||source.contractId!==ref.contractId)throw Error('The sound source differs from its chain reference.');
+    const key='chain:'+chainRefKey(ref)+':'+ref.sha256+':'+ref.bytes+':'+ref.mediaType+':'+(source.audioSha256||'');
+    if(cache.has(key))return cache.get(key);
+    const bytes=await verifyChainBytes(ref,await activeChainLibrary.read(ref,{signal}));
+    const extracted=await extractAudio(new Response(bytes,{headers:{'content-type':ref.mediaType}}),source.label||'Chain sample',signal,0,false);
+    if(source.audioSha256&&await audioHash(extracted.arrayBuffer)!==source.audioSha256)throw Error('Chain audio payload differs from its pinned hash.');
+    const audioBuffer=await decodeAudioBytes(context,extracted.arrayBuffer,{signal});abort(signal);
+    const result={audioBuffer,sampleName:extracted.sampleName,soundMetadata:extracted.soundMetadata,source:structuredClone(source)};keep(key,result);return result;
+  }
+  if(source.localAssetId){
+    const key='asset:'+source.localAssetId;
+    if(cache.has(key))return cache.get(key);
+    const blob=assetBlob(source.localAssetId);
+    const bytes=await blob.arrayBuffer();
+    const audioBuffer=await decodeAudioBytes(context,bytes,{signal});abort(signal);
+    const result={audioBuffer,sampleName:source.label||'Recorded audio',source};keep(key,result);return result;
+  }
   if (source.type === "file") {
     if (source.file) {
       if (source.file.size > MAX_BYTES)
-        throw new Error("Choose an audio file smaller than 50 MB.");
+        throw new Error("Choose an audio file smaller than 256 MB.");
       const bytes = await source.file.arrayBuffer(),
-        audioBuffer = await context.decodeAudioData(bytes.slice(0));
+        audioBuffer = await decodeAudioBytes(context,bytes,{signal});
       abort(signal);
       return {
         audioBuffer,
@@ -265,25 +320,12 @@ export async function fetchAndDecode(
         sampleName: ALL_SYNTH_DRUMS[source.value].label,
       };
     else {
-      const response = await fetch(
-        source.type === "synth" ? key : resolveSource(source),
-        { signal },
-      );
-      if (!response.ok)
-        throw new Error(`Audio fetch failed (${response.status}).`);
-      const fallback =
-          source.label ||
-          decodeURIComponent(key.split("/").pop()?.split("?")[0] || "Sample"),
-        { arrayBuffer, sampleName, soundMetadata } = await extractAudio(
-          response,
-          fallback,
-          signal,
-        );
+      const {arrayBuffer,sampleName,soundMetadata}=await fetchSourceAudio(source,{signal});
       const expectedHash = soundMetadata?.audioSha256 || source.audioSha256;
       if (expectedHash && (await audioHash(arrayBuffer)) !== expectedHash)
         throw new Error("Audio failed its integrity check.");
       result = {
-        audioBuffer: await context.decodeAudioData(arrayBuffer.slice(0)),
+        audioBuffer: await decodeAudioBytes(context,arrayBuffer,{signal}),
         sampleName,
         soundMetadata:
           soundMetadata ||
@@ -307,7 +349,7 @@ export async function fetchAndDecode(
     if (pending.get(key) === request) pending.delete(key);
   }
 }
-export function assignDecodedSample(ch, source, result, { reset = true, dirty = true } = {}) {
+export function assignDecodedSample(ch, source, result, { reset = true, dirty = true, preserveLabels = false } = {}) {
   const channel = store.channel(ch);
   if (!channel) throw new Error("This sample channel no longer exists.");
   tickets.set(ch, Symbol());
@@ -319,6 +361,8 @@ export function assignDecodedSample(ch, source, result, { reset = true, dirty = 
     label: source.label,
     ...(source.localAssetId && { localAssetId: source.localAssetId }),
     ...(source.sourceSha256 && { sourceSha256: source.sourceSha256 }),
+    ...(source.network && {network:source.network,contractId:source.contractId}),
+    ...(source.chainRef && {chainRef:structuredClone(source.chainRef),chainAssetId:source.chainAssetId}),
     ...(source.audioSha256 && { audioSha256: source.audioSha256 }),
     ...(source.assetId && {
       assetId: source.assetId,
@@ -328,9 +372,9 @@ export function assignDecodedSample(ch, source, result, { reset = true, dirty = 
       verifiedAudio: source.verifiedAudio === true,
     }),
   });
-  channel.sampleName = source.label || result.sampleName;
+  if (!preserveLabels || !channel.sampleName) channel.sampleName = source.label || result.sampleName;
   channel.unresolvedSource = null;
-  channel.soundMetadata = result.soundMetadata || null;
+  channel.soundMetadata = result.soundMetadata || (!reset&&source.collectedFrom ? channel.soundMetadata : null);
   if (reset) {
     channel.gateSteps = result.soundMetadata?.loop ? 8 : 0;
     channel.sampleMidi =
@@ -351,15 +395,15 @@ export function assignDecodedSample(ch, source, result, { reset = true, dirty = 
     sampleRate: result.audioBuffer.sampleRate,
     channels: result.audioBuffer.numberOfChannels,
   };
-  if (channel.name.startsWith("Channel "))
+  if (!preserveLabels && channel.name.startsWith("Channel "))
     channel.name = String(channel.sampleName)
       .replace(/\.[a-z0-9]+$/i, "")
       .slice(0, 24);
   store.emit("channel", { ch, prop: "source", value: channel.source }, { dirty });
   return channel.sampleName;
 }
-// Empties a channel: stops its voices, drops the decoded audio and returns every sample-related
-// setting to a fresh channel's defaults. A load still in flight for this channel is discarded.
+// Clears the selected sample without replacing the track identity, routing or takes.
+// Timeline clips retain their source-track reference and can be relinked in place.
 // Steps are left to the caller (they live per sequence).
 export function unloadChannelSample(ch) {
   const channel = store.channel(ch);
@@ -367,9 +411,9 @@ export function unloadChannelSample(ch) {
   tickets.set(ch, Symbol());
   engine.silenceChannel(ch);
   engine.setBuffer(ch, null);
-  for (const key of Object.keys(channel)) delete channel[key];
-  Object.assign(channel, makeChannel(ch));
-  engine.rebuildInserts?.(ch);
+  const defaults = makeChannel(ch);
+  for (const key of ['source','sampleName','pitch','reverse','trimStart','trimEnd']) channel[key] = defaults[key];
+  for (const key of ['clipSnapshot','unresolvedSource','analysis','soundMetadata','gateSteps']) delete channel[key];
   store.emit("channel", { ch });
   return true;
 }
@@ -413,7 +457,7 @@ export async function reloadAllSamples(onProgress, concurrency = 3) {
       source = channel.source;
     try {
       onProgress?.(ch, channel.sampleName || source.value);
-      if (channel.clipSnapshot) {
+      if (channel.clipSnapshot && !source.chainRef && !source.localAssetId && !source.collectedFrom) {
         const { restoreClipChannel } = await import("./clip-actions.js");
         await restoreClipChannel(ch);
       } else await loadSample(ch, source, { preserve: true });
@@ -435,4 +479,43 @@ export async function reloadAllSamples(onProgress, concurrency = 3) {
     Array.from({ length: Math.min(concurrency, queue.length) }, worker),
   );
   return failures.sort((a, b) => a - b);
+}
+
+// Archive immutable decoded PCM, including bank/remote dependencies. Provenance stays
+// attached for pinned clips, while reopening the archive needs no gateway or sound bank.
+export async function collectProjectAssets(project=store.project,{signal,onProgress=()=>{}}={}) {
+  const copy=structuredClone(project),owners=[],seen=new WeakSet(),lease=Symbol('archive');
+  function visit(value){if(!value||typeof value!=='object'||seen.has(value))return;seen.add(value);
+    if(value.source&&typeof value.source==='object')owners.push(value);
+    for(const [key,item]of Object.entries(value))if(!['notes','steps','params','analysis','collectedFrom'].includes(key))visit(item);
+  }visit(copy);retainAssets(lease,copy);
+  try{
+    for(let i=0;i<owners.length;i++){
+      abort(signal);const owner=owners[i],source=owner.source;
+      if(!source.localAssetId&&!source.value?.startsWith('data:audio/')){
+        const result=await fetchAndDecode(source,{signal});
+        const blob=await encodeWavAsync(result.audioBuffer,{bitDepth:'float32',signal});
+        const frozen=registerBlob(blob,{name:source.label||result.sampleName||'Collected audio'});
+        owner.source={...frozen,collectedFrom:structuredClone(source),freezeFormat:'pcm-float32'};
+        retainAssets(lease,copy);
+      }
+      onProgress({phase:'collect',completed:i+1,total:owners.length});
+    }
+    return await portableProjectAsync(copy);
+  }finally{retainAssetIds(lease,[]);pruneAssets();}
+}
+export async function relinkMissingAsset(ch,source,{signal,replace=false}={}) {
+  const current=store.channel(ch),existing=current?.source;
+  if(!current)throw new Error('Select an existing sample track.');
+  const guard=reserveSampleAssignment(ch),expected=existing?.collectedFrom?.audioSha256||existing?.audioSha256;
+  const result=await fetchAndDecode(source,{signal});
+  if(!replace&&expected){
+    const resolved=result.source||source;
+    if(!resolved.localAssetId||await audioHash(await assetBlob(resolved.localAssetId).arrayBuffer())!==expected)
+      throw new Error('This file differs from the pinned recording. Choose Replace to deliberately use different audio.');
+  }
+  abort(signal);if(!guard())throw new DOMException('The destination changed while relinking.','AbortError');
+  const resolved=result.source||source;
+  if(!replace&&current.clipSnapshot)result.source={...resolved,collectedFrom:existing?.collectedFrom||existing};
+  return assignDecodedSample(ch,source,result,{reset:replace,dirty:true});
 }

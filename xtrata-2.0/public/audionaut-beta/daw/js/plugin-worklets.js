@@ -107,6 +107,7 @@ function processorsMain() {
     process(inputs, outputs) {
       if (this.dead) return false;
       const inp = inputs[0];
+      const detector = inputs[1]?.length ? inputs[1] : inp;
       const out = outputs[0];
       const n = out[0] ? out[0].length : 128;
       if (!inp || !inp.length) {
@@ -125,7 +126,7 @@ function processorsMain() {
       for (let i = 0; i < n; i++) {
         let a = 0;
         for (let c = 0; c < det; c++) {
-          let x = this.hp.run(c, inp[c][i]);
+          let x = this.hp.run(c, detector[c]?.[i] || 0);
           x = this.lp.run(c, x);
           const s = x * x;
           if (s > a) a = s;
@@ -276,6 +277,8 @@ function processorsMain() {
       this.p = { bits: 6, downsample: 1, jitter: 0, dither: false };
       const o = options && options.processorOptions;
       if (o && o.p) Object.assign(this.p, o.p);
+      this.rng = (o?.seed >>> 0) || 0x41554449;
+      this.random = () => { let x = this.rng; x ^= x << 13; x ^= x >>> 17; x ^= x << 5; this.rng = x >>> 0; return this.rng / 4294967296; };
       this.held = [0, 0];
       this.left = 0; // samples until the next capture
       this.dead = false;
@@ -307,11 +310,11 @@ function processorsMain() {
             let v = inp[c][i];
             if (v > 1) v = 1;
             else if (v < -1) v = -1;
-            if (dither) v += (Math.random() - Math.random()) * lsb;
+            if (dither) v += (this.random() - this.random()) * lsb;
             held[c] = Math.round(v * steps) / steps;
           }
           let len = downsample;
-          if (jitter > 0) len *= 1 + jitter * (Math.random() * 2 - 1) * 0.75;
+          if (jitter > 0) len *= 1 + jitter * (this.random() * 2 - 1) * 0.75;
           left += Math.max(1, len);
         }
         for (let c = 0; c < nch; c++) out[c][i] = held[c];

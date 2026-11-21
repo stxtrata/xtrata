@@ -16,8 +16,13 @@
 // Option values are always strings (the generic UI hands back <select>.value strings and
 // cleanSlot() compares with ===), so numeric options are parsed with Number() in apply().
 
+import { synthOversampling } from "./synths/capabilities.js";
+import { synthDefaults } from "./synths.js";
+import { installPluginAutomation } from "./plugin-automation.js";
 import { ensureWorklets } from "./plugin-worklets.js";
 import { voxFormants } from "./synths-voices.js";
+import { seededRandom } from "./synths/resources.js";
+import { PRO_EFFECT_TYPES } from "./pro-effects.js";
 
 function makeDriveCurve(amount, steps = 0) {
   const curve = new Float32Array(1025);
@@ -141,12 +146,19 @@ function addMeters(ctx, nodes, inNode, outNode) {
     const an = ctx.createAnalyser();
     an.fftSize = 1024;
     an.smoothingTimeConstant = 0;
-    src.connect(an);
+    src?.connect(an);
     return an;
   };
   nodes.anIn = mk(inNode);
   nodes.anOut = mk(outNode);
   nodes.mbuf = new Float32Array(1024);
+  nodes.stereoMeters = [inNode, outNode].map((source) => {
+    const split = ctx.createChannelSplitter(2), analysers = [mk(null), mk(null)];
+    source.connect(split);
+    analysers.forEach((analyser, channel) => split.connect(analyser, channel));
+    return { split, analysers };
+  });
+  nodes.meterNodes = nodes.stereoMeters.flatMap((meter) => [meter.split, ...meter.analysers]);
   return nodes;
 }
 function peakOf(an, buf) {
@@ -160,6 +172,10 @@ function peakOf(an, buf) {
 }
 function peakMeter(n) {
   if (!n.anIn) return { inPeak: 0, outPeak: 0 };
+  if (n.stereoMeters) {
+    const levels = n.stereoMeters.map((meter) => meter.analysers.map((analyser) => peakOf(analyser, n.mbuf)));
+    return { inPeak: Math.max(...levels[0]), outPeak: Math.max(...levels[1]), inChannels: levels[0], outChannels: levels[1] };
+  }
   return { inPeak: peakOf(n.anIn, n.mbuf), outPeak: peakOf(n.anOut, n.mbuf) };
 }
 const reductionOf = (c) => {
@@ -232,10 +248,10 @@ function chainResponse(n, freqs, filters, extraDb) {
 // `n.ready` resolves true when the node is live (false if unsupported / disposed).
 function attachWorklet(ctx, n, name, getOptions, onReady) {
   n.ready = ensureWorklets(ctx).then((ok) => {
-    if (!ok || n.disposed) return false;
+    if (!ok || n.disposed) { if (!ok) n.workletError = "AudioWorklet unavailable; using compatibility DSP"; return false; }
     try {
       const wk = new AudioWorkletNode(ctx, name, {
-        numberOfInputs: 1,
+        numberOfInputs: n.sidechain ? 2 : 1,
         numberOfOutputs: 1,
         outputChannelCount: [2],
         channelCount: 2,
@@ -245,9 +261,21 @@ function attachWorklet(ctx, n, name, getOptions, onReady) {
         processorOptions: getOptions(),
       });
       n.wk = wk;
+      wk.onprocessorerror = () => {
+        n.workletError = `${name} stopped processing`;
+        if (n.polOut) n.polOut.gain.setValueAtTime(1, ctx.currentTime);
+        if (n.pass) n.pass.gain.setValueAtTime(1, ctx.currentTime);
+        if (n.natG) n.natG.gain.setValueAtTime(1, ctx.currentTime);
+        if (n.wkOut) n.wkOut.gain.setValueAtTime(0, ctx.currentTime);
+        if (n.wkG) n.wkG.gain.setValueAtTime(0, ctx.currentTime);
+        n.failedWorklet = wk;
+        n.wk = null;
+        globalThis.document?.dispatchEvent(new CustomEvent("dsp-error", { detail: { plugin: name, message: n.workletError } }));
+      };
       onReady(wk);
       return true;
-    } catch {
+    } catch (error) {
+      n.workletError = error.message;
       n.wk = null;
       return false;
     }
@@ -256,7 +284,9 @@ function attachWorklet(ctx, n, name, getOptions, onReady) {
 function killWorklet(n) {
   n.disposed = true;
   try {
+    if (n.failedWorklet) { n.failedWorklet.port.postMessage({type:"kill"}); n.failedWorklet.disconnect(); n.failedWorklet = null; }
     if (n.wk) {
+      n.wk.onprocessorerror = null;
       n.wk.port.onmessage = null;
       n.wk.port.postMessage({ type: "kill" });
     }
@@ -501,7 +531,8 @@ function noiseBuf(ctx) {
   if (!b) {
     b = ctx.createBuffer(1, Math.round(ctx.sampleRate * 2), ctx.sampleRate);
     const d = b.getChannelData(0);
-    for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+    const random = ctx.random || seededRandom("audionaut-plugin-noise");
+    for (let i = 0; i < d.length; i++) d[i] = random() * 2 - 1;
     noiseBufs.set(ctx, b);
   }
   return b;
@@ -597,11 +628,16 @@ function makeApChain(ctx, n, lfoS, lfoC) {
     lfoC.connect(lgC);
     stages.forEach((s) => lgC.connect(s.frequency));
   }
-  raw.connect(tail);
+  // Rapidly swept native all-pass coefficients can add energy inside a feedback
+  // loop, despite |feedback| < 1. Bound that loop before it can run away. This
+  // guard is exactly linear below ±4 and leaves ordinary/default patches intact.
+  const safetyIn = mkGain(ctx, n, .25), safety = track(n, ctx.createWaveShaper()), bounded = mkGain(ctx, n, 4);
+  safety.curve = new Float32Array([-1, 1]);
+  raw.connect(safetyIn).connect(safety).connect(bounded).connect(tail);
   const fbG = mkGain(ctx, n, 0);
   const fbD = track(n, ctx.createDelay(0.01));
   fbD.delayTime.value = 0; // inside a loop the delay is at least one render quantum
-  return { head, raw, tail, stages, lgS, lgC, fbG, fbD, fbOn: false, N: 0 };
+  return { head, raw, bounded, tail, stages, lgS, lgC, fbG, fbD, fbOn: false, N: 0 };
 }
 function wireChain(ch, N) {
   if (ch.N === N) return;
@@ -617,7 +653,7 @@ function wireChain(ch, N) {
 }
 function setChainFb(ch, v) {
   if (!ch.fbOn && v !== 0) {
-    ch.raw.connect(ch.fbG);
+    ch.bounded.connect(ch.fbG);
     ch.fbG.connect(ch.fbD);
     ch.fbD.connect(ch.head);
     ch.fbOn = true;
@@ -678,6 +714,7 @@ function crushRoute(ctx, n) {
 }
 
 export const PLUGIN_TYPES = {
+  ...PRO_EFFECT_TYPES,
   eq3: {
     name: "Orderbook",
     role: "EQ — 6 Band",
@@ -970,7 +1007,7 @@ export const PLUGIN_TYPES = {
       const g = ctx.createGain();
       const wet = ctx.createGain();
       const dd = ctx.createDelay(0.05);
-      dd.delayTime.value = COMP_LATENCY;
+      dd.delayTime.value = Math.floor(COMP_LATENCY * ctx.sampleRate) / ctx.sampleRate;
       const dry = ctx.createGain();
       dry.gain.value = 0;
       const out = ctx.createGain();
@@ -1006,7 +1043,7 @@ export const PLUGIN_TYPES = {
   // side-chain, so (unlike DynamicsCompressorNode) the release can remember how long it
   // has been compressing. There is no look-ahead, so no latency.
   //
-  //   detector : inT → mono (L+R)/2 → [HF shelf = "hf" emphasis, side-chain only] → |x|
+  //   detector : stereo input → HF emphasis per channel → (|L|+|R|)/2
   //              → LP 24 Hz (fast envelope)  ──────────────→ gain curve F ─→ vcaF.gain
   //                       └→ feedback-comb one-pole, τ ≈ 1.2 s (slow envelope)
   //                                                        → gain curve S ─→ vcaS.gain
@@ -1059,9 +1096,11 @@ export const PLUGIN_TYPES = {
       inT.connect(vcaF).connect(vcaS).connect(mk).connect(wet).connect(out);
       inT.connect(dry).connect(out);
       // detector
+      const sidechain = ctx.createGain(), internalDetector = ctx.createGain();
+      inT.connect(internalDetector).connect(sidechain);
       const det = ctx.createGain();
       det.gain.value = 0.5; // headroom for |x| up to 2
-      det.channelCount = 1;
+      det.channelCount = 2;
       det.channelCountMode = "explicit";
       det.channelInterpretation = "speakers";
       const emph = ctx.createBiquadFilter();
@@ -1070,6 +1109,9 @@ export const PLUGIN_TYPES = {
       emph.gain.value = 0;
       const rect = ctx.createWaveShaper();
       rect.curve = new Float32Array([1, 0, 1]); // |x|
+      const detectorSplit = ctx.createChannelSplitter(2), emphR = ctx.createBiquadFilter(), rectR = ctx.createWaveShaper(), detectorSum = ctx.createGain();
+      emphR.type = "highshelf"; emphR.frequency.value = emph.frequency.value;
+      rectR.curve = new Float32Array([1, 0, 1]); detectorSum.gain.value = .5;
       const lpF = ctx.createBiquadFilter();
       lpF.type = "lowpass";
       lpF.frequency.value = 24;
@@ -1086,7 +1128,9 @@ export const PLUGIN_TYPES = {
       cDel.delayTime.value = D / sr;
       const cFb = ctx.createGain();
       cFb.gain.value = slowA;
-      inT.connect(det).connect(emph).connect(rect).connect(lpF);
+      sidechain.connect(det).connect(detectorSplit);
+      detectorSplit.connect(emph, 0); detectorSplit.connect(emphR, 1);
+      emph.connect(rect).connect(detectorSum); emphR.connect(rectR).connect(detectorSum); detectorSum.connect(lpF);
       lpF.connect(wsF);
       lpF.connect(cIn).connect(cSum);
       cSum.connect(cDel).connect(cFb).connect(cSum);
@@ -1101,7 +1145,9 @@ export const PLUGIN_TYPES = {
       };
       const nodes = {
         input: inT, output: out, inT, vcaF, vcaS, mk, wet, dry, out, det, emph, rect, lpF, wsF, wsS,
-        cIn, cSum, cDel, cFb, anGF: mkAn(wsF), anGS: mkAn(wsS), gbuf: new Float32Array(32), sig: "",
+        cIn, cSum, cDel, cFb, sidechain, internalDetector, detectorSplit, emphR, rectR, detectorSum,
+        setSidechainExternal: (enabled) => internalDetector.gain.setTargetAtTime(enabled ? 0 : 1, ctx.currentTime, .005),
+        anGF: mkAn(wsF), anGS: mkAn(wsS), gbuf: new Float32Array(32), sig: "",
       };
       addMeters(ctx, nodes, inT, out);
       return nodes;
@@ -1122,6 +1168,7 @@ export const PLUGIN_TYPES = {
         n.wsS.curve = optoCurve(slow.t, slow.w, slow.r);
       }
       n.emph.gain.value = clamp(P.hf, 0, 1) * 12;
+      n.emphR.gain.value = n.emph.gain.value;
       // gain 50 = neutral; ±12 dB across the knob, plus a little automatic make-up as
       // peak reduction goes up.
       n.mk.gain.value = dbToLin((P.gain - 50) * 0.24 + pr * 0.05);
@@ -1171,7 +1218,7 @@ export const PLUGIN_TYPES = {
           ["off", "Off"],
           ["on", "On"],
         ],
-        def: "off",
+        def: "on",
       },
     ],
     // inT → input gain → compressor → [safety soft-clip] → out
@@ -1403,7 +1450,9 @@ export const PLUGIN_TYPES = {
       const wkOut = ctx.createGain();
       wkOut.gain.value = 0;
       const out = ctx.createGain();
-      inT.connect(dHp).connect(dLp).connect(an);
+      const sidechain = ctx.createGain(), internalDetector = ctx.createGain();
+      inT.connect(internalDetector).connect(sidechain);
+      sidechain.connect(dHp).connect(dLp).connect(an);
       inT.connect(gate).connect(polOut).connect(out);
       wkOut.connect(out);
       const nodes = {
@@ -1427,6 +1476,8 @@ export const PLUGIN_TYPES = {
         force: false,
         m: null,
         wk: null,
+        sidechain, internalDetector,
+        setSidechainExternal: (enabled) => internalDetector.gain.setTargetAtTime(enabled ? 0 : 1, ctx.currentTime, .005),
       };
       addMeters(ctx, nodes, inT, out);
       attachWorklet(ctx, nodes, "an-gate", () => ({
@@ -1437,6 +1488,7 @@ export const PLUGIN_TYPES = {
           nodes.m = e.data;
         };
         inT.connect(wk);
+        sidechain.connect(wk, 0, 1);
         wk.connect(wkOut);
         polOutFade(nodes, ctx.currentTime);
       });
@@ -2703,6 +2755,57 @@ export const PLUGIN_TYPES = {
 export const CHAIN_KINDS = ["inserts", "fx"]; // signal order: fader → inserts → FX
 export const KIND_OF_CHAIN = { inserts: "insert", fx: "fx" };
 
+// Algorithmic delay only; musical echo/predelay is deliberately excluded from PDC.
+// Web Audio's compressor uses an integer sample look-ahead. Oversampler group delay
+// is measured once per browser/rate by calibratePluginLatency() before playback.
+const measuredOversampling = new Map();
+export function pluginLatencySamples(type, params = {}, sampleRate = 48000) {
+  if (PRO_EFFECT_TYPES[type]) return PRO_EFFECT_TYPES[type].latencySamples(sampleRate, params);
+  if (type === "comp" || type === "limiter") return Math.floor(sampleRate * COMP_LATENCY);
+  const factor = type === "tape" || (type === "filter" && params.drive > 0) ? 2
+    : (type === "clipper" || type === "drive") && params.hq === "on" ? 4 : 1;
+  return factor === 1 ? 0 : measuredOversampling.get(`${sampleRate}:${factor}`) ?? (factor === 2 ? 128 : 192);
+}
+export function synthLatencySamples(synthId, params = {}, sampleRate = 48000) {
+  return synthOversampling(synthId, {...synthDefaults(synthId), ...params}) === 2 ? measuredOversampling.get(`${sampleRate}:2`) ?? 128 : 0;
+}
+export async function calibratePluginLatency(sampleRate = 48000) {
+  for (const factor of [2, 4]) {
+    const key = `${sampleRate}:${factor}`;
+    if (measuredOversampling.has(key)) continue;
+    const ctx = new OfflineAudioContext(1, 1024, sampleRate), source = ctx.createBufferSource(), shape = ctx.createWaveShaper();
+    const buffer = ctx.createBuffer(1, 1024, sampleRate); buffer.getChannelData(0)[128] = .5;
+    source.buffer = buffer; shape.curve = new Float32Array([-1, 1]); shape.oversample = `${factor}x`;
+    source.connect(shape).connect(ctx.destination); source.start();
+    const samples = (await ctx.startRendering()).getChannelData(0);
+    let peak = 0; for (let i = 1; i < samples.length; i++) if (Math.abs(samples[i]) > Math.abs(samples[peak])) peak = i;
+    measuredOversampling.set(key, Math.max(0, peak - 128));
+  }
+  return Object.fromEntries([2, 4].map(factor => [factor, measuredOversampling.get(`${sampleRate}:${factor}`)]));
+}
+export function pluginTailSeconds(type, params = {}, env = {}) {
+  if (PRO_EFFECT_TYPES[type]) return PRO_EFFECT_TYPES[type].tailSeconds(params, env);
+  if (type === "reverbSend") return (params.decay ?? 2.2) + (params.predelay ?? 0) / 1000;
+  if (type === "delaySend") {
+    const beat = BEAT_DIVS.find(([id]) => id === params.time)?.[1] ?? .75;
+    const time = beat * 60 / (params.bpm || 120), feedback = Math.min(.99, Math.abs(params.feedback ?? .35));
+    return time * (feedback > 0 ? Math.ceil(Math.log(.0001) / Math.log(feedback)) : 1);
+  }
+  if (type === "flanger" || type === "chorus" || type === "phaser") return 2;
+  return 0;
+}
+export function pluginDiagnostics(nodes) {
+  return { worklet: nodes.wk ? "active" : nodes.ready ? "fallback" : "native", error: nodes.workletError || null,
+    sidechain: !!nodes.sidechain, automationError: nodes.automationError || null };
+}
+PLUGIN_TYPES.opto.sidechain = true;
+PLUGIN_TYPES.gate.sidechain = true;
+// New processors expose AudioParams for every numeric control. Preserve their
+// sample-timed automation hooks while retaining the legacy plugin adapter.
+const proAutomation = Object.fromEntries(Object.entries(PRO_EFFECT_TYPES).map(([id,type]) => [id,type.automate]));
+installPluginAutomation(PLUGIN_TYPES);
+for (const [id, automate] of Object.entries(proAutomation)) PLUGIN_TYPES[id].automate = automate;
+
 export function pluginDefaults(type) {
   const out = {};
   (PLUGIN_TYPES[type]?.params || []).forEach((p) => {
@@ -2767,6 +2870,8 @@ function cleanSlot(raw) {
     id: typeof raw.id === "string" && /^[\w-]{1,40}$/.test(raw.id) ? raw.id : slotId(),
     type: raw.type,
     enabled: raw.enabled !== false,
+    ...(t.sidechain && typeof raw.sidechainTrackId === "string" ? { sidechainTrackId: raw.sidechainTrackId.slice(0, 80) } : {}),
+    ...(raw.type === "hybridReverb" && typeof raw.irSource?.sourceTrackId === "string" && raw.irSource.sourceTrackId.length > 0 && raw.irSource.sourceTrackId.length <= 200 ? { irSource: {sourceTrackId: raw.irSource.sourceTrackId} } : {}),
     params,
   };
 }

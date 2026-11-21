@@ -4,9 +4,13 @@
 // ../synth-categories.js (bass, lead, pad, keys, organ, fm, pluck, mallet, reed, voice, chip,
 // wave, drums, fx, glass). See synths/README.md for the folder list and which are still empty.
 // The folder a module sits in IS its category (stamped below), so moving a file between
-// folders re-files it in the picker. Each module is self-contained (no imports) and exports `<ID>_SYNTHS`; list it here and
+// folders re-files it in the picker. Modules export `<ID>_SYNTHS` and may share
+// local runtime modules (all included in the Xtrata application bundle); list them here and
 // synths.js spreads EXTRA_SYNTHS into SYNTH_BANK, so it shows up in every channel's picker.
 
+import { DRUMRACK_SYNTHS } from "./drums/drumrack.js";
+import { GRANULATOR_SYNTHS } from "./fx/granulator.js";
+import { CONCERTPIANO_SYNTHS } from "./keys/concertpiano.js";
 import { ENSEMBLE_SYNTHS } from "./pad/ensemble.js";
 import { TINE_SYNTHS } from "./keys/tine.js";
 import { KIT_SYNTHS } from "./drums/kit.js";
@@ -27,11 +31,20 @@ import { PRISM_SYNTHS } from "./glass/prism.js";
 import { TIDALGLASS_SYNTHS } from "./glass/tidalglass.js";
 import { TIDELACE_SYNTHS } from "./glass/tidelace.js";
 
+import { PORTWHEEL_SYNTHS } from "./lead/portwheel.js";
+import { HUSHWIRE_SYNTHS } from "./pad/hushwire.js";
+import { CLATTERSTEP_SYNTHS } from "./mallet/clatterstep.js";
+import { SWITCHYARD_SYNTHS } from "./keys/switchyard.js";
+import { NEVEREND_SYNTHS } from "./fx/neverend.js";
+
 // stamp every synth in a module with the category of the folder it lives in
 const inFolder = (category, mods) =>
   Object.fromEntries(Object.entries(mods).map(([id, def]) => [id, { ...def, category }]));
 
 export const EXTRA_SYNTHS = {
+  ...inFolder("drums", DRUMRACK_SYNTHS),
+  ...inFolder("fx", GRANULATOR_SYNTHS),
+  ...inFolder("keys", CONCERTPIANO_SYNTHS),
   ...inFolder("pad", ENSEMBLE_SYNTHS),
   ...inFolder("keys", TINE_SYNTHS),
   ...inFolder("drums", KIT_SYNTHS),
@@ -51,4 +64,9 @@ export const EXTRA_SYNTHS = {
   ...inFolder("glass", PRISM_SYNTHS),
   ...inFolder("glass", TIDALGLASS_SYNTHS),
   ...inFolder("glass", TIDELACE_SYNTHS),
+  ...inFolder("lead", PORTWHEEL_SYNTHS),
+  ...inFolder("pad", HUSHWIRE_SYNTHS),
+  ...inFolder("mallet", CLATTERSTEP_SYNTHS),
+  ...inFolder("keys", SWITCHYARD_SYNTHS),
+  ...inFolder("fx", NEVEREND_SYNTHS),
 };

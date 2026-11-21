@@ -46,10 +46,10 @@ const foldHarms = (f0) =>
   });
 const waveCache = new WeakMap();
 function drawbarWave(ctx, P, f0) {
-  let m = waveCache.get(ctx);
+  let m = waveCache.get(ctx.resourceContext || ctx);
   if (!m) {
     m = new Map();
-    waveCache.set(ctx, m);
+    waveCache.set(ctx.resourceContext || ctx, m);
   }
   const hs = foldHarms(f0);
   const key = BARS.map((b) => Math.round(P[b.key])).join("") + hs.join(",");
@@ -75,13 +75,13 @@ function drawbarWave(ctx, P, f0) {
 // ---- phase-locked LFO (one sine cycle in one second, looped)
 const lfoCache = new WeakMap();
 function lfoBuffer(ctx) {
-  let b = lfoCache.get(ctx);
+  let b = lfoCache.get(ctx.resourceContext || ctx);
   if (!b) {
     const n = Math.max(2048, Math.round(ctx.sampleRate));
     b = ctx.createBuffer(1, n, ctx.sampleRate);
     const d = b.getChannelData(0);
     for (let i = 0; i < n; i++) d[i] = Math.sin((2 * Math.PI * i) / n);
-    lfoCache.set(ctx, b);
+    lfoCache.set(ctx.resourceContext || ctx, b);
   }
   return b;
 }
@@ -99,7 +99,7 @@ function lfoSource(ctx, time, rate, phase, stopAt) {
 
 const noiseCache = new WeakMap();
 function noiseBuf(ctx) {
-  let b = noiseCache.get(ctx);
+  let b = noiseCache.get(ctx.resourceContext || ctx);
   if (!b) {
     const n = Math.round(ctx.sampleRate / 2);
     b = ctx.createBuffer(1, n, ctx.sampleRate);
@@ -109,7 +109,7 @@ function noiseBuf(ctx) {
       s = (s * 1664525 + 1013904223) >>> 0;
       d[i] = (s / 4294967296) * 2 - 1;
     }
-    noiseCache.set(ctx, b);
+    noiseCache.set(ctx.resourceContext || ctx, b);
   }
   return b;
 }
@@ -283,7 +283,7 @@ function organVoice(ctx, dest, note, P) {
       n.connect(bp);
       bp.connect(g);
       g.connect(lp); // contact noise bypasses the (slow) amp envelope
-      n.start(t0, Math.random() * 0.3);
+      n.start(t0, (ctx.random || Math.random)() * 0.3);
       n.stop(t0 + 0.02);
     };
     const ck = CLICK * P.keyClick * Math.min(v, 1.4);

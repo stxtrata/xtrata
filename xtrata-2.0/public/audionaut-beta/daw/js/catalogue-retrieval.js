@@ -1,5 +1,6 @@
+import { decodeAudioBytes } from './audio-decode.js';
 // Catalogue requests extend the workstation resolver/decoder, with shared cancellable jobs.
-import { ordinalId, resolveSource, extractAudio } from "./loader.js";
+import { ordinalId, fetchSourceAudio } from "./loader.js";
 import { engine } from "./engine.js";
 import { audioHash } from "./onboard-library.js";
 import { store } from "./state.js";
@@ -56,51 +57,13 @@ async function resolve(job) {
     key = id;
   let p = payloads.get(key);
   if (!p) {
-    const urls = [
-      resolveSource(source),
-      ...(Array.isArray(store.settings.ordinalsFallbacks)
-        ? store.settings.ordinalsFallbacks.map(
-            (g) => g.replace(/\/?$/, "/") + id,
-          )
-        : []),
-    ];
-    let last;
-    for (const url of [...new Set(urls)]) {
-      if (!/^https?:\/\//.test(url)) continue;
-      try {
-        const response = await fetch(url, { signal });
-        if (!response.ok)
-          throw fail(
-            `Gateway returned ${response.status}; retry or change the Ordinals gateway in Settings.`,
-            "GATEWAY",
-          );
-        try {
-          p = await extractAudio(
-            response,
-            source.label || id,
-            signal,
-            0,
-            false,
-          );
-        } catch (e) {
-          if (e.name === "AbortError") throw e;
-          throw fail(`Unsupported source format: ${e.message}`, "FORMAT");
-        }
-        p.sourceHash = await audioHash(p.sourceBytes);
-        p.payloadHash = await audioHash(p.arrayBuffer);
-        p.retrievedVia = url;
-        break;
-      } catch (e) {
-        if (signal.aborted) throw cancelled();
-        if (e.code === "FORMAT") throw e;
-        last = e;
-      }
+    try {
+      p=await fetchSourceAudio(source,{signal,allowNested:false});
+      p.sourceHash=await audioHash(p.sourceBytes);p.payloadHash=await audioHash(p.arrayBuffer);
+    } catch(error) {
+      if(signal.aborted)throw cancelled();
+      throw fail(error.message,error.code||'FORMAT');
     }
-    if (!p)
-      throw fail(
-        `Audio gateway unreachable: ${last?.message || "no valid gateway"}. Retry when online or change Settings.`,
-        "GATEWAY",
-      );
   }
   if (
     (source.sourceSha256 && p.sourceHash !== source.sourceSha256) ||
@@ -117,12 +80,11 @@ async function resolve(job) {
   if (!b) {
     try {
       b = {
-        audioBuffer: await engine
-          .ensureContext()
-          .decodeAudioData(p.arrayBuffer.slice(0)),
+        audioBuffer: await decodeAudioBytes(engine.ensureContext(),p.arrayBuffer,{signal}),
       };
-    } catch {
-      throw fail("Unsupported audio codec or invalid audio payload.", "FORMAT");
+    } catch (error) {
+      if (signal.aborted) throw cancelled();
+      throw fail(`Unsupported audio codec or invalid audio payload: ${error.message}`, "FORMAT");
     }
     if (signal.aborted) throw cancelled();
   }

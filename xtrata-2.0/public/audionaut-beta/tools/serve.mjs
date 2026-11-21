@@ -34,10 +34,12 @@ export async function browser() {
     try { pw = createRequire(import.meta.url)("playwright"); } catch { /* optional global NODE_PATH */ }
   }
   if (!pw) throw new Error("Playwright not found — npm i -g playwright");
-  const chromium = pw.chromium || pw.default.chromium;
-  return chromium.launch({
-    executablePath: process.env.CHROMIUM_PATH || undefined,
-    args: ["--autoplay-policy=no-user-gesture-required"],
+  const kind=process.env.AUDIONAUT_TEST_BROWSER||'chromium',driver=pw[kind]||pw.default?.[kind];
+  if(!driver)throw new Error('Unknown test browser: '+kind);
+  return driver.launch({
+    executablePath:kind==='chromium'?(process.env.CHROMIUM_PATH||undefined):undefined,
+    args:kind==='chromium'?["--autoplay-policy=no-user-gesture-required"]:[],
+    ...(kind==='firefox'?{firefoxUserPrefs:{'media.autoplay.default':0,'media.autoplay.block-webaudio':false}}:{}),
   });
 }
 

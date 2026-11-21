@@ -24,8 +24,10 @@ const fingerprints = () => Object.fromEntries(sourcePaths.map((file) => [file, c
 const beforeFiles = fingerprints();
 function originalView(project) {
   const result = structuredClone(project);
-  delete result.projectId; // beta adds recovery identity without changing musical content
-  for (const instrument of result.instruments) delete instrument.arp; // old projects start with arp disabled
+  for(const key of ['projectId','schemaVersion','renderSeed','buses','master','mixerVersion','timeline','recording','automationMode'])delete result[key];
+  result.format='audionaut-workstation/2';
+  for(const owner of [...result.channels,...result.instruments])for(const key of ['id','kind','pan','inputTrimDb','output','auxSends','armed','monitor','midiInput','takes','arp'])delete owner[key];
+  for(const sequence of result.sequences){delete sequence.id;for(const notes of sequence.notes)for(const note of notes)for(const key of ['id','rawStep','rawDur','expression'])delete note[key];}
   return result;
 }
 for (const song of originals) {
@@ -48,7 +50,7 @@ for (const [synthId, synth] of Object.entries(originalSynths)) {
   betaPersistence.importProject(originalPersistence.exportProject());
   assert.equal(betaStore.instrument(0).synthId, synthId);
   assert.deepEqual(betaStore.instrument(0).params, patch);
-  assert.deepEqual(betaStore.seq.notes[0], originalStore.seq.notes[0]);
+  assert.deepEqual(originalView(JSON.parse(betaPersistence.exportProject())).sequences[0].notes[0], originalStore.seq.notes[0]);
 }
 const legacy = {
   projectName: "Classic Audional song", artistName: "Legacy fixture", projectBPM: 123,
@@ -56,12 +58,33 @@ const legacy = {
   trimSettings: [{ start: 12, end: 88 }], projectChannelNames: ["Legacy sample"],
   projectSequences: { Sequence1: { ch0: { steps: [1, 5, { index: 9, reverse: true }] } }, Sequence2: { ch0: { steps: [3, 7] } } },
 };
-for (const input of [legacy, ...["audional-sequencer-x/1", "audional-sequencer-l1xl2/1"].map((format) => ({ ...JSON.parse(originals[0].raw), format }))]) {
+for (const input of ["audional-sequencer-x/1", "audional-sequencer-l1xl2/1"].map((format) => ({ ...JSON.parse(originals[0].raw), format }))) {
   originalPersistence.importProject(input);
   const expected = originalView(JSON.parse(originalPersistence.exportProject({ compact: true })));
   betaPersistence.importProject(input);
   assert.deepEqual(originalView(JSON.parse(betaPersistence.exportProject({ compact: true }))), expected, "legacy original import semantics preserved");
 }
+// Raw pre-AudioNaut files now use the documented editor bridge. Preserve actual
+// saved sequence numbers and reverse flags, which the old generic importer lost.
+betaPersistence.importProject(legacy);
+assert.equal(betaStore.project.channels.length,1);
+assert.equal(betaStore.project.sequences.length,3);
+assert.ok(betaStore.project.sequences[0].steps[0].every(value=>value===0));
+assert.deepEqual(betaStore.project.sequences[1].steps[0][8],{v:1,rev:true});
+assert.equal(betaStore.project.sequences[2].steps[0][2],1);
+for(const[key,value]of Object.entries({volume:.72,pitch:.75,trimStart:.12,trimEnd:.88}))assert.equal(betaStore.channel(0)[key],value);
+assert.equal(betaStore.project.legacyPlayback.id,'audionals-editor-v1');
+// This fixture was exported by the pre-promotion beta at d6ae247.
+const earlierBetaFile = fs.readFileSync(new URL('./fixtures/pre-promotion-beta.json', import.meta.url), 'utf8');
+betaPersistence.importProject(earlierBetaFile);
+assert.equal(betaStore.project.projectId, 'pre-promotion-beta');
+assert.equal(betaStore.project.bpm, 126);
+assert.equal(betaStore.instrument(0).arp.enabled, true);
+assert.equal(betaStore.instrument(0).arp.octaves, 2);
+assert.equal(betaStore.seq.notes[0][0].vel, 0.65);
+assert.deepEqual(betaStore.seq.steps[0][7], {v:2,rev:true,trimStart:0.25});
+assert.equal(betaStore.project.mixerVersion, 1);
+assert.equal(betaStore.project.timeline.enabled, false);
 console.log(`PASS original formats: all ${songs.length} starter songs, ${Object.keys(originalSynths).length} synth patches and three legacy formats`);
 
 const { srv, url } = await serve();
@@ -167,8 +190,8 @@ try {
   const reopenedOriginal = JSON.parse(originalPersistence.exportProject({ compact: true }));
   assert.deepEqual(originalView(imported.portable), originalView(reopenedOriginal), "beta preserves the original DAW's file reopening semantics");
   for (const key of ["projectName", "artistName", "bpm", "swing", "masterVolume", "continuous", "choke", "fadeMs", "playEmptySequences", "songEndStep", "currentSequence", "sequences", "returns"])
-    assert.deepEqual(imported.portable[key], exportedProject[key], `original exported ${key} preserved`);
-  assert.deepEqual(originalView(imported.portable).instruments, exportedProject.instruments, "original synth patches and effect chains preserved");
+    assert.deepEqual(originalView(imported.portable)[key], originalView(exportedProject)[key], `original exported ${key} preserved`);
+  assert.deepEqual(originalView(imported.portable).instruments, originalView(exportedProject).instruments, "original synth patches and effect chains preserved");
   for (const key of ["source", "pitch", "reverse", "trimStart", "trimEnd", "volume", "inserts", "fx", "sends", "sampleMidi", "gateSteps"])
     assert.deepEqual(imported.portable.channels[0][key], exportedProject.channels[0][key], `original sample ${key} preserved`);
   assert.deepEqual(imported.portable.channels[1].clipSnapshot, exportedProject.channels[1].clipSnapshot, "pinned snapshot preserved byte-for-byte");
@@ -179,7 +202,7 @@ try {
     const { store } = await import("/audionaut-beta/daw/js/state.js");
     const analysed = engine.ctx.createAnalyser(); analysed.fftSize = 2048; engine.masterGain.connect(analysed);
     const data = new Float32Array(2048); let peakRms = 0;
-    engine.play();
+    await engine.play();
     for (let i = 0; i < 20; i++) { await new Promise((resolve) => setTimeout(resolve, 20)); analysed.getFloatTimeDomainData(data); peakRms = Math.max(peakRms, Math.sqrt(data.reduce((sum, value) => sum + value * value, 0) / data.length)); }
     const step = engine.currentStep; engine.stop(); engine.masterGain.disconnect(analysed); analysed.disconnect();
     const expected = engine.buffers[0].getChannelData(0);
@@ -207,7 +230,7 @@ try {
       const [{ store }, { engine }] = await Promise.all([import("/audionaut-beta/daw/js/state.js"), import("/audionaut-beta/daw/js/engine.js")]);
       const a = engine.ctx.createAnalyser(); a.fftSize = 1024; engine.masterGain.connect(a);
       const data = new Float32Array(1024); let peak = 0;
-      engine.play();
+      await engine.play();
       for (let i = 0; i < 12; i++) { await new Promise((resolve) => setTimeout(resolve, 20)); a.getFloatTimeDomainData(data); peak = Math.max(peak, ...data.map(Math.abs)); }
       engine.stop(); engine.masterGain.disconnect(a); a.disconnect();
       return { projectName: store.project.projectName, sources: store.project.channels.filter((channel) => channel.source).length, peak };

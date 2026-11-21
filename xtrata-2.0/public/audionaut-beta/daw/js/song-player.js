@@ -3,6 +3,7 @@ import { engine } from "./engine.js";
 import { fetchAndDecode, resolveSource } from "./loader.js";
 import { downloadBlob } from "./audio-utils.js";
 import { renderOrdinalReferences } from "./ordinal-links.js";
+import { readDocument } from './legacy-bridge/read-document.js';
 const MAX_DOCUMENT = 4 * 1024 * 1024,
   MAX_AUDIO = 256 * 1024 * 1024;
 let completion = null;
@@ -72,14 +73,11 @@ export async function fetchSong(id, { signal = null } = {}) {
   };
   if (Number(response.headers.get("content-length")) > MAX_DOCUMENT)
     throw new Error("Song instructions exceed 4 MB.");
-  let bytes = await read(response.body);
-  if (bytes[0] === 31 && bytes[1] === 139)
-    bytes = await read(
-      new Blob([bytes]).stream().pipeThrough(new DecompressionStream("gzip")),
-    );
-  if (signal?.aborted)
-    throw new DOMException("Loading cancelled.", "AbortError");
-  return songToProject(JSON.parse(new TextDecoder().decode(bytes)), {
+  const bytes = await read(response.body);
+  const decoded=await readDocument(bytes,{signal,limits:{inputBytes:MAX_DOCUMENT,expandedBytes:MAX_DOCUMENT}});
+  // Keep the established curated landmark interpretation; new user files use
+  // the explicit historical profiles in the staged bridge.
+  return songToProject(decoded.document, {
     inscription: id,
     data: landmark.data,
     engine: landmark.engine,

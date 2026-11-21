@@ -59,7 +59,7 @@ const METAL = [1, 1.4471, 1.617, 1.9265, 2.5028, 2.6637]; // classic 808-style s
 // ---- shared noise (one second of white noise per context) and shaper curves
 const noiseCache = new WeakMap();
 function noiseBuf(ctx) {
-  let b = noiseCache.get(ctx);
+  let b = noiseCache.get(ctx.resourceContext || ctx);
   if (!b) {
     const n = Math.round(ctx.sampleRate);
     b = ctx.createBuffer(1, n, ctx.sampleRate);
@@ -69,7 +69,7 @@ function noiseBuf(ctx) {
       s = (s * 1664525 + 1013904223) >>> 0;
       d[i] = (s / 4294967296) * 2 - 1;
     }
-    noiseCache.set(ctx, b);
+    noiseCache.set(ctx.resourceContext || ctx, b);
   }
   return b;
 }
@@ -374,7 +374,7 @@ function kitVoice(ctx, dest, note, P) {
 
   // start every source (noise at a varied offset so repeated hits are not identical), stop together
   for (const s of sources) {
-    if (s.buffer) s.start(t, Math.random() * 0.6);
+    if (s.buffer) s.start(t, (ctx.random || Math.random)() * 0.6);
     else s.start(t);
     s.stop(end);
   }

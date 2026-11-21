@@ -6,24 +6,7 @@ import {
   MAX_CHANNELS,
   MAX_SEQUENCES,
 } from "./state.js";
-const keys = [
-  "projectName",
-  "artistName",
-  "projectBPM",
-  "currentSequence",
-  "channelURLs",
-  "channelVolume",
-  "channelPlaybackSpeed",
-  "trimSettings",
-  "projectChannelNames",
-  "startSliderValue",
-  "endSliderValue",
-  "totalSampleDuration",
-  "start",
-  "end",
-  "projectSequences",
-  "steps",
-];
+import { decodeCompactDocument } from './legacy-bridge/adapters/index.js';
 export const LANDMARKS = {
   "7d058415fb8b6d35fddd375208648254bcb0e4e470b4b25da3dac32d8b04b935i0": {
     kind: "application",
@@ -117,17 +100,9 @@ export function expandSteps(steps) {
       return v;
     });
 }
-function restoreKeys(value) {
-  if (Array.isArray(value)) return value.map(restoreKeys);
-  if (value && typeof value === "object")
-    return Object.fromEntries(
-      Object.entries(value).map(([k, v]) => [keys[k] || k, restoreKeys(v)]),
-    );
-  return value;
-}
 export function songToProject(raw, provenance = {}) {
   const og = !!raw?.audxData;
-  const data = og ? raw.audxData : restoreKeys(raw);
+  const data = og ? raw.audxData : decodeCompactDocument(raw);
   const urls = og ? data.channels?.map((c) => c.url) : data.channelURLs;
   if (!Array.isArray(urls) || !urls.length || urls.length > MAX_CHANNELS)
     fail("Song needs 1–64 sample channels.");

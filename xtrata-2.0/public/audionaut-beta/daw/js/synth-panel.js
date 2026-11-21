@@ -1,3 +1,6 @@
+import { buildPianoKeys, KEYMAP } from './keyboard-layout.js';
+import { drumKeyboard, performancePitch, instrumentKeyName } from './instrument-keyboard.js';
+import { browseDrumPad } from './drum-library-ui.js';
 import { STORAGE_KEYS, ccStorageKey } from "./storage-config.js";
 // synth-panel.js — hardware-style front panels for the character synths
 // (jiMS10, Coinbase, Gm, Taproot). Each synth in synths.js carries a `ui` spec
@@ -14,14 +17,14 @@ import { store } from "./state.js";
 import { engine } from "./engine.js";
 import { addMidiListener, ensureMidi, setMidiEnabled, isMidiOn, midiStatus, setMidiTarget, getMidiTarget } from "./midi-input.js";
 import { SYNTH_BANK, synthDefaults } from "./synths.js";
+import { listUserPresets, saveUserPreset, deleteUserPreset, exportPresetBank, importPresetBank } from "./preset-bank.js";
 import { Kit } from "./synth-faces/index.js";
 import { attachKeyboard, noteOn, noteOff, allOff, getOctave, setOctave, TYPED_VEL } from "./live-keys.js";
 import { voxFormants, fmRoles, FM_MOD, FM_CARRIERS, FM_ALGOS, VOWEL_NAMES } from "./synths-voices.js";
 
 const $ = (s) => document.querySelector(s);
 const NOTE_LEN = 0.45; // seconds — preset / RANDOM audition length
-const KEYMAP = { a: 0, w: 1, s: 2, e: 3, d: 4, f: 5, t: 6, g: 7, y: 8, h: 9, u: 10, j: 11, k: 12, o: 13, l: 14 };
-const BLACK = new Set([1, 3, 6, 8, 10]);
+
 const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
 
 const hz = (v) => (v >= 1000 ? `${(v / 1000).toFixed(2)}k` : `${Math.round(v)}`);
@@ -91,6 +94,7 @@ function writeParams(obj) {
   selfWrite = true;
   store.setInstrumentProp(inst, "params", { ...current(), ...obj });
   selfWrite = false;
+  document.dispatchEvent(new CustomEvent("synth-parameter-edit", {detail:{instrument:inst, params:obj}}));
   const ps = $("#sfp-preset");
   if (ps) ps.value = "";
   drawViz();
@@ -166,7 +170,7 @@ function wire(elm, key, cfg, { vertical }) {
     if (e.key === "End") return (e.preventDefault(), set(p.max));
     if (e.key === "Enter") {
       e.preventDefault();
-      return play(48 + (baseOctave - 3) * 12);
+      return play(previewPitch());
     }
     if (!dir) return;
     e.preventDefault();
@@ -334,7 +338,7 @@ function makeXY(item) {
     pad.setPointerCapture(e.pointerId);
     pad.classList.add("drag");
     setFrom(e);
-    play(48 + (baseOctave - 3) * 12); // hear what you're moving
+    play(previewPitch()); // hear what you're moving
   });
   pad.addEventListener("pointermove", (e) => dragging && setFrom(e));
   const end = () => {
@@ -575,6 +579,8 @@ const VIZ = {
 };
 
 function drawViz() {
+  // A queued refit can outlive a project load that removed this instrument.
+  if (!store.instrument(inst) || root?.dataset.built !== "1") return;
   const P = current();
   const synth = SYNTH_BANK[synthId];
   vizzes.forEach(({ canvas, id }) => VIZ[id]?.(canvas, P, synth));
@@ -640,6 +646,7 @@ function buildFace(id) {
     <div class="sfp-head sfp-face-bar">
       <div class="sfp-sub"><b>${synth.name}</b><span id="sfp-inst"></span></div>
       ${presetMenu(synth)}
+      ${bankMenu()}
       <div class="sfp-oct"><button id="sfp-oct-dn" class="sfp-btn" title="Octave down (Z)">−</button><span id="sfp-oct-lbl"></span><button id="sfp-oct-up" class="sfp-btn" title="Octave up (X)">+</button></div>
       <div class="sfp-head-btns">
         <button id="sfp-midi" class="sfp-btn" title="Play with a MIDI keyboard / controller while the synth dock is open"><i class="led"></i>MIDI IN</button>
@@ -662,7 +669,7 @@ function buildFace(id) {
 }
 
 function build(id) {
-  kbHandle?.release();
+  kbHandle?.dispose();
   kbHandle = null;
   disposeFace();
   synthId = id;
@@ -681,7 +688,7 @@ function build(id) {
   ccMap = loadCcMap();
   if (Kit.has(id)) return buildFace(id);
   const t = spec.theme;
-  root.className = `sfp sfp-${id}`;
+  root.className = `sfp sfp-${id}${synth.ui ? "" : " sfp-generic"}`;
   root.style.setProperty("--sfp-accent", t.accent);
   root.style.setProperty("--sfp-lcd", t.lcd);
   root.style.setProperty("--sfp-lcd-bg", t.lcdBg);
@@ -694,6 +701,7 @@ function build(id) {
       <div class="sfp-logo">${spec.logo[0]}<b>${spec.logo[1]}</b></div>
       <div class="sfp-sub">${spec.sub}<span id="sfp-inst"></span></div>
       ${presetMenu(synth)}
+      ${bankMenu()}
       <div class="sfp-head-btns">
         <button id="sfp-midi" class="sfp-btn" title="Play with a MIDI keyboard / controller while the synth dock is open"><i class="led"></i>MIDI IN</button>
         <button id="sfp-learn" class="sfp-btn" title="MIDI learn: click a control, then move a knob/fader on your controller"><i class="led"></i>LEARN</button>
@@ -725,34 +733,51 @@ function build(id) {
   const sc = $("#sfp-scope-cv");
   if (sc) vizzes.push({ canvas: sc, id: bar });
 
+  if (id === 'drumrack') {
+    const track = store.instrument(inst), range = drumKeyboard(track);
+    const tools = document.createElement('div'); tools.className = 'sfp-drum-tools';
+    const select = document.createElement('select'); select.setAttribute('aria-label', 'Drum pad');
+    for (const pad of range.pads) select.add(new Option(`${pad.name} · ${instrumentKeyName(track, pad.note)} · MIDI ${pad.note}`, pad.note));
+    const browse = document.createElement('button'); browse.className = 'sfp-btn'; browse.textContent = 'Browse drum samples';
+    browse.onclick = () => browseDrumPad(track.id, +select.value).catch(error => setStatus(error.message));
+    const playPad = document.createElement('button'); playPad.className = 'sfp-btn'; playPad.textContent = 'Play pad';
+    playPad.onclick = () => play(+select.value);
+    tools.append(select, playPad, browse); body.after(tools);
+  }
   buildKeys();
   wireHeader();
 }
 
 function buildKeys() {
   const keys = $("#sfp-keys");
-  let white = 0;
-  for (let i = 0; i < 25; i++) {
-    const k = el("button", `sfp-key${BLACK.has(i % 12) ? " blk" : ""}`);
-    k.dataset.i = i;
-    k.tabIndex = -1;
-    if (BLACK.has(i % 12)) k.style.left = `calc(${white} * var(--wk) - var(--wk) * .3)`;
-    else {
-      k.style.left = `calc(${white} * var(--wk))`;
-      white++;
-    }
-    keys.appendChild(k);
-  }
+  const range = drumKeyboard(store.instrument(inst));
+  buildPianoKeys(keys,{from:range?.from ?? 48,to:range?.to ?? 72,octaves:2,classic:true});
   kbHandle = attachKeyboard(keys, {
     inst: () => inst,
     keyAt: (n) => {
       const k = n.closest?.(".sfp-key");
-      return k && keys.contains(k) ? { midi: baseOctave * 12 + 12 + +k.dataset.i, el: k } : null;
+      const midi = k && performancePitch(store.instrument(inst), +k.dataset.i, baseOctave);
+      return k && keys.contains(k) && midi != null ? { midi, el: k } : null;
     },
   });
 }
 
+function bankMenu() {
+  return `<style>@media(max-width:600px){.sfp-bank>div{position:fixed!important;left:12px!important;right:12px!important;min-width:0!important;top:auto!important;bottom:16px;box-shadow:0 8px 32px #000b}}</style><details class="sfp-bank" style="position:relative"><summary class="sfp-btn">MY SOUNDS</summary><div style="position:absolute;z-index:20;top:100%;left:0;background:#17231e;padding:12px;min-width:240px;display:grid;gap:8px;border:1px solid #607066"><label>Saved sound <select id="sfp-user-preset" aria-label="Saved sound"><option value="">Choose a sound</option>${listUserPresets(synthId).map(p=>`<option value="${esc(p.id)}">${esc(p.name)}</option>`).join("")}</select></label><input id="sfp-preset-name" maxlength="100" aria-label="Sound name" placeholder="Name this sound"><div><button id="sfp-bank-save" class="sfp-btn">Save</button><button id="sfp-bank-delete" class="sfp-btn">Delete selected</button></div><div><button id="sfp-bank-export" class="sfp-btn">Export bank</button><label class="sfp-btn">Import bank<input id="sfp-bank-import" type="file" accept=".json,application/json" style="display:none"></label></div></div></details>`;
+}
+function wireBank() {
+  const select = $("#sfp-user-preset"), name = $("#sfp-preset-name");
+  const refresh = chosen => { select.innerHTML = `<option value="">Choose a sound</option>${listUserPresets(synthId).map(p=>`<option value="${esc(p.id)}">${esc(p.name)}</option>`).join("")}`; select.value=chosen||""; };
+  const attempt = fn => { try { fn(); } catch (error) { setStatus(error.message); } };
+  select.addEventListener("change", () => { const preset=listUserPresets(synthId).find(p=>p.id===select.value); if (!preset)return; name.value=preset.name; writeParams(preset.params); syncAll(); setStatus(`Loaded ${preset.name}.`); });
+  $("#sfp-bank-save").onclick=()=>attempt(()=>{const preset=saveUserPreset(synthId,{name:name.value,params:current(),id:select.value||undefined});refresh(preset.id);setStatus(`Saved ${preset.name}.`);});
+  $("#sfp-bank-delete").onclick=()=>attempt(()=>{if(!select.value)return;deleteUserPreset(select.value);refresh();setStatus("Removed the selected saved sound.");});
+  $("#sfp-bank-export").onclick=()=>attempt(()=>{const url=URL.createObjectURL(new Blob([exportPresetBank()],{type:"application/json"})),a=document.createElement("a");a.href=url;a.download="audionaut-beta-sounds.json";a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);});
+  $("#sfp-bank-import").onchange=async e=>{const file=e.target.files[0];if(!file)return;try{const rows=importPresetBank(await file.text());refresh();setStatus(`Imported ${rows.length} sounds.`);}catch(error){setStatus(error.message);}e.target.value="";};
+}
+
 function wireHeader() {
+  wireBank();
   $("#sfp-close").addEventListener("click", closeSynthPanel);
   $("#sfp-init").addEventListener("click", () => {
     store.setInstrumentProp(inst, "params", null);
@@ -779,7 +804,7 @@ function wireHeader() {
     selfWrite = false;
     syncAll();
     $("#sfp-preset").value = e.target.value;
-    play(48 + (baseOctave - 3) * 12);
+    play(previewPitch());
     setStatus(`Preset: ${preset.name}`);
   });
   $("#sfp-learn")?.addEventListener("click", () => {
@@ -816,14 +841,14 @@ function syncAll() {
   Object.entries(widgets).forEach(([k, w]) => w.set(P[k]));
   afterSync(P);
   drawViz();
-  $("#sfp-oct-lbl").textContent = `C${baseOctave}`;
+  paintOctaveLabel();
   $("#sfp-inst").textContent = ` · ${store.instrument(inst).name}`;
 }
 
 function randomise() {
   if (faceH) {
     faceH.P.randomise();
-    play(48 + (baseOctave - 3) * 12);
+    play(previewPitch());
     return setStatus("Randomised — tweak to taste (INIT resets).");
   }
   const P = current();
@@ -841,21 +866,33 @@ function randomise() {
   store.setInstrumentProp(inst, "params", P);
   selfWrite = false;
   syncAll();
-  play(48 + (baseOctave - 3) * 12);
+  play(previewPitch());
   setStatus("Randomised — tweak to taste (INIT resets).");
 }
 
 // ------------------------------------------------------------ playing
+function previewPitch() {
+  const track = store.instrument(inst);
+  return performancePitch(track, 0, baseOctave) ?? drumKeyboard(track)?.pads[0].note;
+}
 function play(pitch, vel = 1) {
   engine.ensureContext();
   engine.triggerNote(inst, pitch, vel, 0, NOTE_LEN);
 }
 // Light every key that is sounding: held (typed / mouse / MIDI) or playing back.
 function paintKeys() {
-  const keys = $("#sfp-keys")?.children;
+  const keys = $("#sfp-keys")?.querySelectorAll("[data-i]");
   if (!keys) return;
-  const lo = baseOctave * 12 + 12;
-  for (let i = 0; i < keys.length; i++) keys[i].classList.toggle("on", lit.has(lo + i));
+  const track = store.instrument(inst), range = drumKeyboard(track), lo = range?.from ?? baseOctave * 12 + 12;
+  for (let i = 0; i < keys.length; i++) {
+    const pad = range?.pads.find(p => p.note === lo + i);
+    keys[i].dataset.midi = lo + i;
+    keys[i].setAttribute('aria-label', `${instrumentKeyName(track, lo + i)}${pad ? ` · ${pad.name} · MIDI ${lo + i}` : ''}`);
+    keys[i].setAttribute('aria-disabled', String(!!range && !pad));
+    keys[i].title = keys[i].getAttribute('aria-label');
+    keys[i].classList.toggle('on', lit.has(lo + i));
+  }
+  for (const id of ['#sfp-oct-dn', '#sfp-oct-up']) if ($(id)) $(id).hidden = !!range;
   let below = false;
   let above = false;
   for (const p of lit.keys()) {
@@ -871,9 +908,14 @@ function setLit(pitch, on) {
   else lit.delete(pitch);
   paintKeys();
 }
+function paintOctaveLabel() {
+  const track = store.instrument(inst), range = drumKeyboard(track);
+  $("#sfp-oct-lbl").textContent = range ? `${instrumentKeyName(track, range.from)} · MIDI ${range.from}` : `C${baseOctave}`;
+}
 function shiftOctave(d) {
+  if (drumKeyboard(store.instrument(inst))) return;
   baseOctave = setOctave(baseOctave + d);
-  $("#sfp-oct-lbl").textContent = `C${baseOctave}`;
+  paintOctaveLabel();
   paintKeys();
 }
 function setStatus(msg) {
@@ -900,7 +942,8 @@ function onKey(e) {
     e.stopImmediatePropagation();
     e.preventDefault();
     if (e.repeat) return;
-    noteOn(`key:${k}`, inst, baseOctave * 12 + 12 + KEYMAP[k], TYPED_VEL); // held until key-up
+    const pitch = performancePitch(store.instrument(inst), KEYMAP[k], baseOctave);
+    if (pitch != null) noteOn(`key:${k}`, inst, pitch, TYPED_VEL); // held until key-up
   }
 }
 function onKeyUp(e) {
@@ -988,7 +1031,7 @@ function paintTabs() {
 }
 
 function hideDockPanel() {
-  kbHandle?.release();
+  kbHandle?.dispose();
   kbHandle = null;
   allOff("key:");
   disposeFace();
@@ -1004,6 +1047,11 @@ function showDockInstrument() {
   hideDockPanel();
   paintTabs();
   const ins = store.instrument(inst);
+  if (!ins) {
+    lit.clear();
+    root.appendChild(el("p", "empty", "This project has no instrument tracks. Add an instrument to open its controls."));
+    return;
+  }
   const id = ins.synthId;
   lit.clear();
   build(id);
@@ -1085,7 +1133,7 @@ export function initSynthPanel() {
   document.addEventListener("live-octave", (e) => {
     baseOctave = e.detail;
     if (isOpen()) {
-      $("#sfp-oct-lbl").textContent = `C${baseOctave}`;
+      paintOctaveLabel();
       paintKeys();
     }
   });
@@ -1100,11 +1148,13 @@ export function initSynthPanel() {
     if (!selfWrite && isOpen() && i === inst && prop === "params") syncAll();
   });
   // a new project, a loaded file or undo/redo: keep the dock on the same synth, rebuilt from the new state
-  store.on("load", () => {
+  const refreshInstruments = () => {
     if (!store.instrument(inst)) inst = 0;
     if (dockOpen()) showDockInstrument();
     else paintTabs();
-  });
+  };
+  store.on("load", refreshInstruments);
+  store.on("instruments", refreshInstruments);
   // names and synth swaps show on the tabs (and the face follows a swapped synth)
   store.on("instrument", ({ i, prop }) => {
     if (prop === "name") paintTabs();

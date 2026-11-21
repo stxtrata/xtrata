@@ -6,6 +6,7 @@ const MAX_BYTES = 8 * 1024 * 1024;
 const MAX_ASSET_BYTES = 64 * 1024 * 1024; // old audio kept solely to make undo possible
 let entries = [], index = 0, bytes = 0, baseline = null;
 let restoring = false, scheduled = false, transactionDepth = 0, generation = 0;
+let changed = false, unknownPaths = false, pendingPaths = new Map();
 let onChange = null, unsubscribe = [], detachGestures = null;
 const copy = (value) => value === undefined ? undefined : structuredClone(value);
 function snapshot() {
@@ -55,24 +56,39 @@ function invalidateRedo() {
 }
 function commit() {
   scheduled = false;
-  if (restoring || !baseline) return;
-  const current = snapshot(), changes = diff(baseline, current);
+  if (restoring || !baseline || !changed) return;
+  let current, changes=[];
+  if (unknownPaths) { current=snapshot(); changes=diff(baseline,current); }
+  else {
+    const at=(value,path)=>path.reduce((owner,key)=>owner?.[key],value);
+    const paths=[...pendingPaths.values()].sort((a,b)=>a.length-b.length), used=[];
+    for(const path of paths) {
+      if(used.some(parent=>parent.every((key,i)=>key===path[i])))continue;
+      used.push(path);diff(at(baseline,path),at(store.project,path),path,changes);
+    }
+  }
+  changed=false;unknownPaths=false;pendingPaths.clear();
   if (!changes.length) { retain(); return; }
   invalidateRedo();
   const entry = {
     changes,
-    assets: [...new Set([...assetIds(baseline), ...assetIds(current)])],
+    assets: [...new Set([...assetIds(baseline), ...assetIds(store.project)])],
     bytes: JSON.stringify(changes).length * 2,
   };
-  baseline = current;
+  baseline = current || apply(baseline, changes, true);
   entries.push(entry); bytes += entry.bytes; index = entries.length;
   while (entries.length && (entries.length > MAX_HISTORY || bytes > MAX_BYTES || retainedAudioBytes() > MAX_ASSET_BYTES)) {
     bytes -= entries.shift().bytes; index--;
   }
   retain(); notify();
 }
-export function record(immediate = false) {
+export function record(immediate = false, change = null) {
   if (restoring || !baseline) return;
+  changed=true;
+  const paths=change?.historyPaths || change?.payload?.historyPaths;
+  if (paths?.length) for(const path of paths) {
+    if(path[0]!=='currentSequence')pendingPaths.set(JSON.stringify(path),path);
+  } else unknownPaths=true;
   invalidateRedo(); // a new edit invalidates redo now, even before the gesture ends
   if (immediate) { generation++; commit(); return; }
   if (transactionDepth || scheduled) return;
@@ -112,6 +128,7 @@ export function redo() {
 }
 export function resetHistory() {
   generation++; scheduled = false; transactionDepth = 0;
+  changed=false;unknownPaths=false;pendingPaths.clear();
   baseline = snapshot(); entries = []; index = 0; bytes = 0;
   retain(); notify();
 }
@@ -142,7 +159,8 @@ export function initHistory(callback) {
   for (const off of unsubscribe) off(); detachGestures?.();
   onChange = callback;
   resetHistory();
-  unsubscribe = [store.on("dirty", () => record()), store.on("load", ({ restore } = {}) => { if (!restore) resetHistory(); })];
+  unsubscribe = [store.on("dirty", change => { if(change?.event!=='load')record(false,change); }), store.on("load", ({ restore } = {}) => { if (!restore) resetHistory(); }),
+    store.on('identity',({projectId})=>{if(baseline)baseline.projectId=projectId;})];
   detachGestures = gestureHooks();
 }
 export function historyStats() { return { entries: entries.length, undo: index, redo: entries.length - index, bytes, maxBytes: MAX_BYTES, assetBytes: retainedAudioBytes(), maxAssetBytes: MAX_ASSET_BYTES }; }

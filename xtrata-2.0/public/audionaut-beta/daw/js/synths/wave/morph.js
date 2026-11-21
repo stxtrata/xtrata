@@ -93,10 +93,10 @@ function coefs(name) {
 }
 const waveCache = new WeakMap();
 function tableWave(ctx, name) {
-  let m = waveCache.get(ctx);
+  let m = waveCache.get(ctx.resourceContext || ctx);
   if (!m) {
     m = new Map();
-    waveCache.set(ctx, m);
+    waveCache.set(ctx.resourceContext || ctx, m);
   }
   let w = m.get(name);
   if (!w) {
