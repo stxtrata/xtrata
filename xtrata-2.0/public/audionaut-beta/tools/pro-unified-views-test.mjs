@@ -158,12 +158,17 @@ try {
     (project) =>
       localStorage.setItem(
         'audionaut.beta.v0.2.project',
-        JSON.stringify({ ...project, format: 'audionaut-workstation/3' })
+        JSON.stringify({ ...project, projectName: 'Timeline recovery fixture', format: 'audionaut-workstation/3' })
       ),
     p
   );
   await tab.goto(url + '/audionaut-beta/daw.html');
-  await tab.waitForSelector('#pro-workspace-nav');
+  // The workspace tabs appear before the asynchronous browser recovery finishes.
+  await tab.waitForFunction(
+    (key) => document.querySelector('#project-name')?.value === 'Timeline recovery fixture'
+      && localStorage.getItem(key) === null,
+    'audionaut.beta.v0.2.project'
+  );
   await tab.evaluate(async () => {
     const base = '/audionaut-beta/daw/js/',
       { engine } = await import(base + 'engine.js'),
