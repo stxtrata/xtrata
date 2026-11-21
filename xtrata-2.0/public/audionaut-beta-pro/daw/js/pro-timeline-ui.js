@@ -25,6 +25,8 @@ import { el, action, row, choice, toggle, status, number } from './pro-ui.js';
 
 const HEADER = 44;
 export function mount(root) {
+  const touch = navigator.maxTouchPoints > 0 || matchMedia('(any-pointer: coarse)').matches;
+  let scrolling = touch, compactTracks = touch;
   let LEFT = 560,
     TRACK = 48,
     zoom = 56,
@@ -74,6 +76,29 @@ export function mount(root) {
     }),
     toggle('Follow playhead', follow, (v) => (follow = v))
   );
+  const navigation = el('div', null, {
+    className: 'song-navigation', role: 'group', 'aria-label': 'Timeline navigation'
+  });
+  const scrollButton = action('Scroll', () => setInteraction(true), {title:'Swipe the waveform to scroll in time or between tracks'});
+  const editButton = action('Edit', () => setInteraction(false), {title:'Drag regions, trim their edges or edit automation'});
+  function setInteraction(value) {
+    scrolling = value;
+    controls?.clear();
+    automationControls?.clear();
+    frameBox.classList.toggle('song-scroll-mode', value);
+    scrollButton.setAttribute('aria-pressed', String(value));
+    editButton.setAttribute('aria-pressed', String(!value));
+    editTools();
+  }
+  const tracksButton = action('Track controls', () => {
+    const anchor = scroll.scrollTop / TRACK;
+    compactTracks = !compactTracks;
+    draw();
+    scroll.scrollTop = anchor * TRACK;
+    draw();
+  }, {title:'Show or collapse the channel controls beside the waveforms'});
+  if (touch) navigation.append(scrollButton, editButton);
+  navigation.append(tracksButton);
   const sequenceField = choice('Edit sequence', [], '0', (v) => store.selectSequence(+v));
   const sequenceSelect = sequenceField.querySelector('select');
   sequenceSelect.title = 'MIDI rolls and note copy/paste use this sequence.';
@@ -122,7 +147,7 @@ export function mount(root) {
   content.append(canvas);
   scroll.append(content);
   frameBox.append(scroll, headers, playhead);
-  root.append(toolbar, frameBox, info, tools, advanced);
+  root.append(toolbar, navigation, frameBox, info, tools, advanced);
   let advancedTicket = 0;
   advanced.addEventListener('toggle', async () => {
     if (!advanced.open || advancedDispose) return;
@@ -158,6 +183,11 @@ export function mount(root) {
   }
   function editTools() {
     tools.replaceChildren();
+    if (scrolling) {
+      info.textContent = 'Swipe to scroll through the song and tracks. Tap Edit to move regions or change automation.';
+      return;
+    }
+    info.textContent = 'Drag a region to move it or drag either end to trim.';
     if (automation) {
       info.textContent = 'Automation overlay · click to add, drag to move, right-click to remove. Arrow keys fine-tune a selected point. Alt: free · Ctrl: fine. Switch Automation off to edit regions; automation keeps playing.';
       const selection = automationControls?.selection, lane = selection && findLane(selection.target), point = lane?.points.find(p => p.beat === selection.beat);
@@ -217,17 +247,23 @@ export function mount(root) {
     automationButton.setAttribute('aria-pressed', String(automation));
     frameBox.classList.toggle('song-automation-active', automation);
     const songEnd = automation ? Math.max(model.end, automationEnd()) : model.end;
-    const width = Math.max(320, scroll.clientWidth),
+    const width = Math.max(1, scroll.clientWidth),
       height = Math.max(180, scroll.clientHeight),
       sx = scroll.scrollLeft,
       sy = scroll.scrollTop;
-    content.style.width = `${Math.max(width, LEFT + songEnd * zoom + 24)}px`;
-    content.style.height = `${Math.max(height, HEADER + rows.length * TRACK)}px`;
-    // Desktop keeps the Pattern control row; smaller screens wrap those same
-    // controls into taller lanes instead of hiding buttons or widening the page.
-    LEFT = width >= 1000 ? 560 : width >= 700 ? 300 : Math.min(220, Math.floor(width * 0.55));
-    TRACK = width >= 1000 ? 48 : width >= 700 ? 96 : 144;
-    frameBox.classList.toggle('song-compact-controls', width < 1000);
+    LEFT = compactTracks ? Math.min(104, Math.floor(width * .21)) :
+      touch ? Math.min(350, Math.floor(width * .52)) :
+      width >= 1000 ? 560 : width >= 700 ? 300 : Math.min(220, Math.floor(width * .55));
+    // The expanded instrument strip occupies 14 grid cells including its two double-width fields.
+    // Keep this in step with the touch grid's 44px targets, 3px gaps and 15px side insets.
+    const columns = Math.max(2, Math.floor((LEFT - 15 + 3) / 47));
+    const touchHeight = Math.ceil(14 / columns) * 47 + 8;
+    TRACK = compactTracks ? 48 : touch ? touchHeight :
+      width >= 1000 ? 48 : width >= 700 ? 96 : 144;
+    tracksButton.setAttribute('aria-expanded', String(!compactTracks));
+    frameBox.classList.toggle('song-compact-controls', !compactTracks && (touch || width < 1000));
+    frameBox.classList.toggle('song-touch-controls', touch && !compactTracks);
+    frameBox.classList.toggle('song-names-only', compactTracks);
     frameBox.style.setProperty('--song-controls-width', LEFT + 'px');
     frameBox.style.setProperty('--song-track-height', TRACK + 'px');
     canvas.dataset.controlsWidth = LEFT;
@@ -273,7 +309,7 @@ export function mount(root) {
           ? store.project.instruments.findIndex((t) => t.id === track.id)
           : sampleIndex;
       const kind = sampleIndex >= 0 ? 'sample' : index >= 0 ? 'instrument' : 'bus';
-      if (label && (label.dataset.ownerIndex !== String(index) || label.dataset.kind !== kind)) {
+      if (label && (label.dataset.ownerIndex !== String(index) || label.dataset.kind !== kind || label.dataset.compact !== String(compactTracks))) {
         label.remove();
         label = null;
       }
@@ -282,7 +318,9 @@ export function mount(root) {
         label.dataset.trackId = track.id;
         label.dataset.ownerIndex = index;
         label.dataset.kind = kind;
-        label.append(kind === 'bus' ? el('div') : createTrackControls(track.id, { patternTools: false, playbackRate: false }));
+        label.dataset.compact = String(compactTracks);
+        if (compactTracks) label.append(el('span', track.name, {className:'song-track-name'}));
+        else label.append(kind === 'bus' ? el('div') : createTrackControls(track.id, { patternTools: false, playbackRate: false }));
         if (kind === 'sample') bindChannelDrop(label, index);
         headers.append(label);
       }
@@ -293,10 +331,14 @@ export function mount(root) {
       label.classList.toggle('has-sample', !!track.sampleName);
       label.classList.toggle('unresolved-source', !!track.unresolvedSource);
       label.title = track.unresolvedSource?.message || '';
-      if (kind !== 'bus') refreshTrackControls(label.firstElementChild);
-      label.firstElementChild.hidden = automation;
-      automationHeader(label, track);
-      const color = label.firstElementChild.style.getPropertyValue('--ch-color') || '#80cbd6';
+      if (compactTracks) {
+        label.firstElementChild.textContent = track.name;
+      } else {
+        if (kind !== 'bus') refreshTrackControls(label.firstElementChild);
+        label.firstElementChild.hidden = automation;
+        automationHeader(label, track);
+      }
+      const color = label.firstElementChild.style.getPropertyValue('--ch-color') || track.color || '#80cbd6';
       label.style.borderLeftColor = color;
       g.globalAlpha = automation ? .22 : 1;
       for (const r of model.byTrack.get(track.id) || []) {
@@ -370,7 +412,7 @@ export function mount(root) {
         if (c) drawAutomation(g, c, { points: automationControls?.points(c.spec.target) || c.lane?.points || [], selected: targetKey(automationControls?.selection?.target) === targetKey(c.spec.target) ? automationControls.selection.beat : null });
       }
     });
-    for (const label of headers.children) if (!seen.has(label.dataset.trackId)) label.remove();
+    for (const label of [...headers.children]) if (!seen.has(label.dataset.trackId)) label.remove();
     g.restore();
     g.fillStyle = '#101922';
     g.fillRect(0, 0, width, HEADER);
@@ -444,7 +486,7 @@ export function mount(root) {
   function animate() {
     if (dead) return;
     paintTransport();
-    if (automation && engine.isPlaying) for (const label of headers.children) {
+    if (automation && !compactTracks && engine.isPlaying) for (const label of headers.children) {
       const track = rows.find(t => t.id === label.dataset.trackId), spec = track && specFor(track), out = label.querySelector('output');
       if (spec && out) out.textContent = Number(automationValue(findLane(spec.target)?.points || [], engine.getMusicalPosition().beat, spec.value).toFixed(3));
     }
@@ -474,7 +516,7 @@ export function mount(root) {
   document.body.append(marquee);
   controls = createRegionControls({
     root: canvas,
-    active: () => !dead && root.isConnected && !automation,
+    active: () => !dead && root.isConnected && !scrolling && !automation,
     regions: (p) => getModel(p).regions,
     bounds,
     repaint: () => {
@@ -552,7 +594,7 @@ export function mount(root) {
     }
   });
   automationControls = automationGestures(canvas, {
-    active: () => automation && !dead,
+    active: () => automation && !scrolling && !dead,
     hit: e => {
       const box = canvas.getBoundingClientRect(), x = e.clientX - box.left, y = e.clientY - box.top;
       if (x < LEFT || x > box.width || y < HEADER || y > box.height) return null;
@@ -564,7 +606,7 @@ export function mount(root) {
   });
   canvas.addEventListener('pointerdown', e => {
     const b = canvas.getBoundingClientRect();
-    if (automation && e.button === 0 && e.clientX >= b.left + LEFT && e.clientY < b.top + HEADER) engine.seekBeat(Math.max(0, (e.clientX - b.left - LEFT + scroll.scrollLeft) / zoom));
+    if (!scrolling && automation && e.button === 0 && e.clientX >= b.left + LEFT && e.clientY < b.top + HEADER) engine.seekBeat(Math.max(0, (e.clientX - b.left - LEFT + scroll.scrollLeft) / zoom));
   });
   scroll.addEventListener('scroll', draw);
   headers.addEventListener(
@@ -577,16 +619,19 @@ export function mount(root) {
     },
     { passive: false }
   );
-  scroll.addEventListener(
-    'wheel',
-    () => {
-      if (engine.isPlaying && follow) {
-        follow = false;
-        toolbar.querySelector('input[type=checkbox]').checked = false;
-      }
-    },
-    { passive: true }
-  );
+  function releaseFollow() {
+    if (engine.isPlaying && follow) {
+      follow = false;
+      toolbar.querySelector('input[type=checkbox]').checked = false;
+    }
+  }
+  scroll.addEventListener('wheel', releaseFollow, { passive: true });
+  scroll.addEventListener('touchmove', () => { if (scrolling) releaseFollow(); }, { passive: true });
+  canvas.addEventListener('click', e => {
+    if (!scrolling) return;
+    const box = canvas.getBoundingClientRect(), x = e.clientX - box.left;
+    if (x >= LEFT && e.clientY - box.top < HEADER) engine.seekBeat((x - LEFT + scroll.scrollLeft) / zoom);
+  });
   const offs = [
     'dirty',
     'load',
@@ -599,6 +644,7 @@ export function mount(root) {
   document.addEventListener('instrument-target', queue);
   const ro = new ResizeObserver(draw);
   ro.observe(scroll);
+  setInteraction(scrolling);
   refresh();
   animate();
   return () => {

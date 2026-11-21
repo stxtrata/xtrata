@@ -44,8 +44,8 @@ export async function browser() {
 }
 
 // a page that never touches the network beyond our server (fonts etc. are aborted)
-export async function page(b, url, { width = 1400, height = 900, logs = [] } = {}) {
-  const p = await b.newPage({ viewport: { width, height } });
+export async function page(b, url, { width = 1400, height = 900, hasTouch = false, logs = [] } = {}) {
+  const p = await b.newPage({ viewport: { width, height }, hasTouch });
   await p.route("**/*", (r) => (r.request().url().startsWith(url) ? r.continue() : r.abort()));
   p.on("console", (m) => {
     const t = m.text();

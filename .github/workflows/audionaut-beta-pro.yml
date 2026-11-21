@@ -73,6 +73,7 @@ jobs:
         run: bash public/audionaut-beta-pro/tools/ci-audio.sh
       - run: npm run build:audionaut-beta-pro
       - run: node public/audionaut-beta-pro/tools/pro-mobile-workspace-test.mjs
+      - run: node public/audionaut-beta-pro/tools/pro-touch-workspace-test.mjs
       - run: node public/audionaut-beta-pro/tools/pro-mobile-song-test.mjs
       - run: node public/audionaut-beta-pro/tools/pro-mixer-console-test.mjs
       - run: node public/audionaut-beta-pro/tools/pro-automation-ui-test.mjs

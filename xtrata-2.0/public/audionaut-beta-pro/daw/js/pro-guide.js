@@ -8,15 +8,19 @@ const topics = [
   ],
   [
     'Sequences and Timeline',
-    'Sequences shows one four-bar phrase. Switch between waveforms and steps with Grid or Waves. Timeline lays the same song out horizontally. Drag a region to move it or drag either edge to trim. Use the ruler to seek.'
+    'Sequences shows one four-bar phrase. Switch between waveforms and steps with Grid or Waves. Timeline lays the same song out horizontally. Drag a region to move it or drag either edge to trim. Use the ruler to seek. Touch Timeline opens in Scroll mode. Swipe across the waveforms, or tap Edit to move and trim. Track controls expands or collapses the channel strips.'
   ],
   [
     'Mobile steps and layers',
-    'Select a sample channel and a bar. Each of the 16 pads represents one sixteenth note. Tap to add or remove a hit. Accent sets stronger hits. Choose another channel to layer a second sound on the same beat. Follow playback shows the playing bar. Turn it off or pick another bar to keep editing while the song plays. Loop bar or Loop sequence jumps playback to your edit. Play song continues through the arrangement from here.'
+    'Choose a track and a bar. Solo, Mute, Preview, Level, Inserts and Effects control the selected track. Instruments have a synth picker, synth panel and piano roll. For sample tracks, use the pads. Each of the 16 pads represents one sixteenth note. Tap to add or remove a hit. Accent sets stronger hits. Choose another channel to layer a second sound on the same beat. Follow playback shows the playing bar. Turn it off or pick another bar to keep editing while the song plays. Loop bar or Loop sequence jumps playback to your edit. Play song continues through the arrangement from here.'
+  ],
+  [
+    'Looping with track groups',
+    'Tap Loop bar, then use the arrows beside Track to switch sounds. Groups lets you save a named set of tracks with the song. Tap its name to browse its members or All tracks to browse the whole song. Each group has its own Mute button. Tap it to drop that layer out and tap again to bring it back. Other active mute groups and individual mutes are preserved.'
   ],
   [
     'Samples and editing',
-    'Load sound opens the library for the selected channel. Select a category and sample, audition it, then choose Load. Trim sound sets the channel’s start and end. Edit step applies changes to one hit. Library also holds the L1 catalogue, Samples & Loops and audio analysis tools.'
+    'Load sound opens the library for the selected channel. Select a category and sample, audition it, then choose Load. Trim sets the channel’s start and end. Edit step applies changes to one hit. Library also holds the L1 catalogue, Samples & Loops and audio analysis tools.'
   ],
   [
     'Templates and beats',
@@ -81,7 +85,7 @@ const lessons = {
   layer: [
     'Layer a second channel',
     [
-      ['.mobile-selectors label:last-child select', 'Select another sample channel.', 'change'],
+      ['#mobile-track', 'Select another sample channel.', 'change'],
       ['.mobile-pads', 'Tap an unlit step to add a hit to the second layer.'],
       ['#btn-play', 'Use the transport to hear the layers together or pause playback.']
     ]
@@ -104,6 +108,7 @@ export async function startLesson(id) {
   const [title, steps] = lessons[id];
   if (!document.querySelector('.mobile-editor')) await openWorkspace('mobile');
   if (attempt !== launch || document.body.dataset.workspace !== 'mobile') return;
+  if (id !== 'fx') document.querySelector('.mobile-editor').dispatchEvent(new CustomEvent('sample-lesson', { detail: id }));
   const panel = el('aside', null, { className: 'studio-lesson', 'aria-label': title });
   const copy = el('span', null, { 'aria-live': 'polite' }),
     skip = action('Next', advance, { title: 'Skip this instruction' }),
