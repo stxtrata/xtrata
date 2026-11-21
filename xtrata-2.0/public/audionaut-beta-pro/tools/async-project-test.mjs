@@ -37,6 +37,7 @@ try {
     const original = window.fetch;
     window.fetch = (resource, options) => String(resource).endsWith("starters/afrobeat.json") ? new Promise((resolve) => window.__starterReady = (text) => resolve(new Response(text, { status: 200 }))) : original(resource, options);
   });
+  await page.click("#studio-project-button");
   await page.click("#btn-starter");
   await page.waitForFunction(() => typeof window.__starterReady === "function");
   await page.evaluate(async (incoming) => {
@@ -55,6 +56,7 @@ try {
     window.__saving = P.autosave();
   });
   await page.waitForFunction(() => typeof window.__hashReady === "function");
+  await page.click("#studio-project-button");
   await page.click("#btn-new");
   await page.evaluate(async () => {
     const { store } = await import("/audionaut-beta-pro/daw/js/state.js");

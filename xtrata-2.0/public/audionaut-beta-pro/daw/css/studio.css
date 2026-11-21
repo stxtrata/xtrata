@@ -1,0 +1,360 @@
+#top-bar {
+  display: grid;
+  grid-template-columns: auto minmax(115px, 1fr) auto minmax(max-content, 1fr);
+  gap: 10px 18px;
+  padding: 8px 16px;
+}
+#top-bar .lockup {
+  width: 108px;
+  height: auto;
+}
+#top-bar .brand {
+  align-items: center;
+}
+#top-bar .project-meta {
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 3px 7px;
+}
+#top-bar .project-meta input {
+  min-width: 68px;
+  max-width: 13em;
+}
+#top-bar #save-state {
+  flex-basis: 100%;
+  padding: 0;
+  font-size: 10px;
+}
+#top-bar .file-ops {
+  justify-content: flex-end;
+  margin: 0;
+}
+#top-bar .transport {
+  justify-content: center;
+}
+#pro-workspace-nav {
+  align-items: center;
+  gap: 8px;
+}
+#pro-workspace-nav button {
+  min-height: 32px;
+}
+.studio-disclosure:after {
+  content: ' ▾';
+  font-size: 0.83em;
+}
+.selected-view {
+  border-color: #58bce8;
+}
+.studio-menu {
+  position: fixed;
+  inset: auto;
+  margin: 0;
+  --menu-width: min(265px, calc(100vw - 16px));
+  width: var(--menu-width);
+  left: clamp(8px, var(--trigger-left, 8px), calc(100vw - var(--menu-width) - 8px));
+  box-sizing: border-box;
+  padding: 10px;
+  color: #e6edf4;
+  background: #15202c;
+  border: 1px solid #506777;
+  border-radius: 8px;
+  box-shadow: 0 10px 36px #0009;
+  overflow: auto;
+}
+.studio-menu:popover-open,
+.studio-menu #source-bar,
+.studio-menu #performance-bar,
+.studio-templates {
+  display: grid;
+  gap: 6px;
+}
+.studio-menu #source-bar,
+.studio-menu #performance-bar {
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+.studio-menu button,
+.studio-menu select,
+.studio-menu input:not([type='checkbox']) {
+  min-height: 32px;
+  max-width: 100%;
+}
+.studio-menu button {
+  text-align: left;
+}
+.studio-menu label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.studio-menu h3 {
+  margin: 8px 0 2px;
+  font-size: 12px;
+  color: #adc4ce;
+}
+.studio-menu .starter-select {
+  width: 100%;
+}
+.mobile-editor {
+  max-width: 760px;
+  margin: 0 auto;
+  --track-color: #66ccc0;
+}
+.mobile-heading,
+.mobile-actions,
+.mobile-bars,
+.studio-help header,
+.studio-lesson {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+#pro-workspace .mobile-heading h2 {
+  margin: 0 auto 0 0;
+}
+.mobile-selectors {
+  display: grid;
+  grid-template-columns: minmax(78px, 1fr) minmax(160px, 2fr);
+  gap: 12px;
+  margin: 14px 0;
+}
+.mobile-bars {
+  margin: 8px 0;
+}
+.mobile-bars button {
+  flex: 1;
+}
+.mobile-editor button,
+.mobile-editor select {
+  min-height: 44px;
+  touch-action: manipulation;
+}
+.mobile-pads {
+  display: grid;
+  grid-template-columns: repeat(8, minmax(0, 1fr));
+  gap: 6px;
+  margin: 8px 0 14px;
+}
+.mobile-pads button {
+  min-height: 48px;
+  font-variant-numeric: tabular-nums;
+  background: #15212d;
+  border: 1px solid #3b4d5f;
+  color: #c1d2dc;
+}
+.mobile-pads button:nth-child(4n + 1) {
+  border-left: 3px solid var(--track-color);
+}
+.mobile-editor button[aria-pressed='true'] {
+  border-color: var(--track-color);
+  background: #293e49;
+}
+.mobile-pads button[aria-pressed='true'] {
+  background: var(--track-color);
+  color: #0b1117;
+  font-weight: 700;
+}
+.mobile-pads button.accent {
+  box-shadow: inset 0 -4px #fff9;
+}
+.mobile-pads button.playing {
+  outline: 2px solid white;
+  outline-offset: -4px;
+}
+.mobile-actions {
+  border-top: 1px solid #324153;
+  padding-top: 12px;
+}
+body[data-workspace='mobile'] #synth-dock {
+  display: none;
+}
+.studio-help {
+  width: min(580px, 94vw);
+  box-sizing: border-box;
+}
+.studio-help h2 {
+  margin: 0 auto 0 0;
+}
+.studio-help input {
+  width: 100%;
+  margin-bottom: 8px;
+  padding: 8px;
+}
+.studio-help details {
+  border-bottom: 1px solid #344858;
+}
+.studio-help summary {
+  padding: 10px 0;
+  cursor: pointer;
+}
+.studio-help p {
+  line-height: 1.55;
+  color: #c4d3de;
+}
+.studio-lessons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.studio-lesson {
+  padding: 10px;
+  margin: 4px 0 12px;
+  border: 1px solid #669fa6;
+  border-radius: 6px;
+  background: #142b34;
+}
+.studio-lesson span {
+  flex: 1 1 160px;
+}
+.studio-target {
+  outline: 3px solid #ffd179 !important;
+  outline-offset: 2px;
+}
+@media (max-width: 1150px) {
+  #top-bar {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+  #top-bar .brand {
+    display: none;
+  }
+  #top-bar .project-meta {
+    grid-column: 1;
+  }
+  #top-bar .transport {
+    grid-column: 2;
+    grid-row: 1 / span 2;
+  }
+  #top-bar .file-ops {
+    grid-column: 1;
+    justify-content: flex-start;
+  }
+}
+@media (max-width: 700px) {
+  #sticky-top #top-bar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    padding: 7px 8px;
+  }
+  #top-bar .project-meta {
+    width: 100%;
+    flex-wrap: nowrap;
+  }
+  #top-bar #save-state {
+    flex: 1;
+    text-align: right;
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+  #top-bar .transport {
+    width: 100%;
+    justify-content: space-between;
+    flex-wrap: nowrap;
+    gap: 4px;
+  }
+  #top-bar .transport .master-vol input {
+    width: 48px;
+  }
+  #top-bar .file-ops {
+    width: 100%;
+    gap: 4px;
+    justify-content: space-between;
+  }
+  #top-bar .file-ops button {
+    min-height: 34px;
+    padding: 3px 6px;
+  }
+  #pro-workspace-nav {
+    flex-wrap: nowrap;
+    gap: 3px;
+  }
+  #pro-workspace-nav button {
+    flex: 1;
+    min-width: 0;
+    padding: 4px;
+    min-height: 38px;
+  }
+  .mobile-pads {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+  .mobile-heading {
+    gap: 4px;
+  }
+  .mobile-editor .mobile-heading h2 {
+    font-size: 17px;
+  }
+  .studio-menu button,
+  .studio-menu select {
+    min-height: 40px;
+  }
+}
+
+.studio-extra-tabs {
+  display: grid;
+  gap: 6px;
+}
+.mobile-introduction {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 8px;
+  margin-top: 8px;
+  border-left: 2px solid #51afbe;
+  background: #152630;
+}
+.mobile-introduction span {
+  flex: 1 1 140px;
+  color: #c4d9df;
+}
+@media (max-width: 700px) {
+  .chain-add {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+  .chain-add select {
+    min-width: 0;
+    width: 100%;
+  }
+  .modal-box {
+    max-height: 92dvh;
+    overflow: auto;
+  }
+  .modal-actions,
+  .chain-tabs {
+    flex-wrap: wrap;
+  }
+  .modal-box canvas {
+    max-width: 100%;
+  }
+  .studio-disclosure {
+    white-space: nowrap;
+  }
+  #top-bar .transport .lcd {
+    min-width: 0;
+  }
+  #pro-workspace-nav .studio-disclosure {
+    white-space: normal;
+  }
+}
+@media (max-width: 700px) {
+  .mobile-heading {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto auto;
+  }
+  #pro-workspace .mobile-heading h2 {
+    font-size: 16px;
+  }
+}
+
+.studio-menu #performance-bar label {
+  min-width: 0;
+}
+.studio-menu #live-instrument {
+  min-width: 0;
+  max-width: 60%;
+}

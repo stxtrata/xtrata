@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="robots" content="noindex"><title>Studio handbook · AudioNaut beta-pro</title>
+  <style>
+    :root{color-scheme:dark;background:#0e151e;color:#dce8ef;font:1rem/1.6 system-ui,sans-serif}
+    body{max-width:48rem;margin:auto;padding:1.2rem}h1,h2{line-height:1.2}h1{margin-bottom:.4rem}h2{margin-top:2rem}
+    nav{display:flex;flex-wrap:wrap;gap:.45rem 1rem;border-block:1px solid #354551;padding:.8rem 0}
+    a{color:#8cdbed}li{margin:.45rem 0}strong{color:#fff}section{scroll-margin-top:1rem}
+  </style>
+</head>
+<body>
+<header><h1>Studio handbook</h1><p>AudioNaut beta-pro</p></header>
+<nav aria-label="Chapters">
+  <a href="#start">First beat</a><a href="#sound">Samples and layering</a><a href="#sequence">Sequences and Timeline</a>
+  <a href="#mix">Mixer and automation</a><a href="#record">Playing and recording</a><a href="#save">Save and restore</a><a href="#chain">On-chain songs</a>
+</nav>
+<main>
+<section id="start"><h2>Make your first beat</h2>
+<ol><li>On a first phone visit, <strong>Mobile</strong> opens with a starter session. Tap <strong>Play</strong> to hear it. A returning session opens your saved song and workspace.</li>
+<li>Choose a sample channel. Each row of four pads on a phone represents one beat. A lit pad triggers that sound. Tap an empty pad to add a hit or tap a lit pad to remove it.</li>
+<li>Tap <strong>Bar 2</strong>, <strong>Bar 3</strong> or <strong>Bar 4</strong> to edit another bar. <strong>Loop sequence</strong> repeats the selected sequence during sequence playback. A saved Timeline arrangement uses its own transport settings.</li>
+<li>For a different beat, choose <strong>Choose beat</strong>. For a complete song template, open <strong>Project</strong> and choose a starter song. Use <strong>New</strong> for a blank project.</li></ol>
+<p><strong>Help → Guided lessons</strong> highlights the real controls as you work. End a lesson at any point. Its edits are part of your song and can be undone.</p></section>
+<section id="sound"><h2>Load, trim and layer samples</h2>
+<ol><li>Choose the destination under <strong>Sample channel</strong>, then tap <strong>Load sound</strong>. In Library, choose a category and sound. Audition it, then tap <strong>Load</strong>. The other tabs accept a Bitcoin inscription, Xtrata ID, URL or local file.</li>
+<li>Tap <strong>Trim sound</strong> to set this channel’s start and end. Preview the result and choose <strong>Done</strong>. To change just one hit, turn on <strong>Edit step</strong>, then tap that pad.</li>
+<li>Choose a second channel and add hits at the same positions to layer the sounds. Turn on <strong>Accent</strong> to enter accented hits. Turn it off to resume ordinary step editing.</li>
+<li>Open <strong>Effects</strong>, select a processor and add it. Adjust its settings, then choose <strong>Done</strong>. Open Mixer to balance the layers.</li></ol></section>
+<section id="sequence"><h2>Build a longer arrangement</h2>
+<p><strong>Sequences</strong> edits one four-bar phrase. Switch between the step grid and waveforms with the view button. Choose another sequence or add one with the sequence selector. Copy and paste a phrase from <strong>Edit</strong> to create a variation.</p>
+<p><strong>Timeline</strong> shows the song across its sequences. Scroll along the ruler to find a section, drag a region to move it, or drag either edge to trim it. Set snap and zoom for finer edits. An existing custom arrangement retains its placements when you switch views.</p></section>
+<section id="mix"><h2>Balance and automate a mix</h2>
+<p>Open <strong>Mixer</strong> and play the song. Use a channel fader for level and pan for placement. Double-click a fader for unity gain or pan to centre it. Scroll the channel bank sideways to reach the other tracks. Watch Master for peaks as you add layers.</p>
+<p>In <strong>Timeline</strong>, reveal <strong>Automation</strong> and choose a track parameter. Edit its points or open <strong>More views → Automation</strong> for detailed control. Hide the overlay to edit regions again. Use the lane’s read or bypass control to change whether its automation plays.</p></section>
+<section id="record"><h2>Play an instrument or record a take</h2>
+<p>Open <strong>Play setup</strong> to select the live instrument and configure MIDI, swing or the arpeggiator. <strong>Panic</strong> releases sounding notes. In Sequences, open an instrument’s panel to play its keyboard or edit the sound.</p>
+<p>Open <strong>More views → Record &amp; takes</strong> for audio input, monitoring and takes. Choose the destination and input before recording. Use headphones if you monitor a microphone. The Sampler workspace provides slicing and processing for recorded or loaded audio.</p></section>
+<section id="save"><h2>Save, restore or open an older song</h2>
+<p><strong>Project → Save</strong> downloads an editable file. <strong>Projects</strong> shows recovery versions saved in this browser for this edition. To move a song between devices or editions, download a portable project that includes its local audio.</p>
+<p><strong>Project → Load</strong> accepts AudioNaut projects and supported older Audional JSON, gzip and AUDX files. The importer chooses the historical playback rules automatically. If a sample cannot be retrieved, use the import report to identify the source and retry it.</p>
+<p><strong>Export</strong> offers a stereo mix and stems. Choose the editable project format if the recipient needs to continue producing the song.</p></section>
+<section id="chain"><h2>Prepare on-chain song instructions</h2>
+<p>Open <strong>More views → On-chain publishing</strong>. Review the dependencies and their references. For an instruction song, each required sound and the playback runtime must be available from its verified chain reference. Resolve missing dependencies, choose <strong>Verify and prepare song</strong>, and download the instructions to check them before reviewing an inscription.</p>
+<p>For detailed formats and constraints, see the <a href="CHAIN-DEVICES.md">chain device reference</a>, <a href="LEGACY-BRIDGE.md">historical import reference</a> and <a href="FIVE_SYNTHS.md">instrument reference</a>.</p></section>
+</main></body></html>
