@@ -65,6 +65,7 @@ const plugin = {
 };
 const result = await build({
   absWorkingDir: root,
+  define: { AUDIONAUT_STANDALONE: 'true' },
   entryPoints: [path.join(here, 'chain-player-entry.js')],
   bundle: true,
   write: false,

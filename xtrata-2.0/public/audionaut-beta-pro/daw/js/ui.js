@@ -43,7 +43,6 @@ import { analogBeats, ANALOG_PERSONAS } from "./analog-kits.js";
 import { ANALOG_PACK_ID } from "./analog-pack.js";
 import { EXPANDED_COMBINED_BEAT_PRESETS as COMBINED_BEAT_PRESETS } from "./combined-beats.js";
 import { loadBeatPreset } from "./l1-beat-loader.js";
-import { record as recordHistory } from "./history.js";
 import { SYNTH_BANK } from "./synths.js";
 import { createSynthPicker } from "./synth-picker.js";
 import { changeSynth } from "./synth-selection.js";
@@ -1995,26 +1994,16 @@ const currentBeatCollection = () => {
 const beatId = (preset) =>
   preset.id ||
   `original-${preset.name.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`;
-let pendingBeatId = null;
+let pendingBeatId = null, beatDestination, focusedBeat;
 function syncBeatTransport() {
   const play = $("#beats-play");
   if (!play) return;
   play.textContent = engine.isPlaying ? "❚❚ Pause" : "▶ Play";
   play.classList.toggle("active", engine.isPlaying);
   $("#beats-stop").disabled = !engine.isPlaying;
-  const status = $("#beats-status");
-  if (!beatLoad && /^(Loaded|Playing) "/.test(status.textContent))
-    status.textContent = status.textContent
-      .replace(/^(Loaded|Playing)/, engine.isPlaying ? "Playing" : "Loaded")
-      .replace(
-        /Choose another beat to switch while playing\.|Press Play here to audition, then choose another beat\./,
-        engine.isPlaying
-          ? "Choose another beat to switch while playing."
-          : "Press Play here to audition, then choose another beat.",
-      );
 }
 function syncBeatRows() {
-  const loaded = store.project.lastBeat?.id;
+  const loaded = focusedBeat;
   for (const row of $("#beats-list").children) {
     row.classList.toggle("beat-current", row.dataset.beatId === loaded);
     row.classList.toggle("beat-loading", row.dataset.beatId === pendingBeatId);
@@ -2023,39 +2012,30 @@ function syncBeatRows() {
       button.textContent =
         row.dataset.beatId === pendingBeatId
           ? "Loading…"
-          : row.dataset.beatId === loaded
-            ? "Reload"
-            : "Load";
+          : "Apply beat";
   }
 }
 async function applyCatalogPreset(preset) {
   beatLoad?.abort();
   const controller = new AbortController();
   beatLoad = controller;
-  pendingBeatId = beatId(preset);
+  pendingBeatId = focusedBeat = beatId(preset);
   syncBeatRows();
   const status = $("#beats-status");
   $("#beats-cancel").hidden = false;
   status.textContent = `Loading ${preset.name}…${engine.isPlaying ? " Current beat keeps playing." : ""}`;
-  recordHistory(true);
   try {
     await loadBeatPreset(preset, {
       signal: controller.signal,
+      sequence: beatDestination,
       onProgress: (loaded, total, name) => {
         if (beatLoad === controller && !controller.signal.aborted)
           status.textContent = `Loading ${preset.name} · ${loaded}/${total} sounds · ${name}${engine.isPlaying ? " · current beat keeps playing" : ""}`;
       },
     });
     if (beatLoad !== controller) return;
-    $("#bpm").value = preset.bpm;
-    $("#swing").value = preset.swing || 0;
-    $("#swing-val").textContent = `${preset.swing || 0}%`;
-    $("#chk-continuous").checked = false;
-    $("#btn-play").textContent = engine.isPlaying ? "❚❚" : "▶";
-    $("#btn-play").classList.toggle("active", engine.isPlaying);
-    refreshAllChannels();
-    recordHistory(true);
-    status.textContent = `${engine.isPlaying ? "Playing" : "Loaded"} "${preset.name}" · ${preset.genre} · ${preset.bpm} BPM. ${engine.isPlaying ? "Choose another beat to switch while playing." : "Press Play here to audition, then choose another beat."}`;
+    buildChannels();
+    status.textContent = `Applied "${preset.name}" to sequence ${store.project.sequences.indexOf(beatDestination)+1} at the song tempo of ${store.project.bpm} BPM. Use Undo to restore the previous beat layer.`;
     setStatus(status.textContent);
   } catch (error) {
     if (beatLoad !== controller) return;
@@ -2117,9 +2097,9 @@ function renderBeatsList() {
       "Drums only, from Bitcoin L1 single hits (OB1 + OG). Toms, rims and shakers are retunes of those hits. ★ Start here lists the essentials first.",
     "drums-analog":
       "Drums only, played on the Analog Kit: real acoustic drum recordings (CC0) voiced on six kits — Jazz Club, Rusty, Unruly, Swirly, Concert and Modern Mix. Pick a kit to hear any beat on it. ★ Start here lists the essentials first.",
-    l1: "Bitcoin samples only (OB1 + OG hits). Loads the current pattern; other tracks are muted.",
+    l1: "Bitcoin samples only (OB1 + OG hits). Adds a beat layer to the selected sequence.",
     combined:
-      "L1 percussion plus the embedded bank. Loads the current pattern; other tracks are muted.",
+      "L1 percussion plus the embedded bank. Adds a beat layer to the selected sequence.",
     tonal: "Embedded kit; ensembles add bass, plucks, keys, pads and chord stabs.",
     original: "Four-bar arrangements with bass and melody on the embedded sound bank.",
   }[key];
@@ -2196,7 +2176,7 @@ function renderBeatsList() {
       }
       info.append(details);
     }
-    const loadBtn = el("button", "primary", "Load");
+    const loadBtn = el("button", "primary", "Apply beat");
     loadBtn.addEventListener("click", async () => {
       await applyCatalogPreset(preset);
     });
@@ -2243,11 +2223,7 @@ export function initBeatsModal() {
   };
   kitSelect.addEventListener("change", () => {
     renderBeatsList();
-    // Hearing the same beat on another kit: reload the current Analog beat in the new voicing.
-    const loaded = store.project.lastBeat;
-    if (loaded?.collection !== "analog") return;
-    const row = [...$("#beats-list").children].find((r) => r.dataset.beatId === loaded.id);
-    if (row?.beatPreset) applyCatalogPreset(row.beatPreset);
+
   });
   $("#beats-collection").addEventListener("change", () => {
     updateGenres();
@@ -2259,6 +2235,9 @@ export function initBeatsModal() {
   const open = (collection) => {
     if (beatLoad && !beatLoad.signal.aborted) return;
     beatLoad = null;
+    beatDestination = store.seq;
+    focusedBeat = null;
+    $("#beats-destination").textContent = `Beat layer · Sequence ${store.project.currentSequence+1} · ${store.project.bpm} BPM. Applying another beat replaces untouched beat parts here. Your edits stay in the song.`;
     pendingBeatId = null;
     $("#beats-cancel").hidden = true;
     $("#beats-collection").value = collection;
@@ -2284,7 +2263,7 @@ export function initBeatsModal() {
     if (!rows.length) return;
     const current = rows.findIndex(
       (row) =>
-        row.dataset.beatId === (pendingBeatId || store.project.lastBeat?.id),
+        row.dataset.beatId === focusedBeat,
     );
     const next =
       current < 0
@@ -2293,7 +2272,9 @@ export function initBeatsModal() {
           : rows.length - 1
         : (current + direction + rows.length) % rows.length;
     rows[next].scrollIntoView({ block: "nearest" });
-    applyCatalogPreset(rows[next].beatPreset);
+    focusedBeat = rows[next].dataset.beatId;
+    syncBeatRows();
+    rows[next].querySelector("button").focus({preventScroll:true});
   };
   $("#beats-prev").addEventListener("click", () => advance(-1));
   $("#beats-next").addEventListener("click", () => advance(1));

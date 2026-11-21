@@ -10,6 +10,50 @@ export function mount(host) {
     bar = 0,
     accent = false,
     edit = false;
+  let following = true,
+    scope = null;
+  const followKey = 'audionaut.beta-pro.mobile.follow';
+  try {
+    following = localStorage.getItem(followKey) !== 'off';
+  } catch {}
+  function setFollowing(value) {
+    following = value;
+    try {
+      localStorage.setItem(followKey, value ? 'on' : 'off');
+    } catch {}
+  }
+  const timeline = () => store.project.timeline;
+  const patternClips = () =>
+    timeline().clips.filter((c) => !c.muted && c.type === 'pattern' && c.trackId === trackId);
+  function editRange(wholeSequence = false) {
+    const offset = wholeSequence ? 0 : bar * 4,
+      length = wholeSequence ? 16 : 4;
+    const start = store.project.currentSequence * 16 + offset;
+    if (!timeline().enabled) return { start, end: start + length };
+    const beat = engine.getMusicalPosition().beat;
+    return patternClips()
+      .filter((c) => c.sequenceId === store.seq.id)
+      .map((c) => ({
+        start: Math.max(c.start, c.start + offset - c.offset),
+        end: Math.min(c.start + c.duration, c.start + offset + length - c.offset)
+      }))
+      .filter((r) => r.start < r.end)
+      .sort(
+        (a, b) =>
+          Math.max(a.start - beat, beat - a.end, 0) - Math.max(b.start - beat, beat - b.end, 0)
+      )[0];
+  }
+  const transport = {
+    startBeat: () => scope?.start ?? editRange()?.start,
+    loop: (songEnd) =>
+      scope?.kind === 'song'
+        ? { enabled: true, start: 0, end: songEnd }
+        : scope && { enabled: true, start: scope.start, end: scope.end }
+  };
+  engine.editorTransport = transport;
+  function browse() {
+    if (engine.isPlaying) setFollowing(false);
+  }
   const channel = () =>
     Math.max(
       0,
@@ -17,7 +61,11 @@ export function mount(host) {
     );
   const sequence = el('select'),
     track = el('select');
-  const bars = el('div', null, { className: 'mobile-bars', role: 'group', 'aria-label': 'Bar to edit' });
+  const bars = el('div', null, {
+    className: 'mobile-bars',
+    role: 'group',
+    'aria-label': 'Bar to edit'
+  });
   const pads = el('div', null, {
     className: 'mobile-pads',
     role: 'group',
@@ -25,8 +73,8 @@ export function mount(host) {
   });
   const tools = el('div', null, { className: 'mobile-actions' });
   const heading = el('div', null, { className: 'mobile-heading' });
-  const beat = action('Choose beat', () => document.querySelector('#btn-beats').click(), {
-    title: 'Browse and load a beat into this project'
+  const beat = action('Add beat', () => document.querySelector('#btn-beats').click(), {
+    title: 'Add a beat layer to the selected sequence'
   });
   const guide = action('Guide me', () => startLesson('beat'), {
     title: 'Learn to play and change this beat'
@@ -34,7 +82,36 @@ export function mount(host) {
   heading.append(el('h2', 'Step sequencer'), beat, guide);
   const selectors = el('div', null, { className: 'mobile-selectors' });
   selectors.append(field('Sequence', sequence), field('Sample channel', track));
-  host.append(heading, selectors, bars, pads, tools);
+  const playback = el('div', null, { className: 'mobile-playback' });
+  const position = el('span', '', { className: 'mobile-position' });
+  const follow = action(
+    'Follow playback',
+    () => {
+      setFollowing(!following);
+      syncPosition();
+    },
+    { title: 'Move the pads to the playing bar. Turn off to keep editing here.' }
+  );
+  async function playHere(kind) {
+    const range = editRange(kind === 'sequence');
+    if (!range && kind !== 'song') return;
+    const start = range?.start ?? 0;
+    if (engine.isPlaying) engine.pause();
+    scope = { kind, start, end: range?.end };
+    await engine.play({ fromBeat: start });
+    paint();
+  }
+  const song = action('Play song', () => playHere('song'), {
+    title: 'Play through the song from this bar'
+  });
+  const loopBar = action('Loop bar', () => playHere('bar'), {
+    title: 'Jump to the displayed bar and repeat it'
+  });
+  const loopSeq = action('Loop sequence', () => playHere('sequence'), {
+    title: 'Jump to the displayed sequence and repeat it'
+  });
+  playback.append(position, follow, song, loopBar, loopSeq);
+  host.append(heading, selectors, bars, pads, playback, tools);
   const welcomeKey = 'audionaut.beta-pro.mobile.introduction';
   let firstVisit = true;
   try {
@@ -60,16 +137,25 @@ export function mount(host) {
     );
     heading.after(welcome);
   }
-  sequence.onchange = () => store.selectSequence(Number(sequence.value));
+  function selectEdit() {
+    // Browsing while paused sets the next start. During playback it only moves the editor.
+    if (!engine.isPlaying) {
+      scope = null;
+      const range = editRange();
+      if (range) engine.seekBeat(range.start);
+    }
+    paint();
+  }
+  sequence.onchange = () => {
+    browse();
+    store.selectSequence(Number(sequence.value));
+    selectEdit();
+  };
   track.onchange = () => {
     trackId = track.value;
+    syncPosition();
     paint();
   };
-  const loop = action(
-    'Loop sequence',
-    () => store.setProjectProp('continuous', !store.project.continuous),
-    { title: 'Repeat the selected sequence during sequence playback' }
-  );
   const mode = action(
     'Accent',
     () => {
@@ -89,7 +175,6 @@ export function mount(host) {
     { title: 'Tap a pad to open its step editor' }
   );
   tools.append(
-    loop,
     mode,
     detail,
     action('Load sound', () => openLoader(channel()), { id: 'mobile-load' }),
@@ -99,8 +184,9 @@ export function mount(host) {
   for (let i = 0; i < 4; i++)
     bars.append(
       action('Bar ' + (i + 1), () => {
+        browse();
         bar = i;
-        paint();
+        selectEdit();
       })
     );
   for (let i = 0; i < 16; i++)
@@ -108,21 +194,57 @@ export function mount(host) {
       action('', () => {
         const step = bar * 16 + i;
         if (edit) {
+          setFollowing(false);
+          paint();
           openStepEditor(channel(), step);
           return;
         }
         store.cycleStep(channel(), step, accent);
       })
     );
-  function playhead() {
-    [...pads.children].forEach((node, i) =>
-      node.classList.toggle(
+  function sourcePosition() {
+    if (!engine.isPlaying || engine.currentStep < 0) return null;
+    const index = engine.playingSequence,
+      step = engine.currentStep;
+    if (!timeline().enabled) return { index, step };
+    const beat = index * 16 + step / 4;
+    const clips = patternClips().filter((c) => c.start <= beat && beat < c.start + c.duration);
+    if (clips.length !== 1) return null;
+    const clip = clips[0],
+      sourceStep = Math.floor((beat - clip.start + clip.offset) * 4);
+    const sourceIndex = store.project.sequences.findIndex((s) => s.id === clip.sequenceId);
+    return sourceIndex < 0 || sourceStep < 0 || sourceStep >= 64
+      ? null
+      : { index: sourceIndex, step: sourceStep };
+  }
+  function playhead(pos = sourcePosition()) {
+    for (let i = 0; i < pads.children.length; i++)
+      pads.children[i].classList.toggle(
         'playing',
-        engine.isPlaying &&
-          engine.playingSequence === store.project.currentSequence &&
-          engine.currentStep === bar * 16 + i
-      )
-    );
+        pos?.index === store.project.currentSequence && pos.step === bar * 16 + i
+      );
+    const label = engine.isPlaying
+      ? (timeline().enabled
+          ? 'Timeline bar ' + (engine.playingSequence * 4 + Math.floor(engine.currentStep / 16) + 1)
+          : 'Playing sequence ' +
+            (engine.playingSequence + 1) +
+            ' · Bar ' +
+            (Math.floor(engine.currentStep / 16) + 1)) +
+        (timeline().enabled && !pos ? ' · No single step pattern' : '')
+      : 'Editing sequence ' + (store.project.currentSequence + 1) + ' · Bar ' + (bar + 1);
+    if (position.textContent !== label) position.textContent = label;
+    follow.setAttribute('aria-pressed', String(following));
+  }
+  function syncPosition() {
+    const pos = sourcePosition();
+    if (following && pos && store.project.sequences[pos.index]) {
+      const nextBar = Math.floor(pos.step / 16),
+        changed = nextBar !== bar;
+      bar = nextBar;
+      if (pos.index !== store.project.currentSequence) store.selectSequence(pos.index);
+      else if (changed) paint();
+    }
+    playhead(pos);
   }
   function paint() {
     const ch = channel(),
@@ -137,11 +259,14 @@ export function mount(host) {
       node.classList.toggle('accent', value === 2);
     });
     sequence.value = String(store.project.currentSequence);
-    loop.setAttribute('aria-pressed', String(!store.project.continuous));
-    loop.disabled = !!store.project.timeline.enabled;
-    loop.title = loop.disabled
-      ? 'The saved Timeline arrangement controls playback'
-      : 'Repeat the selected sequence';
+    loopBar.disabled = !editRange();
+    loopSeq.disabled = !editRange(true);
+    for (const [button, kind] of [
+      [loopBar, 'bar'],
+      [loopSeq, 'sequence'],
+      [song, 'song']
+    ])
+      button.setAttribute('aria-pressed', String(scope?.kind === kind));
     detail.setAttribute('aria-pressed', String(edit));
     mode.setAttribute('aria-pressed', String(accent));
     host.style.setProperty('--track-color', track?.color || '#56d8cf');
@@ -161,20 +286,29 @@ export function mount(host) {
     paint();
   }
   const cleanup = [
-    store.on('load', rebuild),
+    store.on('load', ({ restore }) => {
+      if (!restore) {
+        scope = null;
+        bar = 0;
+      }
+      rebuild();
+    }),
+    store.on('timeline', rebuild),
     store.on('channels', rebuild),
     store.on('channel', rebuild),
     store.on('sequence', rebuild),
     store.on('step', paint),
     store.on('project', paint)
   ];
-  document.addEventListener('audionaut-display-step', playhead);
-  document.addEventListener('transport', playhead);
+  document.addEventListener('audionaut-display-step', syncPosition);
+  document.addEventListener('transport', syncPosition);
   rebuild();
+  syncPosition();
   return () => {
+    if (engine.editorTransport === transport) delete engine.editorTransport;
     endMobileLesson();
     cleanup.forEach((fn) => fn());
-    document.removeEventListener('audionaut-display-step', playhead);
-    document.removeEventListener('transport', playhead);
+    document.removeEventListener('audionaut-display-step', syncPosition);
+    document.removeEventListener('transport', syncPosition);
   };
 }

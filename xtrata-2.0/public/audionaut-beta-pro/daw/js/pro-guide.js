@@ -12,7 +12,7 @@ const topics = [
   ],
   [
     'Mobile steps and layers',
-    'Select a sample channel and a bar. Each of the 16 pads represents one sixteenth note. Tap to add or remove a hit. Accent sets stronger hits. Choose another channel to layer a second sound on the same beat. Loop sequence repeats the phrase during sequence playback.'
+    'Select a sample channel and a bar. Each of the 16 pads represents one sixteenth note. Tap to add or remove a hit. Accent sets stronger hits. Choose another channel to layer a second sound on the same beat. Follow playback shows the playing bar. Turn it off or pick another bar to keep editing while the song plays. Loop bar or Loop sequence jumps playback to your edit. Play song continues through the arrangement from here.'
   ],
   [
     'Samples and editing',
@@ -20,7 +20,7 @@ const topics = [
   ],
   [
     'Templates and beats',
-    'Open Project for a blank song or a complete starter template. A starter replaces the song. For drum patterns, open Library → Beats or choose Choose beat in Mobile. Check the destination in the beat browser before applying.'
+    'Open Project for a blank song or a complete starter template. A starter replaces the song. For drum patterns, open Library → Beats or tap Add beat in Mobile. Browse freely, then choose Apply beat for the displayed destination. It uses the song tempo. Another beat replaces untouched beat parts in that sequence. Edited tracks and other sounds stay in place. Undo reverses an application.'
   ],
   [
     'Playback and MIDI',
