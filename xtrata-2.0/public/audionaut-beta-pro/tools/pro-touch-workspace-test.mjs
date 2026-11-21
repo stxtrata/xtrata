@@ -32,15 +32,25 @@ try {
   await p.locator('#chain-close').tap();
   for (const width of [320, 390, 820, 1180]) {
     await p.setViewportSize({ width, height: 1000 });
-    const fits = await strip
+    const outside = await strip
       .locator('button:visible,input[type=range]:visible')
       .evaluateAll((nodes) =>
-        nodes.every((n) => {
-          const r = n.getBoundingClientRect();
-          return r.left >= 0 && r.right <= innerWidth + 1 && r.width >= 44 && r.height >= 38;
+        nodes.flatMap((n) => {
+          const { left, right, width, height } = n.getBoundingClientRect();
+          if (left >= 0 && right <= innerWidth + 1 && width >= 44 && height >= 38) return [];
+          return [
+            {
+              control: n.getAttribute('aria-label') || n.textContent,
+              left,
+              right,
+              width,
+              height,
+              viewport: innerWidth
+            }
+          ];
         })
       );
-    assert.ok(fits, 'Sample controls fit at ' + width);
+    assert.deepEqual(outside, [], 'Sample controls fit at ' + width);
     if (process.env.SCREENSHOT_DIR && width === 390)
       await p
         .locator('.mobile-inspector')
