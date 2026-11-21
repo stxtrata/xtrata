@@ -3,7 +3,7 @@ import './mobile-track-groups.js';
 
 import { store, makeProject } from "./state.js";
 import { engine } from "./engine.js";
-import { reloadAllSamples } from "./loader.js";
+import { restoreEditorSamples } from "./live-player-setup.js";
 import * as ui from "./ui.js";
 import * as persist from "./persistence.js";
 import { initPianoRoll, rollPlayhead } from "./pianoroll.js";
@@ -45,6 +45,7 @@ async function togglePlay() {
 function stopAll() {
   engine.stop();
   $("#btn-play").textContent = "▶";
+  $("#btn-play").setAttribute("aria-label", "Play");
   $("#btn-play").classList.remove("active");
   ui.movePlayhead(-1);
 }
@@ -329,7 +330,7 @@ function sameAudioSources(a, b) {
 }
 
 function initSubscriptions() {
-  document.addEventListener('transport',({detail})=>{const playing=!!detail?.playing;$('#btn-play').textContent=playing?'❚❚':'▶';$('#btn-play').classList.toggle('active',playing);});
+  document.addEventListener('transport',({detail})=>{const playing=!!detail?.playing;$('#btn-play').setAttribute('aria-label',playing?'Pause':'Play');$('#btn-play').textContent=playing?'❚❚':'▶';$('#btn-play').classList.toggle('active',playing);});
   store.on("step", ({ ch, step, val }) => ui.updateStep(ch, step, val));
   // Playback follows the display: choosing another sequence while the transport is
   // running plays that sequence straight away (same step position, so it stays in
@@ -385,7 +386,7 @@ function initSubscriptions() {
     }
     const preparedFailures=preparedImportFailures(project);
     if(preparedFailures){sampleRestore=Promise.resolve(preparedFailures);return;}
-    sampleRestore = reloadAllSamples().then((failures) => {
+    sampleRestore = restoreEditorSamples().then((failures) => {
       if (project !== store.project) return [];
       ui.refreshAllChannels();
       if (failures.length)
@@ -500,6 +501,7 @@ async function boot() {
 
 document.addEventListener("audionaut-panic", () => {
   $("#btn-play").textContent = "▶";
+  $("#btn-play").setAttribute("aria-label", "Play");
   $("#btn-play").classList.remove("active");
   ui.movePlayhead(-1);
   ui.setStatus("All notes and playback stopped.");
