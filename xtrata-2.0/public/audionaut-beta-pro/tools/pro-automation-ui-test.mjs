@@ -93,6 +93,72 @@ try {
   await p.evaluate(async()=>{const {makeProject}=await import('/audionaut-beta-pro/daw/js/state.js');autoTest.store.loadProject(makeProject());});
   await p.mouse.up();
   ok(await p.evaluate(()=>autoTest.store.project.timeline.automation.length===0),'Loading another song cancels an unfinished automation gesture');
+  // Two copies of a filter on one track and an unrelated effect on another.
+  const missing = await p.evaluate(async () => {
+    const base='/audionaut-beta-pro/daw/js/', {makeProject}=await import(base+'state.js');
+    const {PLUGIN_TYPES,makeSlot}=await import(base+'plugins.js');
+    const {automationTargets}=await import(base+'automation-view.js');
+    const project=makeProject(), track=project.channels[0];
+    track.fx=Object.keys(PLUGIN_TYPES).map(id=>makeSlot(id));
+    const available=automationTargets(project);
+    return track.fx.flatMap(slot=>PLUGIN_TYPES[slot.type].params
+      .filter(p=>!available.some(s=>s.target.slotId===slot.id && s.target.param===p.key))
+      .map(p=>slot.type+'.'+p.key));
+  });
+  assert.deepEqual(missing, [], 'Every registered effect exposes all its declared controls');
+  const ids = await p.evaluate(async () => {
+    const {store} = autoTest, {makeSlot,addSend} = await import('/audionaut-beta-pro/daw/js/plugins.js');
+    const first = makeSlot('filter'), second = makeSlot('filter');
+    store.setChannelProp(0, 'fx', [first, second]);
+    addSend(store.channel(0), 'delay', .3);
+    store.setChannelProp(1, 'inserts', [makeSlot('comp')]);
+    window.testFilters=[first.id,second.id];
+    return { track:store.channel(0).id, name:store.channel(0).name, second:second.id };
+  });
+  const trackPicker = p.getByLabel(ids.name + ' automation parameter', {exact:true});
+  // Track labels already exist while the store's animation-frame refresh is pending.
+  await trackPicker.locator('optgroup[label="FX 2 · Coinjoin"]').waitFor({state:'attached'});
+  const groups = await trackPicker.locator('optgroup').evaluateAll(nodes=>nodes.map(n=>n.label));
+  ok(groups.includes('FX 1 · Coinjoin') && groups.includes('FX 2 · Coinjoin') && groups.includes('Shared delay return'), 'Installed effects and shared returns are grouped');
+  ok(!groups.some(g=>g.startsWith('Insert')), 'Another channel’s effects are excluded');
+  const mode = await trackPicker.locator('optgroup[label="FX 2 · Coinjoin"] option').filter({hasText:/^Mode$/}).getAttribute('value');
+  await trackPicker.selectOption(mode);
+  await clickPoint(3,2);
+  await selectWorkspace(p, 'Automation');
+  const pointValue=p.getByLabel('Point 1 value',{exact:true});
+  await pointValue.selectOption({label:'High-pass'});
+  const verify=await p.evaluate(async () => {
+    const {store,engine}=autoTest, [first,second]=testFilters;
+    const {exportProjectAsync,prepareProject}=await import('/audionaut-beta-pro/daw/js/persistence.js');
+    const {compilePlaybackPlan}=await import('/audionaut-beta-pro/daw/js/playback-plan.js');
+    const round=prepareProject(await exportProjectAsync());
+    const lane=round.timeline.automation.find(l=>l.target.slotId===second);
+    engine.ensureContext();
+    for(const event of compilePlaybackPlan(round).events.filter(e=>e.type==='automation'&&e.target.slotId===second&&e.beat===0))
+      engine.scheduleAutomation({...event,time:engine.ctx.currentTime});
+    const chain=engine.chains.get('c0');
+    const filters=[first,second].map(id=>chain.slots.get(id).nodes.f1.type);
+    const send={trackId:store.channel(0).id,kind:'effectParam',slotId:'send:delay',param:'amount'};
+    const ret={trackId:'master',kind:'effectParam',slotId:'return:delay',param:'ret'};
+    for(const [target,value] of [[send,.64],[ret,.42]]) {
+      store.setAutomationLane({target,points:[{beat:0,value,curve:'step'}]});
+      engine.scheduleAutomation({target,value,beat:0,time:engine.ctx.currentTime,curve:'step'});
+    }
+    await new Promise(resolve=>setTimeout(resolve,80));
+    const sends=[chain.sendFx.delay.amt.gain.value,engine.delayFx.ret.gain.value];
+    store.setChannelProp(0,'fx',[...store.channel(0).fx].reverse());
+    const reordered=prepareProject(await exportProjectAsync()).timeline.automation.find(l=>l.target.slotId===second);
+    store.setChannelProp(0,'fx',store.channel(0).fx.filter(s=>s.id!==second));
+    const after=prepareProject(await exportProjectAsync());
+    return { filters,sends, stepped:lane.points.every(p=>p.curve==='step'), same:reordered.id===lane.id,
+      clean:!after.timeline.automation.some(l=>l.target.slotId===second)&&after.timeline.automation.length===2 };
+  });
+  ok(verify.stepped && verify.same && verify.clean,'Choice points persist, follow reorders and are removed with their effect');
+  assert.deepEqual(verify.filters,['lowpass','highpass']);
+  ok(verify.sends.every((v,i)=>Math.abs(v-[.64,.42][i])<.001),'Automation drives the selected strip send and shared return independently');
+  const newLane=p.getByLabel('New lane',{exact:true});
+  await p.getByLabel('Track',{exact:true}).selectOption(ids.track);
+  ok(await newLane.locator('optgroup[label="FX 1 · Coinjoin"]').count()===1,'Detailed editor groups parameters by installed effect');
   ok(!logs.some(l=>l.startsWith('pageerror:')),logs.join('\n'));
   console.log(JSON.stringify({checks,browser:process.env.AUDIONAUT_TEST_BROWSER||'chromium'}));
 } catch(error){console.error(logs);for(const c of b.contexts())for(const p of c.pages())console.error(await p.evaluate(()=>({labels:[...document.querySelectorAll('.song-automation-header select')].map(n=>n.getAttribute('aria-label')),scroll:document.querySelector('.song-scroll')?.scrollTop,mode:document.querySelector('.song-automation-toggle')?.getAttribute('aria-pressed')})).catch(()=>({})));throw error;} finally {await b.close();srv.close();}

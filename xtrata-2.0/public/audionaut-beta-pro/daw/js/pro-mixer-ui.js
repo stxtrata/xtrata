@@ -1,17 +1,17 @@
 import { store } from './state.js';
 import { engine } from './engine.js';
 import { validateRouting } from './mixer-runtime.js';
-import { PLUGIN_TYPES, makeSlot, typeParams } from './plugins.js';
+import { PLUGIN_TYPES, makeSlot, typeParams, sharedKeys, returnsOf } from './plugins.js';
 import { automationValueAt } from './automation-runtime.js';
 import { createStereoMeter } from './mixer-meter.js';
-import { recordAutomation } from './pro-automation-ui.js';
+import { recordAutomation, recordEffectControl } from './pro-automation-ui.js';
 import { el, action, row, number, choice, toggle, textField, tracks, uid, status, db, gain } from './pro-ui.js';
 
 const owners=()=>[...tracks(store),...(store.project.buses||[]),{...store.project.master,id:'master',name:'Master',kind:'master',volume:store.project.masterVolume}];
 function owner(id){return id==='master'?store.project.master:owners().find(o=>o.id===id);}
 function change(id,prop,value){
   if(['output','auxSends','inserts','fx'].includes(prop)){const candidate=structuredClone(store.project),target=id==='master'?candidate.master:[...candidate.channels,...candidate.instruments,...candidate.buses].find(t=>t.id===id);if(!target)throw Error('This mixer track no longer exists.');target[prop]=value;validateRouting(candidate);}
-  if(id==='master'){if(prop==='volume'){store.setProjectProp('masterVolume',value);engine.setMasterVolume(value);}else{store.project.master[prop]=value;store.emit('project',{prop:'master'});}}
+  if(id==='master'){if(prop==='volume'){store.setProjectProp('masterVolume',value);engine.setMasterVolume(value);}else store.setTrackProp(id,prop,value);}
   else if(store.track(id))store.setTrackProp(id,prop,value);else{owner(id)[prop]=value;store.emit('project',{prop:'buses'});}
   if(engine.ctx)engine.syncMixer();
 }
@@ -28,9 +28,20 @@ export function openEffects(id){
         const section=el('div',null,{className:'pro-take'}),patchSlot=patch=>change(id,kind,owner(id)[kind].map(s=>s.id===slot.id?{...s,...patch}:s));
         section.append(row(el('strong',type.name||slot.type),toggle('Enabled',slot.enabled!==false,v=>patchSlot({enabled:v})),action('Move up',()=>{if(i){const slots=[...owner(id)[kind]];[slots[i-1],slots[i]]=[slots[i],slots[i-1]];change(id,kind,slots);paint();}}),action('Remove',()=>{change(id,kind,target[kind].filter(s=>s.id!==slot.id));paint();})));
         const params=row();for(const p of typeParams(type)){
-          const set=value=>{const current=owner(id)[kind].find(s=>s.id===slot.id);patchSlot({params:{...current.params,[p.key]:value}});recordAutomation({trackId:id,kind:'effectParam',param:p.key,slotId:slot.id},value);};
-          if(p.options)params.append(choice(p.label||p.key,p.options,slot.params[p.key]??p.def,set));
-          else params.append(number(p.label||p.key,slot.params[p.key]??p.def,set,{min:p.min??0,max:p.max??1,step:p.step??.01}));
+          const shared = sharedKeys(type).has(p.key);
+          const value = (shared ? returnsOf(store.project)[type.shared] : slot.params)[p.key] ?? p.def;
+          const set = next => {
+            const current = owner(id)[kind].find(s => s.id === slot.id);
+            if (shared) {
+              const returns = structuredClone(returnsOf(store.project));
+              returns[type.shared][p.key] = next;
+              store.setProjectProp('returns', returns);
+              if (engine.ctx) engine.applyReturns();
+            } else patchSlot({params:{...current.params,[p.key]:next}});
+            recordEffectControl(id, current, p.key, next);
+          };
+          if(p.options)params.append(choice(p.label||p.key,p.options,value,set));
+          else params.append(number(p.label||p.key,value,set,{min:p.min??0,max:p.max??1,step:p.step??.01}));
         }section.append(params);
         if(type.sidechain||['opto','gate'].includes(slot.type))section.append(choice('Sidechain source',[['','Internal detector'],...tracks(store).filter(t=>t.id!==id).map(t=>[t.id,t.name])],slot.sidechainTrackId||'',v=>{try{patchSlot({sidechainTrackId:v||null});}catch(error){paint();throw error;}}));
         if(slot.type==='hybridReverb')section.append(choice('Impulse response',[['','Generated early reflections'],...store.project.channels.filter((t,i)=>engine.buffers[i]||t.id===slot.irSource?.sourceTrackId).map(t=>[t.id,t.name+(engine.buffers[store.project.channels.indexOf(t)]?'':' (audio unavailable)')])],slot.irSource?.sourceTrackId||'',v=>{patchSlot({irSource:v?{sourceTrackId:v}:undefined});}));

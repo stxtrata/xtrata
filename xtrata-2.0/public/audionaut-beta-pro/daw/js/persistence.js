@@ -20,7 +20,7 @@ import { validateWordSelection } from "./word-index.js";
 import { SYNTH_BANK } from "./synths.js";
 import { validateSoundMetadata } from "./onboard-library.js";
 import { validateClipSnapshot } from "./clip-contract.js";
-import { normalizeOwner, cleanReturns, PLUGIN_TYPES, typeParams } from "./plugins.js";
+import { normalizeOwner, cleanReturns, RETURN_SCHEMA, sendRows, PLUGIN_TYPES, typeParams } from "./plugins.js";
 import { internProjectAssets, portableProject, portableProjectAsync, storageAssets, registerStoredAsset, newProjectId, pruneAssets } from "./assets.js";
 import { saveProjectRevision, listProjectRevisions, loadProjectRevision, clearActiveProject, deleteProjectRevisions, pinProjectRevision } from "./project-storage.js";
 import { normalizeArp } from "./arpeggiator.js";
@@ -99,10 +99,15 @@ export async function downloadProject() {
 export async function importProjectAsync(json,{guard=()=>true,...options}={}) {
   const data=typeof json==='string'?JSON.parse(json):json;
   if(data?.format!=='audionaut-chain-song/1')return commitPreparedProject(prepareProject(data),{guard});
-  if(data.manifest?.runtime?.version!==RUNTIME_VERSION)throw Error('This song requires a different AudioNaut runtime version. Open its pinned chain player.');
-  const {currentRuntime}=await import('./chain-publishing.js');
-  const runtime=await currentRuntime(options);
-  if(data.manifest.runtime.sha256!==runtime.sha256||data.manifest.runtime.bytes!==runtime.bytes)throw Error('This song uses different playback code. Open its exact inscribed runtime.');
+  const ref = data.manifest?.runtime;
+  const previousRuntime = ref?.version === 'beta-pro-shared-audio-1' &&
+    ref.sha256 === '7250e5d2cf8c51d5c50853c88e4e681b59a1d19f5f5f7ce3160aca153b8d34b6' && ref.bytes === 1372530;
+  if (!previousRuntime) {
+    if (ref?.version !== RUNTIME_VERSION) throw Error('This song requires a different AudioNaut runtime version. Open its pinned chain player.');
+    const {currentRuntime} = await import('./chain-publishing.js');
+    const runtime = await currentRuntime(options);
+    if (ref.sha256 !== runtime.sha256 || ref.bytes !== runtime.bytes) throw Error('This song uses different playback code. Open its exact inscribed runtime.');
+  }
   const staged=await prepareChainSongImport(data,options);
   if(!guard())throw Error('The project changed during chain verification. Open the song again.');
   const project=importProject({...staged.project,format:'audionaut-workstation/3'});
@@ -253,8 +258,14 @@ function validateCandidate(project,strict){
     if(!owner||!['volume','pan','bend','synthParam','effectParam'].includes(target.kind)||!Array.isArray(lane.points))throw new Error('Invalid automation target or points.');
     let bounds=null;
     if(target.kind==='effectParam'){
-      const slot=[...owner.inserts||[],...owner.fx||[]].find(s=>s.id===target.slotId);
+      const slot=[...owner.inserts||[],...owner.fx||[],...sendRows(owner)].find(s=>s.id===target.slotId);
       bounds=slot&&typeParams(PLUGIN_TYPES[slot.type]).find(p=>p.key===target.param);
+      if(target.trackId==='master' && ['return:delay','return:reverb'].includes(target.slotId))
+        bounds=RETURN_SCHEMA[target.slotId.slice(7)].find(p=>p.key===target.param);
+      if(bounds?.options) {
+        if(lane.points.some(p=>!Number.isInteger(p.value)||p.value<0||p.value>=bounds.options.length))throw Error('Invalid effect automation choice.');
+        for(const point of lane.points)point.curve='step';
+      }
       if(!bounds)throw new Error('Automation refers to an unavailable effect parameter.');
     }
     if(target.kind==='synthParam'){
@@ -371,7 +382,7 @@ function normalizeNative(data) {
       channel.inserts = c.inserts;
       channel.fx = c.fx && typeof c.fx === "object" ? c.fx : [];
       channel.sends = c.sends; // delay / reverb send values; older files hold them as FX slots
-      normalizeOwner(channel);
+      normalizeOwner(channel, p.timeline?.automation);
     });
   }
   const chCount = p.channels.length;
@@ -412,7 +423,7 @@ function normalizeNative(data) {
         inst && inst.fx && typeof inst.fx === "object" ? inst.fx : [];
       p.instruments[i].inserts = inst?.inserts;
       p.instruments[i].sends = inst?.sends;
-      normalizeOwner(p.instruments[i]);
+      normalizeOwner(p.instruments[i], p.timeline?.automation);
       {
         const cur0 = p.instruments[i];
         const legacy = LEGACY_SYNTH_NAMES[cur0.synthId];
