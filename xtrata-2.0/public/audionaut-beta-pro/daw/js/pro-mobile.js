@@ -3,6 +3,7 @@ import { engine } from './engine.js';
 import { createTrackControls, refreshTrackControls, openStepEditor } from './ui.js';
 import { readGroups, toggleGroup } from './mobile-track-groups.js';
 import { createTrackBank } from './mobile-track-bank.js';
+import { openExpandedKeyboard } from './expanded-keyboard.js';
 import { editGroups } from './mobile-group-editor.js';
 import { setMidiTarget } from './midi-input.js';
 import { el, action, field } from './pro-ui.js';
@@ -182,6 +183,7 @@ export function mount(host) {
       mix.append(field('Level', volume));
       if (isSynth) {
         devices.append(strip.querySelector('.synth-picker'));
+        devices.append(action('Expand keyboard', () => openExpandedKeyboard(instrument()), {'aria-haspopup': 'dialog'}));
         moveButton('.panel-open', 'Synth panel', devices);
         moveButton('.roll-open', 'Piano roll', devices);
       } else {
