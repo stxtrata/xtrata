@@ -176,6 +176,50 @@ try {
     return { roundTrip, crossSequence, full: refused && JSON.stringify(project) === original };
   });
   assert.deepEqual(protection, { roundTrip: true, crossSequence: true, full: true });
+  await p.locator('#beats-close').click();
+  await p.evaluate(async () => {
+    const { store, engine } = testSong;
+    const { makeProject, makeSequence } = await import('/audionaut-beta-pro/daw/js/state.js');
+    const project = makeProject();
+    project.sequences.push(makeSequence());
+    project.bpm = 240;
+    project.timeline.enabled = true;
+    project.timeline.lengthBeats = 96;
+    project.timeline.tempo = [{ beat: 0, bpm: 240 }];
+    project.timeline.clips = [
+      {
+        id: 'placed-pattern',
+        type: 'pattern',
+        trackId: project.channels[0].id,
+        sequenceId: project.sequences[1].id,
+        start: 48,
+        duration: 4,
+        offset: 8,
+        gain: 1
+      }
+    ];
+    store.loadProject(project);
+    await engine.play({ fromBeat: 48 });
+  });
+  await p.waitForFunction(
+    () =>
+      testSong.store.project.currentSequence === 1 &&
+      document.querySelector('.mobile-bars [aria-pressed=true]').textContent === 'Bar 3' &&
+      document.querySelector('.mobile-pads .playing')
+  );
+  await btn('Loop bar').click();
+  await p.waitForFunction(
+    () => testSong.engine._loopRange?.start === 48 && testSong.engine._loopRange.end === 52
+  );
+  await btn('Play song').click();
+  await p.evaluate(() => testSong.engine.seekBeat(80));
+  await p.waitForFunction(
+    () =>
+      document.querySelector('.mobile-position').textContent.includes('No single step pattern') &&
+      !document.querySelector('.mobile-pads .playing')
+  );
+  assert.equal(await p.evaluate(() => testSong.store.project.sequences.length), 2);
+  await p.locator('#btn-stop').click();
   assert.deepEqual(
     logs.filter((s) => s.startsWith('pageerror:')),
     []
