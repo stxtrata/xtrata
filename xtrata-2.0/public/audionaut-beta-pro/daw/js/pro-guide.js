@@ -227,6 +227,14 @@ export function openHelp() {
       articles.append(el('p', 'No matching topics. Try “sample”, “save” or “MIDI”.'));
   }
   dialog.append(el('h3', 'Guided lessons'), lessonsBox, el('h3', 'Reference'), search, articles);
+  const reading = el('p');
+  dialog.append(reading);
+  const handbook = el('a', 'Open the studio handbook', {
+    href: 'studio-guide.html',
+    target: '_blank',
+    rel: 'noopener'
+  });
+  reading.append(handbook);
   search.addEventListener('input', filter);
   filter();
   document.body.append(dialog);

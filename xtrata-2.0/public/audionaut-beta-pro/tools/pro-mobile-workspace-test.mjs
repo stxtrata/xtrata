@@ -81,6 +81,10 @@ try {
   await selectWorkspace(p, 'Mobile');
   for (const width of [320, 390, 768, 1440]) {
     await p.setViewportSize({ width, height: 844 });
+    assert.ok(
+      await p.evaluate(() => document.documentElement.scrollWidth <= innerWidth),
+      'No horizontal page overflow at ' + width
+    );
     for (const selector of [
       '#btn-play',
       '#studio-help',

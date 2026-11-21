@@ -50,7 +50,9 @@
   position: fixed;
   inset: auto;
   margin: 0;
-  width: min(265px, calc(100vw - 16px));
+  --menu-width: min(265px, calc(100vw - 16px));
+  width: var(--menu-width);
+  left: clamp(8px, var(--trigger-left, 8px), calc(100vw - var(--menu-width) - 8px));
   box-sizing: border-box;
   padding: 10px;
   color: #e6edf4;
@@ -245,6 +247,8 @@ body[data-workspace='mobile'] #synth-dock {
   #top-bar #save-state {
     flex: 1;
     text-align: right;
+    min-width: 0;
+    overflow-wrap: anywhere;
   }
   #top-bar .transport {
     width: 100%;
@@ -345,4 +349,12 @@ body[data-workspace='mobile'] #synth-dock {
   #pro-workspace .mobile-heading h2 {
     font-size: 16px;
   }
+}
+
+.studio-menu #performance-bar label {
+  min-width: 0;
+}
+.studio-menu #live-instrument {
+  min-width: 0;
+  max-width: 60%;
 }

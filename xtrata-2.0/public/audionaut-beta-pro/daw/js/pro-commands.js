@@ -35,6 +35,11 @@ function modalAccessibility(){
 }
 export function initCommands(){
   if(initialized)return;initialized=true;try{shortcuts={...defaults,...JSON.parse(localStorage.getItem(KEY)||'{}')};}catch{}
-  document.addEventListener('keydown',e=>{if(e.repeat)return;if(matches(e,shortcuts.palette)){e.preventDefault();e.stopImmediatePropagation();openCommands();return;}if(e.target?.closest?.('input,textarea,select,[contenteditable],dialog,.modal:not(.hidden)'))return;for(const[id,,fn]of commands)if(matches(e,shortcuts[id])){e.preventDefault();e.stopImmediatePropagation();Promise.resolve(fn()).catch(error=>status(error.message,true));return;}},true);
+  document.addEventListener('keydown',e=>{if(e.repeat)return;
+    if(e.key==='Escape'){
+      const menu=document.querySelector('.studio-menu:popover-open');
+      if(menu){e.preventDefault();e.stopImmediatePropagation();menu.hidePopover();document.querySelector('[popovertarget="'+menu.id+'"]')?.focus();return;}
+    }
+    if(matches(e,shortcuts.palette)){e.preventDefault();e.stopImmediatePropagation();openCommands();return;}if(e.target?.closest?.('input,textarea,select,[contenteditable],dialog,.modal:not(.hidden)'))return;for(const[id,,fn]of commands)if(matches(e,shortcuts[id])){e.preventDefault();e.stopImmediatePropagation();Promise.resolve(fn()).catch(error=>status(error.message,true));return;}},true);
   modalAccessibility();
 }

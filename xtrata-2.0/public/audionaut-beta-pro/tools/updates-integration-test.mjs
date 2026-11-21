@@ -139,10 +139,11 @@ try {
     for (const id of ["#btn-projects", "#btn-publish", "#btn-load", "#btn-new", "#btn-settings", "#artist-name", "#live-instrument", "#live-panic", "#arp-enabled"]) {
       const control = p.locator(id);
       if (!await control.isVisible()) {
+        if (await p.locator('.studio-menu:popover-open').count()) await p.keyboard.press('Escape');
         const panel = await control.evaluate(node=>node.closest('[popover]').id);
         await p.locator('[popovertarget="'+panel+'"]').click();
       }
-      const box = await control.boundingBox(); assert.ok(box && box.x >= 0 && box.x + box.width <= width, `${id} fits ${width}px`);
+      const box = await control.boundingBox(); assert.ok(box && box.x >= 0 && box.x + box.width <= width, `${id} fits ${width}px: ${JSON.stringify(box)}`);
     }
     await p.keyboard.press("Escape");
     await p.locator("#btn-publish").click();

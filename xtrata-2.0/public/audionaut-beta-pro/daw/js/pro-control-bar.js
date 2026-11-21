@@ -15,12 +15,14 @@ function menu(label, id, nodes, hint) {
   panel.append(...nodes);
   document.body.append(panel);
   function place() {
-    if (!panel.matches(':popover-open')) return;
     const rect = button.getBoundingClientRect();
-    panel.style.left = Math.max(8, Math.min(innerWidth - panel.offsetWidth - 8, rect.left)) + 'px';
+    panel.style.setProperty('--trigger-left', rect.left + 'px');
     panel.style.top = Math.min(innerHeight - 80, rect.bottom + 5) + 'px';
     panel.style.maxHeight = Math.max(68, innerHeight - parseFloat(panel.style.top) - 8) + 'px';
   }
+  panel.addEventListener('beforetoggle', (event) => {
+    if (event.newState === 'open') place();
+  });
   panel.addEventListener('toggle', () => {
     const open = panel.matches(':popover-open');
     button.setAttribute('aria-expanded', String(open));
@@ -123,9 +125,10 @@ export function initControlBar(nav) {
     more.textContent = active?.textContent || 'More views';
     more.classList.toggle('selected-view', !!active);
   };
-  new MutationObserver(reflect).observe(document.body, {
+  new MutationObserver(reflect).observe(tabs, {
+    subtree: true,
     attributes: true,
-    attributeFilter: ['data-workspace']
+    attributeFilter: ['aria-selected']
   });
   bar.after(nav);
   const sequenceTools = find('.seq-tools');
