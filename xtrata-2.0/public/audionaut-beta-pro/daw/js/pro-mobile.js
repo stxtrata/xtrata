@@ -189,6 +189,7 @@ export function mount(host) {
       mix.append(field('Level', volume));
       if (isSynth) {
         devices.append(strip.querySelector('.synth-picker'));
+        devices.append(action('Play live', button => openExpandedKeyboard(instrument(), button, true), {'aria-haspopup':'dialog', className:'live-launch'}));
         devices.append(action('Expand keyboard', (button) => openExpandedKeyboard(instrument(), button), {'aria-haspopup': 'dialog'}));
         moveButton('.panel-open', 'Synth panel', devices);
         moveButton('.roll-open', 'Piano roll', devices);
