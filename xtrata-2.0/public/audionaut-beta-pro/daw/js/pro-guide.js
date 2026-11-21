@@ -24,7 +24,7 @@ const topics = [
   ],
   [
     'Templates and beats',
-    'Open Project for a blank song or a complete starter template. A starter replaces the song. For drum patterns, open Library → Beats or tap Add beat in Mobile. Browse freely, then choose Apply beat for the displayed destination. It uses the song tempo. Another beat replaces untouched beat parts in that sequence. Edited tracks and other sounds stay in place. Undo reverses an application.'
+    'Open Project for a blank song or a complete starter template. A starter replaces the song. For drum patterns, open Library → Beats or tap Add beat in Mobile. Preview loops a beat on its own at your song tempo. Stop or close Beats to hear the song again. Choose Apply beat for the displayed destination. It uses the song tempo. Another beat replaces untouched beat parts in that sequence. Edited tracks and other sounds stay in place. Undo reverses an application.'
   ],
   [
     'Playback and MIDI',

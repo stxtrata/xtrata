@@ -310,6 +310,7 @@ function initKeyboard() {
     }
     if (e.target.matches?.("input, textarea, select, [contenteditable]")) return;
     if (e.code === "Space") {
+      if (document.querySelector("#modal-beats:not(.hidden)")) return;
       e.preventDefault();
       togglePlay();
     } else if (document.querySelector(".modal:not(.hidden)")) return;
