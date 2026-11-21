@@ -1,4 +1,5 @@
 import { store, stepVal, MAX_SEQUENCES } from './state.js';
+import { applyEditorPlaybackRange } from './editor-playback-range.js';
 import { engine } from './engine.js';
 import { createTrackControls, refreshTrackControls, openStepEditor } from './ui.js';
 import { readGroups, toggleGroup } from './mobile-track-groups.js';
@@ -16,7 +17,8 @@ export function mount(host) {
     accent = false,
     edit = false;
   let following = true,
-    scope = null;
+    scope = null,
+    pendingRange = null;
   const followKey = 'audionaut.beta-pro.mobile.follow';
   try {
     following = localStorage.getItem(followKey) !== 'off';
@@ -49,6 +51,10 @@ export function mount(host) {
       )[0];
   }
   const transport = {
+    applyPendingRange(now) {
+      if (pendingRange) applyEditorPlaybackRange(engine, pendingRange, now);
+      pendingRange = null;
+    },
     startBeat: () => scope?.start ?? editRange()?.start,
     loop: (songEnd) =>
       scope?.kind === 'song'
@@ -217,19 +223,26 @@ export function mount(host) {
     const range = editRange(kind === 'sequence');
     if (!range && kind !== 'song') return;
     const start = range?.start ?? 0;
-    if (engine.isPlaying) engine.pause();
-    scope = { kind, start, end: range?.end };
-    await engine.play({ fromBeat: start });
+    const previousKind = scope?.kind;
+    const destination = 'sequence ' + (store.project.currentSequence + 1) +
+      (kind === 'bar' ? ', bar ' + (bar + 1) : '');
+    scope = { kind, start, end: range?.end, destination };
+    if (engine.isPlaying) {
+      pendingRange = { ...scope, finishLoop: previousKind === kind && kind !== 'song' };
+    } else {
+      pendingRange = null;
+      await engine.play({ fromBeat: start });
+    }
     paint();
   }
   const song = action('Play song', () => playHere('song'), {
-    title: 'Play through the song from this bar'
+    title: 'Continue through the song. When stopped, start at the displayed bar.'
   });
   const loopBar = action('Loop bar', () => playHere('bar'), {
-    title: 'Jump to the displayed bar and repeat it'
+    title: 'Repeat this bar on the beat. Choose another bar to loop it next.'
   });
   const loopSeq = action('Loop sequence', () => playHere('sequence'), {
-    title: 'Jump to the displayed sequence and repeat it'
+    title: 'Repeat this sequence. Choose another sequence to play it next.'
   });
   playback.append(position, follow, song, loopBar, loopSeq);
   const editor = el('div', null, { className: 'mobile-edit-area' });
@@ -260,19 +273,20 @@ export function mount(host) {
     );
     heading.after(welcome);
   }
-  function selectEdit() {
-    // Browsing while paused sets the next start. During playback it only moves the editor.
+  function selectEdit(sequenceChanged = false) {
     if (!engine.isPlaying) {
       scope = null;
       const range = editRange();
       if (range) engine.seekBeat(range.start);
+    } else if (scope?.kind === 'bar' || (sequenceChanged && scope?.kind === 'sequence')) {
+      void playHere(scope.kind);
     }
     paint();
   }
   sequence.onchange = () => {
     browse();
     store.selectSequence(Number(sequence.value));
-    selectEdit();
+    selectEdit(true);
   };
   track.onchange = () => {
     selectTrack(track.value);
@@ -339,7 +353,7 @@ export function mount(host) {
         'playing',
         pos?.index === store.project.currentSequence && pos.step === bar * 16 + i
       );
-    const label = engine.isPlaying
+    let label = engine.isPlaying
       ? (timeline().enabled
           ? 'Timeline bar ' + (engine.playingSequence * 4 + Math.floor(engine.currentStep / 16) + 1)
           : 'Playing sequence ' +
@@ -348,6 +362,10 @@ export function mount(host) {
             (Math.floor(engine.currentStep / 16) + 1)) +
         (timeline().enabled && !pos ? ' · No single step pattern' : '')
       : 'Editing sequence ' + (store.project.currentSequence + 1) + ' · Bar ' + (bar + 1);
+    if (engine.isPlaying && scope && scope.kind !== 'song') {
+      const playingBeat = engine.playingSequence * 16 + engine.currentStep / 4;
+      if (playingBeat < scope.start || playingBeat >= scope.end) label += ' · Queued ' + scope.destination;
+    }
     if (position.textContent !== label) position.textContent = label;
     follow.setAttribute('aria-pressed', String(following));
   }
@@ -473,6 +491,7 @@ export function mount(host) {
       if (!restore) {
         groupId = null;
         remembered.clear();
+        pendingRange = null;
         scope = null;
         bar = 0;
       }

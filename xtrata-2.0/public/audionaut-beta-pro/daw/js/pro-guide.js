@@ -12,7 +12,7 @@ const topics = [
   ],
   [
     'Mobile steps and layers',
-    'Choose a track and a bar. Solo, Mute, Preview, Level, Inserts and Effects control the selected track. Instruments have a synth picker, synth panel and piano roll. For sample tracks, use the pads. Each of the 16 pads represents one sixteenth note. Tap to add or remove a hit. Accent sets stronger hits. Choose another channel to layer a second sound on the same beat. Follow playback shows the playing bar. Turn it off or pick another bar to keep editing while the song plays. Loop bar or Loop sequence jumps playback to your edit. Play song continues through the arrangement from here.'
+    'Choose a track and a bar. Solo, Mute, Preview, Level, Inserts and Effects control the selected track. Instruments have a synth picker, synth panel and piano roll. For sample tracks, use the pads. Each of the 16 pads represents one sixteenth note. Tap to add or remove a hit. Accent sets stronger hits. Choose another channel to layer a second sound on the same beat. Follow playback shows the playing bar. Turn it off or pick another bar to keep editing while the song plays. Loop bar repeats the current bar at its end. Choose a different bar to loop it next. Loop sequence does the same for a whole sequence. Play song carries on from the playing beat. Follow playback only moves the editor.'
   ],
   [
     'Looping with track groups',
