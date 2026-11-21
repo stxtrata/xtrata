@@ -16,7 +16,7 @@ const topics = [
   ],
   [
     'Looping with track groups',
-    'Tap Loop bar, then use the arrows beside Track to switch sounds. Groups lets you save a named set of tracks with the song. Tap its name to browse its members or All tracks to browse the whole song. Each group has its own Mute button. Tap it to drop that layer out and tap again to bring it back. Other active mute groups and individual mutes are preserved.'
+    'Tap Loop bar, then tap a lit Track pad to select its channel. A dim pad marked M is muted. Tap it to select and unmute that one track, even inside a muted group. Use the Track list to select it silently. A hollow light marks a track outside the solo mix. Use the bank arrows for more tracks, or tap Track pads to fold the bank. Groups lets you save a named set of tracks with the song. Tap its name to browse its members or All tracks to browse the whole song. Each group has its own Mute button. Tap it to drop that layer out and tap again to bring it back. Other active mute groups and individual mutes are preserved.'
   ],
   [
     'Samples and editing',

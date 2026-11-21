@@ -2,6 +2,7 @@ import { store, stepVal, MAX_SEQUENCES } from './state.js';
 import { engine } from './engine.js';
 import { createTrackControls, refreshTrackControls, openStepEditor } from './ui.js';
 import { readGroups, toggleGroup } from './mobile-track-groups.js';
+import { createTrackBank } from './mobile-track-bank.js';
 import { editGroups } from './mobile-group-editor.js';
 import { setMidiTarget } from './midi-input.js';
 import { el, action, field } from './pro-ui.js';
@@ -99,11 +100,18 @@ export function mount(host) {
       (c) => !c.assetOnly && (!group || group.tracks.includes(c.id))
     );
   }
+  const bank = createTrackBank((id) => {
+    const owner = store.track(id);
+    if (!owner) return;
+    if (owner.mute) store.setTrackProp(id, 'mute', false);
+    selectTrack(id);
+  });
   function selectTrack(id) {
     if (!id) return;
     trackId = id;
     if (groupId) remembered.set(groupId, id);
     track.value = id;
+    bank.reveal(id);
     if (instrument() >= 0) setMidiTarget(instrument());
     updateStrip();
     syncPosition();
@@ -222,7 +230,9 @@ export function mount(host) {
     title: 'Jump to the displayed sequence and repeat it'
   });
   playback.append(position, follow, song, loopBar, loopSeq);
-  host.append(heading, inspector, bars, pads, playback, tools);
+  const editor = el('div', null, { className: 'mobile-edit-area' });
+  editor.append(heading, inspector, bars, pads, playback, tools);
+  host.append(editor, bank.region);
   const welcomeKey = 'audionaut.beta-pro.mobile.introduction';
   let firstVisit = true;
   try {
@@ -438,12 +448,15 @@ export function mount(host) {
       })
     );
     track.value = trackId;
+    bank.rebuild(available, trackId, engine.anySolo(), !!groupId);
     updateStrip();
     paint();
   }
   function trackChanged(change) {
-    if (!change?.prop || ['name', 'assetOnly'].includes(change.prop)) return rebuild();
+    if (!change?.prop || ['name', 'assetOnly', 'source'].includes(change.prop)) return rebuild();
     const owner = change.ch === undefined ? store.instrument(change.i) : store.channel(change.ch);
+    if (['mute', 'solo', 'color', 'synthId'].includes(change.prop))
+      bank.refresh(owner, engine.anySolo());
     if (owner?.id === trackId) updateStrip();
   }
   host.addEventListener('sample-lesson', ({ detail: lesson }) => {
