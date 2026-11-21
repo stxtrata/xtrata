@@ -183,11 +183,25 @@ class Store {
   }
 
   track(id) { return trackAddress(this.project, id)?.track || this.project.buses.find(t => t.id === id) || (id === 'master' ? this.project.master : null); }
+  _removedEffectLanes(owner, prop, value, path, id = owner.id) {
+    if (!['inserts', 'fx', 'sends'].includes(prop)) return;
+    const slotIds = chain => prop === 'sends' ? Object.keys(chain || {}).map(bus => 'send:' + bus)
+      : (Array.isArray(chain) ? chain : []).map(slot => slot?.id);
+    const kept = new Set(slotIds(value)), removed = new Set(slotIds(owner[prop]).filter(key => !kept.has(key)));
+    if (!removed.size) return;
+    const lanes = this.project.timeline.automation;
+    const next = lanes.filter(({target}) => target.trackId !== id || target.kind !== 'effectParam' || !removed.has(target.slotId));
+    if (next.length === lanes.length) return;
+    this.project.timeline.automation = next;
+    return {historyPaths:[path, ['timeline','automation']]};
+  }
   setTrackProp(id, prop, value) {
     const address = trackAddress(this.project, id);
     if (address) return address.kind === 'sample' ? this.setChannelProp(address.index, prop, value) : this.setInstrumentProp(address.index, prop, value);
     const track = this.track(id); if (!track) return false;
-    track[prop] = value; this.emit('project', {prop:id === 'master' ? 'master' : 'buses'}); return true;
+    const group = id === 'master' ? 'master' : 'buses';
+    const change = this._removedEffectLanes(track, prop, value, [group], id);
+    track[prop] = value; this.emit('project', {prop:group}, change); return true;
   }
   addInstrument(synthId = 'jims10') {
     if (this.project.instruments.length >= MODEL_LIMITS.instruments) return null;
@@ -243,7 +257,8 @@ class Store {
   }
   recordAutomationPoint(target,point){
     if(!this.track(target.trackId)||!Number.isFinite(point.beat)||point.beat<0||!Number.isFinite(point.value))throw new Error('Invalid automation point.');
-    const key=JSON.stringify(target),lanes=this.project.timeline.automation;let index=lanes.findIndex(l=>JSON.stringify(l.target)===key);
+    const lanes=this.project.timeline.automation;
+    let index=lanes.findIndex(({target:t})=>t.trackId===target.trackId && t.kind===target.kind && t.slotId===target.slotId && t.param===target.param);
     if(index<0){const lane=this.setAutomationLane({target,points:[point]});return lane;}
     const lane=lanes[index],points=lane.points;let lo=0,hi=points.length;while(lo<hi){const mid=(lo+hi)>>>1;if(points[mid].beat<point.beat)lo=mid+1;else hi=mid;}
     const near=lo>0&&Math.abs(points[lo-1].beat-point.beat)<1/96?lo-1:lo<points.length&&Math.abs(points[lo].beat-point.beat)<1/96?lo:-1;
@@ -271,8 +286,9 @@ class Store {
   }
 
   setInstrumentProp(i, prop, value) {
+    const change = this._removedEffectLanes(this.instrument(i), prop, value, ['instruments', i, prop]);
     this.instrument(i)[prop] = value;
-    this.emit("instrument", { i, prop, value });
+    this.emit("instrument", { i, prop, value }, change);
   }
 
   addNote(i, note) {
@@ -334,6 +350,7 @@ class Store {
   }
 
   setChannelProp(ch, prop, value) {
+    const change = this._removedEffectLanes(this.channel(ch), prop, value, ['channels', ch, prop]);
     this.channel(ch)[prop] = value;
     const c = this.channel(ch);
     if (
@@ -346,7 +363,7 @@ class Store {
         start: c.trimStart * c.analysis.duration,
         end: c.trimEnd * c.analysis.duration,
       };
-    this.emit("channel", { ch, prop, value });
+    this.emit("channel", { ch, prop, value }, change);
   }
 
   setProjectProp(prop, value) {

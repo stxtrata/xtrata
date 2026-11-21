@@ -30,7 +30,7 @@ function stable(value){if(Array.isArray(value))return value.map(stable);if(plain
 export async function canonicalPublishingProject(project){
   const copy=structuredClone(project);internProjectAssets(copy);
   const normalized=normalizeProjectModel((await storageAssets(copy)).project);
-  for(const owner of [...normalized.channels,...normalized.instruments,...normalized.buses,normalized.master])normalizeOwner(owner);
+  for(const owner of [...normalized.channels,...normalized.instruments,...normalized.buses,normalized.master])normalizeOwner(owner, normalized.timeline.automation, owner === normalized.master ? 'master' : owner.id);
   for(const channel of normalized.channels){channel.wordSelection??=null;channel.clipSnapshot??=null;channel.soundMetadata??=null;channel.gateSteps??=channel.soundMetadata?.loop?8:0;channel.sampleMidi??=null;}
   for(const instrument of normalized.instruments){instrument.arp=normalizeArp(instrument.arp);if(isProInstrument(instrument.synthId))instrument.sampleInstrument=normalizeInstrumentConfig(instrument.synthId,instrument.sampleInstrument);}
   normalized.playEmptySequences=!!normalized.playEmptySequences;normalized.lastPresetChannels??=0;

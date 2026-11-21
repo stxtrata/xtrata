@@ -2988,7 +2988,7 @@ export function addSend(owner, bus, amount = 0.25) {
 // if there were inserts, its filter/drive go to the front of the insert chain
 // (they ran before the inserts); otherwise everything lands in the FX chain.
 // Returns true if anything changed.
-export function normalizeOwner(owner) {
+export function normalizeOwner(owner, automation = [], ownerId = owner?.id) {
   if (!owner) return false;
   const beforeIns = owner.inserts;
   const beforeFx = owner.fx;
@@ -3014,7 +3014,7 @@ export function normalizeOwner(owner) {
   const folded = new Set();
   for (const s of tail.slice(end)) {
     const bus = SEND_BUS_OF[s.type];
-    if (sends[bus]) continue;
+    if (sends[bus] || automation.some(l => l.target?.trackId === ownerId && l.target.slotId === s.id)) continue;
     sends[bus] = { amount: s.params.amount, enabled: s.enabled };
     folded.add(s.id);
   }

@@ -20,7 +20,8 @@ import { trackAddress } from './project-model.js';
 import { syncMixer as applyMixer, disposeMixer, validateRouting } from './mixer-runtime.js';
 import { createSamplerVoice } from './sampler-voice.js';
 import {isProInstrument,createProInstrumentVoice} from './pro-instruments.js';
-import { voiceAutomation } from './automation-runtime.js';
+import { scheduleDspBoundary } from './plugin-automation.js';
+import { automationValueAt, voiceAutomation } from './automation-runtime.js';
 import { assertOfflineRenderSupported } from './audio-render-support.js';
 
 const LOOKAHEAD_MS = 25; // scheduler tick
@@ -217,6 +218,10 @@ export class Engine {
     disposeMixer(this);
     for (const key of [...this.chains.keys()]) this._disposeChain(key);
     clearTimeout(this.reverbFx?.timer);
+    if (this.reverbFx) {
+      this.reverbFx.disposed = true;
+      for (const timer of this.reverbFx.automationTimers || []) clearTimeout(timer);
+    }
     const seen = new Set();
     const disconnect = value => {
       if (!value || typeof value !== "object" || seen.has(value)) return;
@@ -379,7 +384,7 @@ export class Engine {
     const chain = this.chains?.get(key);
     const owner = key === 'master' ? this.store.project.master : /^i\d+$/.test(key) ? this.store.instrument(+key.slice(1)) : /^c\d+$/.test(key) ? this.store.channel(+key.slice(1)) : this.store.project.buses?.find(b=>b.id===key);
     if (!chain || !owner) return;
-    normalizeOwner(owner);
+    normalizeOwner(owner, this.store.project.timeline.automation, key === 'master' ? 'master' : owner.id);
     const defs = [...owner.inserts, ...owner.fx].filter(
       (d) => PLUGIN_TYPES[d.type],
     );
@@ -563,9 +568,8 @@ export class Engine {
   }
 
   // The impulse depends on decay/shape/damp/width only; rebuilt (debounced) when they change.
-  _scheduleImpulse(now = false) {
+  _scheduleImpulse(now = false, r = returnsOf(this.store.project).reverb) {
     now = now || this.offline;
-    const r = returnsOf(this.store.project).reverb;
     const sig = [r.decay, r.shape, r.damp, r.width].join("|");
     const rfx = this.reverbFx;
     if (sig === rfx.sig) return;
@@ -1089,6 +1093,46 @@ export class Engine {
     if(event.type==='step'&&!this.offline){const generation=this._transportGeneration;const timer=setTimeout(()=>{this._transportTimers.delete(timer);if(!this.isPlaying||generation!==this._transportGeneration)return;this.currentStep=event.step;this.playingSequence=event.sequenceIndex;if((typeof AUDIONAUT_STANDALONE !== 'undefined' || !this.editorTransport) && !this.store.project.timeline.enabled&&this.store.project.currentSequence!==event.sequenceIndex){this._selectingSequence=true;try{this.store.selectSequence(event.sequenceIndex);}finally{this._selectingSequence=false;}}this.onStep?.(event.step,event.sequenceIndex,time);},Math.max(0,(time-this.ctx.currentTime)*1000));this._transportTimers.add(timer);}
   }
   _click(time,accent=false){if(this.offline)return;const osc=this.ctx.createOscillator(),g=this.ctx.createGain();(this._clicks||=new Set()).add(osc);osc.frequency.value=accent?1500:1000;g.gain.setValueAtTime(.12,time);g.gain.exponentialRampToValueAtTime(.0001,time+.04);osc.connect(g).connect(this.masterGain);osc.start(time);osc.stop(time+.045);osc.onended=()=>{this._clicks.delete(osc);osc.disconnect();g.disconnect();};}
+  _automateReturn(bus, key, event) {
+    const {curve, value, time, duration = 0, fromValue = value} = event;
+    const end = time + duration;
+    const set = (param, map = v => v) => {
+      if (curve === 'linear') {
+        param.setValueAtTime(map(fromValue, event.beat), time);
+        param.linearRampToValueAtTime(map(value, event.endBeat), end);
+      } else param.setValueAtTime(map(value, event.beat), time);
+    };
+    const settings = returnsOf(this.store.project)[bus];
+    if (key === 'ret') return set((bus === 'delay' ? this.delayFx : this.reverbFx).ret.gain);
+    if (bus === 'reverb') {
+      if (key === 'predelay') return set(this.reverbFx.pre.delayTime, v => v / 1000);
+      const fx = this.reverbFx;
+      scheduleDspBoundary(this.ctx, fx, end, () => {
+        fx.shapeAutomation = {...fx.shapeAutomation, [key]:value};
+        this._scheduleImpulse(false, {...settings, ...fx.shapeAutomation});
+      });
+      return;
+    }
+    const fx = this.delayFx;
+    if (key === 'tone') { set(fx.toneL.frequency); set(fx.toneR.frequency); return; }
+    if (key === 'time') {
+      const seconds = () => Math.min(9.9, 60 / (this.store.project.bpm || 120) * BEAT_DIVS[value][1]);
+      set(this.delayNode.delayTime, seconds); set(this.delayR.delayTime, seconds); return;
+    }
+    const other = key === 'spread' ? 'feedback' : 'spread';
+    const lane = this.store.project.timeline.automation.find(l => l.enabled !== false && l.target.trackId === 'master' &&
+      l.target.slotId === 'return:delay' && l.target.param === other);
+    const companion = beat => (lane && automationValueAt(lane, beat)) ?? settings[other];
+    const same = (v, beat) => key === 'spread' ? companion(beat) * (1 - v) : v * (1 - companion(beat));
+    const cross = (v, beat) => v * companion(beat);
+    set(fx.selfL.gain, same); set(fx.selfR.gain, same);
+    set(fx.crossLR.gain, cross); set(fx.crossRL.gain, cross);
+    if (key === 'spread') {
+      set(fx.centerL.gain, v => 1 - v); set(fx.centerR.gain, v => 1 - v);
+      set(fx.hardL.gain); set(fx.hardR.gain);
+    }
+  }
+
   scheduleAutomation(event){
     if(this._automationOverrides?.has(JSON.stringify(event.target))||this.store.project.automationMode==='write')return;
     const {target,value,curve}=event,time=event.time+(curve==='linear'?(event.duration||0):0),owner=this.store.project.channels.concat(this.store.project.instruments,this.store.project.buses||[]).find(t=>t.id===target.trackId),address=trackAddress(this.store.project,target.trackId),strip=target.trackId==='master'?{chain:this.chains.get('master'),pan:this._mixer.master.pan,fader:this.masterGain}:this._mixer?.strips.get(target.trackId);
@@ -1098,9 +1142,25 @@ export class Engine {
     if(target.kind==='bend'&&address?.kind==='instrument'){for(const n of this._synthVoices.values())if(n.i===address.index)this.setNotePitchBend(n.id,value,time);return;}
     if(target.kind==='synthParam'&&address?.kind==='instrument'){for(const n of this._synthVoices.values())if(n.i===address.index)n.voice.setParameters?.({[target.param]:value},time,{curve,startTime:event.time,fromValues:{[target.param]:event.fromValue}});return;}
     if(target.kind==='effectParam'){
-      const it=strip?.chain.slots.get(target.slotId);if(!it)return;
-      const param=it.nodes[target.param];if(param&&typeof param.setValueAtTime==='function')return apply(param);
-      // Plugins can supply an audio-clock automation hook for mapped/compound controls.
+      const bus = sendBusId(target.slotId);
+      if (bus && target.param === 'amount') return apply(strip?.chain.sendFx[bus]?.amt.gain);
+      if (target.trackId === 'master' && ['return:delay','return:reverb'].includes(target.slotId))
+        return this._automateReturn(target.slotId.slice(7), target.param, event);
+      const it = strip?.chain.slots.get(target.slotId);
+      if (!it) return;
+      if (it.type.shared && !it.type.params.some(p => p.key === target.param))
+        return this._automateReturn(it.type.shared, target.param, event);
+      const schema = it.type.params.find(p => p.key === target.param);
+      if (!schema) return;
+      if (schema.options) {
+        const option = schema.options[value];
+        if (option) it.type.automate(this.ctx, it.nodes, target.param, option[0], time, 'step');
+        return;
+      }
+      const param = it.nodes[target.param];
+      if (param && typeof param.setValueAtTime === 'function') return apply(param);
+      if (curve === 'linear' && event.duration && Number.isFinite(event.fromValue))
+        it.type.automate?.(this.ctx,it.nodes,target.param,event.fromValue,event.time,'step');
       it.type.automate?.(this.ctx,it.nodes,target.param,value,time,curve);
     }
   }

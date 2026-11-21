@@ -1,5 +1,6 @@
 // ui.js — builds and updates the DOM: channels, step grid, sequence bar, modals.
 
+import { recordEffectControl } from './pro-automation-ui.js';
 import {
   store,
   NUM_CHANNELS,
@@ -1547,7 +1548,7 @@ const refreshOwnerRow = (isInst, i) =>
 // Light the FX / INS buttons when their chain has an active plugin.
 function markChainButtons(owner, fxBtn, insBtn) {
   if (!owner) return;
-  if (!Array.isArray(owner.fx) || !Array.isArray(owner.inserts)) normalizeOwner(owner);
+  if (!Array.isArray(owner.fx) || !Array.isArray(owner.inserts)) normalizeOwner(owner, store.project.timeline.automation);
   const live = (arr) => (arr || []).filter((s) => s?.enabled).length;
   // the strip's delay / reverb sends count as FX (they are rows in the FX list)
   const nFx = live(owner.fx) + sendRows(owner).filter((r) => r.enabled).length;
@@ -1564,7 +1565,7 @@ const CHAIN_LABEL = { inserts: "insert", fx: "FX" };
 const chainOwner = () => ownerOf(chain.isInst, chain.idx);
 const chainSlots = (kind = chain.kind) => {
   const o = chainOwner();
-  if (!Array.isArray(o.fx) || !Array.isArray(o.inserts) || !o.sends) normalizeOwner(o);
+  if (!Array.isArray(o.fx) || !Array.isArray(o.inserts) || !o.sends) normalizeOwner(o, store.project.timeline.automation);
   return o[kind];
 };
 // What the list shows: the plugin slots, then (FX tab) the strip's delay / reverb sends as
@@ -1660,6 +1661,9 @@ function openPluginFace(slotId) {
     setParams(o) {
       const sl = find();
       if (!sl) return;
+      const previous = link.getParams();
+      for (const [key, value] of Object.entries(o))
+        if (previous[key] !== value) recordEffectControl(ownerOf(isInst, idx).id, sl, key, value);
       const { own, shared } = splitShared(sl.type, o);
       sl.params = { ...pluginDefaults(sl.type), ...(sl.params || {}), ...own };
       if (Object.keys(shared).length) writeShared(sl.type, shared);
@@ -1721,6 +1725,7 @@ function renderParams(slot) {
   };
   const shared = sharedKeys(t);
   const live = (key, v) => {
+    recordEffectControl(chainOwner().id, slot, key, v);
     P[key] = v;
     if (shared.has(key)) writeShared(slot.type, { [key]: v });
     else slot.params = { ...pluginDefaults(slot.type), ...slot.params, [key]: v };
@@ -1919,7 +1924,7 @@ export function openChain(idx, isInst = false, kind = "inserts") {
   chain.isInst = isInst;
   chain.kind = kind;
   engine.ensureContext();
-  normalizeOwner(chainOwner());
+  normalizeOwner(chainOwner(), store.project.timeline.automation);
   $("#modal-chain").classList.remove("hidden");
   renderChain();
 }

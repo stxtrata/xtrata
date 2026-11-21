@@ -20,7 +20,7 @@ import {
 } from './ui.js';
 import { getMidiTarget } from './midi-input.js';
 import { openRoll, openClipRoll } from './pianoroll.js';
-import { focusAutomation, automationTargets, targetKey, findLane, automationEnd, automationValue, drawAutomation, automationGestures, saveAutomation } from './automation-view.js';
+import { fillParameterPicker, automationLabel, pointValueControl, focusAutomation, automationTargets, targetKey, findLane, automationEnd, automationValue, drawAutomation, automationGestures, saveAutomation } from './automation-view.js';
 import { el, action, row, choice, toggle, status, number } from './pro-ui.js';
 
 const HEADER = 44;
@@ -195,7 +195,7 @@ export function mount(root) {
         const spec = specs.find(s => targetKey(s.target) === targetKey(selection.target));
         if (!spec) return;
         const change = patch => { const l = findLane(selection.target); if (!l) return; const points = structuredClone(l.points), p = points.find(p => p.beat === selection.beat); if (!p) return; Object.assign(p, patch); saveAutomation(selection.target, points); selection.beat = p.beat; draw(); editTools(); };
-        tools.append(el('strong', spec.label), number('Automation point beat', point.beat, v => change({ beat: v }), { max: automationEnd(), step: 1 / 16 }), number('Automation point value', point.value, v => change({ value: v }), { min: spec.min, max: spec.max, step: spec.step }), choice('Automation point curve', ['linear', 'step'], point.curve || 'linear', v => change({ curve: v })));
+        tools.append(el('strong', spec.label), number('Automation point beat', point.beat, v => change({ beat: v }), { max: automationEnd(), step: 1 / 16 }), pointValueControl('Automation point value', spec, point.value, v => change({ value: v })), choice('Automation point curve', spec.options ? ['step'] : ['linear', 'step'], point.curve || 'linear', v => change({ curve: v })));
       }
       return;
     }
@@ -434,7 +434,7 @@ export function mount(root) {
     paintTransport();
   }
   function specFor(track) {
-    const available = specs.filter(s => s.target.trackId === track.id);
+    const available = specs.filter(s => s.trackId === track.id);
     let spec = available.find(s => targetKey(s.target) === parameters.get(track.id));
     spec ||= available.find(s => findLane(s.target)) || available[0];
     if (spec) parameters.set(track.id, targetKey(spec.target));
@@ -451,20 +451,21 @@ export function mount(root) {
     if (!header) { header = el('div', null, { className: 'song-automation-header' }); label.append(header); }
     header.hidden = false;
     const spec = specFor(track); if (!spec) return;
-    const available = specs.filter(s => s.target.trackId === track.id), signature = JSON.stringify([track.name, available.map(s => [targetKey(s.target), s.name, !!findLane(s.target)])]);
+    const available = specs.filter(s => s.trackId === track.id), signature = JSON.stringify([track.name, available.map(s => [targetKey(s.target), s.group, s.name, !!findLane(s.target)])]);
     if (header.dataset.signature !== signature) {
       header.replaceChildren(el('strong', track.name));
       const select = el('select', null, { 'aria-label': `${track.name} automation parameter` });
-      for (const s of available) select.append(el('option', `${findLane(s.target) ? '● ' : ''}${s.name}`, { value: targetKey(s.target) }));
+      fillParameterPicker(select, available, true);
       select.addEventListener('change', () => { automationControls.clear(); parameters.set(track.id, select.value); focusAutomation(specFor(track).target); draw(); editTools(); });
       const bypass = action('Read', () => { const l = findLane(specFor(track).target); if (l) store.setAutomationLane({ ...l, enabled: l.enabled === false }); }, { 'aria-label': `${track.name} automation playback`, title: 'Enable or bypass this automation lane. The Automation toggle only hides its display.' });
       header.append(select, bypass, el('output', null, { 'aria-label': `${track.name} automation value` })); header.dataset.signature = signature;
     }
     header.querySelector('strong').textContent = track.name;
     header.querySelector('select').value = targetKey(spec.target);
+    header.querySelector('select').title = spec.label;
     const lane = findLane(spec.target), button = header.querySelector('button');
     button.disabled = !lane; button.textContent = lane?.enabled === false ? 'Bypassed' : lane ? 'Read' : 'Guide'; button.setAttribute('aria-pressed', String(lane?.enabled !== false && !!lane));
-    header.querySelector('output').textContent = Number(automationValue(lane?.points || [], engine.getMusicalPosition().beat, spec.value).toFixed(3));
+    header.querySelector('output').textContent = automationLabel(spec, automationValue(lane?.points || [], engine.getMusicalPosition().beat, spec.value));
   }
   function paintTransport() {
     const beat = engine.getMusicalPosition().beat || 0,
@@ -488,7 +489,7 @@ export function mount(root) {
     paintTransport();
     if (automation && !compactTracks && engine.isPlaying) for (const label of headers.children) {
       const track = rows.find(t => t.id === label.dataset.trackId), spec = track && specFor(track), out = label.querySelector('output');
-      if (spec && out) out.textContent = Number(automationValue(findLane(spec.target)?.points || [], engine.getMusicalPosition().beat, spec.value).toFixed(3));
+      if (spec && out) out.textContent = automationLabel(spec, automationValue(findLane(spec.target)?.points || [], engine.getMusicalPosition().beat, spec.value));
     }
     frame = requestAnimationFrame(animate);
   }
