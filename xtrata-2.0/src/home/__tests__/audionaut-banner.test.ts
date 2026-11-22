@@ -7,8 +7,8 @@ const bannerAt = indexHtml.indexOf('id="audionautBanner"');
 const banner = indexHtml.slice(indexHtml.lastIndexOf('<a ', bannerAt), indexHtml.indexOf('</a>', bannerAt));
 
 describe('homepage Audionaut banner', () => {
-  it('links to The Audionaut and is wired for the home page only', () => {
-    expect(banner).toContain('href="/audionaut"');
+  it('links to the community beta studio and is wired for the home page only', () => {
+    expect(banner).toContain('href="/audionaut-beta/"');
     expect(banner).toContain('home-only');
     expect(banner).toContain('id="audionautWordmark"');
   });
