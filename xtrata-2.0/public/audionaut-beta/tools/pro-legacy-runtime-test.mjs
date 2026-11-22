@@ -165,7 +165,7 @@ try {
   assert.equal(await p.locator('#advanced-playback').getAttribute('open'), null);
   assert.equal(await p.locator('#legacy-profile').isVisible(), false);
   assert.equal(await p.locator('#legacy-profile').inputValue(), '');
-  assert.equal(result.version, 'beta-pro-shared-audio-1');
+  assert.equal(result.version, (await import('../daw/js/runtime-version.js')).RUNTIME_VERSION);
   const fileSong = {
     projectName: 'Automatic file fixture',
     projectBPM: 120,

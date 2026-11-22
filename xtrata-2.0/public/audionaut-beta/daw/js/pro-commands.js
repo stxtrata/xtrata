@@ -5,7 +5,7 @@ const defaults={palette:'Mod+k',save:'Mod+s',mixer:'Mod+2',timeline:'Mod+1',auto
 let shortcuts={...defaults},initialized=false;
 const click=id=>document.querySelector(id)?.click();
 const commands=[
-  ['timeline','Open song timeline',()=>openWorkspace('timeline')],['patterns','Open patterns',()=>openWorkspace('sequence')],['mixer','Open mixer',()=>openWorkspace('mixer')],['automation','Open automation',()=>openWorkspace('automation')],['recording','Record audio and manage takes',()=>openWorkspace('recording')],['sampler','Open sampler',()=>openWorkspace('sampler')],['performance','Open performance diagnostics',()=>openWorkspace('performance')],
+  ['mobile','Open mobile step sequencer',()=>openWorkspace('mobile')],['help','Help and lessons',()=>click('#studio-help')],['timeline','Open song timeline',()=>openWorkspace('timeline')],['patterns','Open sequences',()=>openWorkspace('sequence')],['mixer','Open mixer',()=>openWorkspace('mixer')],['automation','Open automation',()=>openWorkspace('automation')],['recording','Record audio and manage takes',()=>openWorkspace('recording')],['sampler','Open sampler',()=>openWorkspace('sampler')],['performance','Open performance diagnostics',()=>openWorkspace('performance')],
   ['play','Play or pause',()=>click('#btn-play')],['stop','Stop playback',()=>click('#btn-stop')],['panic','Panic: stop every note',()=>click('#live-panic')],['save','Download project',()=>click('#btn-save')],['load','Load project',()=>click('#btn-load')],['new','New project',()=>click('#btn-new')],['undo','Undo',()=>click('#btn-undo')],['redo','Redo',()=>click('#btn-redo')],['export','Export audio or project',()=>click('#btn-publish')],['projects','Projects and recovery',()=>click('#btn-projects')],['shortcuts','Edit keyboard shortcuts',()=>editShortcuts()],
 ];
 export function openCommands() {
@@ -35,6 +35,13 @@ function modalAccessibility(){
 }
 export function initCommands(){
   if(initialized)return;initialized=true;try{shortcuts={...defaults,...JSON.parse(localStorage.getItem(KEY)||'{}')};}catch{}
-  document.addEventListener('keydown',e=>{if(e.repeat)return;if(matches(e,shortcuts.palette)){e.preventDefault();e.stopImmediatePropagation();openCommands();return;}if(e.target?.closest?.('input,textarea,select,[contenteditable],dialog,.modal:not(.hidden)'))return;for(const[id,,fn]of commands)if(matches(e,shortcuts[id])){e.preventDefault();e.stopImmediatePropagation();Promise.resolve(fn()).catch(error=>status(error.message,true));return;}},true);
+  document.addEventListener('keydown',e=>{if(e.repeat)return;
+    if(e.key==='Escape'){
+      const menu=document.querySelector('.studio-menu:popover-open');
+      if(menu){e.preventDefault();e.stopImmediatePropagation();menu.hidePopover();document.querySelector('[popovertarget="'+menu.id+'"]')?.focus();return;}
+      // WebKit can leave focus on the page after tapping a modal button.
+      if(document.querySelector('.modal:not(.hidden)'))return;
+    }
+    if(matches(e,shortcuts.palette)){e.preventDefault();e.stopImmediatePropagation();openCommands();return;}if(e.target?.closest?.('input,textarea,select,[contenteditable],dialog,.modal:not(.hidden)'))return;for(const[id,,fn]of commands)if(matches(e,shortcuts[id])){e.preventDefault();e.stopImmediatePropagation();Promise.resolve(fn()).catch(error=>status(error.message,true));return;}},true);
   modalAccessibility();
 }

@@ -1,3 +1,4 @@
+import { selectWorkspace } from './serve.mjs';
 import assert from 'node:assert/strict';
 import { serve, browser, page } from './serve.mjs';
 const {srv,url}=await serve(), b=await browser(), logs=[]; let checks=0;
@@ -5,12 +6,12 @@ const ok=(value,message)=>{assert.ok(value,message);checks++;};
 try {
   const p=await page(b,url,{logs}); await p.goto(url+'/audionaut-beta/daw.html'); await p.waitForSelector('#pro-workspace-nav');
   await p.evaluate(async()=>{const base='/audionaut-beta/daw/js/',{store,makeProject}=await import(base+'state.js');const project=makeProject();project.channels[0].name='Automation test';project.sequences[0].steps[0][4]=1;store.loadProject(project);window.autoTest={store,engine:(await import(base+'engine.js')).engine};});
-  await p.getByRole('tab',{name:'Automation',exact:true}).click();await p.getByRole('button',{name:'Add lane',exact:true}).click();
+  await selectWorkspace(p, 'Automation');await p.getByRole('button',{name:'Add lane',exact:true}).click();
   const chart=p.locator('.automation-detail-canvas');
   const colorCount=async(locator,from=0,to=1)=>locator.evaluate((c,{from,to})=>{const ctx=c.getContext('2d'),x=Math.floor(c.width*from),w=Math.max(1,Math.floor(c.width*to)-x),data=ctx.getImageData(x,0,w,c.height).data;let count=0;for(let i=0;i<data.length;i+=4)if(data[i]>210&&data[i+1]>145&&data[i+1]<235&&data[i+2]<140)count++;return count;},{from,to});
   ok(await colorCount(chart,.7,.9)>30,'Single-point lane draws a held line across the chart');
   const rowLabel='Automation test automation parameter';
-  await p.getByRole('tab',{name:'Timeline',exact:true}).click();
+  await selectWorkspace(p, 'Timeline');
   const toggle=p.getByRole('button',{name:'Automation',exact:true});
   const before=await p.evaluate(()=>JSON.stringify(autoTest.store.project));
   await toggle.click(); await p.getByLabel(rowLabel,{exact:true}).waitFor();
@@ -62,7 +63,7 @@ try {
   ok(await p.evaluate(value=>JSON.stringify(autoTest.store.project.timeline.automation)===value,laneBefore),'Hiding overlay preserves lane points and playback enablement');
   ok(await p.locator('.song-track .ch-vol').first().isVisible(),'Normal region/channel controls return when overlay is hidden');
   await toggle.click();
-  await p.getByRole('tab',{name:'Automation',exact:true}).click();
+  await selectWorkspace(p, 'Automation');
   ok(await p.getByLabel('Point 2 beat',{exact:true}).inputValue()==='6','Detailed editor shows the same Timeline points');
   await p.getByLabel('Point 1 curve',{exact:true}).selectOption('step');
   await p.getByLabel('Point 2 value',{exact:true}).fill('2.5');await p.getByLabel('Point 2 value',{exact:true}).dispatchEvent('change');
@@ -70,7 +71,7 @@ try {
   ok(await colorCount(chart,.7,.9)>30,'Curve remains visible after the last point');
   const roundtrip=await p.evaluate(async()=>{const{exportProjectAsync,prepareProject}=await import('/audionaut-beta/daw/js/persistence.js');return JSON.stringify(prepareProject(await exportProjectAsync()).timeline.automation)===JSON.stringify(autoTest.store.project.timeline.automation);});
   ok(roundtrip,'Automation survives the existing song format round trip');
-  await p.getByRole('tab',{name:'Timeline',exact:true}).click();
+  await selectWorkspace(p, 'Timeline');
   ok(await toggle.getAttribute('aria-pressed')==='true','Overlay preference survives switching views');
   await p.getByLabel('Zoom',{exact:true}).selectOption('112');
   await p.locator('.song-scroll').evaluate(el=>{el.scrollLeft=250;});await p.waitForTimeout(80);
@@ -78,12 +79,12 @@ try {
   await p.screenshot({path:`/tmp/audionaut-automation-${process.env.AUDIONAUT_TEST_BROWSER||'chromium'}.png`,fullPage:false});
   await p.setViewportSize({width:390,height:844});
   ok(await p.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+2),'Automation overlay fits a phone viewport');
-  await p.getByRole('tab',{name:'Automation',exact:true}).click();
+  await selectWorkspace(p, 'Automation');
   ok(await p.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+2),'Detailed automation editor fits a phone viewport');
   await chart.scrollIntoViewIfNeeded();
   await p.screenshot({path:`/tmp/audionaut-automation-phone-${process.env.AUDIONAUT_TEST_BROWSER||'chromium'}.png`,fullPage:false});
   await p.setViewportSize({width:1400,height:900});
-  await p.getByRole('tab',{name:'Timeline',exact:true}).click();
+  await selectWorkspace(p, 'Timeline');
   await p.getByLabel('Zoom',{exact:true}).selectOption('56');
   await p.locator('.song-scroll').evaluate(el=>{el.scrollLeft=0;});await p.waitForTimeout(80);
   box=await geometry();
@@ -92,6 +93,72 @@ try {
   await p.evaluate(async()=>{const {makeProject}=await import('/audionaut-beta/daw/js/state.js');autoTest.store.loadProject(makeProject());});
   await p.mouse.up();
   ok(await p.evaluate(()=>autoTest.store.project.timeline.automation.length===0),'Loading another song cancels an unfinished automation gesture');
+  // Two copies of a filter on one track and an unrelated effect on another.
+  const missing = await p.evaluate(async () => {
+    const base='/audionaut-beta/daw/js/', {makeProject}=await import(base+'state.js');
+    const {PLUGIN_TYPES,makeSlot}=await import(base+'plugins.js');
+    const {automationTargets}=await import(base+'automation-view.js');
+    const project=makeProject(), track=project.channels[0];
+    track.fx=Object.keys(PLUGIN_TYPES).map(id=>makeSlot(id));
+    const available=automationTargets(project);
+    return track.fx.flatMap(slot=>PLUGIN_TYPES[slot.type].params
+      .filter(p=>!available.some(s=>s.target.slotId===slot.id && s.target.param===p.key))
+      .map(p=>slot.type+'.'+p.key));
+  });
+  assert.deepEqual(missing, [], 'Every registered effect exposes all its declared controls');
+  const ids = await p.evaluate(async () => {
+    const {store} = autoTest, {makeSlot,addSend} = await import('/audionaut-beta/daw/js/plugins.js');
+    const first = makeSlot('filter'), second = makeSlot('filter');
+    store.setChannelProp(0, 'fx', [first, second]);
+    addSend(store.channel(0), 'delay', .3);
+    store.setChannelProp(1, 'inserts', [makeSlot('comp')]);
+    window.testFilters=[first.id,second.id];
+    return { track:store.channel(0).id, name:store.channel(0).name, second:second.id };
+  });
+  const trackPicker = p.getByLabel(ids.name + ' automation parameter', {exact:true});
+  // Track labels already exist while the store's animation-frame refresh is pending.
+  await trackPicker.locator('optgroup[label="FX 2 · Coinjoin"]').waitFor({state:'attached'});
+  const groups = await trackPicker.locator('optgroup').evaluateAll(nodes=>nodes.map(n=>n.label));
+  ok(groups.includes('FX 1 · Coinjoin') && groups.includes('FX 2 · Coinjoin') && groups.includes('Shared delay return'), 'Installed effects and shared returns are grouped');
+  ok(!groups.some(g=>g.startsWith('Insert')), 'Another channel’s effects are excluded');
+  const mode = await trackPicker.locator('optgroup[label="FX 2 · Coinjoin"] option').filter({hasText:/^Mode$/}).getAttribute('value');
+  await trackPicker.selectOption(mode);
+  await clickPoint(3,2);
+  await selectWorkspace(p, 'Automation');
+  const pointValue=p.getByLabel('Point 1 value',{exact:true});
+  await pointValue.selectOption({label:'High-pass'});
+  const verify=await p.evaluate(async () => {
+    const {store,engine}=autoTest, [first,second]=testFilters;
+    const {exportProjectAsync,prepareProject}=await import('/audionaut-beta/daw/js/persistence.js');
+    const {compilePlaybackPlan}=await import('/audionaut-beta/daw/js/playback-plan.js');
+    const round=prepareProject(await exportProjectAsync());
+    const lane=round.timeline.automation.find(l=>l.target.slotId===second);
+    engine.ensureContext();
+    for(const event of compilePlaybackPlan(round).events.filter(e=>e.type==='automation'&&e.target.slotId===second&&e.beat===0))
+      engine.scheduleAutomation({...event,time:engine.ctx.currentTime});
+    const chain=engine.chains.get('c0');
+    const filters=[first,second].map(id=>chain.slots.get(id).nodes.f1.type);
+    const send={trackId:store.channel(0).id,kind:'effectParam',slotId:'send:delay',param:'amount'};
+    const ret={trackId:'master',kind:'effectParam',slotId:'return:delay',param:'ret'};
+    for(const [target,value] of [[send,.64],[ret,.42]]) {
+      store.setAutomationLane({target,points:[{beat:0,value,curve:'step'}]});
+      engine.scheduleAutomation({target,value,beat:0,time:engine.ctx.currentTime,curve:'step'});
+    }
+    await new Promise(resolve=>setTimeout(resolve,80));
+    const sends=[chain.sendFx.delay.amt.gain.value,engine.delayFx.ret.gain.value];
+    store.setChannelProp(0,'fx',[...store.channel(0).fx].reverse());
+    const reordered=prepareProject(await exportProjectAsync()).timeline.automation.find(l=>l.target.slotId===second);
+    store.setChannelProp(0,'fx',store.channel(0).fx.filter(s=>s.id!==second));
+    const after=prepareProject(await exportProjectAsync());
+    return { filters,sends, stepped:lane.points.every(p=>p.curve==='step'), same:reordered.id===lane.id,
+      clean:!after.timeline.automation.some(l=>l.target.slotId===second)&&after.timeline.automation.length===2 };
+  });
+  ok(verify.stepped && verify.same && verify.clean,'Choice points persist, follow reorders and are removed with their effect');
+  assert.deepEqual(verify.filters,['lowpass','highpass']);
+  ok(verify.sends.every((v,i)=>Math.abs(v-[.64,.42][i])<.001),'Automation drives the selected strip send and shared return independently');
+  const newLane=p.getByLabel('New lane',{exact:true});
+  await p.getByLabel('Track',{exact:true}).selectOption(ids.track);
+  ok(await newLane.locator('optgroup[label="FX 1 · Coinjoin"]').count()===1,'Detailed editor groups parameters by installed effect');
   ok(!logs.some(l=>l.startsWith('pageerror:')),logs.join('\n'));
   console.log(JSON.stringify({checks,browser:process.env.AUDIONAUT_TEST_BROWSER||'chromium'}));
 } catch(error){console.error(logs);for(const c of b.contexts())for(const p of c.pages())console.error(await p.evaluate(()=>({labels:[...document.querySelectorAll('.song-automation-header select')].map(n=>n.getAttribute('aria-label')),scroll:document.querySelector('.song-scroll')?.scrollTop,mode:document.querySelector('.song-automation-toggle')?.getAttribute('aria-pressed')})).catch(()=>({})));throw error;} finally {await b.close();srv.close();}

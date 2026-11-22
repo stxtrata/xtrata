@@ -1,3 +1,4 @@
+import { selectWorkspace } from './serve.mjs';
 import assert from 'node:assert/strict';
 import { serve, browser, page } from './serve.mjs';
 const { srv, url } = await serve(),
@@ -15,7 +16,7 @@ try {
     const { store, makeProject } = await import('/audionaut-beta/daw/js/state.js');
     store.loadProject(makeProject());
   });
-  await p.getByRole('tab', { name: 'New instruments', exact: true }).click();
+  await selectWorkspace(p, 'New instruments');
   for (const name of ['Drum Rack', 'Sample Granulator', 'Concert Piano'])
     await p.getByRole('button', { name: '+ ' + name, exact: true }).click();
   await p
@@ -151,10 +152,10 @@ try {
   assert.equal(result.rejected, true);
   assert.equal(result.pianoZone, 1);
   assert.equal(result.ir.sourceTrackId, result.sourceId);
-  await p.getByRole('tab', { name: 'On-chain publishing', exact: true }).click();
+  await selectWorkspace(p, 'On-chain publishing');
   await p.getByRole('button', { name: 'Prepare dependencies', exact: true }).waitFor();
   await p.setViewportSize({ width: 390, height: 844 });
-  await p.getByRole('tab', { name: 'New instruments', exact: true }).click();
+  await selectWorkspace(p, 'New instruments');
   assert.equal(
     await p.evaluate(() => document.documentElement.scrollWidth > innerWidth + 2),
     false

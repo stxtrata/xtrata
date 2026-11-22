@@ -87,3 +87,17 @@
 .mixer-fader::-webkit-slider-thumb{-webkit-appearance:none;width:26px;height:12px;margin-left:-11px;border:1px solid #6b7d8b;border-radius:2px;background:linear-gradient(#e4edf4,#a9bac6 43%,#364853 44%,#364853 55%,#b3c5d1 56%,#d9e5ed);box-shadow:0 2px 4px #0009}
 .mixer-fader::-moz-range-track{width:5px;height:100%;border:1px solid #070c12;background:#0b141e;border-radius:3px;box-shadow:1px 0 #4d5c6a}
 .mixer-fader::-moz-range-thumb{width:26px;height:12px;border:1px solid #6b7d8b;border-radius:2px;background:linear-gradient(#e4edf4,#a9bac6 43%,#364853 44%,#364853 55%,#b3c5d1 56%,#d9e5ed);box-shadow:0 2px 4px #0009}
+
+.song-navigation{display:flex;align-items:center;gap:6px;margin:4px 0 8px}
+.song-navigation button{min-height:36px}
+.song-navigation button:last-child{margin-inline-start:auto}
+.song-navigation [aria-pressed=true]{background:#29434a;border-color:#71d7cc;color:#e8ffff}
+.song-scroll-mode .song-scroll,.song-scroll-mode .song-canvas{touch-action:pan-x pan-y pinch-zoom}
+.song-scroll-mode .song-canvas{cursor:default}
+.song-names-only .song-track{pointer-events:none}
+.song-track-name{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#c4d3df;font-size:12px}
+.song-touch-controls .song-track .channel-controls{display:grid;grid-template-columns:repeat(auto-fit,minmax(44px,1fr));gap:3px;align-items:center}
+.song-touch-controls .song-track .ch-btn,.song-touch-controls .song-track .ch-vol{min-width:0;width:100%;height:44px}
+.song-touch-controls .song-track .ch-name,.song-touch-controls .song-track .synth-picker{grid-column:span 2;width:100%;min-width:0;max-width:100%}
+.song-touch-controls .song-track .synth-picker-btn{width:100%;min-width:0;height:44px}
+@media(any-pointer:coarse){.song-navigation button{min-height:44px;min-width:52px}}

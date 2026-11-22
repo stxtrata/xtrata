@@ -109,7 +109,9 @@ export async function loadOnboardAudio(source, context, { signal } = {}) {
   const bytes = base64ToBytes(entry.audioData);
   if ((await audioHash(bytes)) !== metadata.audioSha256)
     throw new Error("Embedded audio failed its integrity check.");
-  const audioBuffer = await context.decodeAudioData(bytes.slice(0));
+  const audioBuffer = typeof AUDIONAUT_STANDALONE !== "undefined"
+    ? await context.decodeAudioData(bytes.slice(0))
+    : await (await import("./audio-decode.js")).decodeAudioBytes(context, bytes, { signal });
   validateSoundMetadata(metadata, audioBuffer.duration);
   return {
     audioBuffer,

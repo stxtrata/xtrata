@@ -158,7 +158,8 @@ wireGlobal();
 //   velAt(e, el) optional; default: lower on the key = louder (0.45 … 1.0)
 export function attachKeyboard(el, { keyAt, inst, velAt, hitTest, prefix = "kb" }) {
   const tag = `${prefix}${++seq}`;
-  const ptrs = new Map(); // pointerId -> midi currently held by that pointer (or null when off the keys)
+  const ptrs = new Map(), latched = new Map();
+  let sustain = false, pressSerial = 0;
   const rootNode = el.getRootNode();
   const hitRoot = rootNode && rootNode.elementFromPoint ? rootNode : document;
   const vel =
@@ -174,13 +175,23 @@ export function attachKeyboard(el, { keyAt, inst, velAt, hitTest, prefix = "kb" 
     return n && el.contains(n) ? keyAt(n) : null;
   };
   const press = (e, k) => {
-    ptrs.set(e.pointerId, k.midi);
-    noteOn(`${tag}:${e.pointerId}`, inst(), k.midi, vel(e, k.el));
+    const src = tag + ':' + e.pointerId + ':' + ++pressSerial;
+    const slot = inst(), note = slot + ':' + k.midi;
+    if (latched.has(note)) { noteOff(latched.get(note)); latched.delete(note); }
+    ptrs.set(e.pointerId, { midi:k.midi, src, note });
+    noteOn(src, slot, k.midi, vel(e, k.el));
+  };
+  const lift = (pointer, pedal) => {
+    if (!pointer?.src) return;
+    if (pedal && sustain) {
+      if (latched.has(pointer.note)) noteOff(latched.get(pointer.note));
+      latched.set(pointer.note, pointer.src);
+    }
+    else noteOff(pointer.src);
   };
   const end = (e) => {
-    if (!ptrs.has(e.pointerId)) return;
+    lift(ptrs.get(e.pointerId), e.type === 'pointerup');
     ptrs.delete(e.pointerId);
-    noteOff(`${tag}:${e.pointerId}`);
   };
   const onDown = (e) => {
     if (e.button > 0) return;
@@ -196,24 +207,36 @@ export function attachKeyboard(el, { keyAt, inst, velAt, hitTest, prefix = "kb" 
   };
   const onMove = (e) => {
     if (!ptrs.has(e.pointerId)) return;
+    if (ptrs.get(e.pointerId)?.locked) return;
     if (e.pointerType === "mouse" && e.buttons === 0) return end(e); // missed the up (e.g. outside a frame)
     const k = hit(e);
     const cur = ptrs.get(e.pointerId);
     const m = k ? k.midi : null;
-    if (m === cur) return;
-    noteOff(`${tag}:${e.pointerId}`);
+    if (m === (cur?.midi ?? null)) return;
+    lift(cur, true);
     if (k) press(e, k);
     else ptrs.set(e.pointerId, null); // left the keys: silent until it comes back
   };
   const context = e => e.preventDefault();
   const reset = ({detail}={}) => {
     const sources=detail?.sources;
-    for(const pointerId of ptrs.keys())if(!detail?.prefix&&!sources || detail?.prefix&&`${tag}:`.startsWith(detail.prefix) || sources?.includes(`${tag}:${pointerId}`))ptrs.delete(pointerId);
+    const matches = src => sources ? sources.includes(src) : !detail?.prefix || src?.startsWith(detail.prefix);
+    for (const [id, pointer] of ptrs) if (matches(pointer?.src)) ptrs.delete(id);
+    for (const [note,src] of latched) if (matches(src)) latched.delete(note);
   };
-  const events={pointerdown:onDown,pointermove:onMove,pointerup:end,pointercancel:end,lostpointercapture:end,contextmenu:context};
+  const events={pointerdown:onDown,pointermove:onMove,pointerup:end,pointercancel:end,lostpointercapture:end,contextmenu:context,dblclick:context};
   for(const [name,fn] of Object.entries(events))el.addEventListener(name,fn);
+  // Notes use pointer events. Suppress Safari's tap-to-zoom default only on the playing surface.
+  const touchEnd = e => { if (e.cancelable) e.preventDefault(); };
+  el.addEventListener('touchend', touchEnd, {passive:false});
   document.addEventListener('performance-reset',reset);
   const previousTouch=el.style.touchAction;el.style.touchAction='none';
-  const release=()=>{allOff(`${tag}:`);ptrs.clear();};
-  return {tag,release,dispose(){release();for(const [name,fn] of Object.entries(events))el.removeEventListener(name,fn);document.removeEventListener('performance-reset',reset);el.style.touchAction=previousTouch;}};
+  const release=()=>{allOff(`${tag}:`);ptrs.clear();latched.clear();};
+  return {tag,release,
+    keepPointers() { for (const [id,p] of ptrs) { if (p) p.locked = true; else ptrs.set(id, {locked:true}); } },
+    setSustain(on) {
+      sustain = on;
+      if (!on) { for (const src of latched.values()) noteOff(src); latched.clear(); }
+    },
+    dispose(){release();el.removeEventListener('touchend',touchEnd);for(const [name,fn] of Object.entries(events))el.removeEventListener(name,fn);document.removeEventListener('performance-reset',reset);el.style.touchAction=previousTouch;}};
 }

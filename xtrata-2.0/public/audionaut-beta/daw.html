@@ -13,6 +13,7 @@
     <link rel="stylesheet" href="daw/css/style.css?v=20261118" />
     <meta name="robots" content="noindex" />
     <link rel="stylesheet" href="daw/css/pro.css" />
+    <link rel="stylesheet" href="daw/css/studio.css" />
   </head>
   <body>
     <div id="app">
@@ -61,11 +62,11 @@
           <button
             id="btn-play"
             class="transport-btn"
-            title="Play / Pause (Space)"
+            aria-label="Play" title="Play / Pause (Space)"
           >
             ▶
           </button>
-          <button id="btn-stop" class="transport-btn" title="Stop">■</button>
+          <button id="btn-stop" aria-label="Stop" class="transport-btn" title="Stop">■</button>
           <div class="lcd">
             <div class="lcd-row">
               <label>BPM</label>
@@ -264,6 +265,8 @@
         <div class="synth-dock-bar">
           <div id="synth-dock-tabs" class="synth-dock-tabs" role="tablist" aria-label="Synths"></div>
           <span class="synth-dock-hint">Type A–L to play · Z / X octave · Space plays the song</span>
+          <button id="play-live-synth" class="synth-dock-btn live-launch" aria-haspopup="dialog" title="Play this instrument full screen">Play live</button>
+          <button id="expand-synth-keys" class="synth-dock-btn" type="button" aria-haspopup="dialog" title="Play this instrument on a full-width keyboard">Expand keyboard</button>
           <button id="synth-dock-size" class="synth-dock-btn" type="button" title="Make the synth panel taller or shorter">⤢</button>
           <button id="synth-dock-toggle" class="synth-dock-btn" type="button" aria-expanded="true" title="Hide the synth panel">▾</button>
         </div>
@@ -592,9 +595,10 @@
         <h2>
           <span id="beats-title">Beat Presets</span>
           <span class="dim-note"
-            >— loads kit + pattern into the current sequence</span
+            >— add a beat layer</span
           >
         </h2>
+        <p id="beats-destination"></p>
         <div class="beats-filter">
           <select id="beats-collection" aria-label="Beat collection">
             <optgroup label="Drum beats · drums only">
@@ -629,12 +633,10 @@
         </div>
         <p id="beats-summary" class="beat-meta"></p>
         <div class="beats-audition" aria-label="Beat audition controls">
-          <button id="beats-play" class="primary">▶ Play</button>
-          <button id="beats-stop">■ Stop</button>
           <button id="beats-prev">← Previous</button>
           <button id="beats-next">Next →</button>
           <span class="beat-meta"
-            >Keep playing while you browse and load beats.</span
+            >Preview a beat to hear it on its own. Apply beat adds it to the selected sequence.</span
           >
         </div>
         <div id="beats-list"></div>
