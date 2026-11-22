@@ -1,3 +1,4 @@
+import { selectWorkspace } from './serve.mjs';
 import { songPosition, songBarMarks } from '../daw/js/song-ruler.js';
 import assert from 'node:assert/strict';
 import { makeProject, makeSequence } from '../daw/js/state.js';
@@ -182,7 +183,7 @@ try {
     engine.setBuffer(1, b);
     window.testState.before = JSON.stringify(store.project);
   });
-  await tab.getByRole('tab', { name: 'Timeline', exact: true }).click();
+  await selectWorkspace(tab, 'Timeline');
   await tab.waitForSelector('.song-canvas');
   ok(
     await tab.evaluate(() => JSON.stringify(testState.store.project) === testState.before),
@@ -319,8 +320,8 @@ try {
     'Mobile view does not widen page'
   );
   await tab.setViewportSize({ width: 1400, height: 900 });
-  await tab.getByRole('tab', { name: 'Patterns', exact: true }).click();
-  await tab.getByRole('tab', { name: 'Timeline', exact: true }).click();
+  await selectWorkspace(tab, 'Sequences');
+  await selectWorkspace(tab, 'Timeline');
   await tab.waitForSelector('.song-canvas');
   ok((await tab.locator('.song-canvas').count()) === 1, 'View switches dispose old surface');
   if (process.env.SCREENSHOT_DIR) {

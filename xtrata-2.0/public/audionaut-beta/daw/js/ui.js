@@ -1,5 +1,6 @@
 // ui.js — builds and updates the DOM: channels, step grid, sequence bar, modals.
 
+import { recordEffectControl } from './pro-automation-ui.js';
 import {
   store,
   NUM_CHANNELS,
@@ -42,8 +43,8 @@ import { packSoundRow, packSoundNotice, prefetchPack } from "./pack-library.js";
 import { analogBeats, ANALOG_PERSONAS } from "./analog-kits.js";
 import { ANALOG_PACK_ID } from "./analog-pack.js";
 import { EXPANDED_COMBINED_BEAT_PRESETS as COMBINED_BEAT_PRESETS } from "./combined-beats.js";
+import { auditionBeat } from "./beat-audition.js";
 import { loadBeatPreset } from "./l1-beat-loader.js";
-import { record as recordHistory } from "./history.js";
 import { SYNTH_BANK } from "./synths.js";
 import { createSynthPicker } from "./synth-picker.js";
 import { changeSynth } from "./synth-selection.js";
@@ -175,7 +176,7 @@ function sampleControls(ch) {
   const loadBtn = el("button", "ch-btn load", "⊕");
   loadBtn.title = "Load sample";
   loadBtn.addEventListener("click", () => openLoader(ch));
-  const previewBtn = el("button", "ch-btn", "▹");
+  const previewBtn = el("button", "ch-btn preview", "▹");
   previewBtn.title = "Preview sample";
   previewBtn.addEventListener("click", () => engine.trigger(ch));
 
@@ -193,7 +194,7 @@ function sampleControls(ch) {
     soloBtn.classList.toggle("active", store.channel(ch).solo);
   });
 
-  const trimBtn = el("button", "ch-btn", "✂");
+  const trimBtn = el("button", "ch-btn trim", "✂");
   trimBtn.title = "Trim / waveform";
   trimBtn.addEventListener("click", () => openTrim(ch));
 
@@ -427,7 +428,7 @@ function instrumentControls(i) {
   insBtn.addEventListener("click", () => openChain(i, true, "inserts"));
   markChainButtons(instr, fxBtn, insBtn);
 
-  const previewBtn = el("button", "ch-btn", "▹");
+  const previewBtn = el("button", "ch-btn preview", "▹");
   previewBtn.title = "Preview (C3)";
   previewBtn.addEventListener("click", () => {
     setMidiTarget(i);
@@ -1162,6 +1163,9 @@ export function initLoaderModal() {
       source = { type: activeTab, value };
     }
     const picker = samplePicker;
+    const channel = loaderChannel;
+    const button = $('#loader-load');
+    if (!picker) button.dispatchEvent(new Event('audionaut-sample-loading'));
     samplePicker = null;
     $("#modal-loader").classList.add("hidden");
     try {
@@ -1171,17 +1175,19 @@ export function initLoaderModal() {
         setStatus(`Loaded "${name}" → ${picker.label}`);
         return;
       }
-      setStatus(`Loading sample for channel ${loaderChannel + 1}…`);
-      const name = await loadSample(loaderChannel, source);
+      setStatus(`Loading sample for channel ${channel + 1}…`);
+      const name = await loadSample(channel, source);
       if (source.label) {
-        store.setChannelProp(loaderChannel, "sampleName", source.label);
-        store.setChannelProp(loaderChannel, "name", source.label.slice(0, 24));
+        store.setChannelProp(channel, "sampleName", source.label);
+        store.setChannelProp(channel, "name", source.label.slice(0, 24));
       }
-      refreshChannelRow(loaderChannel);
+      refreshChannelRow(channel);
       setStatus(
-        `Loaded "${source.label || name}" → channel ${loaderChannel + 1}`,
+        `Loaded "${source.label || name}" → channel ${channel + 1}`,
       );
+      button.dispatchEvent(new Event('audionaut-sample-ready'));
     } catch (err) {
+      button.dispatchEvent(new Event('audionaut-sample-failed'));
       setStatus(`Load failed: ${err.message}`, true);
     }
   });
@@ -1371,7 +1377,7 @@ function trimStartPlayback() {
   tick();
 }
 
-function openTrim(ch, step = null) {
+export function openTrim(ch, step = null) {
   trimStopPlayback();
   editorScope = { ch, step };
   const c = store.channel(ch);
@@ -1542,7 +1548,7 @@ const refreshOwnerRow = (isInst, i) =>
 // Light the FX / INS buttons when their chain has an active plugin.
 function markChainButtons(owner, fxBtn, insBtn) {
   if (!owner) return;
-  if (!Array.isArray(owner.fx) || !Array.isArray(owner.inserts)) normalizeOwner(owner);
+  if (!Array.isArray(owner.fx) || !Array.isArray(owner.inserts)) normalizeOwner(owner, store.project.timeline.automation);
   const live = (arr) => (arr || []).filter((s) => s?.enabled).length;
   // the strip's delay / reverb sends count as FX (they are rows in the FX list)
   const nFx = live(owner.fx) + sendRows(owner).filter((r) => r.enabled).length;
@@ -1559,7 +1565,7 @@ const CHAIN_LABEL = { inserts: "insert", fx: "FX" };
 const chainOwner = () => ownerOf(chain.isInst, chain.idx);
 const chainSlots = (kind = chain.kind) => {
   const o = chainOwner();
-  if (!Array.isArray(o.fx) || !Array.isArray(o.inserts) || !o.sends) normalizeOwner(o);
+  if (!Array.isArray(o.fx) || !Array.isArray(o.inserts) || !o.sends) normalizeOwner(o, store.project.timeline.automation);
   return o[kind];
 };
 // What the list shows: the plugin slots, then (FX tab) the strip's delay / reverb sends as
@@ -1655,6 +1661,9 @@ function openPluginFace(slotId) {
     setParams(o) {
       const sl = find();
       if (!sl) return;
+      const previous = link.getParams();
+      for (const [key, value] of Object.entries(o))
+        if (previous[key] !== value) recordEffectControl(ownerOf(isInst, idx).id, sl, key, value);
       const { own, shared } = splitShared(sl.type, o);
       sl.params = { ...pluginDefaults(sl.type), ...(sl.params || {}), ...own };
       if (Object.keys(shared).length) writeShared(sl.type, shared);
@@ -1716,6 +1725,7 @@ function renderParams(slot) {
   };
   const shared = sharedKeys(t);
   const live = (key, v) => {
+    recordEffectControl(chainOwner().id, slot, key, v);
     P[key] = v;
     if (shared.has(key)) writeShared(slot.type, { [key]: v });
     else slot.params = { ...pluginDefaults(slot.type), ...slot.params, [key]: v };
@@ -1909,12 +1919,12 @@ function renderChain() {
   $("#chain-add-btn").textContent = `+ Add ${CHAIN_LABEL[chain.kind]}`;
 }
 
-function openChain(idx, isInst = false, kind = "inserts") {
+export function openChain(idx, isInst = false, kind = "inserts") {
   chain.idx = idx;
   chain.isInst = isInst;
   chain.kind = kind;
   engine.ensureContext();
-  normalizeOwner(chainOwner());
+  normalizeOwner(chainOwner(), store.project.timeline.automation);
   $("#modal-chain").classList.remove("hidden");
   renderChain();
 }
@@ -1990,67 +2000,75 @@ const currentBeatCollection = () => {
 const beatId = (preset) =>
   preset.id ||
   `original-${preset.name.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`;
-let pendingBeatId = null;
-function syncBeatTransport() {
-  const play = $("#beats-play");
-  if (!play) return;
-  play.textContent = engine.isPlaying ? "❚❚ Pause" : "▶ Play";
-  play.classList.toggle("active", engine.isPlaying);
-  $("#beats-stop").disabled = !engine.isPlaying;
+let pendingBeatId = null, beatDestination, focusedBeat;
+let beatPreview = null;
+function stopBeatAudition(clearStatus = true) {
+  if (!beatPreview) return;
+  beatPreview.controller.abort();
+  beatPreview = null;
+  if (clearStatus) $("#beats-status").textContent = "";
+  syncBeatRows();
+}
+async function previewCatalogPreset(preset) {
+  const wasActive = beatPreview?.preset === preset;
+  stopBeatAudition();
+  if (wasActive || beatLoad) return;
+  const controller = new AbortController();
+  focusedBeat = beatId(preset);
+  beatPreview = {preset, controller, loading:true};
+  syncBeatRows();
   const status = $("#beats-status");
-  if (!beatLoad && /^(Loaded|Playing) "/.test(status.textContent))
-    status.textContent = status.textContent
-      .replace(/^(Loaded|Playing)/, engine.isPlaying ? "Playing" : "Loaded")
-      .replace(
-        /Choose another beat to switch while playing\.|Press Play here to audition, then choose another beat\./,
-        engine.isPlaying
-          ? "Choose another beat to switch while playing."
-          : "Press Play here to audition, then choose another beat.",
-      );
+  status.textContent = `Preparing preview of ${preset.name}…`;
+  try {
+    await auditionBeat(preset, controller.signal, (loaded, total, name) => {
+      if (!controller.signal.aborted) status.textContent = `Preparing ${preset.name} · ${loaded}/${total} sounds · ${name}`;
+    });
+    if (controller.signal.aborted) return;
+    beatPreview.loading = false;
+    status.textContent = `Previewing ${preset.name} at ${store.project.bpm} BPM. Apply beat to add it to your song.`;
+  } catch (error) {
+    if (controller.signal.aborted) return;
+    stopBeatAudition(false);
+    status.textContent = `Could not preview ${preset.name}. ${error.message}`;
+  }
+  syncBeatRows();
 }
 function syncBeatRows() {
-  const loaded = store.project.lastBeat?.id;
   for (const row of $("#beats-list").children) {
-    row.classList.toggle("beat-current", row.dataset.beatId === loaded);
+    if (!row.beatPreset) continue;
+    const active = beatPreview?.preset === row.beatPreset;
+    row.classList.toggle("beat-current", row.dataset.beatId === focusedBeat);
     row.classList.toggle("beat-loading", row.dataset.beatId === pendingBeatId);
-    const button = row.querySelector("button");
-    if (button)
-      button.textContent =
-        row.dataset.beatId === pendingBeatId
-          ? "Loading…"
-          : row.dataset.beatId === loaded
-            ? "Reload"
-            : "Load";
+    const preview = row.querySelector(".beat-preview");
+    preview.textContent = active ? beatPreview.loading ? "Cancel" : "■ Stop" : "▶ Preview";
+    preview.setAttribute("aria-pressed", String(active));
+    preview.setAttribute("aria-label", (active ? "Stop preview of " : "Preview ") + row.beatPreset.name);
+    preview.disabled = !!beatLoad;
+    row.querySelector(".beat-apply").textContent = row.dataset.beatId === pendingBeatId ? "Loading…" : "Apply beat";
   }
 }
 async function applyCatalogPreset(preset) {
+  stopBeatAudition();
   beatLoad?.abort();
   const controller = new AbortController();
   beatLoad = controller;
-  pendingBeatId = beatId(preset);
+  pendingBeatId = focusedBeat = beatId(preset);
   syncBeatRows();
   const status = $("#beats-status");
   $("#beats-cancel").hidden = false;
   status.textContent = `Loading ${preset.name}…${engine.isPlaying ? " Current beat keeps playing." : ""}`;
-  recordHistory(true);
   try {
     await loadBeatPreset(preset, {
       signal: controller.signal,
+      sequence: beatDestination,
       onProgress: (loaded, total, name) => {
         if (beatLoad === controller && !controller.signal.aborted)
           status.textContent = `Loading ${preset.name} · ${loaded}/${total} sounds · ${name}${engine.isPlaying ? " · current beat keeps playing" : ""}`;
       },
     });
     if (beatLoad !== controller) return;
-    $("#bpm").value = preset.bpm;
-    $("#swing").value = preset.swing || 0;
-    $("#swing-val").textContent = `${preset.swing || 0}%`;
-    $("#chk-continuous").checked = false;
-    $("#btn-play").textContent = engine.isPlaying ? "❚❚" : "▶";
-    $("#btn-play").classList.toggle("active", engine.isPlaying);
-    refreshAllChannels();
-    recordHistory(true);
-    status.textContent = `${engine.isPlaying ? "Playing" : "Loaded"} "${preset.name}" · ${preset.genre} · ${preset.bpm} BPM. ${engine.isPlaying ? "Choose another beat to switch while playing." : "Press Play here to audition, then choose another beat."}`;
+    buildChannels();
+    status.textContent = `Applied "${preset.name}" to sequence ${store.project.sequences.indexOf(beatDestination)+1} at the song tempo of ${store.project.bpm} BPM. Use Undo to restore the previous beat layer.`;
     setStatus(status.textContent);
   } catch (error) {
     if (beatLoad !== controller) return;
@@ -2064,7 +2082,6 @@ async function applyCatalogPreset(preset) {
       pendingBeatId = null;
       $("#beats-cancel").hidden = true;
       syncBeatRows();
-      syncBeatTransport();
     }
   }
 }
@@ -2112,14 +2129,15 @@ function renderBeatsList() {
       "Drums only, from Bitcoin L1 single hits (OB1 + OG). Toms, rims and shakers are retunes of those hits. ★ Start here lists the essentials first.",
     "drums-analog":
       "Drums only, played on the Analog Kit: real acoustic drum recordings (CC0) voiced on six kits — Jazz Club, Rusty, Unruly, Swirly, Concert and Modern Mix. Pick a kit to hear any beat on it. ★ Start here lists the essentials first.",
-    l1: "Bitcoin samples only (OB1 + OG hits). Loads the current pattern; other tracks are muted.",
+    l1: "Bitcoin samples only (OB1 + OG hits). Adds a beat layer to the selected sequence.",
     combined:
-      "L1 percussion plus the embedded bank. Loads the current pattern; other tracks are muted.",
+      "L1 percussion plus the embedded bank. Adds a beat layer to the selected sequence.",
     tonal: "Embedded kit; ensembles add bass, plucks, keys, pads and chord stabs.",
     original: "Four-bar arrangements with bass and melody on the embedded sound bank.",
   }[key];
   $("#beats-summary").textContent =
     `${matches.length} of ${collection.length} beats · ${kitNote} ${isAnalog ? "The Analog Kit sample pack (7.9 MB) downloads the first time you load a beat from it." : "Local today / planned L2."}`;
+  if (beatPreview && !matches.includes(beatPreview.preset)) stopBeatAudition();
   const list = $("#beats-list");
   list.innerHTML = "";
   matches.forEach((preset) => {
@@ -2191,15 +2209,18 @@ function renderBeatsList() {
       }
       info.append(details);
     }
-    const loadBtn = el("button", "primary", "Load");
+    const buttons = el("div", "beat-actions");
+    const preview = el("button", "beat-preview", "▶ Preview");
+    preview.addEventListener("click", () => previewCatalogPreset(preset));
+    const loadBtn = el("button", "primary beat-apply", "Apply beat");
     loadBtn.addEventListener("click", async () => {
       await applyCatalogPreset(preset);
     });
-    row.append(info, loadBtn);
+    buttons.append(preview, loadBtn);
+    row.append(info, buttons);
     list.appendChild(row);
   });
   syncBeatRows();
-  syncBeatTransport();
   $("#beats-prev").disabled = !matches.length;
   $("#beats-next").disabled = !matches.length;
   if (!matches.length)
@@ -2238,11 +2259,7 @@ export function initBeatsModal() {
   };
   kitSelect.addEventListener("change", () => {
     renderBeatsList();
-    // Hearing the same beat on another kit: reload the current Analog beat in the new voicing.
-    const loaded = store.project.lastBeat;
-    if (loaded?.collection !== "analog") return;
-    const row = [...$("#beats-list").children].find((r) => r.dataset.beatId === loaded.id);
-    if (row?.beatPreset) applyCatalogPreset(row.beatPreset);
+
   });
   $("#beats-collection").addEventListener("change", () => {
     updateGenres();
@@ -2254,6 +2271,9 @@ export function initBeatsModal() {
   const open = (collection) => {
     if (beatLoad && !beatLoad.signal.aborted) return;
     beatLoad = null;
+    beatDestination = store.seq;
+    focusedBeat = null;
+    $("#beats-destination").textContent = `Beat layer · Sequence ${store.project.currentSequence+1} · ${store.project.bpm} BPM. Applying another beat replaces untouched beat parts here. Your edits stay in the song.`;
     pendingBeatId = null;
     $("#beats-cancel").hidden = true;
     $("#beats-collection").value = collection;
@@ -2266,20 +2286,12 @@ export function initBeatsModal() {
     warmAnalogPack();
   };
   $("#btn-beats").addEventListener("click", () => open("drums-studio"));
-  $("#beats-play").addEventListener("click", () => {
-    $("#btn-play").click();
-    syncBeatTransport();
-  });
-  $("#beats-stop").addEventListener("click", () => {
-    $("#btn-stop").click();
-    syncBeatTransport();
-  });
   const advance = (direction) => {
     const rows = [...$("#beats-list").children].filter((row) => row.beatPreset);
     if (!rows.length) return;
     const current = rows.findIndex(
       (row) =>
-        row.dataset.beatId === (pendingBeatId || store.project.lastBeat?.id),
+        row.dataset.beatId === focusedBeat,
     );
     const next =
       current < 0
@@ -2288,19 +2300,20 @@ export function initBeatsModal() {
           : rows.length - 1
         : (current + direction + rows.length) % rows.length;
     rows[next].scrollIntoView({ block: "nearest" });
-    applyCatalogPreset(rows[next].beatPreset);
+    focusedBeat = rows[next].dataset.beatId;
+    syncBeatRows();
+    rows[next].querySelector(".beat-preview").focus({preventScroll:true});
+    if (beatPreview && beatPreview.preset !== rows[next].beatPreset) void previewCatalogPreset(rows[next].beatPreset);
   };
   $("#beats-prev").addEventListener("click", () => advance(-1));
   $("#beats-next").addEventListener("click", () => advance(1));
-  for (const selector of ["#btn-play", "#btn-stop"])
-    $(selector).addEventListener("click", () =>
-      queueMicrotask(syncBeatTransport),
-    );
-  document.addEventListener("keydown", (event) => {
-    if (event.code === "Space") queueMicrotask(syncBeatTransport);
-  });
+  store.on("load", () => stopBeatAudition());
+  document.addEventListener("visibilitychange", () => { if (document.hidden) stopBeatAudition(); });
+  window.addEventListener("pagehide", () => stopBeatAudition());
+  document.addEventListener("transport-stop", () => stopBeatAudition());
   $("#beats-cancel").addEventListener("click", () => beatLoad?.abort());
   $("#beats-close").addEventListener("click", () => {
+    stopBeatAudition();
     beatLoad?.abort();
     $("#modal-beats").classList.add("hidden");
   });
@@ -2332,7 +2345,7 @@ export function initModalDismissal() {
   document.querySelectorAll(".modal").forEach((m) => {
     m.addEventListener("click", (e) => {
       if (e.target === m) {
-        if (m.id === "modal-beats") beatLoad?.abort();
+        if (m.id === "modal-beats") { stopBeatAudition(); beatLoad?.abort(); }
         engine.stopPreview();
         trimStopPlayback();
         m.classList.add("hidden");
@@ -2341,6 +2354,7 @@ export function initModalDismissal() {
   });
   document.addEventListener("keydown", (e) => {
     if (e.key === "Escape") {
+      stopBeatAudition();
       beatLoad?.abort();
       engine.stopPreview();
       trimStopPlayback();

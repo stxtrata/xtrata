@@ -44,8 +44,8 @@ export async function browser() {
 }
 
 // a page that never touches the network beyond our server (fonts etc. are aborted)
-export async function page(b, url, { width = 1400, height = 900, logs = [] } = {}) {
-  const p = await b.newPage({ viewport: { width, height } });
+export async function page(b, url, { width = 1400, height = 900, hasTouch = false, logs = [] } = {}) {
+  const p = await b.newPage({ viewport: { width, height }, hasTouch });
   await p.route("**/*", (r) => (r.request().url().startsWith(url) ? r.continue() : r.abort()));
   p.on("console", (m) => {
     const t = m.text();
@@ -55,4 +55,11 @@ export async function page(b, url, { width = 1400, height = 900, logs = [] } = {
   p.on("pageerror", (e) => logs.push(`pageerror: ${e.message}`));
   p.on("response", (r) => { if (r.url().startsWith(url) && r.status() >= 400) logs.push(`http ${r.status()}: ${r.url().slice(url.length)}`); });
   return p;
+}
+
+// Follow the same visible navigation a member uses for secondary workspaces.
+export async function selectWorkspace(page, name) {
+  const tab = page.getByRole('tab', { name, exact: true });
+  if (!await tab.isVisible()) await page.locator('[popovertarget="studio-views"]').click();
+  await tab.click();
 }

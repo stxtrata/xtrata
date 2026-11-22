@@ -20,7 +20,8 @@ import { trackAddress } from './project-model.js';
 import { syncMixer as applyMixer, disposeMixer, validateRouting } from './mixer-runtime.js';
 import { createSamplerVoice } from './sampler-voice.js';
 import {isProInstrument,createProInstrumentVoice} from './pro-instruments.js';
-import { voiceAutomation } from './automation-runtime.js';
+import { scheduleDspBoundary } from './plugin-automation.js';
+import { automationValueAt, voiceAutomation } from './automation-runtime.js';
 import { assertOfflineRenderSupported } from './audio-render-support.js';
 
 const LOOKAHEAD_MS = 25; // scheduler tick
@@ -217,6 +218,10 @@ export class Engine {
     disposeMixer(this);
     for (const key of [...this.chains.keys()]) this._disposeChain(key);
     clearTimeout(this.reverbFx?.timer);
+    if (this.reverbFx) {
+      this.reverbFx.disposed = true;
+      for (const timer of this.reverbFx.automationTimers || []) clearTimeout(timer);
+    }
     const seen = new Set();
     const disconnect = value => {
       if (!value || typeof value !== "object" || seen.has(value)) return;
@@ -379,7 +384,7 @@ export class Engine {
     const chain = this.chains?.get(key);
     const owner = key === 'master' ? this.store.project.master : /^i\d+$/.test(key) ? this.store.instrument(+key.slice(1)) : /^c\d+$/.test(key) ? this.store.channel(+key.slice(1)) : this.store.project.buses?.find(b=>b.id===key);
     if (!chain || !owner) return;
-    normalizeOwner(owner);
+    normalizeOwner(owner, this.store.project.timeline.automation, key === 'master' ? 'master' : owner.id);
     const defs = [...owner.inserts, ...owner.fx].filter(
       (d) => PLUGIN_TYPES[d.type],
     );
@@ -563,9 +568,8 @@ export class Engine {
   }
 
   // The impulse depends on decay/shape/damp/width only; rebuilt (debounced) when they change.
-  _scheduleImpulse(now = false) {
+  _scheduleImpulse(now = false, r = returnsOf(this.store.project).reverb) {
     now = now || this.offline;
-    const r = returnsOf(this.store.project).reverb;
     const sig = [r.decay, r.shape, r.damp, r.width].join("|");
     const rfx = this.reverbFx;
     if (sig === rfx.sig) return;
@@ -903,7 +907,8 @@ export class Engine {
     const generation=++this._transportGeneration;
     const sequenceStart=project.currentSequence*16;
     const songEnd=compilePlaybackPlan(project,{buffers:this.buffers}).endBeat;
-    const loop=timeline?.enabled?timeline.loop:legacy?{enabled:false}:{enabled:true,start:project.continuous?0:sequenceStart,end:project.continuous?songEnd:sequenceStart+16};
+    // Mobile can audition a range without changing the saved song or the published player.
+    const loop=(typeof AUDIONAUT_STANDALONE === 'undefined' && this.editorTransport?.loop(songEnd)) || (timeline?.enabled?timeline.loop:legacy?{enabled:false}:{enabled:true,start:project.continuous?0:sequenceStart,end:project.continuous?songEnd:sequenceStart+16});
     const start=fromBeat??this._pausedBeat??(timeline?.enabled?(loop?.enabled?loop.start:this.currentBeat||0):sequenceStart);
     this._loopRange=loop?.enabled?{start:loop.start,end:loop.end}:null;
     this._playRange={start,end:loop?.enabled?loop.end:timeline?.enabled?Math.max(timeline.lengthBeats,...timeline.clips.map(c=>c.start+c.duration)):legacy?songEnd:project.sequences.length*16};
@@ -922,7 +927,7 @@ export class Engine {
     this._transportStart = this._planOrigin;
     this._transportEnd = Infinity;
     this._tick();
-    if(typeof document!=='undefined')document.dispatchEvent(new CustomEvent('transport',{detail:{playing:true,beat:this.currentBeat}}));
+    if(typeof document!=='undefined')(typeof AUDIONAUT_STANDALONE !== 'undefined' ? document : this.editorTransport?.events ?? document).dispatchEvent(new CustomEvent('transport',{detail:{playing:true,beat:this.currentBeat}}));
   }
 
   pause() {
@@ -930,7 +935,7 @@ export class Engine {
     this._transportEnd = this.ctx?.currentTime || 0;
     if(this.isPlaying)this._pausedBeat=this.getMusicalPosition(this._transportEnd).beat;
     this.currentBeat=this._pausedBeat??this.currentBeat;
-    if (!this.offline && typeof document !== "undefined") document.dispatchEvent(new CustomEvent("transport-stop", { detail: { time: this._transportEnd } }));
+    if (!this.offline && typeof document !== "undefined") (typeof AUDIONAUT_STANDALONE !== 'undefined' ? document : this.editorTransport?.events ?? document).dispatchEvent(new CustomEvent("transport-stop", { detail: { time: this._transportEnd } }));
     this.isPlaying = false;
     this._transportGeneration++;this._prefetchAbort?.abort();
     clearTimeout(this.timer);
@@ -939,17 +944,17 @@ export class Engine {
     for (const ch of this._voices?.keys() || []) this.silenceChannel(ch);
     this.releaseAll(null, { immediate: true });
     for(const node of this._clicks||[]){try{node.stop();}catch{}}this._clicks?.clear();this._automationOverrides?.clear();
-    if(typeof document!=='undefined')document.dispatchEvent(new CustomEvent('transport',{detail:{playing:false,beat:this.currentBeat}}));
+    if(typeof document!=='undefined')(typeof AUDIONAUT_STANDALONE !== 'undefined' ? document : this.editorTransport?.events ?? document).dispatchEvent(new CustomEvent('transport',{detail:{playing:false,beat:this.currentBeat}}));
   }
 
   _finishTransport() {
     // The musical cursor stops at the song end; finite sources and effect releases
     // already scheduled on the audio clock retain their natural tails.
     this._transportEnd=this._planOrigin+this._plan.duration;this.currentBeat=this._plan.endBeat;
-    if(!this.offline&&typeof document!=='undefined')document.dispatchEvent(new CustomEvent('transport-stop',{detail:{time:this._transportEnd}}));
+    if(!this.offline&&typeof document!=='undefined')(typeof AUDIONAUT_STANDALONE !== 'undefined' ? document : this.editorTransport?.events ?? document).dispatchEvent(new CustomEvent('transport-stop',{detail:{time:this._transportEnd}}));
     this.isPlaying=false;this._pausedBeat=null;this._transportGeneration++;this._prefetchAbort?.abort();clearTimeout(this.timer);this._automationOverrides?.clear();
     for(const timer of this._transportTimers)clearTimeout(timer);this._transportTimers.clear();
-    if(typeof document!=='undefined')document.dispatchEvent(new CustomEvent('transport',{detail:{playing:false,beat:this.currentBeat}}));
+    if(typeof document!=='undefined')(typeof AUDIONAUT_STANDALONE !== 'undefined' ? document : this.editorTransport?.events ?? document).dispatchEvent(new CustomEvent('transport',{detail:{playing:false,beat:this.currentBeat}}));
   }
 
   stop() {
@@ -1056,6 +1061,7 @@ export class Engine {
       this.schedulerStats.skippedEvents+=this._plan.events.length-this._planCursor+cycles*next.events.length;
       this._appendTransportRun(firstClock,next.startBeat,next.endBeat,cycles+1);this._playRange={...this._loopRange};this._plan=next;this._nextLoopPlan=null;this._planOrigin=firstClock+cycles*next.duration;this._planCursor=0;this._scheduledEvents.clear();
     }
+    if (typeof AUDIONAUT_STANDALONE === 'undefined') this.editorTransport?.applyPendingRange?.(now);
     for(let cycles=0;cycles<128;cycles++){
       while(this._planCursor<this._plan.events.length){const event=this._plan.events[this._planCursor],time=this._planOrigin+event.time;if(time>=now+SCHEDULE_AHEAD)break;this._planCursor++;const key=`${event.id}:${event.time}`;if(this._scheduledEvents.has(key))continue;
         if(time<now-.01){this.schedulerStats.skippedEvents++;this.schedulerStats.maxLatenessMs=Math.max(this.schedulerStats.maxLatenessMs,(now-time)*1000);delete event.prepared;continue;}
@@ -1084,9 +1090,49 @@ export class Engine {
     }
     if(event.type==='automation')return this.scheduleAutomation(event);
     if(event.type==='metronome')return this._click(time,event.accent);
-    if(event.type==='step'&&!this.offline){const generation=this._transportGeneration;const timer=setTimeout(()=>{this._transportTimers.delete(timer);if(!this.isPlaying||generation!==this._transportGeneration)return;this.currentStep=event.step;this.playingSequence=event.sequenceIndex;if(!this.store.project.timeline.enabled&&this.store.project.currentSequence!==event.sequenceIndex){this._selectingSequence=true;try{this.store.selectSequence(event.sequenceIndex);}finally{this._selectingSequence=false;}}this.onStep?.(event.step,event.sequenceIndex,time);},Math.max(0,(time-this.ctx.currentTime)*1000));this._transportTimers.add(timer);}
+    if(event.type==='step'&&!this.offline){const generation=this._transportGeneration;const timer=setTimeout(()=>{this._transportTimers.delete(timer);if(!this.isPlaying||generation!==this._transportGeneration)return;this.currentStep=event.step;this.playingSequence=event.sequenceIndex;if((typeof AUDIONAUT_STANDALONE !== 'undefined' || !this.editorTransport) && !this.store.project.timeline.enabled&&this.store.project.currentSequence!==event.sequenceIndex){this._selectingSequence=true;try{this.store.selectSequence(event.sequenceIndex);}finally{this._selectingSequence=false;}}this.onStep?.(event.step,event.sequenceIndex,time);},Math.max(0,(time-this.ctx.currentTime)*1000));this._transportTimers.add(timer);}
   }
   _click(time,accent=false){if(this.offline)return;const osc=this.ctx.createOscillator(),g=this.ctx.createGain();(this._clicks||=new Set()).add(osc);osc.frequency.value=accent?1500:1000;g.gain.setValueAtTime(.12,time);g.gain.exponentialRampToValueAtTime(.0001,time+.04);osc.connect(g).connect(this.masterGain);osc.start(time);osc.stop(time+.045);osc.onended=()=>{this._clicks.delete(osc);osc.disconnect();g.disconnect();};}
+  _automateReturn(bus, key, event) {
+    const {curve, value, time, duration = 0, fromValue = value} = event;
+    const end = time + duration;
+    const set = (param, map = v => v) => {
+      if (curve === 'linear') {
+        param.setValueAtTime(map(fromValue, event.beat), time);
+        param.linearRampToValueAtTime(map(value, event.endBeat), end);
+      } else param.setValueAtTime(map(value, event.beat), time);
+    };
+    const settings = returnsOf(this.store.project)[bus];
+    if (key === 'ret') return set((bus === 'delay' ? this.delayFx : this.reverbFx).ret.gain);
+    if (bus === 'reverb') {
+      if (key === 'predelay') return set(this.reverbFx.pre.delayTime, v => v / 1000);
+      const fx = this.reverbFx;
+      scheduleDspBoundary(this.ctx, fx, end, () => {
+        fx.shapeAutomation = {...fx.shapeAutomation, [key]:value};
+        this._scheduleImpulse(false, {...settings, ...fx.shapeAutomation});
+      });
+      return;
+    }
+    const fx = this.delayFx;
+    if (key === 'tone') { set(fx.toneL.frequency); set(fx.toneR.frequency); return; }
+    if (key === 'time') {
+      const seconds = () => Math.min(9.9, 60 / (this.store.project.bpm || 120) * BEAT_DIVS[value][1]);
+      set(this.delayNode.delayTime, seconds); set(this.delayR.delayTime, seconds); return;
+    }
+    const other = key === 'spread' ? 'feedback' : 'spread';
+    const lane = this.store.project.timeline.automation.find(l => l.enabled !== false && l.target.trackId === 'master' &&
+      l.target.slotId === 'return:delay' && l.target.param === other);
+    const companion = beat => (lane && automationValueAt(lane, beat)) ?? settings[other];
+    const same = (v, beat) => key === 'spread' ? companion(beat) * (1 - v) : v * (1 - companion(beat));
+    const cross = (v, beat) => v * companion(beat);
+    set(fx.selfL.gain, same); set(fx.selfR.gain, same);
+    set(fx.crossLR.gain, cross); set(fx.crossRL.gain, cross);
+    if (key === 'spread') {
+      set(fx.centerL.gain, v => 1 - v); set(fx.centerR.gain, v => 1 - v);
+      set(fx.hardL.gain); set(fx.hardR.gain);
+    }
+  }
+
   scheduleAutomation(event){
     if(this._automationOverrides?.has(JSON.stringify(event.target))||this.store.project.automationMode==='write')return;
     const {target,value,curve}=event,time=event.time+(curve==='linear'?(event.duration||0):0),owner=this.store.project.channels.concat(this.store.project.instruments,this.store.project.buses||[]).find(t=>t.id===target.trackId),address=trackAddress(this.store.project,target.trackId),strip=target.trackId==='master'?{chain:this.chains.get('master'),pan:this._mixer.master.pan,fader:this.masterGain}:this._mixer?.strips.get(target.trackId);
@@ -1096,9 +1142,25 @@ export class Engine {
     if(target.kind==='bend'&&address?.kind==='instrument'){for(const n of this._synthVoices.values())if(n.i===address.index)this.setNotePitchBend(n.id,value,time);return;}
     if(target.kind==='synthParam'&&address?.kind==='instrument'){for(const n of this._synthVoices.values())if(n.i===address.index)n.voice.setParameters?.({[target.param]:value},time,{curve,startTime:event.time,fromValues:{[target.param]:event.fromValue}});return;}
     if(target.kind==='effectParam'){
-      const it=strip?.chain.slots.get(target.slotId);if(!it)return;
-      const param=it.nodes[target.param];if(param&&typeof param.setValueAtTime==='function')return apply(param);
-      // Plugins can supply an audio-clock automation hook for mapped/compound controls.
+      const bus = sendBusId(target.slotId);
+      if (bus && target.param === 'amount') return apply(strip?.chain.sendFx[bus]?.amt.gain);
+      if (target.trackId === 'master' && ['return:delay','return:reverb'].includes(target.slotId))
+        return this._automateReturn(target.slotId.slice(7), target.param, event);
+      const it = strip?.chain.slots.get(target.slotId);
+      if (!it) return;
+      if (it.type.shared && !it.type.params.some(p => p.key === target.param))
+        return this._automateReturn(it.type.shared, target.param, event);
+      const schema = it.type.params.find(p => p.key === target.param);
+      if (!schema) return;
+      if (schema.options) {
+        const option = schema.options[value];
+        if (option) it.type.automate(this.ctx, it.nodes, target.param, option[0], time, 'step');
+        return;
+      }
+      const param = it.nodes[target.param];
+      if (param && typeof param.setValueAtTime === 'function') return apply(param);
+      if (curve === 'linear' && event.duration && Number.isFinite(event.fromValue))
+        it.type.automate?.(this.ctx,it.nodes,target.param,event.fromValue,event.time,'step');
       it.type.automate?.(this.ctx,it.nodes,target.param,value,time,curve);
     }
   }

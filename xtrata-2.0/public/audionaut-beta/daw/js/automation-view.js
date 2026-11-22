@@ -2,7 +2,8 @@
 // never the playback model or the saved song format.
 import { store } from './state.js';
 import { SYNTH_BANK } from './synths.js';
-import { PLUGIN_TYPES, typeParams } from './plugins.js';
+import { PLUGIN_TYPES, sendRows, RETURN_SCHEMA } from './plugins.js';
+import { choice, number } from './pro-ui.js';
 import { beginTransaction, endTransaction } from './history.js';
 let focusedTarget = null;
 export const focusAutomation = target => { focusedTarget = target; };
@@ -12,24 +13,62 @@ export const findLane = target => store.project.timeline.automation.find(l => ta
 export function automationTargets(project = store.project) {
   const result = [];
   for (const t of [...project.channels, ...project.instruments, ...project.buses, { ...project.master, id: 'master', name: 'Master' }]) {
-    const add = (name, target, min, max, value, step = .01) => result.push({ label: `${t.name} · ${name}`, name, target: { trackId: t.id, ...target }, min, max, value, step });
+    const add = (name, target, min, max, value, step = .01, group = 'Channel', options) =>
+      result.push({ trackId: t.id, trackName: t.name, group, label: [t.name, group, name].join(' · '),
+        name, target: { trackId: t.id, ...target }, min, max, value, step, options });
     add('Volume', { kind: 'volume' }, 0, 4, t.id === 'master' ? project.masterVolume : t.volume ?? 1);
     add('Pan', { kind: 'pan' }, -1, 1, t.pan || 0);
     if (t.kind === 'instrument') {
       add('Pitch bend', { kind: 'bend' }, -48, 48, 0);
       for (const p of SYNTH_BANK[t.synthId]?.params || []) if (typeof p.def === 'number')
-        add(p.label || p.key, { kind: 'synthParam', param: p.key }, p.min ?? 0, p.max ?? 1, t.params?.[p.key] ?? p.def, p.step || .01);
+        add(p.label || p.key, { kind: 'synthParam', param: p.key }, p.min ?? 0, p.max ?? 1, t.params?.[p.key] ?? p.def, p.step || .01, 'Instrument');
     }
-    for (const slot of [...t.inserts || [], ...t.fx || []]) {
-      const type = PLUGIN_TYPES[slot.type]; if (!type) continue;
-      for (const p of typeParams(type)) if (typeof p.def === 'number')
-        add(`${type.name} · ${p.label || p.key}`, { kind: 'effectParam', slotId: slot.id, param: p.key }, p.min ?? 0, p.max ?? 1, slot.params?.[p.key] ?? p.def, p.step || .01);
+    function parameter(group, p, value, target) {
+      if (p.options) {
+        const index = p.options.findIndex(([v]) => v === value);
+        add(p.label || p.key, target, 0, p.options.length - 1, Math.max(0, index), 1, group, p.options);
+      } else add(p.label || p.key, target, p.min, p.max, value, p.step || .01, group);
+    }
+    const returns = new Set();
+    for (const [section, slots] of [['Insert', t.inserts], ['FX', t.fx], ['Send', sendRows(t)]]) {
+      for (const [i, slot] of (slots || []).entries()) {
+        const type = PLUGIN_TYPES[slot.type];
+        if (!type) continue;
+        const group = section === 'Send' ? type.name : `${section} ${i + 1} · ${type.name}`;
+        for (const p of type.params)
+          parameter(group, p, slot.params?.[p.key] ?? p.def, { kind: 'effectParam', slotId: slot.id, param: p.key });
+        if (type.shared) returns.add(type.shared);
+      }
+    }
+    if (t.id === 'master') for (const bus of Object.keys(RETURN_SCHEMA)) returns.add(bus);
+    for (const bus of returns) {
+      const group = bus === 'delay' ? 'Shared delay return' : 'Shared reverb return';
+      for (const p of RETURN_SCHEMA[bus])
+        parameter(group, p, project.returns?.[bus]?.[p.key] ?? p.def,
+          { kind: 'effectParam', trackId: 'master', slotId: 'return:' + bus, param: p.key });
     }
   }
   return result;
 }
+export function fillParameterPicker(select, specs, markLanes = false) {
+  const groups = new Map();
+  for (const spec of specs) {
+    if (!groups.has(spec.group)) {
+      const group = document.createElement('optgroup');
+      group.label = spec.group;
+      groups.set(spec.group, group);
+      select.append(group);
+    }
+    groups.get(spec.group).append(new Option((markLanes && findLane(spec.target) ? '● ' : '') + spec.name, targetKey(spec.target)));
+  }
+}
+export const automationLabel = (spec, value) => spec.options?.[Math.round(value)]?.[1] ?? Number(value.toFixed(3));
+export function pointValueControl(label, spec, value, update) {
+  if (spec.options) return choice(label, spec.options.map(([,name], i) => [String(i), name]), String(value), v => update(Number(v)));
+  return number(label, value, update, spec);
+}
 export function laneSpec(lane, list = automationTargets()) {
-  const known = list.find(s => targetKey(s.target) === targetKey(lane?.target));
+  const known = list.find(s => s.trackId === lane?.target?.trackId && targetKey(s.target) === targetKey(lane?.target));
   if (known) return known;
   let min = 0, max = 1;
   for (const point of lane?.points || []) { min = Math.min(min, point.value); max = Math.max(max, point.value); }
@@ -106,8 +145,8 @@ export function automationGestures(canvas, { hit, active = () => true, repaint, 
     const c = hit(e); if (!c?.spec?.target) return;
     e.preventDefault(); e.stopImmediatePropagation(); canvas.focus({ preventScroll: true });
     const index = nearest(c, local(e)), points = structuredClone(c.lane?.points || []), p = coordinate(e, c);
-    if (index < 0 && !points.length && p.beat > 0) points.push({ beat: 0, value: c.spec.value, curve: 'linear' });
-    const at = index < 0 ? points.push({ ...p, curve: 'linear' }) - 1 : index;
+    if (index < 0 && !points.length && p.beat > 0) points.push({ beat: 0, value: c.spec.value, curve: c.spec.options ? 'step' : 'linear' });
+    const at = index < 0 ? points.push({ ...p, curve: c.spec.options ? 'step' : 'linear' }) - 1 : index;
     drag = { id: e.pointerId, project: store.project, generation: store.generation, c, points, index: at, changed: index < 0 };
     select(c, points[at].beat); canvas.setPointerCapture(e.pointerId); repaint();
   }

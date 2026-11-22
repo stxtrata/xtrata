@@ -1,8 +1,9 @@
+import './mobile-track-groups.js';
 // main.js — bootstrap and wiring between store, engine, UI, and persistence.
 
 import { store, makeProject } from "./state.js";
 import { engine } from "./engine.js";
-import { reloadAllSamples } from "./loader.js";
+import { restoreEditorSamples } from "./live-player-setup.js";
 import * as ui from "./ui.js";
 import * as persist from "./persistence.js";
 import { initPianoRoll, rollPlayhead } from "./pianoroll.js";
@@ -32,20 +33,19 @@ document.addEventListener('audio-error',event=>ui.setStatus(event.detail.message
 
 // ------------------------------------------------------------ transport
 async function togglePlay() {
-  if (engine.isPlaying) {
-    engine.pause();
-    $("#btn-play").textContent = "▶";
-    $("#btn-play").classList.remove("active");
-  } else {
-    try { await engine.play(); } catch (error) { ui.setStatus(error.message, true); return; }
-    $("#btn-play").textContent = "❚❚";
-    $("#btn-play").classList.add("active");
+  if (engine.isPlaying) return engine.pause();
+  try {
+    const fromBeat = engine._pausedBeat == null ? engine.editorTransport?.startBeat() : undefined;
+    await engine.play({ fromBeat });
+  } catch (error) {
+    ui.setStatus(error.message, true);
   }
 }
 
 function stopAll() {
   engine.stop();
   $("#btn-play").textContent = "▶";
+  $("#btn-play").setAttribute("aria-label", "Play");
   $("#btn-play").classList.remove("active");
   ui.movePlayhead(-1);
 }
@@ -53,6 +53,7 @@ function stopAll() {
 engine.onStep = (step) => {
   ui.movePlayhead(step);
   rollPlayhead(step);
+  if (document.body.dataset.workspace === "mobile") document.dispatchEvent(new Event("audionaut-display-step"));
   if (isArrangeMode()) arrangePlayhead(step);
 };
 
@@ -280,7 +281,7 @@ function initFileOps() {
     } catch (error) { return ui.setStatus(`Could not start a new project: ${error.message}`, true); }
     store.loadProject(makeProject());
     resetHistory();
-    ui.setStatus("New project.");
+    ui.setStatus("Blank project ready. Open Project for starter templates, or Library for beats and samples.");
   });
 }
 
@@ -310,6 +311,7 @@ function initKeyboard() {
     }
     if (e.target.matches?.("input, textarea, select, [contenteditable]")) return;
     if (e.code === "Space") {
+      if (document.querySelector("#modal-beats:not(.hidden)")) return;
       e.preventDefault();
       togglePlay();
     } else if (document.querySelector(".modal:not(.hidden)")) return;
@@ -328,13 +330,13 @@ function sameAudioSources(a, b) {
 }
 
 function initSubscriptions() {
-  document.addEventListener('transport',({detail})=>{const playing=!!detail?.playing;$('#btn-play').textContent=playing?'❚❚':'▶';$('#btn-play').classList.toggle('active',playing);});
+  document.addEventListener('transport',({detail})=>{const playing=!!detail?.playing;$('#btn-play').setAttribute('aria-label',playing?'Pause':'Play');$('#btn-play').textContent=playing?'❚❚':'▶';$('#btn-play').classList.toggle('active',playing);});
   store.on("step", ({ ch, step, val }) => ui.updateStep(ch, step, val));
   // Playback follows the display: choosing another sequence while the transport is
   // running plays that sequence straight away (same step position, so it stays in
   // time). The engine's own chain-to-next-sequence sets this first, so it's a no-op there.
   store.on("sequence", () => {
-    if (engine.isPlaying && !engine._selectingSequence)
+    if (engine.isPlaying && !engine._selectingSequence && !engine.editorTransport)
       engine.playingSequence = store.project.currentSequence;
   });
   store.on("sequence", () => {
@@ -384,7 +386,7 @@ function initSubscriptions() {
     }
     const preparedFailures=preparedImportFailures(project);
     if(preparedFailures){sampleRestore=Promise.resolve(preparedFailures);return;}
-    sampleRestore = reloadAllSamples().then((failures) => {
+    sampleRestore = restoreEditorSamples().then((failures) => {
       if (project !== store.project) return [];
       ui.refreshAllChannels();
       if (failures.length)
@@ -499,6 +501,7 @@ async function boot() {
 
 document.addEventListener("audionaut-panic", () => {
   $("#btn-play").textContent = "▶";
+  $("#btn-play").setAttribute("aria-label", "Play");
   $("#btn-play").classList.remove("active");
   ui.movePlayhead(-1);
   ui.setStatus("All notes and playback stopped.");

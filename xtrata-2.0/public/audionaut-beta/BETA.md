@@ -1,6 +1,6 @@
 # AudioNaut beta
 
-The community beta at `/audionaut-beta/` is an independent snapshot of beta-pro release `d6ae247b8793` on 21 November 2026. It includes the same workstation, instruments, effects, Timeline, mixer, automation and historical song importer.
+The community beta at `/audionaut-beta/` is an independent snapshot of beta-pro release `bfabf8363092` (PR #744). The Mobile step sequencer, track pads and mute groups, beat previews, seamless bar and sequence loops, one-tap live synth player, touch Timeline and effect automation are included. The main transport has larger green Play and red Stop buttons.
 
 Both editions verify the same Audionaut membership. Beta retains its existing browser project database and preferences. Later beta-pro edits reach beta only through another explicit promotion. To move a song between editions, export a portable project and open it in the other edition.
 

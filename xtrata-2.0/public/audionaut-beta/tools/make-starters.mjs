@@ -73,6 +73,9 @@ for (const song of songs) {
     const preset = JSON.parse(JSON.stringify(src));
     await loadBeatPreset(preset);
     const p = store.project;
+    p.bpm = preset.bpm;
+    p.swing = preset.swing || 0;
+    for (const channel of p.channels) delete channel.beatLayer;
     const roles = preset.channels.map((c) => c.role || "");
     const isKick = (r) => /^K\d*$/.test(r);
     const isSnare = (r) => /^(S|S\d|SS|C|C\d)$/.test(r);

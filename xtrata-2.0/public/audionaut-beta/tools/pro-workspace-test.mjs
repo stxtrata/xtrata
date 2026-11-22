@@ -1,3 +1,4 @@
+import { selectWorkspace } from './serve.mjs';
 import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
 import vm from 'node:vm';
@@ -14,10 +15,10 @@ const closePage=async p=>{progress('close workstation page');let timer;try{await
 const watchdog=setTimeout(()=>{console.error(`Workspace exceeded 150 seconds during ${phase}.`,logs);const force=setTimeout(()=>process.exit(1),5000);b.close().finally(()=>{clearTimeout(force);process.exit(1);});},150000);
 try{
  const p=testPage=await page(b,url,{logs});p.setDefaultTimeout(15000);p.setDefaultNavigationTimeout(30000);await p.exposeFunction('__workspaceProgress',progress);progress('load workstation',{browser:process.env.AUDIONAUT_TEST_BROWSER||'chromium',platform:process.platform});await p.goto(url+'/audionaut-beta/daw.html');await p.waitForSelector('#pro-workspace-nav');
- for(const name of ['Timeline','Mixer','Automation','Record & takes','Sampler','Performance','Patterns']){progress(`open ${name}`);await p.getByRole('tab',{name,exact:true}).click();await p.waitForTimeout(250);const error=await p.locator('#pro-workspace').innerText();assert.ok(!/Failed to fetch|does not provide|is not a function|Cannot read/.test(error),`${name}: ${error}`);}
- progress('edit mixer effect');await p.getByRole('tab',{name:'Mixer',exact:true}).click();await p.getByRole('button',{name:'+ Group',exact:true}).click();
+ for(const name of ['Timeline','Mixer','Automation','Record & takes','Sampler','Performance','Sequences']){progress(`open ${name}`);await selectWorkspace(p, name);await p.waitForTimeout(250);const error=await p.locator('#pro-workspace').innerText();assert.ok(!/Failed to fetch|does not provide|is not a function|Cannot read/.test(error),`${name}: ${error}`);}
+ progress('edit mixer effect');await selectWorkspace(p, 'Mixer');await p.getByRole('button',{name:'+ Group',exact:true}).click();
  await p.locator('.pro-strip').first().getByRole('button',{name:'Effects',exact:true}).click();await p.getByRole('dialog',{name:'Mixer effects'}).getByRole('button',{name:'Add effect',exact:true}).first().click();assert.equal(await p.getByRole('dialog',{name:'Mixer effects'}).getByRole('button',{name:'Remove',exact:true}).count(),1);await p.getByRole('dialog',{name:'Mixer effects'}).getByRole('button',{name:'Close',exact:true}).click();
- progress('edit automation');await p.getByRole('tab',{name:'Automation',exact:true}).click();await p.getByRole('button',{name:'Add lane',exact:true}).click();assert.equal(await p.getByLabel('Point 1 beat',{exact:true}).count(),1);
+ progress('edit automation');await selectWorkspace(p, 'Automation');await p.getByRole('button',{name:'Add lane',exact:true}).click();assert.equal(await p.getByLabel('Point 1 beat',{exact:true}).count(),1);
  progress('command palette');await p.keyboard.press(process.platform==='darwin'?'Meta+k':'Control+k');await p.getByRole('searchbox',{name:'Search commands'}).fill('Open mixer');await p.keyboard.press('Enter');await p.waitForSelector('.pro-mixer');
  const result=await p.evaluate(async()=>{
   let ctx,recording,destination,osc,amp;const inputRequests=[];let mockInput;let inputDevices;

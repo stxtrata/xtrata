@@ -1,5 +1,14 @@
 # AudioNaut beta — update testing notes
 
+## Mobile, Sequences and the control bar
+
+Mobile opens on a first phone visit and remembers the workspace you choose after that. Edit one bar of sixteen steps at a time and select a channel to load, trim or layer a sound. Accents, per-step edits and the sequence loop use the same project and transport as Sequences (formerly Patterns) and Timeline.
+
+Project groups files, browser recovery and starter templates. Library contains beats and sample tools. Play setup holds swing, MIDI and arpeggiator settings. Transport, undo, redo, export and help stay in the main bar. More views opens the specialist workspaces.
+
+Help includes a searchable studio reference and five optional lessons that highlight real controls. Choose Show me on your first Mobile visit, or reopen any lesson from Help. End lesson at any time. Edits made in a lesson are ordinary song edits and support undo.
+
+
 This workstation is isolated at `/audionaut-beta/` behind the existing
 membership gate. The original AudioNaut and earlier beta are unchanged.
 `BETA.md` describes isolation and original-file compatibility.

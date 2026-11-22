@@ -1,3 +1,4 @@
+import { selectWorkspace } from './serve.mjs';
 import assert from 'node:assert/strict';
 import { serve, browser, page } from './serve.mjs';
 import { makeProject } from '../daw/js/state.js';
@@ -64,7 +65,7 @@ try {
       engine.setBuffer(0, buffer);
       store.emit('channel', { ch: 0 }, { dirty: false });
     });
-    await p.getByRole('tab', { name: view, exact: true }).click();
+    await selectWorkspace(p, view);
     await p.waitForTimeout(70);
     if (view === 'Timeline')
       await p.locator('.song-scroll').evaluate((n) => {
@@ -74,15 +75,15 @@ try {
       });
     return p.evaluate((view) => {
       const c =
-          view === 'Patterns'
+          view === 'Sequences'
             ? document.querySelector('.channel[data-ch="0"] .arrange-strip')
             : document.querySelector('.song-canvas'),
         r = c.getBoundingClientRect();
       return {
-        left: r.left + (view === 'Patterns' ? 0 : +c.dataset.controlsWidth),
-        top: r.top + (view === 'Patterns' ? 0 : 44),
-        scale: view === 'Patterns' ? r.width / 64 : 14,
-        selector: view === 'Patterns' ? '.channel[data-ch="0"] .arrange-strip' : '.song-canvas'
+        left: r.left + (view === 'Sequences' ? 0 : +c.dataset.controlsWidth),
+        top: r.top + (view === 'Sequences' ? 0 : 44),
+        scale: view === 'Sequences' ? r.width / 64 : 14,
+        selector: view === 'Sequences' ? '.channel[data-ch="0"] .arrange-strip' : '.song-canvas'
       };
     }, view);
   }
@@ -118,7 +119,7 @@ try {
     await p.keyboard.up('Shift');
   }
   const results = [];
-  for (const view of ['Patterns', 'Timeline']) {
+  for (const view of ['Sequences', 'Timeline']) {
     let box = await reset(view);
     for (const [step, cursor] of [
       [6, 'grab'],

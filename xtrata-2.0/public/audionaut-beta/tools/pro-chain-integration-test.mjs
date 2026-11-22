@@ -205,6 +205,19 @@ try {
   console.log('PASS atomic guarded import, old native import, decoded-cache length isolation and no wrapper URL escape');
   console.log('PASS oversized audio and instruction publication reject before upload handoff storage');
 
+  if (process.env.AUDIONAUT_PREVIOUS_PLAYER) {
+    const bytes = await readFile(process.env.AUDIONAUT_PREVIOUS_PLAYER);
+    const old = structuredClone(song);
+    Object.assign(old.manifest.runtime, {version:'beta-pro-shared-audio-1', tokenId:'402', bytes:bytes.length, sha256:hash(bytes)});
+    chain.set('402', {bytes, mediaType:'text/html'});
+    await editor.evaluate(async doc => {
+      const {P,S}=chainTest;
+      await P.importProjectAsync(doc);
+      if (S.store.project.chain.runtime.sha256 !== doc.manifest.runtime.sha256) throw Error('Previous runtime pin was lost');
+    }, old);
+    console.log('PASS verified import of a song pinned to the previous released player');
+  }
+
   // A real UI race: hold runtime catalog fetch while a user edits the live project.
   const ui = await blank(context);
   await ui.evaluate(async ({ originalProject, audioBytes }) => {

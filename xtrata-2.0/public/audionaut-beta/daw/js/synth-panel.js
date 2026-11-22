@@ -1,5 +1,6 @@
 import { buildPianoKeys, KEYMAP } from './keyboard-layout.js';
 import { drumKeyboard, performancePitch, instrumentKeyName } from './instrument-keyboard.js';
+import { openExpandedKeyboard } from './expanded-keyboard.js';
 import { browseDrumPad } from './drum-library-ui.js';
 import { STORAGE_KEYS, ccStorageKey } from "./storage-config.js";
 // synth-panel.js — hardware-style front panels for the character synths
@@ -1014,6 +1015,8 @@ const dockEl = () => $("#synth-dock");
 function paintTabs() {
   const tabs = $("#synth-dock-tabs");
   if (!tabs) return;
+  $("#play-live-synth").disabled = !store.instrument(inst);
+  $("#expand-synth-keys").disabled = !store.instrument(inst);
   tabs.innerHTML = "";
   store.project.instruments.forEach((ins, i) => {
     const synth = SYNTH_BANK[ins.synthId];
@@ -1110,6 +1113,8 @@ export function initSynthPanel() {
   inst = Number.isInteger(pref.inst) && store.instrument(pref.inst) ? pref.inst : 0;
   setMidiTarget(inst);
   dockEl().classList.toggle("tall", !!pref.tall);
+  $("#play-live-synth").addEventListener("click", (event) => openExpandedKeyboard(inst, event.currentTarget, true));
+  $("#expand-synth-keys").addEventListener("click", (event) => openExpandedKeyboard(inst, event.currentTarget));
   $("#synth-dock-toggle").addEventListener("click", () => setDockOpen(!dockOpen()));
   $("#synth-dock-size").addEventListener("click", () => {
     const tall = dockEl().classList.toggle("tall");

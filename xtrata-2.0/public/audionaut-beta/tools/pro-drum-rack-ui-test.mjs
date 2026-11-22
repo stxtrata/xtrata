@@ -1,3 +1,4 @@
+import { selectWorkspace } from './serve.mjs';
 import assert from 'node:assert/strict';
 import { serve, browser, page } from './serve.mjs';
 const { srv, url } = await serve(), b = await browser(), logs = [];
@@ -72,7 +73,7 @@ try {
   await p.getByRole('button', { name: 'Play pad', exact: true }).click();
   await p.waitForFunction(() => drumTest.peak > .001, null, { timeout: 5000 });
   ok(await p.evaluate(() => drumTest.peak > .001), 'Loaded library pad produces real audio');
-  await p.getByRole('tab', { name: 'New instruments', exact: true }).click();
+  await selectWorkspace(p, 'New instruments');
   await p.getByText('Edit pad samples and controls', { exact: true }).click();
   await p.getByRole('button', { name: 'Browse samples for Snare', exact: true }).click();
   await p.locator('#modal-loader:not(.hidden)').waitFor();

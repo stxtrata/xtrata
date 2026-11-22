@@ -1026,8 +1026,12 @@ body.arrange-mode.arrange-zoomed
   color: var(--accent-2);
   font-size: 11px;
 }
-.beat-row > button {
-  flex-shrink: 0;
+.beat-actions {display:flex;gap:6px;flex-shrink:0}
+.beat-actions button {min-height:44px}
+.beat-preview[aria-pressed=true] {border-color:var(--accent);color:var(--accent)}
+@media (max-width:600px) {
+  .beat-row {align-items:stretch;flex-direction:column}
+  .beat-actions button {flex:1}
 }
 .beat-name {
   font-weight: 600;
@@ -1534,6 +1538,10 @@ body.arrange-mode.arrange-zoomed
 #modal-beats #beats-list {
   min-height: 0;
   flex: 0 1 auto;
+}
+@media (max-height:640px) {
+  #modal-beats .modal-box {display:block;overflow-y:auto}
+  #modal-beats #beats-list {max-height:55dvh}
 }
 /* Native source/clip catalogue: bounded lists, explicit touch-friendly actions. */
 .samples-loops-browser {
