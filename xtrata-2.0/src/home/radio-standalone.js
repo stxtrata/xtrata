@@ -11,5 +11,6 @@ initXtrataRadio({
   tokenIds: CURATED_GALLERIES.find((gallery) => gallery.id === 'jim-music')?.tokenIds ?? [],
   stationName: 'XTRATA FM',
   resumePlayback: document.documentElement.dataset.radioEmbed !== 'true',
-  initialPlaybackStop: document.documentElement.dataset.radioPaidOnly === 'true' ? 'CHECKING YOUR LISTENING WALLET' : null
+  // The pay-per-play page plays samples (the opening of each song) until it knows this player can pay.
+  initialSample: document.documentElement.dataset.radioPaidOnly === 'true'
 });

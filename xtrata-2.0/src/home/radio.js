@@ -51,7 +51,7 @@ const saveState = (state) => {
   try { window.localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch { /* noop */ }
 };
 
-export const initXtrataRadio = ({ tokenIds = [], mount = null, resumePlayback = true, initialPlaybackStop = null, hiddenTrackSilenceMs = 60000 } = {}) => {
+export const initXtrataRadio = ({ tokenIds = [], mount = null, resumePlayback = true, initialPlaybackStop = null, initialSample = false, hiddenTrackSilenceMs = 60000 } = {}) => {
   if (!tokenIds.length || typeof document === 'undefined') {
     return null;
   }
@@ -724,6 +724,14 @@ export const initXtrataRadio = ({ tokenIds = [], mount = null, resumePlayback = 
   // sequence per band). Neither shuffle nor loop persists across visits —
   // the heart (likes) is the only remembered button.
   let shuffleMode = false;
+  // Samples (the pay-per-play page, while nothing can be paid): every song plays only its opening, then the next
+  // one starts. The opening is 30 seconds, or half of a song shorter than a minute: exactly where a paid play would
+  // begin, so a sample is never a play. No jumping within a song. `sampleFree` is a song already past that point
+  // when samples were switched on (it was playing as a paid song): it is left to finish.
+  const SAMPLE_SECONDS = 30;
+  let sampleMode = Boolean(initialSample), sampleFree = null;
+  const sampleLimit = () => { const d = player.duration; return Number.isFinite(d) && d > 0 && d < SAMPLE_SECONDS * 2 ? d / 2 : SAMPLE_SECONDS; };
+  const sampling = () => sampleMode && !(nowPlaying && String(nowPlaying.tokenId) === sampleFree);
   const listeners = new Set();
   let nowPlaying = null;                   // {tokenId,title,artist,cover}
   // One canonical snapshot everywhere (emit / getState / subscribe), including
@@ -746,6 +754,7 @@ export const initXtrataRadio = ({ tokenIds = [], mount = null, resumePlayback = 
     albumCover: giftPlayer && albumCoverUrl ? { url: albumCoverUrl, tokenId: giftPlayer.cover } : null,
     likesStatus: chainState?.snapshot().status || 'disconnected', likesRetryAt: chainState?.snapshot().retryAt, likesCheckedAt: chainState?.snapshot().checkedAt, band, preset, nowPlaying, likes: chainState ? chainState.snapshot().likes.slice() : [], volumeStep,
     shuffle: shuffleMode,
+    sample: sampling(),
     // What is cued to follow this song (the radio page's "Up next"); null while nothing is cued.
     upNext: upNextView(),
     loop: player.loop,
@@ -1848,6 +1857,15 @@ export const initXtrataRadio = ({ tokenIds = [], mount = null, resumePlayback = 
   };
   let lastPersist = 0;
   player.addEventListener('timeupdate', () => {
+    // A sample has reached its end: say so, and move on to the next song. (Cut a moment early, so a sample can never
+    // count as a listen. Pausing first means this cannot fire twice for one song.)
+    if (on && nowPlaying && sampling() && !player.paused && player.currentTime >= sampleLimit() - 0.3) {
+      const song = Number(nowPlaying.tokenId);
+      pauseOwn();
+      window.dispatchEvent(new CustomEvent('xtrata:radio-sample-ended', { detail: { song } }));
+      void tuneToNextTrack();
+      return;
+    }
     const now = Date.now();
     if (now - lastPersist > 1500) { lastPersist = now; persist(); }
   });
@@ -2007,6 +2025,17 @@ export const initXtrataRadio = ({ tokenIds = [], mount = null, resumePlayback = 
       try { if (explicitAllowed) window.localStorage.setItem(EXPLICIT_OK_KEY, '1'); else window.localStorage.removeItem(EXPLICIT_OK_KEY); } catch (_) { /* this visit only */ }
     },
     explicitAllowed: () => explicitAllowed,
+    /**
+     * Samples on or off (see SAMPLE_SECONDS above). Switching them on leaves a song that is already past its
+     * opening to finish; switching them off lets the song that is playing carry on to its end.
+     */
+    setSample: (value) => {
+      const next = Boolean(value);
+      if (next === sampleMode) return;
+      sampleMode = next;
+      sampleFree = next && nowPlaying && player.currentTime >= sampleLimit() - 0.3 ? String(nowPlaying.tokenId) : null;
+      emit();
+    },
     /** Block playback until the paid radio is ready. Pass null to allow playback again. */
     setGiftStop: (text) => {
       const next = typeof text === 'string' && text ? text.slice(0, 80) : null;
@@ -2050,6 +2079,7 @@ export const initXtrataRadio = ({ tokenIds = [], mount = null, resumePlayback = 
     seek: (seconds) => {
       const d = player.duration;
       if (!on || !nowPlaying || !Number.isFinite(d) || d <= 0 || !Number.isFinite(seconds)) return false;
+      if (sampling()) return false; // a sample is the opening of the song, nothing else
       try { player.currentTime = Math.max(0, Math.min(d - 0.25, seconds)); return true; } catch { return false; }
     },
     /** The current song's audio address, so the page can draw its whole waveform. */

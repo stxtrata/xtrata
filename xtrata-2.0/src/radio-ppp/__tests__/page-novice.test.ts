@@ -50,7 +50,7 @@ async function open(over: object = {}, flag: string | null = '1') {
     <div id="onair" hidden><b>ON AIR</b><span class="onair-sub"></span></div><div class="nudge" id="pppNudge" hidden><span class="nudge-txt"><b class="nudge-t"></b><span class="nudge-s"></span></span><button type="button">Start</button></div>`;
   h.state = { playing: false, nowPlaying: null };
   h.feeds = [];
-  h.radio = { setGiftPlayer: vi.fn(), setGiftStop: vi.fn(), setGiftLock: vi.fn(), setGiftWait: vi.fn(), subscribe: vi.fn((fn: (st: any) => void) => { h.feeds.push(fn); }), refreshLikes: vi.fn(), forgetWallets: vi.fn(),
+  h.radio = { setGiftPlayer: vi.fn(), setGiftStop: vi.fn(), setSample: vi.fn(), setGiftLock: vi.fn(), setGiftWait: vi.fn(), subscribe: vi.fn((fn: (st: any) => void) => { h.feeds.push(fn); }), refreshLikes: vi.fn(), forgetWallets: vi.fn(),
     getState: () => h.state, getPosition: () => ({ current: 0, duration: 0 }), playToken: vi.fn(), playPause: vi.fn(), next: vi.fn(), prev: vi.fn(), toggleLike: vi.fn() };
   (window as any).XtrataRadio = h.radio;
   h.snap = { ...base, ...over };
@@ -114,7 +114,7 @@ describe('novice mode: the main path uses plain words', () => {
     expect(document.documentElement.dataset.novice).toBeUndefined();
     expect(text(root.querySelector('.ppp-key'))).toMatch(/1 STX ≈/);
     expect(buttons(root.querySelector('.ppp-actions:not(.ppp-actions2)'))).toContain('Copy my address');
-    expect(h.radio.setGiftStop).toHaveBeenLastCalledWith('EMPTY — ADD STX TO PLAY');
+    expect(h.radio.setSample).toHaveBeenLastCalledWith(true); // out of plays: samples, not silence
     expect(document.getElementById('album')!.hidden).toBe(true);
   });
 });

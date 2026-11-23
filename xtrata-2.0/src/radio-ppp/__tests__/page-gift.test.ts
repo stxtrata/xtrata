@@ -41,7 +41,7 @@ async function open(over: object = {}) {
     <details class="ppp-more"><div class="ppp-body"></div></details><details class="ppp-shelf" hidden><summary></summary><div class="ppp-shelf-body"></div></details><details class="ppp-gifts"><div class="ppp-gift-body"></div></details><details class="ppp-fold ppp-release" hidden><summary></summary><div class="ppp-release-body"></div></details></section>`;
   // The radio's own hooks (public/radio.html): the ON AIR lamp and the note under the receiver.
   document.body.insertAdjacentHTML('beforeend', '<div id="onair" hidden><b>ON AIR</b><span class="onair-sub"></span></div><div class="nudge" id="pppNudge" hidden><span class="nudge-txt"><b class="nudge-t"></b><span class="nudge-s"></span></span><button type="button">Start</button></div>');
-  h.radio = { setGiftPlayer: vi.fn(), setGiftStop: vi.fn(), setGiftWait: vi.fn(), subscribe: vi.fn(), refreshLikes: vi.fn() };
+  h.radio = { setGiftPlayer: vi.fn(), setGiftStop: vi.fn(), setSample: vi.fn(), setGiftWait: vi.fn(), subscribe: vi.fn(), refreshLikes: vi.fn() };
   (window as any).XtrataRadio = h.radio;
   h.snap = { ...base, ...over };
   vi.stubGlobal('fetch', vi.fn(async (url: string, init?: any) => h.route?.(String(url), init) ?? new Response(String(url).endsWith('/radio/gift/player') ? JSON.stringify({ id: 'fedcba9876543210', title: 'Proof of Sound', tracks: 2, existing: false }) : '{}')));
@@ -80,10 +80,12 @@ describe('Gift Edition panel', () => {
     expect(h.radio.setGiftPlayer).toHaveBeenCalledTimes(1); // the same album is not pushed again
   });
 
-  it('tells the radio to stop when the plays are gone, with a quiet pointer to Xverse and Leather', async () => {
+  it('switches the radio to samples when the plays are gone, with a quiet pointer to Xverse and Leather', async () => {
     const played = [{ id: 'p1', kind: 'play', song: 11, status: 'confirmed', created: Date.now(), amount: '50', recipient: 'SP1FVCANW8KX51C70JJAFTES86SR48CPP6F2ANQKP' }];
     const root = await open({ step: 'fund', balance: 3_000n, giftPlays: 0, entries: played, giftStop: { reason: 'out', text: 'OUT OF PLAYS — ADD MORE TO KEEP LISTENING' } });
-    expect(h.radio.setGiftStop).toHaveBeenLastCalledWith('OUT OF PLAYS — ADD MORE TO KEEP LISTENING');
+    // Out of plays no longer silences the radio: every song plays its opening only (src/home/radio.js, setSample).
+    expect(h.radio.setSample).toHaveBeenLastCalledWith(true);
+    expect(h.radio.setGiftStop).not.toHaveBeenCalledWith(expect.any(String));
     const key = root.querySelector('.ppp-key')!;
     expect(text(key)).toContain('no plays left');
     expect(text(key)).toContain('Out of plays');
@@ -91,6 +93,7 @@ describe('Gift Edition panel', () => {
     h.snap = { ...h.snap, step: 'ready', giftPlays: 40, giftStop: null };
     h.changed();
     expect(h.radio.setGiftStop).toHaveBeenLastCalledWith(null);
+    expect(h.radio.setSample).toHaveBeenLastCalledWith(false); // plays again: whole songs
   });
 
   it('no deposit button while plays are on their way (a gift or a deposit); it comes back once they are used up', async () => {
@@ -260,9 +263,10 @@ describe('My albums (the shelf)', () => {
     expect(h.openAlbum).toHaveBeenCalledWith(0);
   });
 
-  it('an empty first wallet stops the radio too: paid-only, no free mode', async () => {
+  it('an empty first wallet plays samples too: the opening of each song, never a whole one', async () => {
     await start({ giftStop: { reason: 'out', text: 'EMPTY — ADD STX TO PLAY' } });
-    expect(h.radio.setGiftStop).toHaveBeenLastCalledWith('EMPTY — ADD STX TO PLAY');
+    expect(h.radio.setSample).toHaveBeenLastCalledWith(true);
+    expect(h.radio.setGiftStop).not.toHaveBeenCalledWith(expect.any(String));
   });
 
   it('shows two places: My player and the open album, and each tab opens its wallet', async () => {
