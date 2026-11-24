@@ -1,8 +1,8 @@
 # AudioNaut beta
 
-A separate, token-gated community test edition at `/audionaut-beta`.
+A public community test edition at `/audionaut-beta`.
 
-This beta snapshot includes the beta-pro features listed below. This edition has its own code, browser settings, project database, recordings database, preset bank and workspace preferences. Files move between editions only when the member explicitly downloads and opens them.
+Beta receives the same DAW feature updates as Beta Pro. This edition has its own code, browser settings, project database, recordings database, preset bank and workspace preferences. Files move between editions only when the user explicitly downloads and opens them.
 
 ## What is new
 
@@ -16,7 +16,7 @@ This beta snapshot includes the beta-pro features listed below. This edition has
 - **Projects:** version 3 documents with legacy import, immutable binary assets, metadata-only project listings, named/pinned versions, deduplication, bounded checkpoints, clock-independent revision ordering and concurrent-tab conflict copies. Collect-all portable projects and verified missing-asset relinking support archiving.
 - **Workspace:** separate editing views, command search, editable shortcuts, keyboard clip/point controls, dialog focus handling, saved view preferences, lazy-loaded instrument/effect faces, bounded timeline rendering and diagnostics.
 - **Metering:** stereo peak/RMS, DC, correlation, momentary/short-term/gated integrated loudness and a labelled 4× FIR true-peak estimate. These are engineering meters, not a claim of certified broadcast compliance.
-- **Access:** the same Audionaut collection determines membership. Beta requires a signed Xtrata sign-in and server-side ownership verification for workstation resources. Sign-in is a message proof, not a transaction. An expired access check pauses playback, checkpoints the project and retains the open frame for reauthentication or download.
+- **Access:** the community Beta opens directly without wallet sign-in or membership verification of its studio resources. Beta Pro and the original edition retain their existing membership gates. Publishing and wallet-dependent workflows retain their own explicit authorization requirements.
 
 ## File compatibility
 
@@ -47,4 +47,4 @@ Time stretching uses a stereo-coherent WSOLA processor. It is useful for ordinar
 
 `tools/pro-suite.mjs` runs the automated model, recovery, DSP, browser workflow, export, access, compatibility, storage-isolation and endurance checks. `functions/lib/__tests__/audionaut-pro-auth.test.ts` tests server authorization with disposable generated signers and mocked ownership responses. No personal wallet or paid transaction is used.
 
-The dedicated GitHub Actions workflow runs the suite for relevant pull requests and on manual dispatch. The gate bundle is built by `npm run build:audionaut-beta` and included in the normal site build. Production serves this snapshot at the existing beta address.
+The dedicated GitHub Actions workflow runs the suite for relevant pull requests and on manual dispatch. The public entry and chain runtime are built by `npm run build:audionaut-beta` and included in the normal site build. Production serves the public workstation at the existing beta address.

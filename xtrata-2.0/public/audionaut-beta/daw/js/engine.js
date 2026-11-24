@@ -26,6 +26,12 @@ import { assertOfflineRenderSupported } from './audio-render-support.js';
 
 const LOOKAHEAD_MS = 25; // scheduler tick
 const SCHEDULE_AHEAD = 0.12; // seconds scheduled in advance
+// Exact pattern edges can appear a few floating-point ulps before the beat
+// after converting through seconds. Do not create a phantom previous note.
+const snapPatternBoundary = beat => {
+  const boundary = Math.round(beat / 16) * 16;
+  return Math.abs(beat - boundary) < 1e-9 ? boundary : beat;
+};
 
 // Strip sends are addressed like slots, as "send:delay" / "send:reverb".
 const sendBusId = (id) => (typeof id === "string" && id.startsWith("send:") ? id.slice(5) : null);
@@ -38,6 +44,7 @@ export class Engine {
     this.offline = offline;
     this.seed = seed; this.random = seededRandom(seed);
     this.currentBeat = 0; this._pausedBeat = null; this._planDirty = true; this._transportRuns = [];
+    this._transportPreparing = false; this._noteRecordStart = null;
     this.schedulerStats = { lateTicks: 0, skippedEvents: 0, maxLatenessMs: 0 };
     if (!offline) this.store.on('dirty', ({ event, payload } = {}) => {
       this._planDirty = true;
@@ -880,9 +887,13 @@ export class Engine {
     for(const point of this._eventAutomation(event))if(point.atStart&&point.target.kind==='synthParam')params[point.target.param]=point.value;
     return {event,synthId:owner.synthId,note:{pitch:event.pitch,vel:event.velocity,time:event.time,dur:event.duration+(event.chaseOffsetSeconds||0),held:false},params,sampleRate:this.ctx.sampleRate,seed:event.seed};
   }
-  async preparePlan(plan, { all = this.offline, signal, onProgress } = {}) {
+  async _preparePlaybackSupport() {
     this.ensureContext(); await calibratePluginLatency(this.ctx.sampleRate);this.syncMixer();await this.effectsReady();
     const pool=await import('./synths/render-pool.js');this._prefetchSynthVoices=pool.prefetchSynthVoices;
+    return pool;
+  }
+  async preparePlan(plan, { all = this.offline, signal, onProgress } = {}) {
+    const pool=await this._preparePlaybackSupport();
     const notes=plan.events.filter(e=>e.type==='note'&&(all||e.time<2));
     if(!all&&pool.prefetchSynthVoices){await pool.prefetchSynthVoices(notes.map(e=>this._prepareRequest(e)).filter(Boolean),{signal,onPrepared:(r,layers)=>{r.event.prepared=layers;}});return;}
     let preparedBytes=0;
@@ -899,11 +910,26 @@ export class Engine {
     this._prefetchPending=this._prefetchSynthVoices(requests,{signal:controller.signal,onPrepared:(r,layers)=>{if((r.plan===this._plan||r.plan===this._nextLoopPlan)&&r.event.time+r.origin>this.ctx.currentTime)r.event.prepared=layers;}}).then(report=>{if(report.errors.length)this.schedulerStats.preparationError=report.errors[0].message;}).catch(error=>{if(error.name!=='AbortError')this.schedulerStats.preparationError=error.message;}).finally(()=>{for(const r of requests)delete r.event.preparing;this._prefetchPending=null;});
   }
 
-  async play({ fromBeat } = {}) {
+  playFromEditor(options = {}) {
+    const fromBeat = this._pausedBeat == null ? this.editorTransport?.startBeat() : undefined;
+    return this.play({ fromBeat, ...options });
+  }
+
+  // A note-triggered take starts on this musical clock before its first note is
+  // written. Keep the timestamp of that input (including fast taps and chords).
+  recordingInputTime(time) {
+    const start = this._noteRecordStart;
+    return this.isPlaying && start && time >= start.input && time < start.clock ? start.clock : time;
+  }
+
+  async play({ fromBeat, firstNoteTime } = {}) {
     this.ensureContext();
     if (this.isPlaying) return;
     const project=this.store.project,timeline=project.timeline,legacy=legacyPlaybackProfile(project);
+    const noteTriggered = !this.offline && Number.isFinite(firstNoteTime);
     this.isPlaying = true;
+    this._transportPreparing = true;
+    this._noteRecordStart = null;
     const generation=++this._transportGeneration;
     const sequenceStart=project.currentSequence*16;
     const songEnd=compilePlaybackPlan(project,{buffers:this.buffers}).endBeat;
@@ -914,20 +940,27 @@ export class Engine {
     this._playRange={start,end:loop?.enabled?loop.end:timeline?.enabled?Math.max(timeline.lengthBeats,...timeline.clips.map(c=>c.start+c.duration)):legacy?songEnd:project.sequences.length*16};
     if(this._playRange.start>=this._playRange.end)this._playRange.start=this._loopRange?.start||0;
     this._nextLoopPlan=null;this._lastTickTime=null;this._plan=compilePlaybackPlan(project,{range:this._playRange,seed:this.seed,buffers:this.buffers});
-    try{await this.preparePlan(this._plan);}catch(error){this.isPlaying=false;throw error;}
+    // Explicit Play retains full preparation and count-in. Waiting for a first
+    // note must not defer the recorder behind asynchronous instrument prefetch.
+    if(!noteTriggered)try{await this.preparePlan(this._plan);}catch(error){if(generation===this._transportGeneration){this.isPlaying=false;this._transportPreparing=false;}throw error;}
     if(generation!==this._transportGeneration||!this.isPlaying)return;
-    const meter=meterAt(project,start),countBeats=this._pausedBeat==null?(project.recording?.countIn||0)*meter.numerator*4/meter.denominator:0;
+    const meter=meterAt(project,start),countBeats=!noteTriggered&&this._pausedBeat==null?(project.recording?.countIn||0)*meter.numerator*4/meter.denominator:0;
     const countSeconds=countBeats*60/(project.bpm||120);
     this._pausedBeat=null;this.currentBeat=this._playRange.start;
-    this._planOrigin=this.ctx.currentTime+.05+countSeconds;this._planCursor=0;this._planDirty=false;this._scheduledEvents=new Map();
+    this._planOrigin=noteTriggered?Math.max(this.ctx.currentTime+.01,firstNoteTime):this.ctx.currentTime+.05+countSeconds;this._planCursor=0;this._planDirty=false;this._scheduledEvents=new Map();
+    if(noteTriggered)this._noteRecordStart={input:firstNoteTime,clock:this._planOrigin};
     this._transportRuns=[{clock:this._planOrigin,startBeat:this._playRange.start,endBeat:this._playRange.end,project:structuredClone({bpm:project.bpm,swing:project.swing,timeline:{enabled:timeline?.enabled,tempo:timeline?.tempo}})}];
     for(let n=0;n<countBeats;n++)this._click(this.ctx.currentTime+.05+n*60/project.bpm,n%(meter.numerator*4/meter.denominator)===0);
     this._timeline = [];
     this.playingSequence=Math.floor(this.currentBeat/16);this.currentStep=Math.floor(this.currentBeat*4)%64;
     this._transportStart = this._planOrigin;
     this._transportEnd = Infinity;
+    this._transportPreparing = false;
     this._tick();
     if(typeof document!=='undefined')(typeof AUDIONAUT_STANDALONE !== 'undefined' ? document : this.editorTransport?.events ?? document).dispatchEvent(new CustomEvent('transport',{detail:{playing:true,beat:this.currentBeat}}));
+    if(noteTriggered)void this._preparePlaybackSupport().catch(error=>{
+      if(generation===this._transportGeneration&&this.isPlaying&&typeof document!=='undefined')document.dispatchEvent(new CustomEvent('audio-error',{detail:{message:error.message}}));
+    });
   }
 
   pause() {
@@ -937,6 +970,8 @@ export class Engine {
     this.currentBeat=this._pausedBeat??this.currentBeat;
     if (!this.offline && typeof document !== "undefined") (typeof AUDIONAUT_STANDALONE !== 'undefined' ? document : this.editorTransport?.events ?? document).dispatchEvent(new CustomEvent("transport-stop", { detail: { time: this._transportEnd } }));
     this.isPlaying = false;
+    this._transportPreparing = false;
+    this._noteRecordStart = null;
     this._transportGeneration++;this._prefetchAbort?.abort();
     clearTimeout(this.timer);
     for (const timer of this._transportTimers) clearTimeout(timer);
@@ -952,7 +987,7 @@ export class Engine {
     // already scheduled on the audio clock retain their natural tails.
     this._transportEnd=this._planOrigin+this._plan.duration;this.currentBeat=this._plan.endBeat;
     if(!this.offline&&typeof document!=='undefined')(typeof AUDIONAUT_STANDALONE !== 'undefined' ? document : this.editorTransport?.events ?? document).dispatchEvent(new CustomEvent('transport-stop',{detail:{time:this._transportEnd}}));
-    this.isPlaying=false;this._pausedBeat=null;this._transportGeneration++;this._prefetchAbort?.abort();clearTimeout(this.timer);this._automationOverrides?.clear();
+    this.isPlaying=false;this._transportPreparing=false;this._noteRecordStart=null;this._pausedBeat=null;this._transportGeneration++;this._prefetchAbort?.abort();clearTimeout(this.timer);this._automationOverrides?.clear();
     for(const timer of this._transportTimers)clearTimeout(timer);this._transportTimers.clear();
     if(typeof document!=='undefined')(typeof AUDIONAUT_STANDALONE !== 'undefined' ? document : this.editorTransport?.events ?? document).dispatchEvent(new CustomEvent('transport',{detail:{playing:false,beat:this.currentBeat}}));
   }
@@ -973,14 +1008,14 @@ export class Engine {
   seekBeat(beat) { const playing=this.isPlaying;if(playing)this.pause();this.currentBeat=this._pausedBeat=Math.max(0,Number(beat)||0);if(playing)return this.play({fromBeat:this.currentBeat});this.onStep?.(Math.floor(this.currentBeat*4)%64,Math.floor(this.currentBeat/16)); }
   getMusicalPosition(atTime=this.ctx?.currentTime||0) {
     const time=Math.min(atTime,this._transportEnd??Infinity),run=this._transportRuns.filter(r=>r.clock<=time).at(-1)||this._transportRuns[0];
-    if(!run||!this.isPlaying)return {beat:this._pausedBeat??this.currentBeat,time,playing:false};
+    if(!run||!this.isPlaying||this._transportPreparing)return {beat:this._pausedBeat??this.currentBeat,time,playing:false};
     const cycle=beatToSeconds(run.project,run.endBeat)-beatToSeconds(run.project,run.startBeat),elapsed=Math.max(0,time-run.clock),local=run.repeats>1?elapsed-Math.min(run.repeats-1,Math.floor(elapsed/cycle))*cycle:elapsed;
     const seconds=beatToSeconds(run.project,run.startBeat)+local;
     return {beat:Math.min(run.endBeat,secondsToBeat(run.project,seconds)),time,playing:time>=this._transportStart};
   }
 
   getTransportPosition(atTime = this.ctx?.currentTime || 0) {
-    if(this._plan){const p=this.getMusicalPosition(atTime),sequenceIndex=Math.floor(p.beat/16),step=unswingStep((p.beat-sequenceIndex*16)*4,this.store.project.swing);return {...p,sequenceIndex,step,elapsedSteps:p.beat*4};}
+    if(this._plan){const p=this.getMusicalPosition(atTime),beat=snapPatternBoundary(p.beat),sequenceIndex=Math.floor(beat/16),step=unswingStep((beat-sequenceIndex*16)*4,this.store.project.swing);return {...p,beat,sequenceIndex,step,elapsedSteps:beat*4};}
     const time = Math.min(atTime, this._transportEnd ?? Infinity);
     if (this.isPlaying && this.ctx) this._catchUp(Math.min(time, this.ctx.currentTime));
     const spans = this._timeline;
@@ -999,7 +1034,8 @@ export class Engine {
         const first=Math.max(0,Math.floor((startTime-run.clock)/cycle)),last=Math.min(repeats-1,Math.floor((end-run.clock)/cycle));
         for(let repeat=first;repeat<=last;repeat++){
           const clock=run.clock+repeat*cycle,runEnd=Math.min(this._transportRuns[i+1]?.clock??Infinity,clock+cycle),from=Math.max(startTime,clock),to=Math.min(end,runEnd);if(to<=from)continue;
-          let beat=secondsToBeat(run.project,beatToSeconds(run.project,run.startBeat)+from-clock),lastBeat=secondsToBeat(run.project,beatToSeconds(run.project,run.startBeat)+to-clock);
+          const originSeconds=beatToSeconds(run.project,run.startBeat);
+          let beat=snapPatternBoundary(secondsToBeat(run.project,originSeconds+(from-clock))),lastBeat=snapPatternBoundary(secondsToBeat(run.project,originSeconds+(to-clock)));
           while(beat<lastBeat-1e-9){const sequenceIndex=Math.floor(beat/16),boundary=Math.min(lastBeat,(sequenceIndex+1)*16);result.push({sequenceIndex,startStep:unswingStep((beat-sequenceIndex*16)*4,run.project.swing),endStep:unswingStep((boundary-sequenceIndex*16)*4,run.project.swing),startTime:clock+beatToSeconds(run.project,beat)-beatToSeconds(run.project,run.startBeat),endTime:clock+beatToSeconds(run.project,boundary)-beatToSeconds(run.project,run.startBeat)});beat=boundary;}
         }
       }return result;

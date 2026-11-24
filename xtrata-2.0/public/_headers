@@ -149,7 +149,7 @@
 /audionaut/daw/js/*
   Cache-Control: no-cache
 
-# Gated AudioNaut beta snapshot.
+# Public AudioNaut community Beta (revalidate during testing, keep noindex).
 /audionaut-beta
   Cache-Control: no-store
   X-Robots-Tag: noindex, nofollow

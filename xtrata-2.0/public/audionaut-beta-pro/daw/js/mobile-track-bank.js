@@ -1,6 +1,7 @@
 // The bank follows editor selection. Paging alone never changes a track or transport.
 import { action, el } from './pro-ui.js';
 import { SYNTH_BANK } from './synths.js';
+import { markRecordTrack } from './record-controls.js';
 
 const bankSize = 16;
 export function createTrackBank(selectPad) {
@@ -56,6 +57,7 @@ export function createTrackBank(selectPad) {
       button.lastElementChild.textContent = track.name;
     const color = track.kind === 'instrument' ? SYNTH_BANK[track.synthId]?.color : track.color;
     button.style.setProperty('--pad-color', color || '#69cdc1');
+    if (track.kind === 'instrument') markRecordTrack(button, track.id);
   }
   function showPage(index) {
     page = Math.max(0, Math.min(index, Math.ceil(tracks.length / bankSize) - 1));

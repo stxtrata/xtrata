@@ -1,6 +1,7 @@
 import { buildPianoKeys, KEYMAP } from './keyboard-layout.js';
 import { drumKeyboard, performancePitch, instrumentKeyName } from './instrument-keyboard.js';
 import { openExpandedKeyboard } from './expanded-keyboard.js';
+import { bindRecordArm, markRecordTrack, makeQuantizeControls, setQuantizeTrack } from './record-controls.js';
 import { browseDrumPad } from './drum-library-ui.js';
 import { STORAGE_KEYS, ccStorageKey } from "./storage-config.js";
 // synth-panel.js — hardware-style front panels for the character synths
@@ -1011,12 +1012,15 @@ const saveDockPref = (patch) => {
   }
 };
 const dockEl = () => $("#synth-dock");
+let dockQuantize;
 
 function paintTabs() {
   const tabs = $("#synth-dock-tabs");
   if (!tabs) return;
   $("#play-live-synth").disabled = !store.instrument(inst);
   $("#expand-synth-keys").disabled = !store.instrument(inst);
+  bindRecordArm($('#synth-record-arm'), store.instrument(inst)?.id);
+  if (dockQuantize) setQuantizeTrack(dockQuantize, store.instrument(inst)?.id);
   tabs.innerHTML = "";
   store.project.instruments.forEach((ins, i) => {
     const synth = SYNTH_BANK[ins.synthId];
@@ -1029,6 +1033,7 @@ function paintTabs() {
     b.appendChild(document.createTextNode(ins.name));
     b.title = `${ins.name} — ${synth?.name || ins.synthId}`;
     b.addEventListener("click", () => openSynthPanel(i));
+    markRecordTrack(b, ins.id);
     tabs.appendChild(b);
   });
 }
@@ -1111,6 +1116,8 @@ export function initSynthPanel() {
   if (!root) return;
   const pref = dockPref();
   inst = Number.isInteger(pref.inst) && store.instrument(pref.inst) ? pref.inst : 0;
+  dockQuantize = makeQuantizeControls(store.instrument(inst)?.id, {showStrength:true});
+  $('#synth-record-arm').after(dockQuantize);
   setMidiTarget(inst);
   dockEl().classList.toggle("tall", !!pref.tall);
   $("#play-live-synth").addEventListener("click", (event) => openExpandedKeyboard(inst, event.currentTarget, true));

@@ -8,6 +8,7 @@ import { engine } from './engine.js';
 import { livePreference, saveLivePreference, prepareLiveInstrument } from './live-player-setup.js';
 import { SYNTH_BANK } from './synths.js';
 import { store, CHANNEL_COLORS } from './state.js';
+import { bindRecordArm, bindRecordHint, makeRecordArm, makeQuantizeControls, markRecordTrack, setQuantizeTrack } from './record-controls.js';
 
 let opened;
 let preferredSpan = livePreference('span', 'auto');
@@ -115,6 +116,7 @@ export function openExpandedKeyboard(slot, opener = document.activeElement, dire
     document.removeEventListener('instrument-target', targetChanged);
     document.removeEventListener('synth-note', voice);
     document.removeEventListener('live-octave', octaveChanged);
+    document.removeEventListener('transport', syncTransport);
     cleanup.forEach((off) => off());
     dialog.remove();
     if (opener?.isConnected) opener.focus({ preventScroll: true });
@@ -137,6 +139,19 @@ export function openExpandedKeyboard(slot, opener = document.activeElement, dire
   zoom.append(span);
   controls.append(zoom, lower, readout, higher);
   header.append(name, screen, close);
+  const recordStrip = el('div', null, {className:'expanded-record-controls', 'aria-label':'Performance transport and MIDI recording'});
+  const play = action('▶', () => engine.isPlaying ? engine.pause() : engine.playFromEditor(), {className:'performance-play', 'aria-label':'Play transport'});
+  const stop = action('■', () => engine.stop(), {className:'performance-stop', 'aria-label':'Stop transport'});
+  const arm = makeRecordArm(track.id);
+  const armHint = bindRecordHint(el('span', null, {className:'record-arm-hint'}), track.id);
+  const quantize = makeQuantizeControls(track.id, {showStrength:true});
+  recordStrip.append(play, stop, arm, armHint, quantize);
+  function syncTransport() {
+    play.textContent = engine.isPlaying ? '❚❚' : '▶';
+    play.classList.toggle('active', engine.isPlaying);
+    play.setAttribute('aria-label', engine.isPlaying ? 'Pause transport' : 'Play transport');
+  }
+  syncTransport();
   const bed = el('div', null, { className: 'expanded-keybed' });
   const live = el('div', null, {className:'live-instrument-controls'});
   const bank = el('div', null, {className:'live-instrument-bank', role:'group', 'aria-label':'Live instruments'});
@@ -161,7 +176,7 @@ export function openExpandedKeyboard(slot, opener = document.activeElement, dire
     return Array.isArray(ids) ? ids : [];
   }
   live.append(bank, pin, edit, pedal, status, retry);
-  player.append(header, controls, live, bed);
+  player.append(header, controls, recordStrip, live, bed);
   dialog.append(player);
   document.body.append(dialog);
   const wide = matchMedia('(min-width: 580px)');
@@ -214,6 +229,7 @@ export function openExpandedKeyboard(slot, opener = document.activeElement, dire
     for (const {t,i} of tracks) {
       const button = action(t.name, () => setMidiTarget(i), {'aria-pressed':String(i === slot)});
       button.style.setProperty('--track-color', SYNTH_BANK[t.synthId]?.color || t.color || CHANNEL_COLORS[i % CHANNEL_COLORS.length]);
+      markRecordTrack(button, t.id);
       bank.append(button);
     }
     pin.textContent = pinned.includes(track.id) ? '★' : '☆';
@@ -355,6 +371,9 @@ export function openExpandedKeyboard(slot, opener = document.activeElement, dire
       if (!padRange) saveLivePreference(octaveKey(), getOctave());
       slot = detail.i;
       track = store.instrument(slot);
+      bindRecordArm(arm, track.id);
+      bindRecordHint(armHint, track.id);
+      setQuantizeTrack(quantize, track.id);
       padRange = drumKeyboard(track);
       name.textContent = track.name;
       lit.clear();
@@ -369,6 +388,7 @@ export function openExpandedKeyboard(slot, opener = document.activeElement, dire
   document.addEventListener('instrument-target', targetChanged);
   document.addEventListener('synth-note', voice);
   document.addEventListener('live-octave', octaveChanged);
+  document.addEventListener('transport', syncTransport);
   wide.addEventListener('change', resize);
   document.addEventListener('keydown', escape, true);
   document.addEventListener('fullscreenchange', nativeChange);

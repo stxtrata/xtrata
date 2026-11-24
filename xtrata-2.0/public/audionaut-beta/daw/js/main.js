@@ -24,6 +24,7 @@ import { initPerformanceControls } from "./performance-controls.js";
 import { initProjectLibrary } from "./project-library.js";
 import { initPublish } from "./publish.js";
 import { initWorkspace } from "./pro-workspace.js";
+import { bindRecordArm } from './record-controls.js';
 import { openProjectFile } from './legacy-import-ui.js';
 import { preparedImportFailures } from './legacy-import-audio.js';
 
@@ -35,8 +36,7 @@ document.addEventListener('audio-error',event=>ui.setStatus(event.detail.message
 async function togglePlay() {
   if (engine.isPlaying) return engine.pause();
   try {
-    const fromBeat = engine._pausedBeat == null ? engine.editorTransport?.startBeat() : undefined;
-    await engine.play({ fromBeat });
+    await engine.playFromEditor();
   } catch (error) {
     ui.setStatus(error.message, true);
   }
@@ -180,6 +180,11 @@ function syncHeaderFromProject() {
 function initHeader() {
   $("#btn-play").addEventListener("click", togglePlay);
   $("#btn-stop").addEventListener("click", stopAll);
+  const syncArm = () => bindRecordArm($('#btn-record'), store.instrument(getMidiTarget())?.id, {compact:true});
+  document.addEventListener('instrument-target', syncArm);
+  store.on('load', syncArm);
+  store.on('instruments', syncArm);
+  syncArm();
   $("#project-name").addEventListener("change", (e) =>
     store.setProjectProp("projectName", e.target.value),
   );

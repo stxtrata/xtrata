@@ -1,5 +1,27 @@
 # AudioNaut beta-pro — update testing notes
 
+## 24 November 2026 — instrument record arming
+
+- REC is available on the transport, instrument controls, selected synth dock,
+  Piano Roll, Mobile inspector and expanded live keyboard. A track waits for a
+  note when stopped; that first note starts the transport and is captured.
+  Disarm an individual instrument during playback without stopping the song.
+- Quantize grid and strength are available alongside the synth controls.
+  Apply to take updates the active MIDI take; Apply to notes in a piano roll
+  works on the selection or entire roll. Off restores original timing.
+  Explicit Play still respects the configured count-in. Record & takes keeps
+  metronome, input compensation, MIDI routing, overdub and replace controls.
+- The same recording changes are maintained in community Beta and Beta Pro,
+  with independent browser project storage.
+
+Validation: both edition builds and chain-runtime packaging passed, along with
+the record-arm model, timeline and manifest/library regressions and nine server
+access-policy tests. Local Chrome interaction checks captured a first note in
+each edition, tested independent disarming and reversible quantization, and
+checked the Mobile and Play live layouts at 390px and 320px. The automated
+headless browser runner could not launch in this workspace; physical iOS MIDI
+and audio-device testing remains to be done.
+
 ## Mobile, Sequences and the control bar
 
 Mobile opens on a first phone visit and remembers the workspace you choose after that. Edit one bar of sixteen steps at a time and select a channel to load, trim or layer a sound. Accents, per-step edits and the sequence loop use the same project and transport as Sequences (formerly Patterns) and Timeline.

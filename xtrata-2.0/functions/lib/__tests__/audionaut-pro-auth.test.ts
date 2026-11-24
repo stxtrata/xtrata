@@ -21,6 +21,15 @@ beforeEach(()=>{clearProMembershipCache();holds=true;unavailable=false;const DB=
 });
 afterEach(()=>{vi.unstubAllGlobals();clearProMembershipCache();env.DB.sqlite.close();});
 describe('AudioNaut Pro server gate',()=>{
+ it('allows public community Beta resources while leaving the Pro policy intact',async()=>{
+  const {onRequest: beta}=await import('../../audionaut-beta/_middleware');
+  for(const path of ['/audionaut-beta/','/audionaut-beta/daw.html','/audionaut-beta/daw/js/main.js']){
+   const response=await beta({env:{},request:new Request('https://xtrata.xyz'+path),next:()=>new Response('public beta')} as any);
+   expect(response.status).toBe(200);expect(await response.text()).toBe('public beta');
+  }
+  const response=await middleware({env,request:new Request('https://xtrata.xyz/audionaut-beta-pro/daw/js/main.js'),next:()=>new Response('members only')} as any);
+  expect(response.status).toBe(401);
+ });
  it('requires actual proof, never a client claimed address or disabled creator enforcement',async()=>{
   const owner=wallet();const response=await api({env,request:new Request(url+'?address='+owner.address)} as any);expect((await response.json() as any).allowed).toBe(false);
   const missing=await middleware({env,request:new Request('https://xtrata.xyz/audionaut-beta-pro/daw/js/main.js'),next:()=>new Response('secret')} as any);expect(missing.status).toBe(401);
@@ -104,7 +113,8 @@ describe('AudioNaut Pro server gate',()=>{
   expect(await body(await post('claim',pending))).toEqual({waiting:true});
   expect(await (await asset(device)).text()).toBe('studio');
   expect((await post('approve',device,code)).status).toBe(403);
-  expect((await earlierBeta({env,request:new Request(origin+'/audionaut-beta/daw.html',{headers:{Cookie:device}}),next:()=>new Response('studio')} as any)).status).toBe(303);
+  expect((await earlierBeta({env,request:new Request(origin+'/audionaut-beta/daw.html',{headers:{Cookie:device}}),next:()=>new Response('studio')} as any)).status).toBe(200);
+  expect((await earlierBeta({env:{},request:new Request(origin+'/audionaut-beta/daw.html'),next:()=>new Response('public studio')} as any)).status).toBe(200);
   expect((await authorizePro(new Request(url,{headers:{Cookie:device}}),env)).allowed).toBe(false);
   holds=false;clearProMembershipCache();expect((await asset(device)).status).toBe(303);
   holds=true;clearProMembershipCache();

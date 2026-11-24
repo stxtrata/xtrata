@@ -51,6 +51,7 @@ import { changeSynth } from "./synth-selection.js";
 import { getMidiTarget, setMidiTarget } from "./midi-input.js";
 import { openRoll } from "./pianoroll.js";
 import { openSynthPanel } from "./synth-panel.js";
+import { makeRecordArm } from './record-controls.js';
 import {
   PLUGIN_TYPES,
   makeSlot,
@@ -412,6 +413,7 @@ function instrumentControls(i) {
   );
 
   const rollBtn = el("button", "ch-btn roll-open", "♪");
+  const recordBtn = makeRecordArm(instr.id, {compact:true, className:'ch-btn rec-arm'});
   rollBtn.title = "Open MIDI roll & synth editor";
   rollBtn.addEventListener("click", () => openRoll(i));
 
@@ -499,6 +501,7 @@ function instrumentControls(i) {
   ctrl.append(
     nameInput,
     rollBtn,
+    recordBtn,
     panelBtn,
     previewBtn,
     fxBtn,
