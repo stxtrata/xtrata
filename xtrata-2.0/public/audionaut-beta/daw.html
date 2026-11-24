@@ -67,6 +67,7 @@
             ▶
           </button>
           <button id="btn-stop" aria-label="Stop" class="transport-btn" title="Stop">■</button>
+          <button id="btn-record" class="transport-btn record-arm-btn" type="button" aria-pressed="false">● REC</button>
           <div class="lcd">
             <div class="lcd-row">
               <label>BPM</label>
@@ -265,6 +266,7 @@
         <div class="synth-dock-bar">
           <div id="synth-dock-tabs" class="synth-dock-tabs" role="tablist" aria-label="Synths"></div>
           <span class="synth-dock-hint">Type A–L to play · Z / X octave · Space plays the song</span>
+          <button id="synth-record-arm" class="synth-dock-btn record-arm-btn" type="button" aria-pressed="false">● REC</button>
           <button id="play-live-synth" class="synth-dock-btn live-launch" aria-haspopup="dialog" title="Play this instrument full screen">Play live</button>
           <button id="expand-synth-keys" class="synth-dock-btn" type="button" aria-haspopup="dialog" title="Play this instrument on a full-width keyboard">Expand keyboard</button>
           <button id="synth-dock-size" class="synth-dock-btn" type="button" title="Make the synth panel taller or shorter">⤢</button>
@@ -571,7 +573,7 @@
           <button id="roll-paste" title="Paste notes (⌘/Ctrl+V)">Paste</button>
           <button
             id="roll-rec"
-            title="Arm recording — play keys A–L while the sequencer runs"
+            title="Arm MIDI recording — play a note, or press Play for count-in"
           >
             ● REC
           </button>

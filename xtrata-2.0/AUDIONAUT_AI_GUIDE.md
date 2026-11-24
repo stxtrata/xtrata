@@ -14,6 +14,16 @@ necessary surfaces only. Inspect host code under `src/audionaut` and
 `src/audionaut-beta-pro` when relevant, plus build configuration and chain-runtime
 packaging. A local runtime change does not update already-inscribed code.
 
+### Beta and Beta Pro release policy
+
+Keep the community Beta and Beta Pro workstation features in sync. For new
+DAW behaviour, apply and verify the same relevant runtime and UI changes in
+both editions, preserving their distinct browser storage namespaces, routes,
+labels and build configuration. The community Beta is public without a wallet
+or Audionaut NFT. Beta Pro and the original edition retain their existing
+membership access policies; do not copy the public host or middleware into
+those editions.
+
 Before synth work, inspect the selected edition's registry, representative
 instruments, shared voice helpers and parameter/preset handling. Use its
 `daw/js/synths/README.md` as a starting point, then verify the current interfaces

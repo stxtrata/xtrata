@@ -16,6 +16,7 @@ import { changeSynth } from "./synth-selection.js";
 import { attachKeyboard, noteOn, noteOff, allOff, getOctave, setOctave, TYPED_VEL } from "./live-keys.js";
 import { beginTransaction, endTransaction } from "./history.js";
 import { quantizeRecordedSpan } from "./performance-recorder.js";
+import { bindRecordArm, bindRecordHint, makeQuantizeControls, setQuantizeTrack } from './record-controls.js';
 
 const $ = (s) => document.querySelector(s);
 
@@ -34,7 +35,7 @@ const rollLength = () => editingClip()?Math.max(1,Math.ceil(editingClip().durati
 const editOffset = () => (editingClip()?.offset||0)*4;
 const gridSteps = () => store.project.recording.quantize>0?store.project.recording.quantize*4:1/16;
 let noteDur = 2;
-let recArmed = false;
+let quantizeTools, armHint;
 let canvas, ctx2d;
 
 // --- editing state ---
@@ -583,21 +584,32 @@ const recording = new Map();
 const recordingTakes = new Map();
 let recordingTransaction = false;
 const rollVisible = () => !$("#modal-roll").classList.contains("hidden");
+function endRecordingTransactionIfIdle() {
+  if (!recording.size && recordingTransaction) {
+    recordingTransaction = false;
+    endTransaction();
+  }
+}
 function recordFinish(src, time = engine.ctx?.currentTime || 0) {
   const held = recording.get(src);
   if (!held) return;
   recording.delete(src);
   clearTimeout(held.timer);
-  if (held.project !== store.project) return;
-  const end = Math.min(time, held.end ?? Infinity);
-  if (end < held.time) return; // queued arp pulse was cancelled before it sounded
+  const index = store.project.instruments.findIndex(t => t.id === held.trackId);
+  const inputEnd = Math.min(time, held.inputEnd ?? Infinity);
+  if (held.project !== store.project || index < 0 || inputEnd < held.inputTime) {
+    endRecordingTransactionIfIdle();
+    return; // project changed, or a queued arp pulse was cancelled before it sounded
+  }
+  const end = inputEnd + held.clockShift;
   let segments = engine.getTransportSegments?.(held.time, end) || [];
-  if (!segments.length && held.position?.playing) segments.push({ sequenceIndex: held.position.sequenceIndex, startStep: held.position.step, endStep: held.position.step + 1 });
+  if (!segments.length && held.position?.playing) segments.push({ sequenceIndex: held.position.sequenceIndex, startStep: held.position.step, endStep: Math.min(NUM_STEPS, held.position.step + Math.max(1/960, (inputEnd-held.inputTime)/engine.stepDuration())) });
   const punch=store.project.timeline.punch;
   if(punch.enabled)segments=segments.map(s=>({...s,startStep:Math.max(s.startStep,(punch.start-s.sequenceIndex*16)*4),endStep:Math.min(s.endStep,(punch.end-s.sequenceIndex*16)*4)})).filter(s=>s.endStep>s.startStep);
   const settings=store.project.recording;
   const notes = quantizeRecordedSpan(segments, held.pitch, held.vel, NUM_STEPS,{grid:settings.quantize,strength:settings.strength,tieId:held.noteId,expression:held.expression});
-  const owner=store.instrument(held.inst);let take=recordingTakes.get(owner.id);
+  if (!notes.length) { endRecordingTransactionIfIdle(); return; }
+  const owner=store.instrument(index);let take=recordingTakes.get(owner.id);
   if(!take){take={id:newId('take'),name:`Take ${(owner.takes?.length||0)+1}`,createdAt:Date.now(),notes:[],clipIds:[],cleared:[]};(owner.takes||=[]).push(take);owner.activeTakeId=take.id;recordingTakes.set(owner.id,take);}
   for (const { sequenceIndex, note } of notes) {
     note.id=newId('note');take.notes.push({sequenceIndex,note:structuredClone(note)});
@@ -608,32 +620,42 @@ function recordFinish(src, time = engine.ctx?.currentTime || 0) {
     }else{
       while(store.project.sequences.length<=sequenceIndex){const seq=makeSequence(store.numChannels);while(seq.notes.length<store.project.instruments.length)seq.notes.push([]);store.project.sequences.push(seq);}
       const seq=store.project.sequences[sequenceIndex];
-      if(settings.mode!=='overdub'&&!take.cleared.includes(sequenceIndex)){seq.notes[held.inst]=[];take.cleared.push(sequenceIndex);}
-      seq.notes[held.inst].push(note);
+      if(settings.mode!=='overdub'&&!take.cleared.includes(sequenceIndex)){seq.notes[index]=[];take.cleared.push(sequenceIndex);}
+      seq.notes[index].push(note);
     }
   }
-  if (notes.length) store.emit("notes", held.inst,{historyPaths:[['sequences'],['timeline'],['instruments',held.inst,'takes'],['instruments',held.inst,'activeTakeId']]});
-  if(!recording.size&&recordingTransaction){recordingTransaction=false;endTransaction();}
+  store.emit("notes", index,{historyPaths:[['sequences'],['timeline'],['instruments',index,'takes'],['instruments',index,'activeTakeId']]});
+  endRecordingTransactionIfIdle();
   drawRoll();
 }
-function finishRecording() {
-  for (const src of [...recording.keys()]) recordFinish(src);
+function finishRecording(time) {
+  for (const src of [...recording.keys()]) recordFinish(src, time);
   if (recordingTransaction) { recordingTransaction = false; endTransaction(); }
 }
 function onLiveNote({ detail: n }) {
   if (!n.on) return recordFinish(n.src, n.time);
-  if (!(store.instrument(n.inst)?.armed || (recArmed&&rollVisible()&&n.inst===inst)) || !engine.isPlaying || !engine.getTransportPosition(n.time).playing) return;
+  const owner = store.instrument(n.inst);
+  if (!owner?.armed) return;
+  if (!engine.isPlaying) {
+    void engine.playFromEditor({firstNoteTime:n.time}).catch(error => {
+      if (engine._transportPreparing) engine.pause();
+      document.dispatchEvent(new CustomEvent('audio-error', {detail:{message:error.message}}));
+    });
+  }
+  const time = engine.recordingInputTime(n.time), position = engine.getTransportPosition(time);
+  if (!engine.isPlaying || !position.playing) return;
   recordFinish(n.src, n.time);
   if (!recordingTransaction) { beginTransaction(); recordingTransaction = true; }
-  const held = { ...n, noteId:newId('performance'),expression:[{offset:0,type:'bend',value:n.bend||0}],project: store.project, position: engine.getTransportPosition?.(n.time), timer: 0 };
+  const held = { ...n, time, inputTime:n.time, clockShift:time-n.time, trackId:owner.id,
+    noteId:newId('performance'),expression:[{offset:0,type:'bend',value:n.bend||0}],project:store.project,position,timer:0 };
   if (Number.isFinite(n.duration)) {
-    held.end = n.time + n.duration;
-    held.timer = setTimeout(() => recordFinish(n.src, held.end), Math.max(0, (held.end - engine.ctx.currentTime) * 1000));
+    held.inputEnd = n.time + n.duration;
+    held.timer = setTimeout(() => recordFinish(n.src, held.inputEnd), Math.max(0, (held.inputEnd - engine.ctx.currentTime) * 1000));
   }
   recording.set(n.src, held);
 }
 function releaseRollInputs() {
-  for(const [src,held] of recording)if(src.startsWith('roll:')||!store.instrument(held.inst)?.armed)recordFinish(src);
+  for(const [src,held] of recording)if(src.startsWith('roll:')||!store.track(held.trackId)?.armed)recordFinish(src);
   allOff("roll:");
   heldTyped.clear();
   lit.clear();
@@ -648,6 +670,7 @@ function refreshRoll() {
   if (!store.instrument(inst)) inst = 0;
   if (!rollVisible()) return;
   const instrument = store.instrument(inst);
+  syncRollRecordControls();
   $("#roll-title").textContent = `${instrument.name} — MIDI Roll`;
   $("#roll-synth-select").value = instrument.synthId;
   renderSynthPanel();
@@ -660,7 +683,6 @@ function paintMidi() {
   const b = $("#roll-midi");
   if (b) b.textContent = on ? "MIDI input: on" : "Enable MIDI input";
   b?.classList.toggle("on", on);
-  if (!on) finishRecording();
   if ($("#modal-roll").classList.contains("hidden")) return;
   setRollStatus(
     error ||
@@ -673,6 +695,12 @@ function paintMidi() {
 }
 
 // --------------------------------------------------------------- modal lifecycle
+function syncRollRecordControls() {
+  const id = store.instrument(inst)?.id;
+  bindRecordArm($('#roll-rec'), id);
+  if (armHint) bindRecordHint(armHint, id);
+  if (quantizeTools) setQuantizeTrack(quantizeTools, id);
+}
 export function openRoll(i) {
   editingClipId=null;
   if (inst !== i) releaseRollInputs();
@@ -688,7 +716,7 @@ export function openRoll(i) {
   renderLineSelect();
   $("#modal-roll").classList.remove("hidden");
   canvas.width=KEY_W+rollLength()*CELL_W;
-  $('#roll-rec').classList.toggle('rec-on',store.instrument(i).armed);recArmed=!!store.instrument(i).armed;
+  syncRollRecordControls();
   $('.roll-scroll').scrollTop=(HIGH-76)*CELL_H;
   drawRoll(-1);
   setRollStatus(
@@ -742,19 +770,22 @@ export function initPianoRoll() {
   $("#roll-copy").addEventListener("click", copySelection);
   $("#roll-paste").addEventListener("click", pasteClipboard);
 
-  $("#roll-rec").addEventListener("click", () => {
-    recArmed = !recArmed;
-    store.setInstrumentProp(inst,'armed',recArmed);
-    if (!recArmed) finishRecording();
-    $("#roll-rec").classList.toggle("rec-on", recArmed);
-    setRollStatus(
-      recArmed
-        ? "REC armed — press Play, then play keys A–L to record (quantized to 16ths)."
-        : "Recording disarmed.",
-    );
+  armHint = document.createElement('span');
+  armHint.className = 'record-arm-hint';
+  quantizeTools = makeQuantizeControls(store.instrument(inst)?.id, {
+    showStrength:true,
+    onApply:(grid, strength) => {
+      for (const note of selection.size ? selection : notes()) note.id ||= newId('note');
+      const count = store.quantizeNotes(inst, grid, strength, selection.size ? [...selection].map(n => n.id) : null, {clipId:editingClipId});
+      drawRoll();
+      setRollStatus(count ? 'Updated timing for ' + count + ' MIDI notes. Off restores original timing.' : 'No notes to quantize.');
+      return count;
+    }
   });
+  $("#roll-rec").after(armHint, quantizeTools);
+  syncRollRecordControls();
   $("#roll-clear").addEventListener("click", () => {
-    for(const [src,held] of recording)if(held.inst===inst){clearTimeout(held.timer);recording.delete(src);}
+    for(const [src,held] of recording)if(held.trackId===store.instrument(inst)?.id){clearTimeout(held.timer);recording.delete(src);}
     if(!recording.size&&recordingTransaction){recordingTransaction=false;endTransaction();}
     selection.clear();
     setEditorNotes([]);
@@ -763,7 +794,7 @@ export function initPianoRoll() {
   $("#roll-close").addEventListener("click", closeRoll);
   $("#roll-midi").addEventListener("click", () => setMidiEnabled(!isMidiOn()));
   document.addEventListener("live-note", onLiveNote);
-  document.addEventListener('live-expression',({detail:e})=>{for(const [src,held]of recording)if(src.startsWith(e.prefix)){const segments=engine.getTransportSegments(held.time,e.time),offset=segments.reduce((sum,s)=>sum+(s.endStep-s.startStep)/4,0);held.expression.push({offset,type:e.type,value:e.value,...(e.controller!=null&&{controller:e.controller})});}});
+  document.addEventListener('live-expression',({detail:e})=>{for(const [src,held]of recording)if(src.startsWith(e.prefix)&&e.time>=held.inputTime){const segments=engine.getTransportSegments(held.time,e.time+held.clockShift),offset=segments.reduce((sum,s)=>sum+(s.endStep-s.startStep)/4,0);held.expression.push({offset,type:e.type,value:e.value,...(e.controller!=null&&{controller:e.controller})});}});
   document.addEventListener('transport',({detail})=>{if(detail.playing)recordingTakes.clear();});
   document.addEventListener("midi-status", paintMidi);
   paintMidi();
@@ -777,14 +808,23 @@ export function initPianoRoll() {
     }
   });
   window.addEventListener("blur", releaseRollInputs);
-  document.addEventListener("transport-stop", finishRecording);
-  document.addEventListener("performance-reset", finishRecording);
+  document.addEventListener("transport-stop", ({detail}) => finishRecording(detail?.time));
+  document.addEventListener("performance-reset", ({detail}) => {
+    if (detail?.prefix || detail?.sources) {
+      for (const src of [...recording.keys()]) if (
+        (detail.prefix && src.startsWith(detail.prefix)) || detail.sources?.includes(src)
+      ) recordFinish(src);
+    } else finishRecording();
+  });
   new MutationObserver(() => { if (!rollVisible()) releaseRollInputs(); }).observe($("#modal-roll"), { attributes: true, attributeFilter: ["class"] });
   document.addEventListener("instrument-target", ({ detail }) => {
     if (rollVisible() && inst !== detail.i) { releaseRollInputs(); inst = detail.i; refreshRoll(); }
   });
   store.on("load", () => { for(const held of recording.values())clearTimeout(held.timer);recording.clear();recordingTakes.clear();if(recordingTransaction){recordingTransaction=false;endTransaction();}releaseRollInputs(); refreshRoll(); });
   store.on("instrument", ({ i, prop }) => {
+    if (prop === 'armed' && !store.instrument(i)?.armed) {
+      for (const [src, held] of recording) if (held.trackId === store.instrument(i)?.id) recordFinish(src);
+    }
     if (i !== inst || !rollVisible()) return;
     if (["synthId", "name"].includes(prop)) refreshRoll();
     if (prop === "params") {

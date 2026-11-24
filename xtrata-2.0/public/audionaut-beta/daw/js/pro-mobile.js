@@ -9,6 +9,7 @@ import { editGroups } from './mobile-group-editor.js';
 import { setMidiTarget } from './midi-input.js';
 import { el, action, field } from './pro-ui.js';
 import { startLesson, endMobileLesson } from './pro-guide.js';
+import { bindRecordArm, bindRecordHint, makeQuantizeControls } from './record-controls.js';
 
 export function mount(host) {
   host.classList.add('mobile-editor');
@@ -165,6 +166,8 @@ export function mount(host) {
       isSynth = i < 0,
       owner = store.track(trackId);
     if (!owner) return;
+    inspector.classList.toggle('instrument-selected', isSynth);
+    host.classList.toggle('instrument-selected', isSynth);
     if (
       strip?.dataset.trackId !== trackId ||
       +strip.dataset.ownerIndex !== (isSynth ? instrument() : i)
@@ -188,8 +191,14 @@ export function mount(host) {
       const volume = strip.querySelector('.ch-vol');
       mix.append(field('Level', volume));
       if (isSynth) {
+        const arm = bindRecordArm(strip.querySelector('.rec-arm'), owner.id);
+        const record = el('div', null, {className:'mobile-record-tools'});
+        record.append(arm,
+          action('Play live', button => openExpandedKeyboard(instrument(), button, true), {'aria-haspopup':'dialog', className:'live-launch'}),
+          bindRecordHint(el('span', null, {className:'record-arm-hint'}), owner.id),
+          makeQuantizeControls(owner.id, {showStrength:true}));
+        devices.append(record);
         devices.append(strip.querySelector('.synth-picker'));
-        devices.append(action('Play live', button => openExpandedKeyboard(instrument(), button, true), {'aria-haspopup':'dialog', className:'live-launch'}));
         devices.append(action('Expand keyboard', (button) => openExpandedKeyboard(instrument(), button), {'aria-haspopup': 'dialog'}));
         moveButton('.panel-open', 'Synth panel', devices);
         moveButton('.roll-open', 'Piano roll', devices);

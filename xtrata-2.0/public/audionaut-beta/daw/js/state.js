@@ -2,12 +2,19 @@
 
 import { newProjectId, retainAssets } from "./assets.js";
 import { normalizeProjectModel, newId, trackAddress, patternClips, MODEL_LIMITS } from "./project-model.js";
+import { activeMidiTake, requantizeNoteTiming } from './performance-recorder.js';
 
 export const NUM_CHANNELS = 16; // default channel count
 export const MAX_CHANNELS = 64;
 export const NUM_INSTRUMENTS = 4;
 export const NUM_STEPS = 64;
 export const MAX_SEQUENCES = 64;
+
+const noteTiming = n => ({ step:n.step, dur:n.dur, rawStep:n.rawStep, rawDur:n.rawDur });
+const clipNoteSteps = clip => (clip.notes || []).reduce(
+  (end, note) => Math.max(end, (note.rawStep ?? note.step) + (note.rawDur ?? note.dur)),
+  Math.max(1, (clip.duration + (clip.offset || 0)) * 4)
+);
 
 export const CHANNEL_COLORS = [
   "#ff4d4d",
@@ -265,17 +272,62 @@ class Store {
     if(near>=0)points[near]={...point};else {if(points.length>=100000)throw new Error('This automation lane reached its point limit. Simplify the curve before recording more.');points.splice(lo,0,{...point});}
     this.emit('project',{prop:'timeline',automationPoint:true},{historyPaths:[['timeline','automation',index,'points']]});return lane;
   }
-  quantizeNotes(i, gridBeats = this.project.recording.quantize, strength = this.project.recording.strength, selectedIds = null) {
-    const stepGrid=gridBeats*4;
-    for(const n of this.seq.notes[i]) {
-      if(selectedIds && !selectedIds.includes(n.id))continue;
-      n.rawStep ??= n.step; n.rawDur ??= n.dur;
-      const end=n.rawStep+n.rawDur;
-      n.step=stepGrid>0?n.rawStep+(Math.round(n.rawStep/stepGrid)*stepGrid-n.rawStep)*strength:n.rawStep;
-      const quantizedEnd=stepGrid>0?end+(Math.round(end/stepGrid)*stepGrid-end)*strength:end;
-      n.dur=stepGrid>0?Math.max(1/960,quantizedEnd-n.step):n.rawDur;
+  quantizeNotes(i, gridBeats = this.project.recording.quantize, strength = this.project.recording.strength, selectedIds = null, { clipId = null } = {}) {
+    const owner = this.instrument(i);
+    if (!owner) return 0;
+    const clip = clipId && this.project.timeline.clips.find(c => c.id === clipId && c.trackId === owner.id && c.type === 'midi');
+    if (clipId && !clip) return 0;
+    const notes = clip ? clip.notes || [] : this.seq.notes[i] || [];
+    const selected = selectedIds && new Set(selectedIds);
+    const steps = clip ? clipNoteSteps(clip) : NUM_STEPS;
+    const changed = new Map();
+    for (const n of notes) {
+      if (selected && !selected.has(n.id)) continue;
+      n.id ||= newId('note');
+      requantizeNoteTiming(n, gridBeats, strength, steps);
+      changed.set(n.id, noteTiming(n));
     }
-    this.emit('notes',i);
+    if (!changed.size) return 0;
+    // A recalled take must keep the same non-destructive timing edits.
+    for (const take of owner.takes || []) for (const entry of take.notes || []) {
+      if (changed.has(entry.note.id)) Object.assign(entry.note, changed.get(entry.note.id));
+    }
+    const historyPaths = [
+      clip ? ['timeline'] : ['sequences', this.project.currentSequence, 'notes', i],
+      ['instruments', i, 'takes']
+    ];
+    this.emit('notes', i, { historyPaths });
+    if (clip) this.emit('project', { prop:'timeline' }, { dirty:false });
+    return changed.size;
+  }
+
+  quantizeTake(trackId, gridBeats = this.project.recording.quantize, strength = this.project.recording.strength) {
+    const i = this.project.instruments.findIndex(t => t.id === trackId);
+    const take = activeMidiTake(this.instrument(i));
+    if (!take?.notes.length) return 0;
+    const ids = new Set(take.notes.map(entry => entry.note.id).filter(Boolean));
+    const refs = new Map();
+    const collect = (notes, steps) => {
+      for (const n of notes || []) if (ids.has(n.id)) {
+        if (!refs.has(n.id)) refs.set(n.id, []);
+        refs.get(n.id).push({ n, steps });
+      }
+    };
+    for (const seq of this.project.sequences) collect(seq.notes[i], NUM_STEPS);
+    for (const clip of this.project.timeline.clips) {
+      if (clip.trackId === trackId && clip.type === 'midi') collect(clip.notes, clipNoteSteps(clip));
+    }
+    for (const entry of take.notes) {
+      const matches = refs.get(entry.note.id) || [];
+      const basis = matches[0] || { n:entry.note, steps:NUM_STEPS };
+      requantizeNoteTiming(basis.n, gridBeats, strength, basis.steps);
+      const timing = noteTiming(basis.n);
+      Object.assign(entry.note, timing);
+      for (const { n } of matches) Object.assign(n, timing);
+    }
+    this.emit('notes', i, { historyPaths:[['sequences'], ['timeline'], ['instruments', i, 'takes']] });
+    this.emit('project', { prop:'timeline' }, { dirty:false });
+    return take.notes.length;
   }
   selectTake(trackId,takeId){
     const address=trackAddress(this.project,trackId),track=address?.track,take=track?.takes?.find(t=>t.id===takeId);if(!take)return false;

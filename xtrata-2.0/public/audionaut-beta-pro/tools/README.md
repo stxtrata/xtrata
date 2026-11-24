@@ -72,3 +72,9 @@ Chrome, WebKit and Linux Firefox use the real native fallback.
 `pro-track-controls-test.mjs` checks the shared channel/synth buttons, editors,
 state synchronization, sequence targeting, clipboard, undo, focus retention,
 track creation and control fit at desktop, tablet and phone widths.
+
+`pro-record-arm-model-test.mjs` checks immediate first-note transport timing,
+ordinary count-in, selected-note quantization, and reversible take timing in
+Sequences and Timeline. `pro-record-arm-test.mjs` exercises the desktop and
+touch record-arm controls, first-note capture, disarming without stopping,
+quantization changes, original timing restoration and phone-size Play live.

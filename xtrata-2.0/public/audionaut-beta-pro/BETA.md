@@ -2,11 +2,11 @@
 
 Community testing address: `https://xtrata.xyz/audionaut-beta-pro/`.
 
-The beta is a separate copy of the updated workstation from commit `b45f7a9`.
-Its code, sound banks, starter songs and catalogues live under
-`public/audionaut-beta-pro/`. The production workstation under `public/audionaut/`
-remains unchanged from main. There is no automatic synchronization between the
-two folders: beta edits stay in beta until an explicit promotion is reviewed.
+Beta Pro's code, sound banks, starter songs and catalogues live under
+`public/audionaut-beta-pro/`. The community Beta at `/audionaut-beta/` receives
+the same workstation updates and is public. Beta Pro retains membership access
+and its own browser project storage. The original workstation under
+`public/audionaut/` remains unchanged.
 
 ## Access
 
