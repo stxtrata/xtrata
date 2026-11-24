@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { FAIR_PLAY_HREF, FAIR_PLAY_START, discPattern, fairPlayLive, msUntilFairPlay, previewFairPlay, validateFairPlay } from '../fair-play-tile.js';
+import { FAIR_PLAY_HREF, FAIR_PLAY_START, FAIR_PLAY_COPY, fairPlayLive, msUntilFairPlay, previewFairPlay, validateFairPlay } from '../fair-play-tile.js';
 
 const read = (path: string) => readFileSync(new URL(path, import.meta.url), 'utf8');
 
@@ -25,9 +25,11 @@ describe('Fair Play banner timing', () => {
     expect(validateFairPlay()).toEqual([]);
     expect(FAIR_PLAY_HREF).toBe('/players');
   });
-  it('draws a fixed disc pattern with Diamonds in it', () => {
-    expect(discPattern()).toEqual(discPattern());
-    expect(discPattern().filter((d) => d === 'diamond').length).toBeGreaterThan(0);
+  it('pitches free, pre-paid plays in plain words', () => {
+    expect(FAIR_PLAY_COPY.headline).toEqual(['Free music.', 'Every play pre-paid.']);
+    expect(FAIR_PLAY_COPY.strong).toBe('You pay nothing.');
+    const all = JSON.stringify(FAIR_PLAY_COPY);
+    expect(all).not.toMatch(/crypto|blockchain|on-chain|\u2014/i);
   });
 });
 
