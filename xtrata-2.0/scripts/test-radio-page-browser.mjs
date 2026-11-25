@@ -245,9 +245,10 @@ for (const viewport of [{ width: 1280, height: 900 }, { width: 390, height: 844 
   await page.locator('#findBody li .lt').click();
   assert.deepEqual((await calls()).at(-1), ['playToken', 108]);
 
-  // Browse with albums: two tabs, covers in two columns, and a tap opens the album and goes to Listen.
+  // Browse with albums: one page (search, "In your player" covers two across, artists), and a tap opens the album and goes to Listen.
   // (The real shelf code runs here; page.ts, which wires it to the player, is covered by page-browse-albums.test.ts.)
-  assert.equal(await page.locator('#browseTabs').isVisible(), false, 'no tabs until there are albums');
+  assert.equal(await page.locator('#browseTabs').isVisible(), false, 'Browse has no tabs');
+  assert.equal(await page.locator('.sk-h[data-for=albums]').isVisible(), false, 'no album heading until there are albums');
   await page.addScriptTag({ content: shelfJs });
   await page.evaluate(([shelf]) => {
     const snap = { step: 'ready', root: 'SP3X2F7FQH7GQS0YRBWH0H5W6RM2PB1B0WPD1XA2V', slot: 0, walletCannotAlbums: false };
@@ -262,11 +263,12 @@ for (const viewport of [{ width: 1280, height: 900 }, { width: 390, height: 844 
     draw();
   }, [albums]);
   await page.locator('#shelfBox .ppp-shelf-list li').first().waitFor();
-  assert.equal(await page.locator('#browseTabs').isVisible(), true);
-  assert.deepEqual(await page.locator('#browseTabs button').allInnerTexts(), ['My albums', 'Search']);
-  assert.equal(await page.locator('#browseTabs button[aria-selected="true"]').innerText(), 'My albums', 'albums first when there are some');
-  assert.equal(await page.locator('#findBox').isVisible(), false);
+  assert.equal(await page.locator('#browseTabs').isVisible(), false, 'still no tabs');
+  assert.equal(await page.locator('#findBox').isVisible(), true, 'search stays, above the albums');
   assert.equal(await page.locator('#shelfBox').isVisible(), true);
+  assert.equal(await page.locator('.sk-h[data-for=albums]').innerText(), 'IN YOUR PLAYER');
+  assert.equal(await page.locator('#shelfBox .ppp-shelf-tools').isVisible(), false, 'a few albums need no search or sort of their own');
+  { const f = await page.locator('#findBox').boundingBox(), sh = await page.locator('#shelfBox').boundingBox(); assert.ok(f.y < sh.y, 'search, then the albums'); }
   assert.equal(await page.locator('.sk-h[data-for=browse]').innerText(), 'Browse');
   { const lis = page.locator('#shelfBox .ppp-shelf-list li'); assert.equal(await lis.count(), 4);
     const a = await lis.nth(0).boundingBox(), b = await lis.nth(1).boundingBox(), c = await lis.nth(2).boundingBox();
@@ -275,19 +277,14 @@ for (const viewport of [{ width: 1280, height: 900 }, { width: 390, height: 844 
     assert.ok(await page.locator('#shelfBox .ppp-shelf-list .t').last().evaluate((n) => n.scrollHeight <= 2.6 * parseFloat(getComputedStyle(n).lineHeight || '20') + 4), 'a long title stays within two lines'); }
   await noSideScroll('Browse, My albums');
   await shot('browse-albums');
-  await page.locator('#browseTabs button[data-bt="search"]').click();
-  assert.equal(await page.locator('#findBox').isVisible(), true);
-  assert.equal(await page.locator('#shelfBox').isVisible(), false);
-  await page.locator('#browseTabs button[data-bt="albums"]').click();
   await page.locator('#shelfBox .ppp-shelf-list li').nth(1).click();
   assert.deepEqual((await calls()).at(-1), ['openAlbum', await page.evaluate(() => window.__snap.slot)]);
   assert.equal(await tab(), 'listen', 'an album tapped on Browse opens on Listen');
   await page.evaluate(() => window.dispatchEvent(new CustomEvent('xtrata:radio-browse', { detail: { tab: 'albums' } })));
   assert.equal(await tab(), 'browse');
-  assert.equal(await page.locator('#browseTabs button[aria-selected="true"]').innerText(), 'My albums');
   assert.equal(await page.locator('#shelfBox .ppp-shelf-list li.now').count(), 1, 'the open album is marked');
   await page.evaluate(() => window.dispatchEvent(new CustomEvent('xtrata:radio-albums', { detail: { has: false } })));
-  assert.equal(await page.locator('#browseTabs').isVisible(), false, 'no albums: back to plain search');
+  assert.equal(await page.locator('#shelfBox').isVisible(), false, 'no albums: plain search');
   assert.equal(await page.locator('#findBox').isVisible(), true);
   await page.evaluate(() => window.dispatchEvent(new CustomEvent('xtrata:radio-albums', { detail: { has: true } })));
 
