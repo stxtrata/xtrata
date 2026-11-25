@@ -1533,7 +1533,9 @@ function start(root: HTMLElement) {
     const shelfFold = document.querySelector('.ppp-shelf') as HTMLDetailsElement | null;
     const browseMount = shelfInBrowse() ? document.getElementById('shelfBox') : null;
     if (browseMount) {
-      // The new look: the albums are a tab of Browse. (The album page's own sheet keeps the fold below.)
+      // The new look: the albums are a section of Browse, "In your player". (The album page's own sheet keeps the fold
+      // below.) Search, sort and pinning only appear once there are more albums than fit at a glance.
+      if (shelf.count() > 6) browseMount.dataset.many = '1'; else delete browseMount.dataset.many;
       if (shelfBox) { if (browseMount.firstChild !== shelfBox) browseMount.replaceChildren(shelfBox); } else browseMount.replaceChildren();
       if (shelfFold) shelfFold.hidden = true;
       announceAlbums(!!shelfBox);
@@ -1933,6 +1935,8 @@ function start(root: HTMLElement) {
     explicit: (id) => !!(window as any).XtrataRadio?.isExplicit?.(id),
     liked: (id) => likedNow().has(id),
     grid: document.documentElement.hasAttribute('data-skin'),   // the new look lists artist names three across
+    // ...and draws them in their own section of Browse, under the listener's albums
+    artistsMount: (document.documentElement.hasAttribute('data-skin') && document.getElementById('artistBox')) || undefined,
     leaveAlbum: () => openFromShelf(0)
   }) : null;
   findBox?.addEventListener('toggle', () => { if (findBox.open) find?.load(); });

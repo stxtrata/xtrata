@@ -988,6 +988,19 @@ d.setAttribute('data-skin','1');d.setAttribute('data-tab','listen');}catch(e){}}
   html[data-skin]:not([data-view])[data-tab=browse][data-albums="1"][data-btab=albums] .shelfbox{display:block;order:-1}
   html[data-skin]:not([data-view])[data-albums="1"][data-btab=albums] #findBox{display:none}
   html[data-skin]:not([data-view]) #findBox>summary{display:none}
+  /* Browse is one page now, not two tabs: search, the listener's albums as covers, then artists. */
+  .artistbox{display:none}
+  html[data-skin]:not([data-view]) #paidRadioStatus{order:-4}
+  html[data-skin]:not([data-view])[data-tab=browse][data-albums="1"] .btabs{display:none}
+  html[data-skin]:not([data-view])[data-tab=browse] #findBox,html[data-skin]:not([data-view])[data-tab=browse][data-albums="1"][data-btab] #findBox{display:block;order:-2}
+  html[data-skin]:not([data-view])[data-tab=browse][data-albums="1"] .shelfbox,html[data-skin]:not([data-view])[data-tab=browse][data-albums="1"][data-btab] .shelfbox{display:block;order:-1}
+  html[data-skin]:not([data-view])[data-tab=browse][data-albums="1"] .sk-h[data-for=albums]{display:block;order:-1;margin:6px 0 -4px}
+  html[data-skin]:not([data-view])[data-tab=browse] .sk-h[data-for=artists]{display:block;order:0;margin:6px 0 -4px}
+  html[data-skin]:not([data-view])[data-tab=browse] .artistbox{display:block;order:0}
+  html[data-skin]:not([data-view]) .sk-h[data-for=artists]:has(+ .artistbox:empty),html[data-skin]:not([data-view]) .sk-h[data-for=artists]:has(+ .artistbox .find-artists:empty),html[data-skin]:not([data-view]) .artistbox:empty{display:none}
+  html[data-skin]:not([data-view]) .artistbox .find-artists{margin:0}
+  html[data-skin]:not([data-view]) .shelfbox:not([data-many]) .ppp-shelf-tools{display:none}
+  html[data-skin]:not([data-view]) .shelfbox .ppp-shelf-list{margin-bottom:6px}
   html[data-skin]:not([data-view]) .find-back{min-height:44px;margin-top:8px;padding:0 16px;border:1px solid #2c3341;border-radius:12px;background:#171b23;color:#8fe0f2;font:inherit;font-size:14px;font-weight:600;cursor:pointer;display:block}
   html[data-skin]:not([data-view]) .shelfbox .ppp-shelf-tools{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;margin:0 0 14px}
   html[data-skin]:not([data-view]) .shelfbox .ppp-shelf-tools input{grid-column:1/-1;min-height:48px;padding:0 14px;border:1px solid #2c3341;border-radius:14px;background:#171b23;color:#f2efe6;font-size:16px}
@@ -1200,11 +1213,15 @@ d.setAttribute('data-skin','1');d.setAttribute('data-tab','listen');}catch(e){}}
     <h2 class="sk-h sk-h--big" data-for="browse">Browse</h2>
     <!-- The new look: Browse has two tabs when the listener has albums (src/radio-ppp/page.ts announces them). -->
     <div class="btabs" id="browseTabs" role="tablist" aria-label="Browse"><button type="button" role="tab" data-bt="albums" aria-selected="false">My albums</button><button type="button" role="tab" data-bt="search" aria-selected="true">Search</button></div>
-    <section class="shelfbox" id="shelfBox" aria-label="My albums"></section>
+    <!-- One Browse page: search, then the listener's albums as covers ("In your player"), then artists. -->
+    <h3 class="sk-h" data-for="albums">In your player</h3>
+    <section class="shelfbox" id="shelfBox" aria-label="Albums in your player"></section>
     <details class="likes" id="findBox">
       <summary title="Search every song on Xtrata by title, artist or number, or browse by artist"><span>🔎 FIND MUSIC</span></summary>
       <div id="findBody"></div>
     </details>
+    <h3 class="sk-h" data-for="artists">Artists</h3>
+    <div class="artistbox" id="artistBox"></div>
     <details class="likes" id="likesBox" open>
       <summary title="Your own playlist: every song you ♥ joins it, in your order, saved on the public record"><span>♥ YOUR STATION</span><span class="count" id="likesCount"></span></summary>
       <div class="likesTools">
@@ -1273,7 +1290,7 @@ d.setAttribute('data-skin','1');d.setAttribute('data-tab','listen');}catch(e){}}
       if(byUser)bChosen=true;
       ROOT.setAttribute('data-btab',t);
       Array.prototype.forEach.call($('browseTabs').children,function(b){b.setAttribute('aria-selected',String(b.dataset.bt===t))});
-      if(t==='search')$('findBox').open=true;
+      $('findBox').open=true;
     }
     ROOT.setAttribute('data-btab','search');
     Array.prototype.forEach.call($('browseTabs').children,function(b){b.addEventListener('click',function(){setBtab(b.dataset.bt,true)})});
@@ -1724,7 +1741,7 @@ function showUnavailable(){
 fetch('/radio/listening-wallet/config',{cache:'no-store',signal:AbortSignal.timeout(15000)})
   .then(function(r){return r.ok?r.json():{}})
   .then(function(c){
-    if(c?.enabled && (!paidHost || c.here)) return import('/radio/ppp.js?v=2f12fe126244');
+    if(c?.enabled && (!paidHost || c.here)) return import('/radio/ppp.js?v=851a9ca56535');
     showUnavailable();
   }).catch(showUnavailable);
 </script>
