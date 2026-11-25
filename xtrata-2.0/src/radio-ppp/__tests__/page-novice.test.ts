@@ -396,6 +396,23 @@ describe('a free starter player: claimed, arriving, landed', () => {
     expect(h.calls.filter(([n]) => n === 'holdFirstPlay')).toHaveLength(0);
   });
 
+  it('on an iPhone the box is asked on arrival and nothing plays first: the tab is about to leave to make the player, and come back', async () => {
+    const ua = vi.spyOn(navigator, 'userAgent', 'get').mockReturnValue('Mozilla/5.0 (iPhone; CPU iPhone OS 26_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.0 Mobile/15E148 Safari/604.1');
+    try {
+      starter();
+      await open(NEW);
+      await vi.waitFor(() => expect(named(/Claim my free player/)).toBeTruthy());
+      expect(named(/^Play$/)).toBeUndefined();
+      // Asked once, by itself: the same happens when the tab comes back from the create page, which is what makes the
+      // box's "Finish" button the only thing left to tap.
+      await vi.waitFor(() => expect(h.calls.filter(([n]) => n === 'create')).toHaveLength(1));
+      expect(h.calls.find(([n]) => n === 'create')![1]).toEqual([{ quick: true }]);
+      named(/Claim my free player/)!.click();
+      expect(h.radio.playToken).not.toHaveBeenCalled();
+      expect(h.calls.filter(([n]) => n === 'holdFirstPlay')).toHaveLength(0);
+    } finally { ua.mockRestore(); }
+  });
+
   it('the operator can change the intro song: the next claim starts on the new one', async () => {
     starter();
     const plain = h.route!;

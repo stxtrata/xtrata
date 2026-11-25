@@ -35,6 +35,7 @@ import type { GiftStopReason } from './controller';
 import { createWelcomeView, type WelcomeMode } from './welcome';
 import { createRestockSheet, type RestockInput } from './restock-sheet';
 import { buildSongs, createFindBox } from './find';
+import { webkitOnly } from '../lib/listening-wallet/webkit';
 import { isTierId, tierById, tierOfAmount, type Tier } from '../lib/listening-wallet/tiers';
 import { AWARDS_DROP } from '../lib/listening-wallet/tx';
 import { awardSeed } from '../lib/music-awards/record';
@@ -422,6 +423,10 @@ function start(root: HTMLElement) {
     return s.step === 'loading' && welcomeLast !== 'checking' ? welcomeLast : null; // a check in between: stay where we were
   };
   let autoClaimTried = false;
+  // iPhone and Safari cannot make a player inside the secure box: the whole tab goes to the box's own page for that and
+  // comes back (frame/passkey.ts). So nothing is gained by a "Play" tap here first (the music would be cut off as the
+  // tab leaves): the box is asked straight away, on arrival and again on the way back, and the music starts after.
+  const topCreate = (() => { try { return webkitOnly(navigator.userAgent); } catch { return false; } })();
   function syncWelcome(s: Snapshot, albumActive: boolean, lines: HTMLElement[] = [], decided?: WelcomeMode | null) {
     if (!welcome) return;
     const mode = decided !== undefined ? decided : welcomeMode(s, albumActive);
@@ -439,7 +444,7 @@ function start(root: HTMLElement) {
     // untouched: making the passkey still takes the visitor's tap inside the box.
     // With an intro song the visitor's first tap here is "Play": it starts the music (a browser only lets sound start
     // from a tap on this page) and asks the box at the same moment, so nothing is asked for before that tap.
-    if (starter && introSong === null && !autoClaimTried && s.step === 'intro' && !s.busy && !s.armed && !s.error && !inApp) {
+    if (starter && (introSong === null || topCreate) && !autoClaimTried && s.step === 'intro' && !s.busy && !s.armed && !s.error && !inApp) {
       autoClaimTried = true;
       void ppp.create({ quick: true, ...(replace.claiming() ? { another: true } : {}) });
     }
@@ -447,11 +452,11 @@ function start(root: HTMLElement) {
       mode, status, asking: !!s.busy || s.armed, busy: !!s.busy, canStart: (s.step === 'intro' || s.step === 'locked') && !inApp,
       plays: starter ? starter.plays : mode === 'landed' ? s.playsLeft : null, from: starter?.from ?? null,
       tier: tierNow, mystery, spot: spotPicked, installed: standalone,
-      intro: starter && introSong !== null && (s.step === 'intro') ? { ready: true } : null,
+      intro: starter && introSong !== null && !topCreate && (s.step === 'intro') ? { ready: true } : null,
       now: introNow(),
       albums: mode === 'landed' ? featured.map((p) => ({ title: p.title, by: p.subtitle, cover: coverArt(p.cover), run: () => { showFull(); openFeatured(p, true); } })) : [],
       claimNew: mode === 'back' ? claimNewFor(s) : null, replaceOld: mode === 'back' ? replaceFor(s) : null,
-      start: () => { if (starter && introSong !== null) startIntro(); void ppp.create(createOpts()); }, unlock: () => void ppp.unlock(), returning: () => void ppp.unlock(true), restock: () => openRestock(),
+      start: () => { if (starter && introSong !== null && !topCreate) startIntro(); void ppp.create(createOpts()); }, unlock: () => void ppp.unlock(), returning: () => void ppp.unlock(true), restock: () => openRestock(),
       full: () => {
         // "Start listening" starts the music: it is the listener's own tap, and nothing is playing yet.
         const radio = (window as any).XtrataRadio;

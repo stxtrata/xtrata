@@ -15,6 +15,14 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
 <meta name="theme-color" content="#0c0e13" />
 <script>
+// Making a player on an iPhone takes this tab to the secure box's own page and back (src/listening-wallet/frame). It
+// comes back to plain "/radio.html?made=1", so the address this visit had (which disc, which kind of visit) is kept
+// here for the tab and put back before anything below reads it. Only this page's own path and query, nothing else.
+(function(){try{var K='xtrata.radio.return';
+if(/[?&]made=1(?:&|$)/.test(location.search)){var u=sessionStorage.getItem(K);history.replaceState(null,'',u&&/^\/radio(\.html)?(\?[^#]*)?$/.test(u)?u:'/radio.html');}
+else sessionStorage.setItem(K,location.pathname+location.search);}catch(e){}})();
+</script>
+<script>
 // Set before the audio engine loads so a slow or unavailable wallet check cannot open playback.
 if (location.hostname === 'radio.xtrata.xyz') document.documentElement.dataset.radioPaidOnly = 'true';
 // Novice mode (src/radio-ppp/novice.ts, off unless asked for): hold the page blank until the panel knows whether this
@@ -543,6 +551,10 @@ d.setAttribute('data-skin','1');d.setAttribute('data-tab','listen');}catch(e){}}
   .al-welcome .al-welcome-note{font-size:13px;color:#8f97a3}
   .al-welcome .al-welcome-wait{font-size:14px;color:#8f97a3}
   .al-welcome .al-primary{margin-top:28px}
+  /* The one button to press on a welcome screen glows, so a newcomer never has to hunt for it. */
+  .al-welcome .al-primary:not(:disabled){animation:press-me 1.6s ease-in-out infinite}
+  @keyframes press-me{0%,100%{box-shadow:0 0 0 0 rgba(127,227,245,0)}50%{box-shadow:0 0 0 7px rgba(127,227,245,.4)}}
+  @media (prefers-reduced-motion:reduce){.al-welcome .al-primary:not(:disabled){animation:none;box-shadow:0 0 0 4px rgba(127,227,245,.4)}}
   /* Add to Home Screen (install.ts): the button in the top bar, and the iPhone sheet with its three taps. */
   .a2hs{display:inline-flex;align-items:center;gap:7px;min-height:36px;padding:0 12px;border-radius:999px;border:1px solid #2c3341;background:#171b23;color:#f2f0ea;font:600 12.5px/1 inherit;cursor:pointer}
   .a2hs[hidden]{display:none}
@@ -1741,7 +1753,7 @@ function showUnavailable(){
 fetch('/radio/listening-wallet/config',{cache:'no-store',signal:AbortSignal.timeout(15000)})
   .then(function(r){return r.ok?r.json():{}})
   .then(function(c){
-    if(c?.enabled && (!paidHost || c.here)) return import('/radio/ppp.js?v=851a9ca56535');
+    if(c?.enabled && (!paidHost || c.here)) return import('/radio/ppp.js?v=f9f83ba65799');
     showUnavailable();
   }).catch(showUnavailable);
 </script>

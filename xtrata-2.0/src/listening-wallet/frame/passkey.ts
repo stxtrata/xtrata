@@ -5,6 +5,7 @@
  */
 import { LISTENING_PRF_SALT } from '../../lib/listening-wallet/derive';
 import type { PasskeyPort } from './engine';
+import { webkitOnly } from '../../lib/listening-wallet/webkit';
 
 const b64u = (buf: ArrayBuffer) =>
   btoa(String.fromCharCode(...new Uint8Array(buf))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
@@ -71,7 +72,21 @@ const prfFirst = (cred: PublicKeyCredential): Uint8Array | undefined => {
   return new Uint8Array(view.buffer.slice(view.byteOffset, view.byteOffset + view.byteLength));
 };
 
-export function browserPasskey(o: PasskeyOptions = LISTENING_PASSKEY): PasskeyPort {
+/** The page this frame sits in, by origin (never its address: a frame is not told that). Empty when it cannot be told. */
+const parentOrigin = (): string => {
+  try {
+    const a = (location as unknown as { ancestorOrigins?: { length: number; [i: number]: string } }).ancestorOrigins;
+    if (a && a.length) return String(a[0]);
+    return document.referrer ? new URL(document.referrer).origin : '';
+  } catch { return ''; }
+};
+
+/**
+ * `returnOrigins`: the exact parent origins (the build's own list) that the create page may send the listener back to.
+ * Given, the passkey is made in THIS tab and the listener is returned to the radio; without it, in a new tab as before.
+ */
+export function browserPasskey(o: PasskeyOptions = LISTENING_PASSKEY, returnOrigins: string[] = []): PasskeyPort {
+  const returnTo = () => { const p = parentOrigin(); return p && returnOrigins.includes(p) ? p : ''; };
   return {
     available: () => typeof window.PublicKeyCredential === 'function' && !!navigator.credentials,
 
@@ -121,22 +136,24 @@ export function browserPasskey(o: PasskeyOptions = LISTENING_PASSKEY): PasskeyPo
     },
 
     createsInNewTab: () => window.top !== window && webkitOnly(navigator.userAgent),
+    createsInSameTab: () => !!returnTo(),
 
     openCreator(exclude, name, userId) {
       const params = new URLSearchParams({ u: userId, n: name });
       if (exclude.length) params.set('x', exclude.join(','));
+      // Same tab when the radio is a page we may return to: the whole tab goes to the create page (this runs inside
+      // the listener's tap, which is what lets a frame move the tab), and that page sends them back when the passkey
+      // is saved. Only the radio's origin travels (`r`), and the create page checks it against its own list.
+      const back = returnTo();
+      if (back) {
+        params.set('r', back);
+        try { window.top!.location.href = `${location.origin}/create#${params}`; return; } catch { params.delete('r'); /* not allowed here: a new tab, as before */ }
+      }
       // A top-level page on this same origin; no opener link back to the frame or the radio page.
       window.open(`${location.origin}/create#${params}`, '_blank', 'noopener');
     }
   };
 }
 
-/**
- * WebKit (Safari, and every browser on iPhone and iPad, which must use WebKit) refuses to CREATE a passkey inside
- * a cross-origin frame, even with permission and a tap: the request fails at once with no system prompt. It does
- * allow signing in there. Seen on iOS 26 Safari and Chrome, 13 Oct 2026.
- */
-export function webkitOnly(ua: string) {
-  if (/(CriOS|FxiOS|EdgiOS|OPiOS)\//.test(ua) || /iP(hone|ad|od)/.test(ua)) return true;
-  return /AppleWebKit\//.test(ua) && /Safari\//.test(ua) && !/(Chrome|Chromium|Edg|OPR|Firefox)\//.test(ua);
-}
+// Which browsers cannot create a passkey inside this frame: shared with the radio page (lib/listening-wallet/webkit.ts).
+export { webkitOnly } from '../../lib/listening-wallet/webkit';

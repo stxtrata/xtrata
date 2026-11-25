@@ -47,6 +47,11 @@ export interface PasskeyPort {
    */
   createsInNewTab?(): boolean;
   /**
+   * True when that top-level page opens in THIS tab and sends the listener back to the radio afterwards (the radio
+   * reloads and the frame carries on from its pending record), instead of a second tab they must close.
+   */
+  createsInSameTab?(): boolean;
+  /**
    * Opens the top-level create page. Must run synchronously inside the listener's tap (popup rules). `userId` (16 random
    * bytes, base64url, public) becomes the new passkey's user id, so the frame can tell that exact passkey apart.
    */
@@ -349,6 +354,9 @@ export function createListeningEngine(deps: {
     let created: { credentialId: string; prf?: Uint8Array };
     // Every new player has a backup phrase (version 2). Only a passkey half-made before that existed finishes as version 1.
     let version: 1 | 2 = 2;
+    // The passkey was already USED once to get here (signing in with it after it was made on the create page).
+    let usedToArrive = false;
+    const sameTab = !!deps.passkey.createsInSameTab?.();
     try {
       if (!deps.passkey.createsInNewTab?.() || !deps.passkey.openCreator) {
         if (resume?.credentialId) { created = { credentialId: resume.credentialId }; version = resume.v === 2 ? 2 : 1; }
@@ -379,26 +387,29 @@ export function createListeningEngine(deps: {
           const [u, l] = [userId, label];
           await deps.ui.act({
             ...createPanel,
-            lines: [...createPanel.lines, 'On this browser the passkey is made on a wallet.xtrata.xyz page that opens in a new tab. Make it there, then come back to this tab.'],
-            confirmLabel: 'Make my passkey (new tab)'
+            lines: [...createPanel.lines, sameTab
+              ? 'The next screen makes it, then brings you straight back here.'
+              : 'On this browser the passkey is made on a wallet.xtrata.xyz page that opens in a new tab. Make it there, then come back to this tab.'],
+            confirmLabel: sameTab ? 'Create my player' : 'Make my passkey (new tab)'
           }, async () => { setPending({ at: now(), tries: 0, userId: u, label: l }); deps.passkey.openCreator!(exclude, l, u); return true; });
         }
         const wanted = userId;
         created = await deps.ui.act({
           kind: 'confirm-passkey',
-          title: 'Made your passkey?',
-          summary: `In the new tab, tap "Create passkey". Then come back here, tap below and choose "${label}".`,
-          lines: ['The wallet is ready as soon as that passkey is confirmed.'],
-          confirmLabel: 'I made it: use my passkey'
+          ...(sameTab
+            ? { title: 'One more tap', summary: 'Use Face ID or your passcode once more and your player is ready.', lines: [`If your phone shows a list, choose "${label}".`], confirmLabel: 'Finish' }
+            : { title: 'Made your passkey?', summary: `In the new tab, tap "Create my player". Then come back here, tap below and choose "${label}".`,
+                lines: ['The wallet is ready as soon as that passkey is confirmed.'], confirmLabel: 'I made it: use my passkey' })
         }, async () => {
           const r = await deps.passkey.evaluate();
           if (r.userHandle !== wanted) {
             r.prf.fill(0);
-            throw Object.assign(new Error(`That is a different passkey. Choose "${label}", the one you just made (or make it in the new tab first).`), { retryable: true });
+            throw Object.assign(new Error(`That is a different passkey. Choose "${label}", the one you just made${sameTab ? '' : ' (or make it in the new tab first)'}.`), { retryable: true });
           }
           return r;
         });
         version = isPhraseUserId(userId) ? 2 : 1;
+        usedToArrive = true;
         setPending({ at: now(), tries: 0, credentialId: created.credentialId, ...(version === 2 ? { v: 2 as const } : {}) });
       }
     } catch (e) {
@@ -413,7 +424,8 @@ export function createListeningEngine(deps: {
     // PRF is proven live, and the second, matching check is put off (see `once`). A result that came with creation
     // alone never counts for this: the passkey must have been used at least once.
     const outputs: Uint8Array[] = created.prf ? [created.prf] : [];
-    let used = 0;
+    // ...which that sign-in was: the result in hand came from using the passkey, not from making it.
+    let used = usedToArrive ? 1 : 0;
     try {
       while (outputs.length < 2 && !(quick && used > 0)) {
         const first = outputs.length === 0;

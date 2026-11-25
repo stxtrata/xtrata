@@ -25,6 +25,14 @@ p { margin: 4px 0; }
 .row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
 button { font: inherit; padding: 8px 12px; border-radius: 8px; border: 1px solid var(--line); background: transparent; color: var(--fg); cursor: pointer; min-height: 40px; }
 button.primary { background: var(--accent); color: #05221d; border-color: var(--accent); font-weight: 600; }
+/* The one button to press glows, so nobody has to hunt for it. A ring only: never opacity, transform or filter on the
+   button (the confirm button's visibility check, noted below, would then count it as hidden). */
+button.primary:not(:disabled) { animation: press-me 1.6s ease-in-out infinite; }
+@keyframes press-me { 0%, 100% { box-shadow: 0 0 0 0 rgba(79, 224, 201, .0); } 50% { box-shadow: 0 0 0 5px rgba(79, 224, 201, .45); } }
+@media (prefers-reduced-motion: reduce) { button.primary:not(:disabled) { animation: none; box-shadow: 0 0 0 3px rgba(79, 224, 201, .45); } }
+main.create h1 { font-size: 22px; margin: 10px 0 8px; }
+main.create #c-intro, main.create #c-next { font-size: 16px; line-height: 1.5; }
+main.create button.primary { width: 100%; min-height: 56px; font-size: 18px; border-radius: 14px; }
 /* Dimmed with colour, never opacity: the confirm button's visibility check (IntersectionObserver v2)
    treats any translucent button as hidden, so an opacity dim would keep it disabled forever. */
 button:disabled { color: var(--muted); border-color: var(--line); cursor: progress; }

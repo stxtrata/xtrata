@@ -8,6 +8,8 @@ export interface CreateRequest {
   userId: string;
   name: string;
   exclude: string[];
+  /** The radio's origin to send the listener back to once the passkey is saved. Only ever one of the build's own parent origins. */
+  returnTo?: string;
 }
 
 // 16 random bytes (22 characters), or the 20 bytes of a player with a backup phrase (27; lib/listening-wallet/phrase.ts).
@@ -17,12 +19,15 @@ const CREDENTIAL = /^[A-Za-z0-9_-]{16,1400}$/;
 export const MAX_EXCLUDE = 25;
 
 /** `name` lets another wallet (the casino's) check its own passkey names; the radio's pattern is the default. */
-export function parseCreateRequest(hash: string, pattern: RegExp = NAME): CreateRequest | null {
+export function parseCreateRequest(hash: string, pattern: RegExp = NAME, parents: string[] = []): CreateRequest | null {
   const p = new URLSearchParams(hash.startsWith('#') ? hash.slice(1) : hash);
   const userId = p.get('u') ?? '';
   const name = p.get('n') ?? '';
   const exclude = (p.get('x') ?? '').split(',').filter(Boolean);
   if (!USER_ID.test(userId) || !pattern.test(name)) return null;
   if (exclude.length > MAX_EXCLUDE || !exclude.every((id) => CREDENTIAL.test(id))) return null;
-  return { userId, name, exclude };
+  // Anything but an exact origin from the list is dropped (the passkey is still made; the page just does not send anyone anywhere).
+  const r = p.get('r') ?? '';
+  const returnTo = /^https:\/\/[a-z0-9.-]+$/.test(r) && parents.includes(r) ? r : undefined;
+  return { userId, name, exclude, ...(returnTo ? { returnTo } : {}) };
 }
