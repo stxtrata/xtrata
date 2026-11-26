@@ -63,6 +63,12 @@ with the wall and the booth sits in an alcove behind it. It teaches forking, reu
   layer blocks on the right wall (choose the layer); family tree and credits on the back-wall screen (click a version
   to hear it); RESET DEMO plate. The panel bottom-left (compact on phones) has the same controls plus a Tree & credits
   dialog. Nothing is saved, inscribed or paid for; shares count hits and notes, not money.
+- **Information** (`src/booth-info.js`): the back-wall screen has tabs along the top — Tree & credits, Audionals, Why
+  on-chain, Forking, Paid plays, Who gets paid, Credits × payments, The studio. Two **Learn** lecterns either side of
+  the opening, the (i) on the SONGS and LAYERS signs and the booth's header sign all switch the screen to a topic; the
+  panel has the same topics and a Read dialog with links. Each page is marked LIVE, PLANNED, DEMO or IDEA. Payment
+  facts follow `docs/radio/XTRATA-MUSIC-THIRD-PARTY-GUIDE.md` (20 Oct 2026); update `booth-info.js` when they change.
+  With nobody at the booth the screen cycles the topics; walking up brings the family tree back.
 - Sound is synthesised in the browser through the shop's shared AudioContext from a positional source at the console.
   Starting the booth pauses any CD or record, and starting a CD or record stops the booth.
 

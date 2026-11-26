@@ -3,6 +3,7 @@ import {esc} from './util.js';
 // split text into lines that fit maxW on a canvas context
 const wrapText=(x,text,maxW)=>{const out=[];let line='';for(const w of String(text).split(/\s+/)){const t=line?line+' '+w:w;if(x.measureText(t).width>maxW&&line){out.push(line);line=w;}else line=t;}if(line)out.push(line);return out;};
 import {createStudio,ROWS,LAYERS,LAYER_NAME,LAYER_ROWS,MODES,MAKERS,makerLabel,keyName} from './fork.js';
+import {TOPICS,topic,LECTERNS,STATUS_COL,drawTopicPage} from './booth-info.js';
 
 // The Audionaut booth: a permanent 9 ft × 6 ft × 8 ft station recessed into the back wall, running the forking demo.
 // A song here is a set of instructions built from credited layers (drums, bass, keys, lead). Visitors fork any version,
@@ -20,14 +21,14 @@ const NN=['C','C♯','D','E♭','E','F','F♯','G','A♭','A','B♭','B'];
 // console screen layout (px)
 const CW=1024,CH=624,GX=168,GY=78,CEW=52.5,CEH=52,RG=8,FY=GY+6*(CEH+RG)+4;
 // wall screen
-const WW=1600,WH=598,TREEW=980;
+const WW=1600,WH=660,TB=62,CHT=WH-TB,TREEW=980; // the top TB px of the wall screen is a row of topic tabs
 
 export function initBooth(app){
   const {scene,art,mats:M,box}=app,F=art.font,P=app.playback;
   const {w:W,d:D,h:H}=BOOTH;
   app.STUDIO_URL=STUDIO_URL;
   const St=createStudio();
-  const B={studio:St,playing:false,step:-1,layer:null,ab:false,levels:[0,0,0,0,0,0],hoverCell:null,dirty:true,wallDirty:true,flash:0};app.booth=B;
+  const B={studio:St,topic:'tree',topicAt:-1e9,playing:false,step:-1,layer:null,ab:false,levels:[0,0,0,0,0,0],hoverCell:null,dirty:true,wallDirty:true,flash:0};app.booth=B;
   const cur=()=>St.get(St.cur),fam=()=>St.family(cur().fam);
   const g=new THREE.Group();g.position.set(BOOTH.x,0,BOOTH.z);scene.add(g);B.root=g;
   const basic=(c)=>new THREE.MeshBasicMaterial({color:c,toneMapped:false});
@@ -52,7 +53,7 @@ export function initBooth(app){
     x.textBaseline='middle';x.fillStyle='#fff6e2';x.font=`800 76px ${F}`;x.fillText('THE AUDIONAUT',158,86);const tw=x.measureText('THE AUDIONAUT').width;
     x.fillStyle='#f2b84b';x.font=`700 26px ${F}`;x.fillText('FORK IT · REMIX IT · KEEP THE CREDITS',Math.min(w-560,190+tw),90);
     x.fillStyle='#58d7e8';x.font=`700 30px ${F}`;x.fillText('BLOCKCHAIN AUDIONAL WORK-SPACE-STATION  ·  FORKING DEMO',160,160);});
-  app.plane(g,W-.12,.28,new THREE.MeshBasicMaterial({map:signTex,toneMapped:false}),0,H-.16,D/2+.002);
+  const sign=app.plane(g,W-.12,.28,new THREE.MeshBasicMaterial({map:signTex,toneMapped:false}),0,H-.16,D/2+.002);
   const ledW=(W-.32)/16,leds=new THREE.InstancedMesh(new THREE.BoxGeometry(ledW-.025,.022,.022),new THREE.MeshBasicMaterial({toneMapped:false}),16);
   const m4=new THREE.Matrix4(),col=new THREE.Color();
   for(let i=0;i<16;i++){m4.makeTranslation(-(W-.32)/2+ledW*(i+.5),H-.355,D/2-.02);leds.setMatrixAt(i,m4);leds.setColorAt(i,col.set(0x22180f));}
@@ -74,9 +75,10 @@ export function initBooth(app){
     btns[id]={cap,mat:cm,c,press:0,lt,label};});
   // ---- left wing: the six starting songs, plus the reset plate ----
   const label=(t,s,c)=>art.panel(512,160,(x,w,h)=>{x.fillStyle='#16110d';x.fillRect(0,0,w,h);x.fillStyle=c;x.fillRect(0,0,14,h);x.strokeStyle='rgba(255,255,255,.14)';x.lineWidth=3;x.strokeRect(2,2,w-4,h-4);
-    x.font=`800 44px ${F}`;x.fillStyle='#fff6e2';x.textBaseline='alphabetic';x.fillText(t,34,72);x.font=`700 22px ${F}`;x.fillStyle=c;x.fillText(s,34,120);});
+    x.font=`800 44px ${F}`;x.fillStyle='#fff6e2';x.textBaseline='alphabetic';x.fillText(t,34,72);x.font=`700 22px ${F}`;x.fillStyle=c;x.fillText(s,34,120);
+    x.beginPath();x.arc(w-44,52,24,0,7);x.fillStyle=c;x.fill();x.font=`800 30px ${F}`;x.fillStyle='#16110d';x.textAlign='center';x.fillText('i',w-44,63);x.textAlign='left';});
   const lw=new THREE.Group();lw.position.set(-W/2+.11,0,-.04);lw.rotation.y=Math.PI/2;g.add(lw);
-  app.plane(lw,1.18,.24,lit(label('SONGS','CLICK ONE TO LOAD IT AND ITS FAMILY TREE','#f2b84b'),.5),0,1.94,.01);
+  const songsHead=app.plane(lw,1.18,.24,lit(label('SONGS','CLICK ONE TO LOAD IT AND ITS FAMILY TREE','#f2b84b'),.5),0,1.94,.01);
   nc(box(lw,1.4,.04,.22,M.black,0,1.12,.1,{cast:false}));
   const cardTex=f=>art.panel(300,420,(x,w,h)=>{const v4=St.get(f.id+':v4');x.fillStyle='#17130f';x.fillRect(0,0,w,h);x.fillStyle='#f2b84b';x.fillRect(0,0,w,10);x.strokeStyle='rgba(255,255,255,.14)';x.lineWidth=3;x.strokeRect(8,18,w-16,h-26);
     x.textBaseline='alphabetic';x.font=`800 18px ${F}`;x.fillStyle='#58d7e8';x.fillText(f.style.toUpperCase(),22,50);x.font=`800 30px ${F}`;x.fillStyle='#fff6e2';const lines=wrapText(x,f.title,w-44).slice(0,2);lines.forEach((l,i)=>x.fillText(l,22,88+i*32));
@@ -94,7 +96,7 @@ export function initBooth(app){
   const resetFace=app.plane(lw,.35,.117,new THREE.MeshBasicMaterial({map:resetTex,toneMapped:false}),0,.86,.0755);
   // ---- right wing: the four layer blocks ----
   const rw=new THREE.Group();rw.position.set(W/2-.11,0,-.04);rw.rotation.y=-Math.PI/2;g.add(rw);
-  app.plane(rw,1.18,.24,lit(label('LAYERS','PICK ONE FOR VARY / BORROW — OR LEAVE IT TO CHANCE','#9b7bff'),.5),0,1.94,.01);
+  const layersHead=app.plane(rw,1.18,.24,lit(label('LAYERS','PICK ONE FOR VARY / BORROW — OR LEAVE IT TO CHANCE','#9b7bff'),.5),0,1.94,.01);
   nc(box(rw,1.24,.96,.03,M.matte,0,1.28,.02,{cast:false}));
   const root=new THREE.Mesh(new THREE.SphereGeometry(.045,20,14),basic(0xf2b84b));root.position.set(0,.92,.06);rw.add(root);
   const blocks=LAYERS.map((layer,i)=>{const bx=i%2?.3:-.3,by=i<2?1.54:1.18,c=new THREE.Color(LCOL[layer]);
@@ -115,7 +117,7 @@ export function initBooth(app){
       x.fillText(how,36,154);if(li.makers.length>1){x.fillStyle='#bfae95';x.fillText(`+ ${li.makers.length-1} other maker${li.makers.length>2?'s':''}`,36,188);}}
     bk.tex.needsUpdate=true;bk.sm.emissiveIntensity=sel?.9:.45;bk.mesh.position.z=sel?.085:.068;}
   // ---- back wall: family tree + credits screen ----
-  nc(box(g,2.36,.92,.03,M.black,0,1.66,-D/2+.095,{cast:false}));
+  nc(box(g,2.36,2.3*WH/WW+.08,.03,M.black,0,1.66,-D/2+.095,{cast:false}));
   const wallTex=art.panel(WW,WH,()=>{});
   const wall=app.plane(g,2.3,2.3*WH/WW,new THREE.MeshBasicMaterial({map:wallTex,toneMapped:false}),0,1.66,-D/2+.112);
   let nodeRects=[],helpRect=null;
@@ -162,7 +164,7 @@ export function initBooth(app){
   B.loud=()=>{if(!B.playing)return false;const p=app.camera.position;return Math.hypot(p.x-BOOTH.x,p.z-(BOOTH.z+.1))<6;};
   // ---- actions ----
   const say=m=>{if(!B.near())app.toast(m);};
-  function changed(note,opt={}){B.note=note;B.flash=2.4;B.dirty=true;B.wallDirty=true;blocks.forEach(drawBlock);btnColor();panel();if(note&&!opt.quiet)say(note);if(opt.play&&!B.playing)B.start();app.emit('booth');}
+  function changed(note,opt={}){B.topic='tree';B.autoTopic=false;B.topicAt=performance.now();if(typeof drawLecterns==='function')drawLecterns();B.note=note;B.flash=2.4;B.dirty=true;B.wallDirty=true;blocks.forEach(drawBlock);btnColor();panel();if(note&&!opt.quiet)say(note);if(opt.play&&!B.playing)B.start();app.emit('booth');}
   B.fork=(layer)=>{app.foley('click');B.ab=false;const r=St.fork(St.cur,{layer:layer||B.layer||undefined});changed(r.note,{play:true});return r.version;};
   B.vary=(layer)=>{app.foley('click');B.ab=false;const r=St.vary(St.cur,layer||B.layer||undefined);changed(r.note,{play:true});return r.version;};
   B.borrow=(layer,fromId)=>{app.foley('click');B.ab=false;const r=St.borrow(St.cur,layer||B.layer||undefined,fromId||undefined);changed(r.note,{play:true});return r.version;};
@@ -176,6 +178,7 @@ export function initBooth(app){
   B.reset=()=>{app.foley('click');B.stop();St.reset();B.layer=null;B.ab=false;changed('Reset: all six starting songs are back, and every fork has been cleared for the next visitor.');};
   B.about=()=>app.ui.openBooth();B.makerLabel=makerLabel;
   B.credits=()=>app.ui.openBoothCredits();
+  B.setTopic=(id,auto)=>{if(!TOPICS.some(t=>t.id===id))id='tree';B.autoTopic=!!auto;if(!auto){B.topicAt=performance.now();app.foley('click');}B.topic=id;B.wallDirty=true;drawLecterns();panel();app.emit('booth');};
   // ---- console screen ----
   function draw(){const x=scr.userData.canvas.getContext('2d'),v=cur(),hv=B.hearing(),f=St.family(v.fam),last=v.last||{on:[],off:[],chg:[]},lastSet=new Set([...last.on,...last.chg]),offSet=new Set(last.off),fl=B.flash>0;
     x.fillStyle='#090706';x.fillRect(0,0,CW,CH);x.fillStyle='#17110c';x.fillRect(0,0,CW,64);x.fillStyle=v.mine?'#58d7e8':'#f2b84b';x.fillRect(0,62,CW,3);
@@ -208,14 +211,21 @@ export function initBooth(app){
     scr.needsUpdate=true;B.dirty=false;}
   scr.userData.redraw=draw;
   // ---- wall screen: family tree (left) and credits (right) ----
-  function drawWall(){const x=wallTex.userData.canvas.getContext('2d'),v=cur(),f=St.family(v.fam),t=St.tree(v.fam);nodeRects=[];
-    x.fillStyle='#0c0907';x.fillRect(0,0,WW,WH);x.fillStyle='#f2b84b';x.fillRect(0,0,WW,8);
+  let tabRects=[];
+  function drawTabs(x){tabRects=[];x.fillStyle='#0c0907';x.fillRect(0,0,WW,WH);x.fillStyle='#15100c';x.fillRect(0,0,WW,TB);const tw=(WW-20)/TOPICS.length;
+    TOPICS.forEach((t,i)=>{const X=10+i*tw,on=B.topic===t.id;x.fillStyle=on?'#f2b84b':'#211912';rr(x,X+3,10,tw-6,TB-18,10);x.fill();if(!on&&t.status){x.fillStyle=STATUS_COL[t.status];x.fillRect(X+14,TB-16,tw-28,3);}
+      x.font=`800 19px ${F}`;x.textAlign='center';x.textBaseline='middle';x.fillStyle=on?'#120d09':'#efe3cc';x.fillText(t.tab,X+tw/2,TB/2-2);x.textAlign='left';x.textBaseline='alphabetic';tabRects.push({id:t.id,x:X,y:0,w:tw,h:TB});});}
+  function drawWall(){const x=wallTex.userData.canvas.getContext('2d');drawTabs(x);nodeRects=[];helpRect=null;x.save();x.translate(0,TB);
+    if(B.topic==='tree')drawTree(x);else drawTopicPage(x,topic(B.topic),WW,CHT,F);
+    x.restore();for(const r of nodeRects)r.y+=TB;if(helpRect)helpRect.y+=TB;wallTex.needsUpdate=true;B.wallDirty=false;}
+  function drawTree(x){const v=cur(),f=St.family(v.fam),t=St.tree(v.fam);
+    x.fillStyle='#f2b84b';x.fillRect(0,0,WW,4);
     x.textBaseline='alphabetic';x.textAlign='left';x.font=`800 30px ${F}`;x.fillStyle='#fff6e2';x.fillText('FAMILY TREE',30,52);x.font=`700 24px ${F}`;x.fillStyle='#58d7e8';x.fillText(`“${f.title}”`,248,52);
     x.font=`600 17px ${F}`;x.fillStyle='#bfae95';x.fillText('Each version builds on its parent. Forks branch off; borrowed layers link to other songs.',30,82);
-    const NW=150,NH=62,top=108,laneH=Math.min(84,(WH-top-70)/Math.max(1,t.lanes)),maxG=t.gens;const curNode=t.nodes.find(n=>n.id===v.id);
+    const NW=150,NH=62,top=108,laneH=Math.min(84,(CHT-top-70)/Math.max(1,t.lanes)),maxG=t.gens;const curNode=t.nodes.find(n=>n.id===v.id);
     const nh=Math.min(NH,laneH-10),visG=Math.max(1,Math.floor((TREEW-40)/(NW+26))),g0=Math.max(0,Math.min(maxG-visG,(curNode?curNode.gen:0)-visG+2));
     const pos=n=>({x:30+(n.gen-g0)*(NW+26),y:top+n.lane*laneH});
-    x.save();x.beginPath();x.rect(20,top-22,TREEW-30,WH-top-48);x.clip();
+    x.save();x.beginPath();x.rect(20,top-22,TREEW-30,CHT-top-48);x.clip();
     for(const n of t.nodes){if(!n.parent)continue;const p=t.nodes.find(q=>q.id===n.parent);if(!p)continue;const a=pos(p),b=pos(n);x.strokeStyle=n.mine?'#58d7e8':n.kind==='fork'?'#c69cff':'#f2b84b';x.lineWidth=3;x.beginPath();x.moveTo(a.x+NW,a.y+nh/2);x.bezierCurveTo(a.x+NW+20,a.y+nh/2,b.x-20,b.y+nh/2,b.x,b.y+nh/2);x.stroke();}
     const chips=[];
     for(const n of t.nodes){const p=pos(n),me=n.id===v.id,hear=B.ab&&n.id===v.parent;x.fillStyle=me?'#3a2a12':n.mine?'#0f2427':'#1b1510';rr(x,p.x,p.y,NW,nh,10);x.fill();x.lineWidth=me?5:2.5;x.strokeStyle=me?'#f2b84b':hear?'#58d7e8':n.mine?'#58d7e8':n.kind==='fork'?'#c69cff':'rgba(242,184,75,.5)';x.stroke();
@@ -227,23 +237,23 @@ export function initBooth(app){
       for(const b of n.borrows)chips.push({from:p,b});}
     x.restore();
     // borrowed-layer links drawn to labelled chips along the bottom of the tree area
-    chips.slice(-4).forEach((c,i)=>{const cx=40+i*235,cy=WH-46;x.setLineDash([7,6]);x.strokeStyle=LCOL[c.b.layer];x.lineWidth=2.5;x.beginPath();x.moveTo(c.from.x+NW/2,c.from.y+nh);x.lineTo(cx+100,cy);x.stroke();x.setLineDash([]);
+    chips.slice(-4).forEach((c,i)=>{const cx=40+i*235,cy=CHT-46;x.setLineDash([7,6]);x.strokeStyle=LCOL[c.b.layer];x.lineWidth=2.5;x.beginPath();x.moveTo(c.from.x+NW/2,c.from.y+nh);x.lineTo(cx+100,cy);x.stroke();x.setLineDash([]);
       x.fillStyle='#15100c';rr(x,cx,cy,215,36,8);x.fill();x.strokeStyle=LCOL[c.b.layer];x.lineWidth=2;x.stroke();x.font=`700 15px ${F}`;x.fillStyle='#efe3cc';let tx=`${LAYER_NAME[c.b.layer]} from ${c.b.fromLabel}`;while(x.measureText(tx).width>200)tx=tx.slice(0,-2)+'…';x.fillText(tx,cx+8,cy+24);});
     if(g0>0){x.font=`700 15px ${F}`;x.fillStyle='#bfae95';x.fillText(`◀ ${g0} earlier`,30,top-6);}
     // credits
-    const cx0=TREEW+20,cw=WW-cx0-30,cr=St.credits(v.id);x.fillStyle='#130f0b';x.fillRect(cx0-10,20,cw+20,WH-34);x.strokeStyle='rgba(255,255,255,.1)';x.lineWidth=2;x.strokeRect(cx0-10,20,cw+20,WH-34);
+    const cx0=TREEW+20,cw=WW-cx0-30,cr=St.credits(v.id);x.fillStyle='#130f0b';x.fillRect(cx0-10,20,cw+20,CHT-34);x.strokeStyle='rgba(255,255,255,.1)';x.lineWidth=2;x.strokeRect(cx0-10,20,cw+20,CHT-34);
     x.font=`800 26px ${F}`;x.fillStyle='#fff6e2';x.fillText('CREDITS · '+v.label,cx0+8,58);
     x.font=`600 16px ${F}`;x.fillStyle='#d8c9b0';let y=88;for(const l of wrapText(x,'Ancestry: '+cr.ancestry.join(' ← '),cw-80).slice(0,3)){x.fillText(l,cx0+8,y);y+=21;}
-    y+=12;x.font=`800 17px ${F}`;x.fillStyle='#f2b84b';x.fillText('WHO MADE THE HITS AND NOTES',cx0+8,y);y+=12;
+    y+=12;x.font=`800 17px ${F}`;x.fillStyle='#f2b84b';x.fillText('CHTO MADE THE HITS AND NOTES',cx0+8,y);y+=12;
     for(const m of cr.makers.slice(0,6)){const bw=cw-210;x.fillStyle='#221a13';x.fillRect(cx0+150,y+4,bw,16);x.fillStyle=m.key==='you'?'#58d7e8':'#f2b84b';x.fillRect(cx0+150,y+4,Math.max(2,bw*m.pct/100),16);
       x.font=`700 15px ${F}`;x.fillStyle='#efe3cc';x.fillText(MAKERS[m.key].name+(MAKERS[m.key].demo?' (demo)':''),cx0+8,y+18);x.textAlign='right';x.fillText(m.pct+'%',cx0+cw-4,y+18);x.textAlign='left';y+=24;}
     if(cr.makers.length>6){x.font=`600 14px ${F}`;x.fillStyle='#bfae95';x.fillText(`+ ${cr.makers.length-6} more`,cx0+8,y+14);y+=20;}
-    y+=30;x.font=`800 17px ${F}`;x.fillStyle='#f2b84b';x.fillText('FROM WHICH SONGS',cx0+8,y);y+=8;
+    y+=30;x.font=`800 17px ${F}`;x.fillStyle='#f2b84b';x.fillText('FROM CHTICH SONGS',cx0+8,y);y+=8;
     for(const s of cr.songs.slice(0,3)){x.font=`700 15px ${F}`;x.fillStyle='#efe3cc';x.fillText(`${s.key} — ${s.pct}%`,cx0+8,y+18);y+=22;}
     y+=8;x.font=`700 15px ${F}`;x.fillStyle='#bfae95';x.fillText(`${cr.how.inherited} inherited · ${cr.how.borrowed} borrowed · ${cr.how.new} new`,cx0+8,y+14);
-    x.font=`600 13px ${F}`;x.fillStyle='#8c7f70';wrapText(x,'Shares count hits and notes, not money. Demo makers are placeholders. Nothing here is inscribed or paid.',cw-20).slice(0,2).forEach((l,i)=>x.fillText(l,cx0+8,WH-48+i*17));
+    x.font=`600 13px ${F}`;x.fillStyle='#8c7f70';wrapText(x,'Shares count hits and notes, not money. Demo makers are placeholders. Nothing here is inscribed or paid.',cw-20).slice(0,2).forEach((l,i)=>x.fillText(l,cx0+8,CHT-48+i*17));
     helpRect={x:WW-70,y:14,w:50,h:44};x.fillStyle='#2a2016';rr(x,helpRect.x,helpRect.y,helpRect.w,helpRect.h,10);x.fill();x.font=`800 26px ${F}`;x.fillStyle='#f2b84b';x.textAlign='center';x.fillText('?',helpRect.x+25,helpRect.y+32);x.textAlign='left';
-    wallTex.needsUpdate=true;B.wallDirty=false;}
+  }
   wallTex.userData.redraw=drawWall;
   function leds_(){for(let i=0;i<16;i++)leds.setColorAt(i,col.set(B.playing&&i===B.step?0xffe2a8:i%4===0?0x5a3b12:0x1d2a2c));leds.instanceColor.needsUpdate=true;}
   // ---- centre-dot picks (nothing locks the view) ----
@@ -266,11 +276,34 @@ export function initBooth(app){
   const resetPick={id:'booth:reset',title:'Reset demo',sub:'Back to the six starting songs',hint:'Click to clear every fork for the next visitor',click:()=>B.reset()};
   app.addPick(resetFace,resetPick);app.addPick(resetBox,resetPick);
   app.addPick(wall,{id:'booth:wall',reach:4,resolve(h){if(!h.uv)return null;const px=h.uv.x*WW,py=(1-h.uv.y)*WH;
+    const tb=py<TB&&tabRects.find(r=>px>=r.x&&px<=r.x+r.w);if(tb){const T=topic(tb.id),on=B.topic===tb.id;return {id:'booth:tab:'+tb.id+':'+on,title:T.title,sub:T.status?T.status+(T.kicker?' · '+T.kicker:''):'Versions of the song you are on, and who made them',hint:on?'Showing now':'Click to show it on the big screen',click:()=>B.setTopic(tb.id)};}
+    if(B.topic!=='tree'){const T=topic(B.topic);return {id:'booth:wall:topic:'+T.id,title:T.title,sub:T.kicker,hint:'Use the tabs along the top, or the Learn lecterns outside the booth',click:()=>app.ui.openBoothTopic(T.id)};}
     if(helpRect&&px>=helpRect.x&&px<=helpRect.x+helpRect.w&&py>=helpRect.y&&py<=helpRect.y+helpRect.h)return {id:'booth:wall:help',title:'How forking works',sub:'The Audionaut',hint:'Click for the short explanation',click:B.about};
     const n=nodeRects.find(r=>px>=r.x&&px<=r.x+r.w&&py>=r.y&&py<=r.y+r.h);
     if(n){const here=n.id===St.cur;return {id:'booth:node:'+n.id+':'+here,title:n.label+(n.mine?' (your fork)':''),sub:`${makerLabel(n.maker)}${n.parent?' · from '+St.get(n.parent).label:' · the first version'}`,hint:here?'You are here':'Click to hear it',click:()=>B.select(n.id)};}
     if(px>TREEW)return {id:'booth:wall:credits:'+St.cur,title:'Credits · '+cur().label,sub:'Ancestry, makers and shares of the hits and notes',hint:'Click for the full credits',click:B.credits};
     return {id:'booth:wall:tree:'+St.cur,title:'Family tree · '+fam().title,sub:`${St.tree(fam().id).nodes.length} versions`,hint:'Aim at a version and click to hear it'};}});
+  // ---- "Learn" lecterns either side of the opening: tiles that switch the big screen to a topic ----
+  const LW=512,LH=384,tileAt=(i)=>({x:16+(i%2)*244,y:96+Math.floor(i/2)*140,w:236,h:130});
+  const lecterns=LECTERNS.map((L,i)=>{const lx=i?BOOTH.x+W/2+.78:BOOTH.x-W/2-.78,lz=WALL_Z+.55,lg=new THREE.Group();lg.position.set(lx,0,lz);lg.rotation.y=i?-.32:.32;scene.add(lg);
+    box(lg,.4,.8,.3,M.walnut,0,.4,0);nc(box(lg,.44,.04,.34,M.dark,0,.82,0,{cast:false}));
+    const tg=new THREE.Group();tg.position.set(0,1.05,.03);tg.rotation.x=-.72;lg.add(tg);nc(box(tg,.6,.46,.03,M.black,0,0,-.016,{cast:false}));
+    const tex=art.panel(LW,LH,()=>{}),face=app.plane(tg,.57,.57*LH/LW,new THREE.MeshBasicMaterial({map:tex,toneMapped:false}),0,0,.001);
+    app.addCollider(lx-.3,lx+.3,lz-.26,lz+.26);return {L,lg,tex,face,hover:-1};});
+  function drawLectern(le){const x=le.tex.userData.canvas.getContext('2d'),L=le.L;x.fillStyle='#120e0b';x.fillRect(0,0,LW,LH);x.fillStyle='#f2b84b';x.fillRect(0,0,LW,8);
+    x.textBaseline='alphabetic';x.textAlign='left';x.font=`800 30px ${F}`;x.fillStyle='#fff6e2';x.fillText(L.head,18,48);x.font=`600 16px ${F}`;x.fillStyle='#bfae95';x.fillText(L.sub,18,76);
+    L.tiles.forEach((id,i)=>{const r=tileAt(i),T=topic(id),on=B.topic===id,hv=le.hover===i;x.fillStyle=on?'#3a2a12':hv?'#2a2016':'#1b1510';rr(x,r.x,r.y,r.w,r.h,12);x.fill();x.lineWidth=on?5:3;x.strokeStyle=on?'#f2b84b':T.status?STATUS_COL[T.status]:'#58d7e8';x.stroke();
+      x.font=`800 22px ${F}`;x.fillStyle='#fff6e2';wrapText(x,T.title,r.w-26).slice(0,2).forEach((l,k)=>x.fillText(l,r.x+14,r.y+34+k*26));
+      x.font=`800 13px ${F}`;x.fillStyle=T.status?STATUS_COL[T.status]:'#58d7e8';x.fillText(on?'▶ ON THE BIG SCREEN':(T.status||'IN THE BOOTH'),r.x+14,r.y+r.h-16);});
+    le.tex.needsUpdate=true;}
+  function drawLecterns(){lecterns.forEach(drawLectern);}
+  lecterns.forEach((le,li)=>app.addPick(le.face,{id:'booth:learn:'+li,reach:3.2,resolve(h){if(!h.uv)return null;const px=h.uv.x*LW,py=(1-h.uv.y)*LH;
+    const i=le.L.tiles.findIndex((id,k)=>{const r=tileAt(k);return px>=r.x&&px<=r.x+r.w&&py>=r.y&&py<=r.y+r.h;});
+    if(i<0)return {id:'booth:learn:'+li+':head',title:le.L.head,sub:'Four short explainers for the big screen in the Audionaut booth',hint:'Aim at a tile and click'};
+    const id=le.L.tiles[i],T=topic(id),on=B.topic===id;return {id:`booth:learn:${li}:${id}:${on}`,title:T.title,sub:T.kicker||'The song you are on, its versions and who made them',hint:on?'Showing on the big screen':'Click to show it on the big screen in the booth',click:()=>B.setTopic(id),
+      hover:v=>{le.hover=v?i:-1;drawLectern(le);}};}}));
+  const infoPick=(mesh,id,title)=>app.addPick(mesh,{id:'booth:info:'+id,resolve:()=>{const T=topic(id);return {id:'booth:info:'+id+':'+(B.topic===id),title,sub:T.title,hint:B.topic===id?'Showing on the big screen':'Click to show it on the big screen',click:()=>B.setTopic(id)};}});
+  infoPick(songsHead,'audionals','Songs as instructions');infoPick(layersHead,'forking','Reusable, credited parts');infoPick(sign,'studio','The Audionaut');
   // ---- station panel (bottom-left while you are at the booth; compact on phones) ----
   const $st=()=>document.getElementById('station');
   const wx0=BOOTH.x-W/2,wx1=BOOTH.x+W/2,wz1=BOOTH.z+D/2;
@@ -284,21 +317,26 @@ export function initBooth(app){
 ${B.note?`<p class="bnote">${esc(B.note)}</p>`:''}${grid}
 <div class="btns"><button data-s="fork" class="gold big">Fork</button><button data-s="vary">Vary</button><button data-s="borrow">Borrow</button><button data-s="play">${B.playing?'■ Stop':'▶ Play'}</button><button data-s="ab"${v.parent?'':' disabled'} class="${B.ab?'on':''}">Hear parent</button></div>
 <div class="btns bchips"><span class="dim small">Layer</span><button data-s="layer:auto" class="${B.layer?'':'on'}">Any</button>${LAYERS.map(l=>`<button data-s="layer:${l}" class="${B.layer===l?'on':''}">${LAYER_NAME[l]}</button>`).join('')}</div>
-<div class="btns bchips"><label class="dim small" for="bsong">Song</label><select id="bsong" data-sel="song">${St.families.map(x=>`<option value="${x.id}"${x.id===v.fam?' selected':''}>${esc(x.title)} — ${esc(x.style)}</option>`).join('')}</select><button data-s="credits">Tree &amp; credits</button><button data-s="about">How it works</button><button data-s="reset">Reset</button></div>`,act);
+<div class="btns bchips"><span class="dim small">Learn</span>${TOPICS.map(t=>`<button data-s="topic:${t.id}" class="${B.topic===t.id?'on':''}">${esc(t.short)}</button>`).join('')}<button data-s="read">Read ▸</button></div>
+<div class="btns bchips"><label class="dim small" for="bsong">Song</label><select id="bsong" data-sel="song">${St.families.map(x=>`<option value="${x.id}"${x.id===v.fam?' selected':''}>${esc(x.title)} — ${esc(x.style)}</option>`).join('')}</select><button data-s="about">How it works</button><button data-s="reset">Reset</button></div>`,act);
     document.body.classList.add('booth-near');head();}
   B.panel=panel;
   function act(a){if(a==='fork'||a==='vary'||a==='borrow'||a==='ab'||a==='play')return press(a);if(a==='reset')return B.reset();if(a==='about')return B.about();if(a==='credits')return B.credits();
-    const [k,p,q]=a.split(':');if(k==='cell'){if(B.ab)B.toggleAB();else B.edit(+p,+q);}else if(k==='layer')B.chooseLayer(p==='auto'?null:p);else if(k==='song')B.loadSong(p);else if(k==='node')B.select(a.slice(5));}
+    if(a==='read')return B.topic==='tree'?B.credits():app.ui.openBoothTopic(B.topic);
+    const [k,p,q]=a.split(':');if(k==='topic')return B.setTopic(p);if(k==='cell'){if(B.ab)B.toggleAB();else B.edit(+p,+q);}else if(k==='layer')B.chooseLayer(p==='auto'?null:p);else if(k==='song')B.loadSong(p);else if(k==='node')B.select(a.slice(5));}
   B.act=act;
   document.addEventListener('change',e=>{const t=e.target;if(t&&t.id==='bsong'&&t.closest('#station'))B.loadSong(t.value);});
   let wasNear=false;
-  function nearCheck(){const n=B.near();if(n&&!wasNear)panel();else if(!n&&wasNear){document.body.classList.remove('booth-near');const el=$st();if(el&&!el.hidden&&el.querySelector('[data-booth]'))app.ui.stationHide();if(B.hoverCell){B.hoverCell=null;B.dirty=true;}}wasNear=n;}
+  function nearCheck(){const n=B.near();if(n&&!wasNear){if(B.autoTopic){B.autoTopic=false;B.topic='tree';B.wallDirty=true;drawLecterns();}panel();}else if(!n&&wasNear){document.body.classList.remove('booth-near');const el=$st();if(el&&!el.hidden&&el.querySelector('[data-booth]'))app.ui.stationHide();if(B.hoverCell){B.hoverCell=null;B.dirty=true;}}wasNear=n;}
   app.on('mode',()=>{wasNear=false;});addEventListener('resize',()=>{if(wasNear)panel();});
   // ---- world positions (tests and the quick-jump) ----
   B.world=(what,a,b)=>{const p=new THREE.Vector3();
     if(what==='cell'){const u=(GX+b*CEW+(CEW-6)/2)/CW,v=1-(GY+a*(CEH+RG)+CEH/2)/CH;p.set((u-.5)*.94,(v-.5)*.572,0);screen.localToWorld(p);}
     else if(what==='rowlabel'){const v=1-(GY+a*(CEH+RG)+CEH/2)/CH;p.set((80/CW-.5)*.94,(v-.5)*.572,0);screen.localToWorld(p);}
     else if(what==='node'){const n=nodeRects.find(r=>r.id===a);if(!n)return null;p.set(((n.x+n.w/2)/WW-.5)*2.3,(.5-(n.y+n.h/2)/WH)*2.3*WH/WW,0);wall.localToWorld(p);}
+    else if(what==='tab'){const r=tabRects.find(t=>t.id===a);p.set(((r.x+r.w/2)/WW-.5)*2.3,(.5-(r.y+r.h/2)/WH)*2.3*WH/WW,0);wall.localToWorld(p);}
+    else if(what==='learn'){const le=lecterns[a],r=tileAt(b);p.set(((r.x+r.w/2)/LW-.5)*.57,(.5-(r.y+r.h/2)/LH)*.57*LH/LW,0);le.face.localToWorld(p);}
+    else if(what==='head'){({songs:songsHead,layers:layersHead,sign})[a].getWorldPosition(p);}
     else if(what==='credits'){p.set(((TREEW+300)/WW-.5)*2.3,0,0);wall.localToWorld(p);}
     else if(what==='btn'){btns[a].cap.getWorldPosition(p);p.y+=.02;}else if(what==='song')cards.find(c=>c.fam===a).mesh.getWorldPosition(p);
     else if(what==='layer')blocks.find(bk=>bk.layer===a).face.getWorldPosition(p);else if(what==='reset')resetFace.getWorldPosition(p);else screen.getWorldPosition(p);
@@ -311,6 +349,7 @@ ${B.note?`<p class="bnote">${esc(B.note)}</p>`:''}${grid}
     for(let r=0;r<6;r++)if(B.levels[r]>.01)B.levels[r]*=Math.exp(-dt*7);
     if(B.flash>0){B.flash-=rd;if(B.flash<=0)B.dirty=true;}
     since+=dt;if(B.dirty||B.playing&&since>.066){since=0;draw();leds_();}
+    if(!B.near()&&performance.now()-B.topicAt>(B.autoTopic?9000:25000)){const i=TOPICS.findIndex(t=>t.id===B.topic);B.setTopic(TOPICS[(i+1)%TOPICS.length].id,true);B.topicAt=performance.now();}
     if(B.wallDirty)drawWall();
     for(const k in btns){const b=btns[k];if(b.press>0){b.press-=dt;b.cap.position.y=b.press>0?b.cap.userData.y0-.009:b.cap.userData.y0;}}
     const here=cur().fam;cards.forEach(c=>{const s=c.fam===here,k=1-Math.exp(-dt*8);c.h.position.y+=((s?1.33:1.29)-c.h.position.y)*k;c.h.position.z+=((s?.15:.11)-c.h.position.z)*k;c.gm.opacity+=((s?.85:0)-c.gm.opacity)*k;c.front.emissiveIntensity+=((s?.6:.3)-c.front.emissiveIntensity)*k;});
@@ -318,6 +357,6 @@ ${B.note?`<p class="bnote">${esc(B.note)}</p>`:''}${grid}
       if(l.positionX){const t=ac.currentTime+.03;for(const [p,v] of [[l.positionX,c.position.x],[l.positionY,c.position.y],[l.positionZ,c.position.z],[l.forwardX,fwd.x],[l.forwardY,fwd.y],[l.forwardZ,fwd.z],[l.upX,up.x],[l.upY,up.y],[l.upZ,up.z]])p.linearRampToValueAtTime(v,t);}
       else{l.setPosition(c.position.x,c.position.y,c.position.z);l.setOrientation(fwd.x,fwd.y,fwd.z,up.x,up.y,up.z);}}};
   B.qa=()=>{const v=cur();return {playing:B.playing,audio:B.audio(),step:B.step,cur:v.id,label:v.label,fam:v.fam,mine:!!v.mine,parent:v.parent,ab:B.ab,hearing:B.hearing().id,layer:B.layer,note:B.note||'',last:v.last?v.last.n:0,
-    versions:St.versions.size,yours:[...St.versions.values()].filter(x=>x.mine).length,near:B.near(),loud:B.loud(),hover:B.hoverCell,unique:St.unique(),nodes:nodeRects.length};};
-  B.note='';blocks.forEach(drawBlock);btnColor();draw();drawWall();leds_();return B;
+    topic:B.topic,autoTopic:!!B.autoTopic,versions:St.versions.size,yours:[...St.versions.values()].filter(x=>x.mine).length,near:B.near(),loud:B.loud(),hover:B.hoverCell,unique:St.unique(),nodes:nodeRects.length};};
+  B.note='';blocks.forEach(drawBlock);btnColor();draw();drawWall();drawLecterns();leds_();B.TOPICS=TOPICS;return B;
 }
