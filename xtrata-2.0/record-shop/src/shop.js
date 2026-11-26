@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import {primaryName} from './bns.js';
 import {XTRATA_LOGO} from './logo.js';
 import {rng,hash,fitText,wrapText,fmt,typeName} from './util.js';
 import {CD,thick} from './cdstock.js';
@@ -31,7 +32,7 @@ export function initShop(app){
         x.fillStyle='#efe6d2';x.fillRect(ix-7,iy-7,iw+14,ih+14);x.imageSmoothingEnabled=im.width>=96;x.drawImage(im,ix,iy,iw,ih);x.imageSmoothingEnabled=true;
         const tx=land?m+bw+26:m,tw=land?W-tx-m:W-2*m;let y=land?H*.3:H-92;x.textAlign='left';x.fillStyle='#f2b84b';x.font=`800 ${land?34:30}px ${F}`;y=wrapText(x,ct.head,tx,y,tw,land?40:34,land?4:2);
         x.fillStyle='#fff3d6';x.font=`600 18px ${F}`;x.fillText(fitText(x,'Inscription #'+pr.id+' · '+(pr.mime||'').replace('image/','').toUpperCase()+' · '+Math.max(1,Math.round(pr.size/1024))+' KB',tw),tx,y+4);
-        x.fillStyle='rgba(88,215,232,.9)';x.font=`600 14px ${F}`;x.fillText(fitText(x,'on Xtrata · inscribed by '+(pr.creator?pr.creator.slice(0,5)+'…'+pr.creator.slice(-4):'someone'),tw),tx,y+26);}
+        x.fillStyle='rgba(88,215,232,.9)';x.font=`600 14px ${F}`;x.fillText(fitText(x,'on Xtrata · inscribed by '+(pr.creatorName||(pr.creator?pr.creator.slice(0,5)+'…'+pr.creator.slice(-4):'someone')),tw),tx,y+26);}
       else{const sc=Math.max(W/im.width,H/im.height);x.fillStyle='#000';x.fillRect(0,0,W,H);x.drawImage(im,(W-im.width*sc)/2,(H-im.height*sc)/2,im.width*sc,im.height*sc);
         x.fillStyle='rgba(0,0,0,.6)';x.fillRect(0,H-40,W,40);x.fillStyle='#fff3d6';x.textAlign='left';x.font=`700 18px ${F}`;x.fillText(fitText(x,'INSCRIPTION #'+pr.id+(pr.title?' · '+pr.title:''),W-28),14,H-14);}}
     p.tex.needsUpdate=true;}
@@ -113,7 +114,10 @@ export function initShop(app){
   mons.forEach(m=>{drawMon(m);m.tex.userData.redraw=()=>drawMon(m);});
   let artT=0;app.on('art',()=>{clearTimeout(artT);artT=setTimeout(()=>{S.redrawPosters();mons.forEach(m=>drawMon(m));},250);});
   {const im=new Image();im.onload=()=>{S.logo=im;S.redrawPosters();};im.src=XTRATA_LOGO;}
-  const place=pr=>{S.prints.push(pr);if(S.prints.length>14)S.prints.splice(0,S.prints.length-14);const f=app.room.posters.find(p=>p.content&&p.content.type==='track');
+  // show the inscriber's primary BNS name (e.g. dyle.btc) instead of a raw address whenever the address has one
+  const nameOf=pr=>{const c=app.chain;if(!pr.creator||pr.creatorName||!c||!c.enabled)return;const C2=window.XTRATA_SHOP_CONFIG||{};let bases=[];try{bases=[C2.hiroBase||new URL(c.base).origin+'/hiro/mainnet'];}catch(e){}
+    primaryName(pr.creator,bases).then(n=>{if(!n)return;pr.creatorName=n;app.room.posters.forEach(p=>{if(p.content&&p.content.print===pr)drawPoster(p);});});};
+  const place=pr=>{nameOf(pr);S.prints.push(pr);if(S.prints.length>14)S.prints.splice(0,S.prints.length-14);const f=app.room.posters.find(p=>p.content&&p.content.type==='track');
     if(f&&app.room.posters.filter(p=>p.content.type==='print').length<3){f.content={type:'print',print:pr,head:HEADS[(pr.id+S.seed)%HEADS.length],alt:pr.id%2===0};drawPoster(f);}};
   S.morePrints=()=>{const c=app.chain;if(!c||!c.randomPrints||S.finding)return;S.finding=true;c.randomPrints(3).then(l=>{for(const pr of l)if(!S.prints.some(q=>q.id===pr.id))place(pr);}).catch(()=>{}).then(()=>{S.finding=false;});};
   S.loadPrints=()=>{const c=app.chain;if(S.printsAsked||!c||!c.fetchPrint)return;S.printsAsked=true;const C2=window.XTRATA_SHOP_CONFIG||{},ids=Array.isArray(C2.posterInscriptions)?C2.posterInscriptions:PRINTS;

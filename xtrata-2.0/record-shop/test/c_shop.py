@@ -75,6 +75,9 @@ async def main():
         nob=await E("__QA.app.room.posters.every(p=>['release','track','print','promo'].includes(p.content.type))&&__QA.app.room.posters.filter(p=>p.content.type==='release').length===6&&__QA.app.room.posters.filter(p=>p.content.type==='promo').length===1&&!!__QA.app.shop.logo")
         ok('posters: six album covers, one Xtrata-logo poster, the rest track artwork (chain finds join when online)',nob)
         ok('16 posters are clickable and enlarge with matching metadata; aspect preserved',hv and hv['id'].startswith('poster') and st['modal']=='poster' and abs(pinfo['ar']-pinfo['war'])<.01 and await page.locator('#modalBox .trk li').count()>=2,hv)
+        pc=await page.evaluate("(()=>{const b=document.querySelector('#modalBox .printbtn'),l=[...document.querySelectorAll('#modalBox .plinks button')],r=b.getBoundingClientRect(),lr=l[0].getBoundingClientRect();return {dis:b.disabled,txt:b.textContent,note:document.querySelector('#modalBox .printcta p').textContent,links:l.map(x=>x.textContent),bh:r.height,lh:lr.height,above:r.bottom<=lr.top}})()")
+        await page.screenshot(path='test/shot_poster_print.png')
+        ok('poster dialog leads with a greyed-out print button; play / CD / vinyl are smaller links below it',pc['dis'] and 'print' in pc['txt'] and 'Not available yet' in pc['txt'] and 'Nothing can be bought' in pc['note'] and len(pc['links'])==3 and 'vinyl' in pc['links'][2] and pc['bh']>pc['lh']*1.5 and pc['above'],pc)
         await page.click('#modalBox .trk li:nth-child(2) button'); await E('__QA.step(12)'); st=await E(S)
         ok('16 release poster opens that actual release and plays the selected track',st['mode']=='inspect' and st['inspect']['rel']==pinfo['rel'] and st['playback']['trackId']==pinfo['tid'] and st['playback']['playing'],(st['inspect'],st['playback']['trackId']))
         await page.keyboard.press('Escape'); await E('__QA.step(.8)'); await page.keyboard.press('Escape'); await E('__QA.step(2.5)')
@@ -122,7 +125,7 @@ async def main():
         ok('17 corrupt saved crate falls back safely',st['crate']==[] and info['note'] and all('ERR_UNKNOWN_URL_SCHEME' in e or 'ERR_INVALID_URL' in e for e in errs),(info['note'],errs[:2]))
         await page.screenshot(path='test/shot_override.png'); await b.close()
         b,page,errs,reqs=await launch(p,init='window.XTRATA_SHOP_DATA={albums:[["x","ep","A","T","named",1,"k",[],null,[[1,5,-3,"k","bad"]]]],singles:[]}'); E=page.evaluate
-        st=await E(S); toast=await page.inner_text('#toasts')
+        st=await E(S); toast=await page.inner_text('#toasts')+' | '+' '.join(await E('__QA.app.notes'))
         ok('1 invalid override rejected → embedded 21/49 fallback, reported',st['catalog']['source']=='embedded snapshot' and st['catalog']['releases']==21 and st['catalog']['tracks']==49 and 'rejected' in toast,toast[:90])
         await b.close()
 
