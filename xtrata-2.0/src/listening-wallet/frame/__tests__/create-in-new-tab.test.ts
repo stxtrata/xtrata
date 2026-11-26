@@ -17,11 +17,11 @@ const prfOf = (seed: number) => Uint8Array.from({ length: 32 }, (_, i) => (i * 7
  * listener: it "makes" the passkey in the other tab with the user id it was given, then signs in with whichever
  * passkeys `picks` lists, in order (an old synced one first, if asked).
  */
-function webkitBox(opts: { picks?: ('old' | 'new')[]; storedOld?: boolean } = {}) {
+function webkitBox(opts: { picks?: ('old' | 'new')[]; storedOld?: boolean; sameTab?: boolean; map?: Map<string, string>; made?: string; leaves?: boolean } = {}) {
   const panels: Panel[] = [];
   const opened: { exclude: string[]; name: string; userId: string }[] = [];
   const evaluated: (string | undefined)[] = [];
-  const map = new Map<string, string>();
+  const map = opts.map ?? new Map<string, string>();
   const picks = [...(opts.picks ?? ['new'])];
   // Passkeys on the device: an older one synced from elsewhere, and the one made in the new tab.
   const passkeys = new Map<string, { prf: Uint8Array; userHandle: string }>([['cred-old', { prf: prfOf(1), userHandle: 'old-user-handle-xxxxxx' }]]);
@@ -30,12 +30,14 @@ function webkitBox(opts: { picks?: ('old' | 'new')[]; storedOld?: boolean } = {}
     available: () => true,
     create: async () => { createdInFrame++; throw new Error('WebKit refuses creation in a frame'); },
     evaluate: async (id) => {
+      if (opts.leaves) return new Promise<never>(() => {}); // the tab has gone to the create page: nothing more happens here
       evaluated.push(id);
       const pick = id ?? (picks.shift() === 'old' ? 'cred-old' : 'cred-new');
       const k = passkeys.get(pick)!;
       return { credentialId: pick, prf: k.prf.slice(), userHandle: k.userHandle };
     },
     createsInNewTab: () => true,
+    ...(opts.sameTab ? { createsInSameTab: () => true } : {}),
     openCreator: (exclude, name, userId) => {
       opened.push({ exclude, name, userId });
       passkeys.set('cred-new', { prf: prfOf(2), userHandle: userId }); // the listener makes it in the new tab
@@ -57,7 +59,9 @@ function webkitBox(opts: { picks?: ('old' | 'new')[]; storedOld?: boolean } = {}
       idle: () => {}
     }
   });
-  return { h: engine.handlers, panels, opened, evaluated, createdInFrame: () => createdInFrame };
+  // A passkey already made on the create page before this frame loaded (the tab went there and came back).
+  if (opts.made) passkeys.set('cred-new', { prf: prfOf(2), userHandle: opts.made });
+  return { h: engine.handlers, panels, opened, evaluated, map, createdInFrame: () => createdInFrame };
 }
 
 describe('making the passkey in a new tab (WebKit)', () => {
@@ -124,5 +128,50 @@ describe('which browsers create in a new tab', () => {
     expect(webkitOnly('Mozilla/5.0 (Linux; Android 15) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Mobile Safari/537.36')).toBe(false);
     expect(webkitOnly('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36 Edg/141.0.0.0')).toBe(false);
     expect(webkitOnly('Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:140.0) Gecko/20100101 Firefox/140.0')).toBe(false);
+  });
+});
+
+describe('making the passkey in the same tab (WebKit, on a radio the create page may return to)', () => {
+  it('a free starter player takes one tap to leave and one to finish: the sign-in that proves the passkey is its one check', async () => {
+    const b = webkitBox({ sameTab: true });
+    const r = await b.h['listening.unlock']({ mode: 'create', quick: true });
+    expect(r.address).toBe((await deriveListeningIdentity(prfOf(2))).address);
+    expect(b.evaluated).toEqual([undefined]); // no "Confirm your passkey" after it: that would be a third prompt
+    expect(b.panels.map((p) => p.kind)).toEqual(['create', 'confirm-passkey']);
+    expect(b.panels.map((p) => p.confirmLabel)).toEqual(['Create my player', 'Finish']);
+    expect(b.panels[1].title).toBe('One more tap');
+    expect(JSON.stringify(b.panels)).not.toMatch(/new tab/i);
+  });
+
+  it('an ordinary player is still checked twice', async () => {
+    const b = webkitBox({ sameTab: true });
+    await b.h['listening.unlock']({ mode: 'create' });
+    expect(b.evaluated).toEqual([undefined, 'cred-new']);
+    expect(b.panels.map((p) => p.kind)).toEqual(['create', 'confirm-passkey', 'verify-passkey']);
+  });
+
+  it('back on the radio after the create page: the box goes straight to "Finish", and does not send them away again', async () => {
+    const first = webkitBox({ sameTab: true, leaves: true });
+    // The tab leaves as the create page opens: the first frame never gets further than its tap.
+    void first.h['listening.unlock']({ mode: 'create', quick: true }).catch(() => {});
+    await new Promise((r) => setTimeout(r, 0));
+    expect(first.opened).toHaveLength(1);
+    const back = webkitBox({ sameTab: true, map: first.map, made: first.opened[0].userId });
+    const r = await back.h['listening.unlock']({ mode: 'create', quick: true });
+    expect(back.opened).toHaveLength(0);
+    expect(back.panels.map((p) => p.confirmLabel)).toEqual(['Finish']);
+    expect(r.address).toBe((await deriveListeningIdentity(prfOf(2))).address);
+  });
+
+  it('the create page is only ever told to return to an origin on its own list', () => {
+    const base = new URLSearchParams({ u: 'A'.repeat(22), n: 'Xtrata listening wallet · AB12' });
+    const ask = (r: string, parents: string[]) => parseCreateRequest('#' + new URLSearchParams({ ...Object.fromEntries(base), r }).toString(), undefined, parents);
+    expect(ask('https://radio.xtrata.xyz', ['https://radio.xtrata.xyz'])?.returnTo).toBe('https://radio.xtrata.xyz');
+    expect(ask('https://evil.example', ['https://radio.xtrata.xyz'])).toMatchObject({ userId: 'A'.repeat(22) });
+    expect(ask('https://evil.example', ['https://radio.xtrata.xyz'])?.returnTo).toBeUndefined();
+    expect(ask('https://radio.xtrata.xyz/elsewhere?x=1', ['https://radio.xtrata.xyz'])?.returnTo).toBeUndefined();
+    expect(ask('https://radio.xtrata.xyz.evil.example', ['https://radio.xtrata.xyz'])?.returnTo).toBeUndefined();
+    expect(ask('javascript:alert(1)', ['https://radio.xtrata.xyz'])?.returnTo).toBeUndefined();
+    expect(ask('https://radio.xtrata.xyz', [])?.returnTo).toBeUndefined(); // no list, no return
   });
 });

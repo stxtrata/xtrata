@@ -50,7 +50,7 @@ async function open(over: object = {}, flag: string | null = '1') {
     <div id="onair" hidden><b>ON AIR</b><span class="onair-sub"></span></div><div class="nudge" id="pppNudge" hidden><span class="nudge-txt"><b class="nudge-t"></b><span class="nudge-s"></span></span><button type="button">Start</button></div>`;
   h.state = { playing: false, nowPlaying: null };
   h.feeds = [];
-  h.radio = { setGiftPlayer: vi.fn(), setGiftStop: vi.fn(), setGiftLock: vi.fn(), setGiftWait: vi.fn(), subscribe: vi.fn((fn: (st: any) => void) => { h.feeds.push(fn); }), refreshLikes: vi.fn(), forgetWallets: vi.fn(),
+  h.radio = { setGiftPlayer: vi.fn(), setGiftStop: vi.fn(), setSample: vi.fn(), setGiftLock: vi.fn(), setGiftWait: vi.fn(), subscribe: vi.fn((fn: (st: any) => void) => { h.feeds.push(fn); }), refreshLikes: vi.fn(), forgetWallets: vi.fn(),
     getState: () => h.state, getPosition: () => ({ current: 0, duration: 0 }), playToken: vi.fn(), playPause: vi.fn(), next: vi.fn(), prev: vi.fn(), toggleLike: vi.fn() };
   (window as any).XtrataRadio = h.radio;
   h.snap = { ...base, ...over };
@@ -114,7 +114,7 @@ describe('novice mode: the main path uses plain words', () => {
     expect(document.documentElement.dataset.novice).toBeUndefined();
     expect(text(root.querySelector('.ppp-key'))).toMatch(/1 STX ≈/);
     expect(buttons(root.querySelector('.ppp-actions:not(.ppp-actions2)'))).toContain('Copy my address');
-    expect(h.radio.setGiftStop).toHaveBeenLastCalledWith('EMPTY — ADD STX TO PLAY');
+    expect(h.radio.setSample).toHaveBeenLastCalledWith(true); // out of plays: samples, not silence
     expect(document.getElementById('album')!.hidden).toBe(true);
   });
 });
@@ -394,6 +394,23 @@ describe('a free starter player: claimed, arriving, landed', () => {
     named(/Claim my free player/)!.click();
     expect(h.radio.playToken).not.toHaveBeenCalled();
     expect(h.calls.filter(([n]) => n === 'holdFirstPlay')).toHaveLength(0);
+  });
+
+  it('on an iPhone the box is asked on arrival and nothing plays first: the tab is about to leave to make the player, and come back', async () => {
+    const ua = vi.spyOn(navigator, 'userAgent', 'get').mockReturnValue('Mozilla/5.0 (iPhone; CPU iPhone OS 26_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.0 Mobile/15E148 Safari/604.1');
+    try {
+      starter();
+      await open(NEW);
+      await vi.waitFor(() => expect(named(/Claim my free player/)).toBeTruthy());
+      expect(named(/^Play$/)).toBeUndefined();
+      // Asked once, by itself: the same happens when the tab comes back from the create page, which is what makes the
+      // box's "Finish" button the only thing left to tap.
+      await vi.waitFor(() => expect(h.calls.filter(([n]) => n === 'create')).toHaveLength(1));
+      expect(h.calls.find(([n]) => n === 'create')![1]).toEqual([{ quick: true }]);
+      named(/Claim my free player/)!.click();
+      expect(h.radio.playToken).not.toHaveBeenCalled();
+      expect(h.calls.filter(([n]) => n === 'holdFirstPlay')).toHaveLength(0);
+    } finally { ua.mockRestore(); }
   });
 
   it('the operator can change the intro song: the next claim starts on the new one', async () => {

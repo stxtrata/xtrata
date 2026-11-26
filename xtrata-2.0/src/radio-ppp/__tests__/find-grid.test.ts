@@ -59,3 +59,19 @@ describe('find music: artists in three columns', () => {
     expect(names()).toContain('melophonic · 2');
   });
 });
+
+describe('find music: artists in a section of their own (the radio page\'s Browse)', () => {
+  it('draws the names in the mount it is given, and the results stay under the search box', async () => {
+    const mount = document.createElement('div'), artists = document.createElement('div');
+    mount.scrollIntoView = vi.fn();
+    const box = createFindBox(mount, { load: async () => SONGS, play: () => {}, current: () => null, locked: () => false, grid: true, artistsMount: artists });
+    box.load();
+    await vi.waitFor(() => expect(artists.querySelector('.find-chip')).not.toBeNull());
+    expect(mount.querySelector('.find-artists')).toBeNull();
+    expect(mount.querySelector('input.find-q')).not.toBeNull();
+    const chip = [...artists.querySelectorAll('.find-chip')].find((b) => b.textContent === 'melophonic') as HTMLButtonElement;
+    chip.click();
+    expect([...mount.querySelectorAll('.find-list .lt')].map((b) => b.textContent)).toEqual(['One', 'Two']);
+    expect(mount.scrollIntoView).toHaveBeenCalled(); // the results are brought into view
+  });
+});

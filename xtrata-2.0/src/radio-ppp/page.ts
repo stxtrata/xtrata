@@ -35,6 +35,7 @@ import type { GiftStopReason } from './controller';
 import { createWelcomeView, type WelcomeMode } from './welcome';
 import { createRestockSheet, type RestockInput } from './restock-sheet';
 import { buildSongs, createFindBox } from './find';
+import { webkitOnly } from '../lib/listening-wallet/webkit';
 import { isTierId, tierById, tierOfAmount, type Tier } from '../lib/listening-wallet/tiers';
 import { AWARDS_DROP } from '../lib/listening-wallet/tx';
 import { awardSeed } from '../lib/music-awards/record';
@@ -422,6 +423,10 @@ function start(root: HTMLElement) {
     return s.step === 'loading' && welcomeLast !== 'checking' ? welcomeLast : null; // a check in between: stay where we were
   };
   let autoClaimTried = false;
+  // iPhone and Safari cannot make a player inside the secure box: the whole tab goes to the box's own page for that and
+  // comes back (frame/passkey.ts). So nothing is gained by a "Play" tap here first (the music would be cut off as the
+  // tab leaves): the box is asked straight away, on arrival and again on the way back, and the music starts after.
+  const topCreate = (() => { try { return webkitOnly(navigator.userAgent); } catch { return false; } })();
   function syncWelcome(s: Snapshot, albumActive: boolean, lines: HTMLElement[] = [], decided?: WelcomeMode | null) {
     if (!welcome) return;
     const mode = decided !== undefined ? decided : welcomeMode(s, albumActive);
@@ -439,7 +444,7 @@ function start(root: HTMLElement) {
     // untouched: making the passkey still takes the visitor's tap inside the box.
     // With an intro song the visitor's first tap here is "Play": it starts the music (a browser only lets sound start
     // from a tap on this page) and asks the box at the same moment, so nothing is asked for before that tap.
-    if (starter && introSong === null && !autoClaimTried && s.step === 'intro' && !s.busy && !s.armed && !s.error && !inApp) {
+    if (starter && (introSong === null || topCreate) && !autoClaimTried && s.step === 'intro' && !s.busy && !s.armed && !s.error && !inApp) {
       autoClaimTried = true;
       void ppp.create({ quick: true, ...(replace.claiming() ? { another: true } : {}) });
     }
@@ -447,11 +452,11 @@ function start(root: HTMLElement) {
       mode, status, asking: !!s.busy || s.armed, busy: !!s.busy, canStart: (s.step === 'intro' || s.step === 'locked') && !inApp,
       plays: starter ? starter.plays : mode === 'landed' ? s.playsLeft : null, from: starter?.from ?? null,
       tier: tierNow, mystery, spot: spotPicked, installed: standalone,
-      intro: starter && introSong !== null && (s.step === 'intro') ? { ready: true } : null,
+      intro: starter && introSong !== null && !topCreate && (s.step === 'intro') ? { ready: true } : null,
       now: introNow(),
       albums: mode === 'landed' ? featured.map((p) => ({ title: p.title, by: p.subtitle, cover: coverArt(p.cover), run: () => { showFull(); openFeatured(p, true); } })) : [],
       claimNew: mode === 'back' ? claimNewFor(s) : null, replaceOld: mode === 'back' ? replaceFor(s) : null,
-      start: () => { if (starter && introSong !== null) startIntro(); void ppp.create(createOpts()); }, unlock: () => void ppp.unlock(), returning: () => void ppp.unlock(true), restock: () => openRestock(),
+      start: () => { if (starter && introSong !== null && !topCreate) startIntro(); void ppp.create(createOpts()); }, unlock: () => void ppp.unlock(), returning: () => void ppp.unlock(true), restock: () => openRestock(),
       full: () => {
         // "Start listening" starts the music: it is the listener's own tap, and nothing is playing yet.
         const radio = (window as any).XtrataRadio;
@@ -588,7 +593,7 @@ function start(root: HTMLElement) {
   setInterval(() => { if (preview.phase === 'playing') advancePreview({ kind: 'tick', at: Date.now() }); }, 5000);
 
   // A gifted wallet's album becomes a band on the radio; when its paid plays run out the radio stops (no free mode).
-  let giftPushed = '', stopPushed: string | null | undefined, lockPushed = false, waitPushed = false;
+  let giftPushed = '', stopPushed: string | null | undefined, lockPushed = false, waitPushed = false, samplePushed: boolean | undefined;
   const syncGift = (raw: Snapshot, s: Snapshot) => {
     const radio = (window as any).XtrataRadio;
     if (!radio?.setGiftPlayer || !radio?.setGiftStop) return; // pushed again at the next render, once the radio is there
@@ -600,7 +605,19 @@ function start(root: HTMLElement) {
     // queued and paid when they land), and only while it is that song.
     const intro = introLive(raw);
     const said = gs ? (plainFor(raw) ? plainStop(gs.reason as GiftStopReason, gs.text) : gs.text) : null;
-    const stop = pre || intro ? null : said ?? (paidHost && (!raw.gate?.here || raw.step === 'off') ? 'PAID RADIO IS UNAVAILABLE' : null);
+    const reason = pre || intro ? null : said ?? (paidHost && (!raw.gate?.here || raw.step === 'off') ? 'PAID RADIO IS UNAVAILABLE' : null);
+    // Whatever would have stopped the music now plays samples instead: the opening of every song (src/home/radio.js),
+    // which is the sign that this player cannot pay right now. Two things still stop it outright: plays on their way
+    // (they are seconds off, and the first song waits for them) and this player already playing in another tab.
+    // The one-button welcome screens (welcome.ts) cover the radio and have music of their own to offer, so nothing
+    // plays underneath them: there the radio is stopped outright, as before.
+    const freshOwn = raw.slot === 0 && !raw.gift?.player && !raw.entries.some((e) => e.kind === 'play');
+    const covered = !!welcome && !welcomeFull && plainFor(raw)
+      && (raw.step === 'intro' || raw.step === 'unsupported' || raw.step === 'locked' || (raw.step === 'fund' && freshOwn));
+    const hard = gs?.reason === 'arriving' || gs?.reason === 'tab' || covered;
+    const sample = !!reason && !hard;
+    const stop = sample ? null : reason;
+    if (sample !== samplePushed) { radio.setSample?.(sample); samplePushed = sample; }
     if (stop && stop !== stopPushed) { radio.setGiftStop(stop); stopPushed = stop; }
     const p = raw.step === 'off' || raw.step === 'elsewhere' ? null : raw.gift?.player ?? pre ?? featuredFor(raw) ?? null;
     const id = p ? p.id + ':' + p.cover + ':' + p.tracks.map((t) => t.id).join(',') : '';
@@ -855,13 +872,13 @@ function start(root: HTMLElement) {
   const onair = document.getElementById('onair');
   nudge?.querySelector('button')?.addEventListener('click', () => go());
   const NOT_PAYING: Partial<Record<Snapshot['step'], string>> = {
-    connect: 'Connect your player to listen',
-    intro: 'Set up your player to listen',
-    locked: 'Unlock your player to listen',
-    'wrong-wallet': 'Switch wallets to listen',
-    link: 'Finish setup to listen',
-    fund: 'No plays yet',
-    over: 'Return the excess to listen',
+    connect: 'Connect your player to hear whole songs',
+    intro: 'Set up your player to hear whole songs',
+    locked: 'Unlock your player to hear whole songs',
+    'wrong-wallet': 'Switch wallets to hear whole songs',
+    link: 'Finish setup to hear whole songs',
+    fund: 'Previews only: no plays left',
+    over: 'Return the excess to hear whole songs',
     ready: 'Music support is paused'
   };
   const NUDGE_ACTION: Partial<Record<Snapshot['step'], string>> = {
@@ -929,7 +946,7 @@ function start(root: HTMLElement) {
         nudge.querySelector('button')!.textContent = 'Get a player';
       } else if (mode === 'off') {
         nudge.querySelector('.nudge-t')!.textContent = warning;
-        nudge.querySelector('.nudge-s')!.textContent = plainFor(s) ? (s.step === 'intro' ? PLAIN_NUDGE : '') : 'This radio requires a funded listening wallet with music support on.';
+        nudge.querySelector('.nudge-s')!.textContent = plainFor(s) && s.step === 'intro' ? PLAIN_NUDGE : 'Until then you hear the first 30 seconds of each song.';
         nudge.querySelector('button')!.textContent = NUDGE_ACTION[s.step] ?? 'Start';
       }
     }
@@ -1521,7 +1538,9 @@ function start(root: HTMLElement) {
     const shelfFold = document.querySelector('.ppp-shelf') as HTMLDetailsElement | null;
     const browseMount = shelfInBrowse() ? document.getElementById('shelfBox') : null;
     if (browseMount) {
-      // The new look: the albums are a tab of Browse. (The album page's own sheet keeps the fold below.)
+      // The new look: the albums are a section of Browse, "In your player". (The album page's own sheet keeps the fold
+      // below.) Search, sort and pinning only appear once there are more albums than fit at a glance.
+      if (shelf.count() > 6) browseMount.dataset.many = '1'; else delete browseMount.dataset.many;
       if (shelfBox) { if (browseMount.firstChild !== shelfBox) browseMount.replaceChildren(shelfBox); } else browseMount.replaceChildren();
       if (shelfFold) shelfFold.hidden = true;
       announceAlbums(!!shelfBox);
@@ -1921,6 +1940,8 @@ function start(root: HTMLElement) {
     explicit: (id) => !!(window as any).XtrataRadio?.isExplicit?.(id),
     liked: (id) => likedNow().has(id),
     grid: document.documentElement.hasAttribute('data-skin'),   // the new look lists artist names three across
+    // ...and draws them in their own section of Browse, under the listener's albums
+    artistsMount: (document.documentElement.hasAttribute('data-skin') && document.getElementById('artistBox')) || undefined,
     leaveAlbum: () => openFromShelf(0)
   }) : null;
   findBox?.addEventListener('toggle', () => { if (findBox.open) find?.load(); });

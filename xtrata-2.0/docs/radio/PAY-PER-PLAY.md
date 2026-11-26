@@ -385,3 +385,20 @@ npm run build:listening-wallet   # rebuild with the production parents afterward
 
 The browser checks use Chrome's virtual authenticator with PRF, a strict-CSP wallet origin and a
 second parent origin that must be refused. They do not prove real-device passkey behaviour.
+
+## Samples: what plays when a player cannot pay
+
+The pay-per-play page never plays a whole song unpaid, and it is no longer silent either. Whenever the player
+cannot pay (no player yet, locked, out of plays, plays switched off, setup unfinished, the service unreachable)
+the radio plays **samples**: the opening of each song, then the next song.
+
+- A sample is the first 30 seconds, or the first half of a song shorter than a minute. That is where a paid play
+  would begin, so a sample is never a play and nothing is owed for it.
+- No jumping within a sampled song. Next and previous still work.
+- A song already past its opening when the plays run out is left to finish (it was paid for).
+- When plays arrive mid-sample, the song carries on to its end and is paid for at the usual point.
+- Two things still stop the music outright: plays that are on their way, and the same player open in another tab.
+  The one-button welcome screens also keep the radio stopped underneath them.
+
+The engine does the cutting (`setSample` in `src/home/radio.js`); `syncGift` in `src/radio-ppp/page.ts` decides
+when. The main site's free radio is unchanged.

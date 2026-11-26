@@ -83,6 +83,8 @@ export interface FindDeps {
   grid?: boolean;
   /** Leave the open album and go back to the listener's own player. When given, the "an album is open" note carries a button for it. */
   leaveAlbum?(): void;
+  /** Where the artist names go when they are not drawn under the search box (the radio page's Browse: below the albums). */
+  artistsMount?: HTMLElement;
 }
 
 const el = (tag: string, cls = '', text = '') => { const n = document.createElement(tag); if (cls) n.className = cls; if (text) n.textContent = text; return n; };
@@ -100,7 +102,8 @@ export function createFindBox(mount: HTMLElement, deps: FindDeps) {
   const status = el('div', 'hint'), chips = el('div', 'find-artists' + (deps.grid ? ' find-artists--grid' : '')), list = el('ol', 'likesList find-list');
   status.setAttribute('role', 'status');
   const tools = el('div', 'likesTools'); tools.append(input);
-  mount.replaceChildren(tools, status, chips, list);
+  if (deps.artistsMount) { mount.replaceChildren(tools, status, list); deps.artistsMount.replaceChildren(chips); }
+  else mount.replaceChildren(tools, status, chips, list);
   input.oninput = () => { query = input.value; paint(); };
 
   function load() {
@@ -134,7 +137,11 @@ export function createFindBox(mount: HTMLElement, deps: FindDeps) {
       b.type = 'button'; b.setAttribute('aria-pressed', String(on)); if (title) b.title = title; b.onclick = run;
       return b;
     };
-    const pick = (a: ArtistCount, label: string, cls = '') => chip(label, fold(a.name) === fold(artist), () => { artist = fold(a.name) === fold(artist) ? '' : a.name; paint(); }, `Show ${a.name}’s ${a.songs === 1 ? 'song' : `${a.songs} songs`}`, cls);
+    const pick = (a: ArtistCount, label: string, cls = '') => chip(label, fold(a.name) === fold(artist), () => {
+      artist = fold(a.name) === fold(artist) ? '' : a.name; paint();
+      // The names sit apart from the results: bring the results (under the search box) into view.
+      if (artist && deps.artistsMount) mount.scrollIntoView?.({ block: 'start', behavior: 'smooth' });
+    }, `Show ${a.name}’s ${a.songs === 1 ? 'song' : `${a.songs} songs`}`, cls);
     if (deps.grid) {
       // Every short name goes in the grid. Longer names are tucked behind one button; an artist already picked stays in view.
       const short = artists.filter((a) => isShortName(a.name)), long = artists.filter((a) => !isShortName(a.name));

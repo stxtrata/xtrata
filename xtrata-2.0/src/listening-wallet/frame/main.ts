@@ -21,7 +21,7 @@ const ui = domUi({
   stop: () => void engine.handlers['listening.stop'](),
   lock: () => engine.lock()
 });
-engine = createListeningEngine({ passkey: browserPasskey(), ui, store });
+engine = createListeningEngine({ passkey: browserPasskey(undefined, parents), ui, store });
 
 new WalletBridgeHost({
   allowedParentOrigins: parents,

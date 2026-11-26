@@ -15,6 +15,14 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
 <meta name="theme-color" content="#0c0e13" />
 <script>
+// Making a player on an iPhone takes this tab to the secure box's own page and back (src/listening-wallet/frame). It
+// comes back to plain "/radio.html?made=1", so the address this visit had (which disc, which kind of visit) is kept
+// here for the tab and put back before anything below reads it. Only this page's own path and query, nothing else.
+(function(){try{var K='xtrata.radio.return';
+if(/[?&]made=1(?:&|$)/.test(location.search)){var u=sessionStorage.getItem(K);history.replaceState(null,'',u&&/^\/radio(\.html)?(\?[^#]*)?$/.test(u)?u:'/radio.html');}
+else sessionStorage.setItem(K,location.pathname+location.search);}catch(e){}})();
+</script>
+<script>
 // Set before the audio engine loads so a slow or unavailable wallet check cannot open playback.
 if (location.hostname === 'radio.xtrata.xyz') document.documentElement.dataset.radioPaidOnly = 'true';
 // Novice mode (src/radio-ppp/novice.ts, off unless asked for): hold the page blank until the panel knows whether this
@@ -543,6 +551,10 @@ d.setAttribute('data-skin','1');d.setAttribute('data-tab','listen');}catch(e){}}
   .al-welcome .al-welcome-note{font-size:13px;color:#8f97a3}
   .al-welcome .al-welcome-wait{font-size:14px;color:#8f97a3}
   .al-welcome .al-primary{margin-top:28px}
+  /* The one button to press on a welcome screen glows, so a newcomer never has to hunt for it. */
+  .al-welcome .al-primary:not(:disabled){animation:press-me 1.6s ease-in-out infinite}
+  @keyframes press-me{0%,100%{box-shadow:0 0 0 0 rgba(127,227,245,0)}50%{box-shadow:0 0 0 7px rgba(127,227,245,.4)}}
+  @media (prefers-reduced-motion:reduce){.al-welcome .al-primary:not(:disabled){animation:none;box-shadow:0 0 0 4px rgba(127,227,245,.4)}}
   /* Add to Home Screen (install.ts): the button in the top bar, and the iPhone sheet with its three taps. */
   .a2hs{display:inline-flex;align-items:center;gap:7px;min-height:36px;padding:0 12px;border-radius:999px;border:1px solid #2c3341;background:#171b23;color:#f2f0ea;font:600 12.5px/1 inherit;cursor:pointer}
   .a2hs[hidden]{display:none}
@@ -988,6 +1000,19 @@ d.setAttribute('data-skin','1');d.setAttribute('data-tab','listen');}catch(e){}}
   html[data-skin]:not([data-view])[data-tab=browse][data-albums="1"][data-btab=albums] .shelfbox{display:block;order:-1}
   html[data-skin]:not([data-view])[data-albums="1"][data-btab=albums] #findBox{display:none}
   html[data-skin]:not([data-view]) #findBox>summary{display:none}
+  /* Browse is one page now, not two tabs: search, the listener's albums as covers, then artists. */
+  .artistbox{display:none}
+  html[data-skin]:not([data-view]) #paidRadioStatus{order:-4}
+  html[data-skin]:not([data-view])[data-tab=browse][data-albums="1"] .btabs{display:none}
+  html[data-skin]:not([data-view])[data-tab=browse] #findBox,html[data-skin]:not([data-view])[data-tab=browse][data-albums="1"][data-btab] #findBox{display:block;order:-2}
+  html[data-skin]:not([data-view])[data-tab=browse][data-albums="1"] .shelfbox,html[data-skin]:not([data-view])[data-tab=browse][data-albums="1"][data-btab] .shelfbox{display:block;order:-1}
+  html[data-skin]:not([data-view])[data-tab=browse][data-albums="1"] .sk-h[data-for=albums]{display:block;order:-1;margin:6px 0 -4px}
+  html[data-skin]:not([data-view])[data-tab=browse] .sk-h[data-for=artists]{display:block;order:0;margin:6px 0 -4px}
+  html[data-skin]:not([data-view])[data-tab=browse] .artistbox{display:block;order:0}
+  html[data-skin]:not([data-view]) .sk-h[data-for=artists]:has(+ .artistbox:empty),html[data-skin]:not([data-view]) .sk-h[data-for=artists]:has(+ .artistbox .find-artists:empty),html[data-skin]:not([data-view]) .artistbox:empty{display:none}
+  html[data-skin]:not([data-view]) .artistbox .find-artists{margin:0}
+  html[data-skin]:not([data-view]) .shelfbox:not([data-many]) .ppp-shelf-tools{display:none}
+  html[data-skin]:not([data-view]) .shelfbox .ppp-shelf-list{margin-bottom:6px}
   html[data-skin]:not([data-view]) .find-back{min-height:44px;margin-top:8px;padding:0 16px;border:1px solid #2c3341;border-radius:12px;background:#171b23;color:#8fe0f2;font:inherit;font-size:14px;font-weight:600;cursor:pointer;display:block}
   html[data-skin]:not([data-view]) .shelfbox .ppp-shelf-tools{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;margin:0 0 14px}
   html[data-skin]:not([data-view]) .shelfbox .ppp-shelf-tools input{grid-column:1/-1;min-height:48px;padding:0 14px;border:1px solid #2c3341;border-radius:14px;background:#171b23;color:#f2efe6;font-size:16px}
@@ -1200,11 +1225,15 @@ d.setAttribute('data-skin','1');d.setAttribute('data-tab','listen');}catch(e){}}
     <h2 class="sk-h sk-h--big" data-for="browse">Browse</h2>
     <!-- The new look: Browse has two tabs when the listener has albums (src/radio-ppp/page.ts announces them). -->
     <div class="btabs" id="browseTabs" role="tablist" aria-label="Browse"><button type="button" role="tab" data-bt="albums" aria-selected="false">My albums</button><button type="button" role="tab" data-bt="search" aria-selected="true">Search</button></div>
-    <section class="shelfbox" id="shelfBox" aria-label="My albums"></section>
+    <!-- One Browse page: search, then the listener's albums as covers ("In your player"), then artists. -->
+    <h3 class="sk-h" data-for="albums">In your player</h3>
+    <section class="shelfbox" id="shelfBox" aria-label="Albums in your player"></section>
     <details class="likes" id="findBox">
       <summary title="Search every song on Xtrata by title, artist or number, or browse by artist"><span>🔎 FIND MUSIC</span></summary>
       <div id="findBody"></div>
     </details>
+    <h3 class="sk-h" data-for="artists">Artists</h3>
+    <div class="artistbox" id="artistBox"></div>
     <details class="likes" id="likesBox" open>
       <summary title="Your own playlist: every song you ♥ joins it, in your order, saved on the public record"><span>♥ YOUR STATION</span><span class="count" id="likesCount"></span></summary>
       <div class="likesTools">
@@ -1273,7 +1302,7 @@ d.setAttribute('data-skin','1');d.setAttribute('data-tab','listen');}catch(e){}}
       if(byUser)bChosen=true;
       ROOT.setAttribute('data-btab',t);
       Array.prototype.forEach.call($('browseTabs').children,function(b){b.setAttribute('aria-selected',String(b.dataset.bt===t))});
-      if(t==='search')$('findBox').open=true;
+      $('findBox').open=true;
     }
     ROOT.setAttribute('data-btab','search');
     Array.prototype.forEach.call($('browseTabs').children,function(b){b.addEventListener('click',function(){setBtab(b.dataset.bt,true)})});
@@ -1493,7 +1522,7 @@ d.setAttribute('data-skin','1');d.setAttribute('data-tab','listen');}catch(e){}}
     stage.classList.toggle('arriving',gw);
     $('tuner').classList.toggle('locked',!!s.giftLocked);
     $('tuner').title=s.giftLocked?'This album plays only its own songs':'';
-    $('stn').textContent=SKIN?stationName(s):(s.band==='liked'?'XTRATA · YOUR STATION':s.band==='chain'?'XTRATA · CHAIN BAND':'XTRATA FM');
+    $('stn').textContent=s.sample?(SKIN?'Preview · first 30 seconds':'PREVIEW · FIRST 30 SECONDS'):SKIN?stationName(s):(s.band==='liked'?'XTRATA · YOUR STATION':s.band==='chain'?'XTRATA · CHAIN BAND':'XTRATA FM');
     $('ttl').textContent=np?np.title:(s.on?(SKIN?'Finding a song…':'TUNING…'):(SKIN?'Press play':'— OFF AIR —'));
     $('artst').textContent=np&&np.artist?np.artist:'';
     $('albumName').textContent=np&&np.album?'Album: '+np.album:'';
@@ -1699,7 +1728,7 @@ d.setAttribute('data-skin','1');d.setAttribute('data-tab','listen');}catch(e){}}
   },120);
 })();
 </script>
-<script src="/xtrata-radio.js?v=611164ac4d13" defer></script>
+<script src="/xtrata-radio.js?v=6f9eb85276dc" defer></script>
 <script type="module" src="/radio/wallet.js?v=a6f0d7fef7a3"></script>
 <script>
 // On the pay-per-play radio host (radio.xtrata.xyz) only the radio's own pages run; everything
@@ -1718,13 +1747,13 @@ const paidHost = document.documentElement.dataset.radioPaidOnly === 'true';
 function showUnavailable(){
   if (!paidHost) return;
   const status = document.getElementById('paidRadioStatus');
-  status.textContent = 'Paid radio is unavailable. Reload to check again.';
-  window.XtrataRadio?.setGiftStop('PAID RADIO IS UNAVAILABLE');
+  status.textContent = 'Only previews are playing right now. Reload to check again.';
+  window.XtrataRadio?.setSample?.(true); // the opening of each song, never silence
 }
 fetch('/radio/listening-wallet/config',{cache:'no-store',signal:AbortSignal.timeout(15000)})
   .then(function(r){return r.ok?r.json():{}})
   .then(function(c){
-    if(c?.enabled && (!paidHost || c.here)) return import('/radio/ppp.js?v=3cfa24ff4771');
+    if(c?.enabled && (!paidHost || c.here)) return import('/radio/ppp.js?v=f9f83ba65799');
     showUnavailable();
   }).catch(showUnavailable);
 </script>
