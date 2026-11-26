@@ -7,11 +7,17 @@ def ok(n,c,i=''):
 FX=os.path.join(os.path.dirname(__file__),'fixtures')
 FILES={'136':('134.bin','image/jpeg'),'1107':('1107.html','text/html'),'2830':('2830.html','text/html'),'3089':('3089.html','text/html'),'317':('317.html','text/html'),'315':('315.bin','audio/webm'),'134':('134.bin','image/jpeg')}
 HITS=[]
+BNS=[]
 async def handler(route):
     req=route.request
+    if '/hiro/' in req.url:
+        H={'content-type':'application/json','access-control-allow-origin':'*','access-control-allow-headers':'content-type','access-control-allow-methods':'GET,POST,OPTIONS'}
+        if req.method=='OPTIONS': return await route.fulfill(status=204,headers=H)
+        BNS.append(req.post_data or ''); primary='0x070a0c00000002046e616d65020000000464796c65096e616d6573706163650200000003627463' if '05163b07c532d4ecf16a' in (req.post_data or '') else '0x0709'
+        return await route.fulfill(status=200,headers=H,body='{"okay":true,"result":"%s"}'%primary)
     if '/index/' in req.url:
         import json as J
-        toks=[{'id':134,'creator':'SPAAA1111','mime':'image/jpeg','totalSize':165034,'sealed':True},{'id':135,'creator':'SPBBB2222','mime':'text/html','totalSize':5000,'sealed':True},{'id':136,'creator':'SPCCC3333','mime':'image/jpeg','totalSize':90000,'sealed':True},{'id':137,'creator':'SPAAA1111','mime':'image/png','totalSize':900,'sealed':True}]
+        toks=[{'id':134,'creator':'SPXGFH9JTKPF2TQZJ2AH7NSMMMXJ72VMGH8PR654','mime':'image/jpeg','totalSize':165034,'sealed':True},{'id':135,'creator':'SPBBB2222','mime':'text/html','totalSize':5000,'sealed':True},{'id':136,'creator':'SPCCC3333','mime':'image/jpeg','totalSize':90000,'sealed':True},{'id':137,'creator':'SPAAA1111','mime':'image/png','totalSize':900,'sealed':True}]
         HITS.append(('index',None)); return await route.fulfill(status=200,headers={'content-type':'application/json','access-control-allow-origin':'*'},body=J.dumps({'mintedCount':6268,'tokens':toks}))
     req=route.request; m=re.search(r'/i/(\d+)',req.url); i=m.group(1) if m else ''
     f,ct=FILES.get(i,FILES['2830']); data=open(os.path.join(FX,f),'rb').read(); HITS.append((i,req.headers.get('range')))
@@ -46,6 +52,8 @@ async def main():
         ok('radio moves on through the mix, artist by artist',r2['now']['id']!=r1['now']['id'] and r2['artists'][0]==r2['artists'][1],(r1['now'],r2['now'],r2['artists']))
         await page.wait_for_function("__QA.app.shop.prints.length>=3",timeout=60000); pst=await E("({types:__QA.app.room.posters.map(p=>p.content.type),print:__QA.app.shop.prints.map(p=>[p.id,p.title])})")
         ok('posters: album art, an Xtrata poster, print #1107 and random image inscriptions found via the chain index',set(pst['types'])<={'release','track','print','promo'} and pst['types'].count('print')>=2 and pst['types'].count('promo')==1 and {1107,134,136}<={q[0] for q in pst['print']} and 137 not in {q[0] for q in pst['print']} and 135 not in {q[0] for q in pst['print']},pst)
+        await page.wait_for_function("__QA.app.shop.prints.some(p=>p.creatorName)",timeout=20000); nm=await E("__QA.app.shop.prints.map(p=>[p.creator,p.creatorName||null])")
+        ok('inscriber shown by primary BNS name when the address has one (dyle.btc), address otherwise',any(n=='dyle.btc' and c.startswith('SPXGF') for c,n in nm if c) and all(n is None for c,n in nm if not (c or '').startswith('SPXGF')) and len(BNS)>=1,(nm,BNS[:1]))
         for k,ty in enumerate(['print','promo']):
             await E("(()=>{const a=__QA.app,ps=a.room.posters.filter(p=>p.content.type==='%s'&&(p.content.type!=='print'||p.content.print.found)),p=ps[0],m=p.mesh.position,n=new __QA.THREE.Vector3(0,0,1).applyQuaternion(p.mesh.quaternion);__QA.setAuto(true);__QA.teleport(m.x+n.x*1.7,m.z+n.z*1.7,0,0);__QA.lookAt(m.x,m.y,m.z)})()"%ty); await page.wait_for_timeout(700); await page.screenshot(path='test/shot_poster_%s.png'%ty)
         await page.click('#bRadio'); await page.wait_for_timeout(900); r3=(await E(S))['radio']; await page.click('#bRadio'); await page.wait_for_function("__QA.state().radio.on&&!__QA.state().radio.paused",timeout=30000)
