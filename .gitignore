@@ -73,3 +73,6 @@ xtrata-2.0/comms/canary/index.html
 xtrata-2.0/dist-casino-wallet/
 
 *.mp4
+
+# DeGrants: local working files (layer extractions, drafts). Kept on this Mac, never pushed.
+/DeGrants/
