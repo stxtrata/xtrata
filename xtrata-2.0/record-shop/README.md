@@ -33,10 +33,17 @@ real downloaded inscriptions through a mocked route; nothing in the tests talks 
 
 - `https://xtrata.xyz/i/<inscription id>` — each track's on-chain player, for its artwork and audio.
 - `https://xtrata.xyz/index/<contract>` — to pick random image inscriptions for the poster frames.
+- `https://xtrata.xyz/hiro/mainnet` — one read-only `get-primary` call on the BNS-V2 contract per poster inscriber, so a
+  primary BNS name (for example `dyle.btc`) is shown instead of a raw address. A failed lookup leaves the address.
 - `https://api.open-meteo.com` and `https://geocoding-api.open-meteo.com` — current weather for the city in
   the visitor's time zone (no location permission is requested). Not yet exercised against the live service.
 
 Offline it still opens, with placeholder artwork and a labelled demo timer instead of audio.
+
+## Posters
+
+Clicking a poster offers it as a print first. The print button is switched off and says so: prints open once the
+artist has signed a print collection and set a price. Smaller links below it play the music or find the CD or vinyl.
 
 ## Playback rules
 

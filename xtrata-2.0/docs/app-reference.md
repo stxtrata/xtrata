@@ -100,7 +100,9 @@ Purpose: one-stop map of where code lives and which files to touch for common up
   (three.js r170 bundled). Source, build and browser tests live in `record-shop/`; run `npm run build`
   there to regenerate and publish it. It has no wallet code and makes no payments. It streams artwork and
   audio from each track's on-chain player through `/i/<id>` and picks random poster images through
-  `/index/<contract>`; CDs stop after a 30-second preview, vinyl plays in full. See `record-shop/README.md`.
+  `/index/<contract>`; CDs stop after a 30-second preview, vinyl plays in full. Poster dialogs lead with a disabled "buy as a print" action (no print sales exist yet) and
+  show an inscriber's primary BNS name via a read-only BNS-V2 `get-primary` call through `/hiro/mainnet`.
+  See `record-shop/README.md`.
 - `music/artist/` provides `/music/artist/`, royalty overview, collection list and
   a planned pay-per-play reporting page. `src/music-artist/routes.ts` is the
   collection/link registry; `functions/lib/music-artist.ts` maps each collection
