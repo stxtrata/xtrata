@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import {BOOTH} from './booth.js';
 import {rng,lerp,clamp} from './util.js';
 
 export function buildRoom(app){
@@ -68,7 +69,8 @@ export function buildRoom(app){
   sign(art.neon('ON-CHAIN · FOREVER',null,'#ff5fa2',768,128),1.5,.25,-.9,3.2,-5.47,0);
   R.sign=sign;
   // posters (about eleven, varied sizes)
-  const PS=[[-3.25,1.95,-5.45,0,.9,1.2],[-1.75,1.7,-5.45,0,.7,.7],[-.35,1.95,-5.45,0,1,1.4],[1.25,1.75,-5.45,0,.8,.8],
+  const BL=BOOTH.x-BOOTH.w/2-.006,BR=BOOTH.x+BOOTH.w/2+.006; // outer faces of the Audionaut booth's side walls
+  const PS=[[-3.25,1.95,-5.45,0,.9,1.2],[BL,1.7,BOOTH.z,-Math.PI/2,.7,.7],[BR,1.55,BOOTH.z,Math.PI/2,1,1.4],[1.25,1.75,-5.45,0,.8,.8],
     [7.95,1.95,-2.7,-Math.PI/2,1,1.4],[7.95,1.75,-1.1,-Math.PI/2,.8,.8],[7.95,1.8,.6,-Math.PI/2,1.3,.87],[7.95,1.95,2.4,-Math.PI/2,.9,1.2],[7.95,1.7,4.2,-Math.PI/2,.7,.7],
     [-7.95,1.95,3.45,Math.PI/2,.9,1.2],[-7.95,1.75,4.75,Math.PI/2,.72,.72]];
   PS.forEach(([x,y,z,ry,w,h],i)=>{const c=art.mkCanvas(512,Math.round(512*h/w)),tex=art.mkTex(c);

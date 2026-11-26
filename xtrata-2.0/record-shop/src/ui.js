@@ -18,7 +18,7 @@ export function initUI(app){
   const v3=new THREE.Vector3();
   U.cueTag=(text,obj)=>{if(!text){cue.hidden=true;return;}obj.getWorldPosition(v3);v3.project(app.camera);cue.hidden=false;if(cue.textContent!==text)cue.textContent=text;};
   // ---------- HUD ----------
-  const JUMPS=['Entrance','CD Wall','CD Player','Vinyl Crates','Turntable','Checkout','Window'];
+  const JUMPS=['Entrance','CD Wall','CD Player','Vinyl Crates','Turntable','Checkout','Window','Audionaut Booth'];
   $('jumps').innerHTML=JUMPS.map((j,i)=>`<button data-jump="${j}" title="${j} (${i+1})">${j==='Entrance'?'Entrance / Reset':j}</button>`).join('');
   function renderHUD(){const s=app.state;$('bCrate').textContent='Crate ('+app.shop.crate.length+')';{const wl=app.room.weatherLabel();$('bWeather').textContent=wl;$('bWeather').title='Outside: live local time & weather, Late-Night Rain, or Golden Hour';$('bWeather').setAttribute('aria-label','Outside: '+wl+'. Click to change.');}
     if(app.radio){const r=app.radio,n=r.now;$('bRadio').textContent='📻 Radio: '+(!r.available?'Off-air':r.on?'On':'Off');$('bRadio').setAttribute('aria-pressed',!!r.on);$('radioNow').textContent=r.on&&n?'Shop radio — '+(n.artist||'Xtrata')+' · '+n.title:'';}$('bLook').textContent='Mouse Look: '+(s.mouseLook?'On':'Off');$('bLook').setAttribute('aria-pressed',s.mouseLook);$('zone').textContent=s.zone||'';
@@ -89,7 +89,12 @@ ${R.items.map(i=>`<div class="ri"><b>${esc(i.title)}</b><span>${esc(i.artist||'�
       handler=m=>{if(m==='find')U.openFinder('');};}};
   const HELP=`<ul class="help"><li><b>Look</b> — click once, then just move the mouse (no dragging). <b>Esc</b> frees the pointer.</li><li><b>Walk</b> — WASD or arrow keys. Quick-jump buttons travel along clear aisles.</li><li><b>Aim + click</b> — the small centre dot is your hand. Click a CD spine or sleeve to pull it out; <b>E</b> grabs a vinyl sleeve.</li>
 <li><b>CDs</b> — click the cover to open the case, click a track artwork to audition it, <b>T</b> takes the disc to the CD Player.</li><li><b>Vinyl</b> — carry a sleeve to the Turntable, click the glowing pad, click the sleeve, then hold the record with the mouse and drop it on the platter. Grab the headshell, swing it over the grooves and let go.</li>
-<li><b>/</b> Find · <b>B</b> Crate List · <b>M</b> Mouse Look · <b>1–7</b> zone jumps · <b>H</b> this help.</li></ul><p class="dim small">Songs and artwork stream from each track’s on-chain Xtrata player when you are online. CDs are free 30-second previews; vinyl plays each side in full. Offline, the shop runs a demo timer with handling foley only.</p>`;
+<li><b>Audionaut booth</b> — step up to the console, click steps on the screen, click a Paper Play card to load it, click a stem to mute it. <b>Space</b> plays or stops, <b>T</b> changes tempo, <b>1–4</b> load cards, <b>←/→</b> look at the cards or stems.</li>
+<li><b>/</b> Find · <b>B</b> Crate List · <b>M</b> Mouse Look · <b>1–8</b> zone jumps · <b>H</b> this help.</li></ul><p class="dim small">Songs and artwork stream from each track’s on-chain Xtrata player when you are online. CDs are free 30-second previews; vinyl plays each side in full. Offline, the shop runs a demo timer with handling foley only.</p>`;
+  U.openBooth=()=>{U.modal('booth',`<h2>The Audionaut booth</h2><p>A 16-step sequencer you can play right here in the shop. Pick a Paper Play card, change any step on the console screen or in the panel, and mute the stems on the right-hand wall.</p>
+<p>Everything is synthesised live in your browser. Nothing here is saved, inscribed or paid for, and the shop radio goes quiet while the booth is playing.</p>
+<p>The full Audionaut — the Blockchain Audional Work-Space-Station that the Audionauts unlock — is at <b>xtrata.xyz/audionaut</b>.</p>
+<div class="btns"><a class="btnlink gold" href="${app.STUDIO_URL}" target="_blank" rel="noopener">Open xtrata.xyz/audionaut ↗</a><button data-m="close" autofocus>Back to the booth</button></div>`,{label:'The Audionaut booth'});handler=null;};
   U.openHelp=()=>{U.modal('help','<h2>How the shop works</h2>'+HELP+'<div class="btns"><button data-m="close" autofocus>Back to the shop</button></div>',{label:'Help'});handler=null;};
   $('introHelp').innerHTML=HELP;
   // ---------- mini-player ----------

@@ -43,6 +43,21 @@ real downloaded inscriptions through a mocked route; nothing in the tests talks 
 
 Offline it still opens, with placeholder artwork and a labelled demo timer instead of audio.
 
+## The Audionaut booth
+
+A permanent 9 ft × 6 ft × 8 ft station against the back wall (`src/booth.js`, quick-jump 8): a 16-step sequencer on
+the console screen, four Paper Play pattern cards on the left wing and four mutable stems on the right wing. Sound is
+synthesised in the browser through the shop's shared AudioContext from a positional source at the console, so it fades
+as you walk away. Nothing is saved, inscribed or paid for; the About panel links to the full studio at
+`xtrata.xyz/audionaut`. Starting the booth pauses any CD or record, and starting a CD or record stops the booth.
+
+## Shop radio
+
+Quiet background (`radioVolume` defaults to 0.16) through four ceiling speakers with a steep distance roll-off, so you
+mostly hear the nearest one. Back-left and front-right sound plain, front-left (by the checkout) is tinny and breaking
+up, back-right (above the vinyl bench) has blown tweeters and sounds muffled. It goes silent while a CD (case or
+player), a record or the booth is playing, and fades back in afterwards.
+
 ## Posters
 
 Clicking a poster offers it as a print first. The print button is switched off and says so: prints open once the
