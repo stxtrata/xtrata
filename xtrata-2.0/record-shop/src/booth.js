@@ -1,11 +1,13 @@
 import * as THREE from 'three';
 import {clamp,esc} from './util.js';
 
-// The Audionaut booth: a permanent 9 ft × 6 ft × 8 ft walk-up station against the back wall.
+// The Audionaut booth: a permanent 9 ft × 6 ft × 8 ft station recessed into the back wall.
 // A 16-step sequencer synthesised in the browser (nothing is saved, inscribed or paid for), four Paper Play
 // pattern cards on the left wing and four mutable stems on the right wing. It plays through the shop's shared
 // AudioContext from a positional source at the console, so it fades as you walk away and the radio ducks under it.
-export const BOOTH={x:-.6,z:-4.535,w:2.74,d:1.83,h:2.44};
+// Set into the back wall: its open front is flush with the wall's inner face (z = -5.5) and the booth sits in an alcove behind it.
+export const WALL_Z=-5.5;
+export const BOOTH={x:-.6,z:WALL_Z-1.83/2,w:2.74,d:1.83,h:2.44};
 export const STUDIO_URL='https://xtrata.xyz/audionaut/';
 
 const TRACKS=[{label:'DRUMS',short:'KCK',color:'#f2b84b'},{label:'PERC',short:'PRC',color:'#58d7e8'},{label:'BASS',short:'BAS',color:'#9b7bff'},{label:'SYNTH',short:'SYN',color:'#ff5fa2'}];
@@ -111,9 +113,8 @@ export function initBooth(app){
     ['Pick a Paper Play card, change any step on the console,','mute a stem. Everything is synthesised live in your browser —','nothing here is saved, inscribed or paid for.'].forEach((l,i)=>x.fillText(l,44,198+i*40));
     x.fillStyle='rgba(255,255,255,.07)';x.fillRect(44,330,w-88,52);x.font=`800 24px ${F}`;x.fillStyle='#f2b84b';x.fillText('THE FULL STUDIO: XTRATA.XYZ/AUDIONAUT  ·  CLICK FOR DETAILS →',70,364);});
   const about=app.plane(g,1.7,.68,lit(aboutTex,.5),0,1.66,-D/2+.112);about.userData.about=true;
-  // ---- collision: the front strip under the header stays open so you can step right up to the console ----
+  // ---- the booth is behind the wall line, so the room's own bounds keep you at its open front; occluders stop picks through its walls ----
   const wx0=BOOTH.x-W/2,wx1=BOOTH.x+W/2,wz1=BOOTH.z+D/2;
-  app.addCollider(wx0,wx1,-5.5,BOOTH.z+.4);app.addCollider(wx0,wx0+.1,-5.5,wz1);app.addCollider(wx1-.1,wx1,-5.5,wz1);
   for(const sx of [-1,1])app.addOccluder(.06,H-.12,D-.16,BOOTH.x+sx*(W/2-.05),H/2,BOOTH.z-.02);
   app.addOccluder(1.18,.84,.56,BOOTH.x,.48,BOOTH.z+.06);app.addOccluder(W,.34,.12,BOOTH.x,H-.17,wz1-.06);
   // ---- sequencer state ----

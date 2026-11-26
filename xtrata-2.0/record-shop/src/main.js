@@ -78,7 +78,7 @@ async function boot(){
     return out;}
   app.findPath=findPath;
   const J={'Entrance':{x:.05,z:4.22,yaw:0,pitch:0},'CD Wall':{x:-6.05,z:-.55,yaw:Math.PI/2,pitch:-.1},'CD Player':{x:-5.32,z:-3.5,yaw:0,pitch:-.3,then:()=>deck.focus()},
-    'Vinyl Crates':{x:3.1,z:1.02,yaw:0,pitch:-.6},'Turntable':{x:4.3,z:-3.45,yaw:0,pitch:-.35,then:()=>vinyl.focus()},'Checkout':{x:-4.9,z:2.72,yaw:Math.PI,pitch:-.33},'Window':{x:3.2,z:3.6,yaw:Math.PI,pitch:.04},'Audionaut Booth':{x:BOOTH.x,z:BOOTH.z+BOOTH.d/2+.08,look:{x:BOOTH.x,y:1.02,z:BOOTH.z+.02}}};
+    'Vinyl Crates':{x:3.1,z:1.02,yaw:0,pitch:-.6},'Turntable':{x:4.3,z:-3.45,yaw:0,pitch:-.35,then:()=>vinyl.focus()},'Checkout':{x:-4.9,z:2.72,yaw:Math.PI,pitch:-.33},'Window':{x:3.2,z:3.6,yaw:Math.PI,pitch:.04},'Audionaut Booth':{x:BOOTH.x,z:BOOTH.z+BOOTH.d/2+.45,look:{x:BOOTH.x,y:1.02,z:BOOTH.z+.02}}};
   app.jumps=J;
   app.jump=(name,custom)=>{const t=custom||J[name];if(!t)return;if(state.modal)ui.closeModal();if(insp.item)insp.close();if(state.mode==='cd'||state.mode==='vinyl')app.exitFocus();if(stock.active)stock.cancelExtract();
     app.whenIdle(()=>{let [gi,gj]=freeCell(...cell(t.x,t.z));let gx=t.x,gz=t.z;if(blocked(gx,gz,.3)){gx=GX0+gi*GS;gz=GZ0+gj*GS;}

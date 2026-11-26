@@ -9,14 +9,15 @@ async def main():
         b,page,errs,reqs=await launch(p); E=page.evaluate
         await enter(page); await page.mouse.move(640,400)
         bq=lambda: E("__QA.state().booth")
-        # layout: collision footprint, posters moved off the covered back wall onto the booth's side walls
-        lay=await E("""(()=>{const a=__QA.app,{x,z,w,d}={x:-.6,z:-4.535,w:2.74,d:1.83};const inside=[[x,z],[x-1,z+.5],[x+1,z-.5]].every(([px,pz])=>__QA.blocked(px,pz,.3));
-          const front=!__QA.blocked(x,z+d/2+.6,.3);const ps=a.room.posters.map(p=>({x:p.mesh.position.x,z:p.mesh.position.z}));
-          const covered=ps.filter(p=>p.z<-5.3&&p.x>x-w/2-.05&&p.x<x+w/2+.05).length,onSides=ps.filter(p=>Math.abs(p.z-z)<.01&&Math.abs(Math.abs(p.x-x)-w/2)<.06).length;return {inside,front,covered,onSides}})()""")
-        ok('booth footprint blocks walking; the front is reachable',lay['inside'] and lay['front'],lay)
-        ok('no poster hidden behind the booth; two posters hang on its outer side walls',lay['covered']==0 and lay['onSides']==2,lay)
+        # layout: booth recessed behind the wall line; back-wall posters clear of the opening
+        lay=await E("""(()=>{const a=__QA.app,x=-.6,w=2.74,ox0=x-w/2,ox1=x+w/2,fz=-5.5;
+          const recessed=a.booth.root.position.z+1.83/2<=fz+.001,front=!__QA.blocked(x,fz+.5,.3),into=__QA.blocked(x,fz-.3,.3);
+          const ps=a.room.posters.map(p=>({x:p.mesh.position.x,z:p.mesh.position.z,w:p.w}));const back=ps.filter(p=>p.z<-5.3);
+          const clash=back.filter(p=>p.x+p.w/2>ox0-.08&&p.x-p.w/2<ox1+.08).length;return {recessed,front,into,n:ps.length,back:back.length,clash}})()""")
+        ok('booth is set into the back wall: its front is flush with the wall and you stand in the room in front of it',lay['recessed'] and lay['front'] and lay['into'],lay)
+        ok('all 11 posters still hang; the four on the back wall sit either side of the opening',lay['n']==11 and lay['back']==4 and lay['clash']==0,lay)
         # free interaction: stand in the open front strip and aim with the centre dot; the view never locks
-        FX,FZ=-.6,-3.55
+        FX,FZ=-.6,-5.0
         async def aim(what,a=0,b=0,x=FX,z=FZ):
             await page.mouse.move(640,400)  # back over the canvas (a panel click leaves the pointer on the panel) before setting the view
             await E("(()=>{const w=__QA.app.booth.world('%s',%s,%s);__QA.teleport(%s,%s);__QA.lookAt(w.x,w.y,w.z)})()"%(what,a,b,x,z)); await E('__QA.step(.1)'); return (await E(S))['hover']
@@ -37,13 +38,13 @@ async def main():
         await page.click('#station [data-s="mute:1"]'); await page.click('#station [data-s="cell:0:1"]'); q=await bq(); c=await page.locator('#station [data-s="cell:3:1"]').get_attribute('class')
         ok('panel grid edits the same pattern and mirrors the screen',q['grid'][0][1]=='1' and q['muted'][1] is False and (('on' in c)==(g1[1]=='1')),(q['grid'][0],c))
         # cards on the left wing, from the front strip
-        hv=await aim('card',2,0,-.95,-3.55); await page.screenshot(path='test/shot_booth_cards.png'); await click(); await E('__QA.step(.6)'); q=await bq()
+        hv=await aim('card',2,0,-1.15,-5.0); await page.screenshot(path='test/shot_booth_cards.png'); await click(); await E('__QA.step(.6)'); q=await bq()
         ok('aiming at a Paper Play card and clicking loads its pattern and tempo',hv and 'COSMIC ARPS' in hv['title'] and q['card']==2 and q['bpm']==120 and q['grid'][3]=='1011011010110101',(hv,q['card']))
-        hv=await aim('stem',2,0,-.25,-3.55); await page.screenshot(path='test/shot_booth_stems.png'); await click(); q=await bq()
+        hv=await aim('stem',2,0,-.05,-5.0); await page.screenshot(path='test/shot_booth_stems.png'); await click(); q=await bq()
         ok('aiming at a stem on the right wall and clicking mutes it',hv and 'BASS' in hv['title'] and q['muted']==[False,False,True,False],(hv,q['muted']))
         hv=await aim('btn','"tempo"'); await click(); q=await bq()
         ok('3D Tempo button cycles the tempo',q['bpm']==128,q['bpm'])
-        await E("__QA.teleport(-.6,-3.55,0,-.9)"); await E('__QA.step(.1)');
+        await E("__QA.teleport(-.6,-5.0,0,-.9)"); await E('__QA.step(.1)');
         # walking is never blocked by the booth: walk back out with S
         z0=(await E(S))['player']['z']; await page.keyboard.down('s'); await E('__QA.step(.6)'); await page.keyboard.up('s'); z1=(await E(S))['player']['z']
         ok('you can walk away from the console at any time (no step-in mode)',z1>z0+.5 and (await E(S))['mode']=='room',(z0,z1))
