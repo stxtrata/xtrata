@@ -78,9 +78,9 @@ async function boot(){
     return out;}
   app.findPath=findPath;
   const J={'Entrance':{x:.05,z:4.22,yaw:0,pitch:0},'CD Wall':{x:-6.05,z:-.55,yaw:Math.PI/2,pitch:-.1},'CD Player':{x:-5.32,z:-3.5,yaw:0,pitch:-.3,then:()=>deck.focus()},
-    'Vinyl Crates':{x:3.1,z:1.02,yaw:0,pitch:-.6},'Turntable':{x:4.3,z:-3.45,yaw:0,pitch:-.35,then:()=>vinyl.focus()},'Checkout':{x:-4.9,z:2.72,yaw:Math.PI,pitch:-.33},'Window':{x:3.2,z:3.6,yaw:Math.PI,pitch:.04},'Audionaut Booth':{x:BOOTH.x,z:BOOTH.z+BOOTH.d/2+.62,yaw:0,pitch:-.2,then:()=>booth.focus('console')}};
+    'Vinyl Crates':{x:3.1,z:1.02,yaw:0,pitch:-.6},'Turntable':{x:4.3,z:-3.45,yaw:0,pitch:-.35,then:()=>vinyl.focus()},'Checkout':{x:-4.9,z:2.72,yaw:Math.PI,pitch:-.33},'Window':{x:3.2,z:3.6,yaw:Math.PI,pitch:.04},'Audionaut Booth':{x:BOOTH.x,z:BOOTH.z+BOOTH.d/2+.08,look:{x:BOOTH.x,y:1.02,z:BOOTH.z+.02}}};
   app.jumps=J;
-  app.jump=(name,custom)=>{const t=custom||J[name];if(!t)return;if(state.modal)ui.closeModal();if(insp.item)insp.close();if(state.mode==='cd'||state.mode==='vinyl'||state.mode==='booth')app.exitFocus();if(stock.active)stock.cancelExtract();
+  app.jump=(name,custom)=>{const t=custom||J[name];if(!t)return;if(state.modal)ui.closeModal();if(insp.item)insp.close();if(state.mode==='cd'||state.mode==='vinyl')app.exitFocus();if(stock.active)stock.cancelExtract();
     app.whenIdle(()=>{let [gi,gj]=freeCell(...cell(t.x,t.z));let gx=t.x,gz=t.z;if(blocked(gx,gz,.3)){gx=GX0+gi*GS;gz=GZ0+gj*GS;}
       const pts=findPath(player.x,player.z,gx,gz);let yaw=t.yaw,pitch=t.pitch;if(t.look){yaw=Math.atan2(-(t.look.x-gx),-(t.look.z-gz));pitch=Math.atan2(t.look.y-1.62,Math.hypot(t.look.x-gx,t.look.z-gz));}
       player.travel={pts,i:0,yaw,pitch,then:t.then,turn:0,name};});};
@@ -93,7 +93,7 @@ async function boot(){
     app.emit('mode');};
   app.setBusy=b=>{state.busy=b;if(b){clearKeys();hoverSet(null);}};
   app.setFocus=(mode,pos,look,dur=.65)=>{focus.p0.copy(camera.position);focus.q0.copy(camera.quaternion);tmpCam.position.copy(pos);tmpCam.lookAt(look);focus.p1.copy(pos);focus.q1.copy(tmpCam.quaternion);focus.t=0;focus.dur=dur;focus.active=true;focus.exiting=false;player.travel=null;app.setMode(mode);};
-  app.exitFocus=()=>{if(state.mode!=='cd'&&state.mode!=='vinyl'&&state.mode!=='booth')return;if(state.mode==='vinyl')vinyl.onExit();if(state.mode==='booth')booth.onExit();focus.p0.copy(camera.position);focus.q0.copy(camera.quaternion);tmpCam.position.set(player.x,1.62,player.z);tmpCam.rotation.set(player.pitch,player.yaw,0);focus.p1.copy(tmpCam.position);focus.q1.copy(tmpCam.quaternion);focus.t=0;focus.dur=.5;focus.exiting=true;app.setMode('room');};
+  app.exitFocus=()=>{if(state.mode!=='cd'&&state.mode!=='vinyl')return;if(state.mode==='vinyl')vinyl.onExit();focus.p0.copy(camera.position);focus.q0.copy(camera.quaternion);tmpCam.position.set(player.x,1.62,player.z);tmpCam.rotation.set(player.pitch,player.yaw,0);focus.p1.copy(tmpCam.position);focus.q1.copy(tmpCam.quaternion);focus.t=0;focus.dur=.5;focus.exiting=true;app.setMode('room');};
   app.setCursor=c=>{if(state.mode!=='room')canvas.style.cursor=c||'';};
   let gesturePid=null;
   app.beginGesture=(e,keepCursor)=>{state.gesture=true;if(!keepCursor)document.body.classList.add('nocursor');gesturePid=e.pointerId;try{canvas.setPointerCapture(e.pointerId);}catch(er){}};
@@ -137,11 +137,11 @@ async function boot(){
   window.addEventListener('pointermove',e=>{cursorX=e.clientX;cursorY=e.clientY;overCanvas=e.target===canvas;if(!state.entered||state.modal)return;
     if(state.mode==='room'){if(touch&&e.pointerId===touch.id){turn(-(e.clientX-touch.x)*2.2,-(e.clientY-touch.y)*2.2);touch.x=e.clientX;touch.y=e.clientY;}
       else if(e.pointerType!=='touch'&&!focus.active&&(state.look==='locked'||(state.look==='free'&&overCanvas)))turn(e.movementX||0,e.movementY||0);}
-    else if(state.mode==='inspect'){if(overCanvas||downOnCanvas)insp.pointerMove(e);}else if(state.mode==='cd'){if(overCanvas)deck.hover(e.clientX,e.clientY);}else if(state.mode==='booth'){if(overCanvas&&focus.t>=1)booth.hover(e.clientX,e.clientY);}else if(state.mode==='vinyl')vinyl.pointerMove(e);});
+    else if(state.mode==='inspect'){if(overCanvas||downOnCanvas)insp.pointerMove(e);}else if(state.mode==='cd'){if(overCanvas)deck.hover(e.clientX,e.clientY);}else if(state.mode==='vinyl')vinyl.pointerMove(e);});
   window.addEventListener('pointerup',e=>{const was=downOnCanvas;downOnCanvas=false;if(!state.entered)return;
     if(state.mode==='vinyl'){if(vinyl.b.g||was)vinyl.pointerUp(e);return;}if(state.modal||!was)return;
     if(state.mode==='room'){if(touch&&e.pointerId===touch.id){const tap=performance.now()-touch.t<320&&Math.hypot(e.clientX-touch.x0,e.clientY-touch.y0)<12;touch=null;if(tap)clickCentre();}}
-    else if(state.mode==='inspect')insp.pointerUp(e);else if(state.mode==='cd'&&!focus.exiting&&e.target===canvas)deck.click(e.clientX,e.clientY);else if(state.mode==='booth'&&!focus.exiting&&e.target===canvas)booth.click(e.clientX,e.clientY);});
+    else if(state.mode==='inspect')insp.pointerUp(e);else if(state.mode==='cd'&&!focus.exiting&&e.target===canvas)deck.click(e.clientX,e.clientY);});
   canvas.addEventListener('pointercancel',()=>app.cancelInputs());
   canvas.addEventListener('lostpointercapture',()=>{if(vinyl.b.g)vinyl.cancelGesture('lostcapture');});
   window.addEventListener('blur',()=>app.cancelInputs());document.addEventListener('visibilitychange',()=>{if(document.hidden)app.cancelInputs();});
@@ -156,7 +156,6 @@ async function boot(){
     if(tg&&tg.tagName==='BUTTON'&&(k==='enter'||k===' '))return;
     if(state.mode==='inspect'){if(insp.key(e))e.preventDefault();return;}
     if(state.mode==='cd'){if(k==='escape'||k==='backspace')app.exitFocus();else if(k==='e')deck.button('eject');else if(k===' '||k==='p'){const pb=app.playback.s;deck.button(pb.source==='cd-deck'&&pb.playing?'pause':'play');}else if(k==='arrowright'||k==='n')deck.button('next');else if(k==='arrowleft')deck.button('prev');else if(k==='enter'||k==='l')deck.trayClick();else if(k==='r')deck.returnDisc();else return;e.preventDefault();return;}
-    if(state.mode==='booth'){if(k==='escape'||k==='backspace')app.exitFocus();else if(e.repeat||!booth.key(e))return;e.preventDefault();return;}
     if(state.mode==='vinyl'){if(k==='escape'||k==='backspace'){if(!vinyl.cancelGesture('escape'))app.exitFocus();}else if(!vinyl.key(e))return;e.preventDefault();return;}
     if(k==='escape'){if(state.busy==='extract')stock.cancelExtract();else if(player.travel)player.travel=null;return;}
     if(['w','a','s','d','arrowup','arrowdown','arrowleft','arrowright'].includes(k)){keys[k]=true;if(player.travel)player.travel=null;e.preventDefault();return;}
@@ -164,7 +163,7 @@ async function boot(){
     if(k==='e')clickCentre(true);else if(k==='enter'||k===' '){e.preventDefault();clickCentre();}else if(k==='m')app.setMouseLook(!state.mouseLook);else if(k==='b')ui.openCrate();else if(k==='h'||k==='?')ui.openHelp();
     else if(k==='r'&&app.carry)app.returnCarry();else if(/^[1-8]$/.test(k))app.jump(Object.keys(J)[+k-1]);});
   window.addEventListener('keyup',e=>{keys[e.key.toLowerCase()]=false;});
-  window.addEventListener('resize',()=>{renderer.setSize(innerWidth,innerHeight);camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();if(state.mode==='vinyl'&&!vinyl.b.g&&!focus.exiting)vinyl.focus();if(state.mode==='cd')deck.focus();if(state.mode==='booth')booth.focus(booth.view);});
+  window.addEventListener('resize',()=>{renderer.setSize(innerWidth,innerHeight);camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();if(state.mode==='vinyl'&&!vinyl.b.g&&!focus.exiting)vinyl.focus();if(state.mode==='cd')deck.focus();});
   // ---- update ----
   const ZONES=[['Audionaut Booth',p=>p.x>BOOTH.x-BOOTH.w/2-.5&&p.x<BOOTH.x+BOOTH.w/2+.5&&p.z<BOOTH.z+BOOTH.d/2+1.1],['CD Wall',p=>p.x<-5.1&&p.z>-3.4&&p.z<2.9],['CD Listening Booth',p=>p.x<-3.4&&p.z<=-2.9],['Vinyl Listening Bench',p=>p.x>2.3&&p.z<-2.8],['Vinyl Crates',p=>p.x>1&&p.x<5.5&&p.z>-1.5&&p.z<1.9],['Checkout',p=>p.x<-3.1&&p.z>2.1],['Feature Island',p=>p.x>-3.5&&p.x<-.4&&p.z>-3&&p.z<2],['Storefront Window',p=>p.x>.9&&p.z>2.9],['Entrance',p=>p.z>3.2&&p.x>-3&&p.x<=.9]];
   let zt=0,bob=0;
@@ -192,7 +191,7 @@ async function boot(){
     app.room.update(dt);stock.update(dt);app.playback.update(dt);deck.update(dt);vinyl.update(dt);insp.update(dt);app.shop.update(dt);booth.update(dt);app.radio.update(dt);
     if(app.idleQ.length&&state.mode==='room'&&!state.busy&&!focus.active&&!stock.active&&!insp.item&&!state.modal){const q=app.idleQ.splice(0);for(const f of q)f();}
     if(canAct())hoverSet(pickCentre());else if(state.entered&&state.mode==='room'&&state.look==='released'&&!state.modal&&!state.busy&&!focus.active)hoverSet(RELOCK);else if(hover&&(state.mode!=='room'||state.modal||player.travel||hover===RELOCK))hoverSet(null);
-    zt+=dt;if(zt>.25){zt=0;let z='Shop Floor';for(const [n,f] of ZONES)if(f(player)){z=n;break;}if(state.mode==='cd')z='CD Listening Booth';if(state.mode==='vinyl')z='Vinyl Listening Bench';if(state.mode==='booth')z='Audionaut Booth';if(z!==state.zone){state.zone=z;app.emit('zone');}}
+    zt+=dt;if(zt>.25){zt=0;let z='Shop Floor';for(const [n,f] of ZONES)if(f(player)){z=n;break;}if(state.mode==='cd')z='CD Listening Booth';if(state.mode==='vinyl')z='Vinyl Listening Bench';if(z!==state.zone){state.zone=z;app.emit('zone');}}
   }
   renderer.info.autoReset=false;
   function render(){renderer.info.reset();renderer.clear();renderer.render(scene,camera);renderer.clearDepth();renderer.render(app.fgScene,app.fgCam);}

@@ -15,62 +15,56 @@ async def main():
           const covered=ps.filter(p=>p.z<-5.3&&p.x>x-w/2-.05&&p.x<x+w/2+.05).length,onSides=ps.filter(p=>Math.abs(p.z-z)<.01&&Math.abs(Math.abs(p.x-x)-w/2)<.06).length;return {inside,front,covered,onSides}})()""")
         ok('booth footprint blocks walking; the front is reachable',lay['inside'] and lay['front'],lay)
         ok('no poster hidden behind the booth; two posters hang on its outer side walls',lay['covered']==0 and lay['onSides']==2,lay)
-        # pick from the shop floor with the centre dot
-        await E("__QA.teleport(-.6,-2.55,0,0);__QA.lookAt(-.6,1.1,-4.5)"); await E('__QA.step(.2)'); hv=(await E(S))['hover']
-        ok('centre dot on the booth shows its tip',hv and hv['id'].startswith('booth') and 'Audionaut' in hv['title'],hv)
-        await page.mouse.down(); await page.mouse.up(); await E('__QA.step(1)'); st=await E(S)
-        ok('clicking the booth steps up to the console (booth mode, panel shown)',st['mode']=='booth' and st['booth']['view']=='console' and st['zone']=='Audionaut Booth' and await page.locator('#station .bc').count()==64,(st['mode'],st['zone']))
+        # free interaction: stand in the open front strip and aim with the centre dot; the view never locks
+        FX,FZ=-.6,-3.55
+        async def aim(what,a=0,b=0,x=FX,z=FZ):
+            await page.mouse.move(640,400)  # back over the canvas (a panel click leaves the pointer on the panel) before setting the view
+            await E("(()=>{const w=__QA.app.booth.world('%s',%s,%s);__QA.teleport(%s,%s);__QA.lookAt(w.x,w.y,w.z)})()"%(what,a,b,x,z)); await E('__QA.step(.1)'); return (await E(S))['hover']
+        async def click(): await page.mouse.down(); await page.mouse.up(); await E('__QA.step(.1)')
+        hv=await aim('btn','"play"'); st=await E(S)
+        ok('standing at the booth: still in normal walking mode, panel shown, Play button tip',st['mode']=='room' and st['booth']['near'] and await page.locator('#station [data-booth]').count()==1 and await page.locator('#station .bc').count()==64 and hv and hv['title']=='Play / Stop',(st['mode'],hv))
         await page.screenshot(path='test/shot_booth_console.png')
-        # 3D play button
-        xy=await E("__QA.app.booth.project('btn','play')"); await page.mouse.move(xy['x'],xy['y']); await page.mouse.down(); await page.mouse.up()
-        await page.wait_for_timeout(900); await E('__QA.step(.05)'); q=await bq()
-        ok('3D PLAY/STOP button starts the sequencer through the shared audio context',q['playing'] and q['audio'] and q['step']>=0,q)
+        await click(); await page.wait_for_timeout(900); await E('__QA.step(.05)'); q=await bq()
+        ok('clicking the 3D Play button starts the sequencer through the shared audio context',q['playing'] and q['audio'] and q['step']>=0,q)
         s1=q['step']; await page.wait_for_timeout(500); await E('__QA.step(.05)'); s2=(await bq())['step']
         ok('playhead advances in time with the audio clock',s2!=s1,(s1,s2))
-        rm=await E("__QA.app.radio.muted()")
-        ok('shop radio is silenced while the booth plays nearby',rm)
-        # click a step on the 3D screen (row 3 SYNTH, step 2)
-        g0=(await bq())['grid'][3]; xy=await E("__QA.app.booth.project('cell',3,1)"); await page.mouse.move(xy['x'],xy['y']); await E('__QA.step(.05)'); hvc=(await bq())['hover']
-        await page.mouse.down(); await page.mouse.up(); await E('__QA.step(.05)'); g1=(await bq())['grid'][3]
-        ok('hovering a screen step outlines it; clicking toggles exactly that step',hvc==[3,1] and g1[1]!=g0[1] and g1[:1]+g1[2:]==g0[:1]+g0[2:],(hvc,g0,g1))
-        # panel grid stays in sync and can edit too
-        await page.click('#station [data-s="cell:0:1"]'); g2=(await bq())['grid'][0]; c=await page.locator('#station [data-s="cell:3:1"]').get_attribute('class')
-        ok('panel grid edits the same pattern and mirrors the screen',g2[1]=='1' and (('on' in c)==(g1[1]=='1')),(g2,c))
-        # cards view: load card 3 from the wing
-        await page.click('#station [data-s="view:cards"]'); await E('__QA.step(.8)'); await page.screenshot(path='test/shot_booth_cards.png')
-        xy=await E("__QA.app.booth.project('card',2)"); await page.mouse.move(xy['x'],xy['y']); await page.mouse.down(); await page.mouse.up(); await E('__QA.step(.6)'); q=await bq()
-        ok('cards view: clicking a Paper Play card loads its pattern and tempo',q['view']=='cards' and q['card']==2 and q['bpm']==120 and q['grid'][3]=='1011011010110101',q)
-        # stems view: mute bass from the wall
-        await page.keyboard.press('ArrowRight'); await page.keyboard.press('ArrowRight'); await E('__QA.step(.8)'); await page.screenshot(path='test/shot_booth_stems.png')
-        xy=await E("__QA.app.booth.project('stem',2)"); await page.mouse.move(xy['x'],xy['y']); await page.mouse.down(); await page.mouse.up(); await E('__QA.step(.1)'); q=await bq()
-        ok('stems view (arrow keys): clicking a stem block mutes that part',q['view']=='stems' and q['muted']==[False,False,True,False],q)
-        # keys: tempo, space stop/start
-        await page.keyboard.press('t'); q1=await bq(); await page.keyboard.press(' '); q2=await bq(); await page.keyboard.press(' '); q3=await bq()
-        ok('T changes tempo; Space stops and starts',q1['bpm']==128 and not q2['playing'] and q3['playing'],(q1['bpm'],q2['playing'],q3['playing']))
-        # about dialog with the studio link
-        await page.click('#station [data-s="about"]'); st=await E(S); href=await page.get_attribute('#modalBox a.btnlink','href'); txt=await page.inner_text('#modalBox')
-        ok('About explains the booth honestly and links to the full studio',st['modal']=='booth' and href=='https://xtrata.xyz/audionaut/' and 'Nothing here is saved, inscribed or paid for' in txt,href)
-        await page.keyboard.press('Escape')
-        # Esc steps back to the shop floor; the booth keeps playing and fades with distance
-        await page.keyboard.press('Escape'); await E('__QA.step(.8)'); st=await E(S)
-        ok('Esc steps back to the shop floor',st['mode']=='room' and st['booth']['playing'],st['mode'])
-        far=await E("(()=>{__QA.teleport(4.3,3.5,0,0);return __QA.app.radio.muted()})()")
-        ok('far from the booth the radio is not held silent by it',far is False,far)
-        # a CD audition stops the booth; while it plays the radio is muted
+        ok('shop radio is silenced while the booth plays nearby',await E("__QA.app.radio.muted()"))
+        g0=(await bq())['grid'][3]; hv=await aim('cell',3,1); hvc=(await bq())['hover']
+        await click(); g1=(await bq())['grid'][3]; hv2=(await E(S))['hover']
+        ok('aiming at a screen step shows its tip and outlines it; clicking toggles exactly that step',hv and hv['title']=='SYNTH · step 2' and hvc==[3,1] and g1[1]!=g0[1] and g1[:1]+g1[2:]==g0[:1]+g0[2:] and hv2['sub']!=hv['sub'],(hv,hvc,g0,g1))
+        hv=await aim('label',1); await click(); q=await bq()
+        ok('clicking a track label on the screen mutes that part',hv and 'PERC' in hv['title'] and q['muted']==[False,True,False,False],(hv,q['muted']))
+        await page.click('#station [data-s="mute:1"]'); await page.click('#station [data-s="cell:0:1"]'); q=await bq(); c=await page.locator('#station [data-s="cell:3:1"]').get_attribute('class')
+        ok('panel grid edits the same pattern and mirrors the screen',q['grid'][0][1]=='1' and q['muted'][1] is False and (('on' in c)==(g1[1]=='1')),(q['grid'][0],c))
+        # cards on the left wing, from the front strip
+        hv=await aim('card',2,0,-.95,-3.55); await page.screenshot(path='test/shot_booth_cards.png'); await click(); await E('__QA.step(.6)'); q=await bq()
+        ok('aiming at a Paper Play card and clicking loads its pattern and tempo',hv and 'COSMIC ARPS' in hv['title'] and q['card']==2 and q['bpm']==120 and q['grid'][3]=='1011011010110101',(hv,q['card']))
+        hv=await aim('stem',2,0,-.25,-3.55); await page.screenshot(path='test/shot_booth_stems.png'); await click(); q=await bq()
+        ok('aiming at a stem on the right wall and clicking mutes it',hv and 'BASS' in hv['title'] and q['muted']==[False,False,True,False],(hv,q['muted']))
+        hv=await aim('btn','"tempo"'); await click(); q=await bq()
+        ok('3D Tempo button cycles the tempo',q['bpm']==128,q['bpm'])
+        await E("__QA.teleport(-.6,-3.55,0,-.9)"); await E('__QA.step(.1)');
+        # walking is never blocked by the booth: walk back out with S
+        z0=(await E(S))['player']['z']; await page.keyboard.down('s'); await E('__QA.step(.6)'); await page.keyboard.up('s'); z1=(await E(S))['player']['z']
+        ok('you can walk away from the console at any time (no step-in mode)',z1>z0+.5 and (await E(S))['mode']=='room',(z0,z1))
+        hv=await aim('about'); await click(); st=await E(S); href=await page.get_attribute('#modalBox a.btnlink','href'); txt=await page.inner_text('#modalBox')
+        ok('back-wall panel opens About, which explains the booth honestly and links to the full studio',st['modal']=='booth' and href=='https://xtrata.xyz/audionaut/' and 'Nothing here is saved, inscribed or paid for' in txt,href)
+        await page.keyboard.press('Escape'); await E('__QA.step(.1)')
+        ok('panel returns after closing the dialog',await page.locator('#station [data-booth]').count()==1 and not await page.locator('#station').is_hidden())
+        far=await E("(()=>{__QA.teleport(4.3,3.5,0,0);return __QA.app.radio.muted()})()"); await E('__QA.step(.1)')
+        ok('walking away hides the booth panel; the booth keeps playing and no longer holds the radio silent',far is False and await page.locator('#station').is_hidden() and (await bq())['playing'],far)
         await E("(()=>{const a=__QA.app,r=a.catalog.releases[0];a.playback.play(r,0,'cd-case',0)})()"); await E('__QA.step(.1)'); q=await bq(); rm=await E("__QA.app.radio.muted()")
         ok('playing a CD stops the booth, and the radio is muted while it plays',not q['playing'] and rm,(q['playing'],rm))
         await E("__QA.app.playback.pause()"); rm2=await E("__QA.app.radio.muted()")
         ok('radio comes back when the CD stops',rm2 is False)
-        # jump button and number key 8
-        await E("__QA.setAuto(true)"); await page.click('button[data-jump="Audionaut Booth"]'); await page.wait_for_function("__QA.state().mode==='booth'",timeout=30000); await E("__QA.setAuto(false)"); st=await E(S)
-        ok('Audionaut Booth quick-jump walks there and focuses the console',st['mode']=='booth' and st['booth']['view']=='console')
-        # starting the booth while a CD plays pauses the CD
-        await E("(()=>{const a=__QA.app;a.playback.play(a.catalog.releases[0],0,'cd-case',0)})()"); await page.keyboard.press(' '); pb=await E("__QA.state().playback"); q=await bq()
+        await E("__QA.setAuto(true)"); await page.click('button[data-jump="Audionaut Booth"]'); await page.wait_for_function("!__QA.state().player.travel&&__QA.state().booth.near",timeout=30000); await E("__QA.setAuto(false)"); st=await E(S)
+        ok('Audionaut Booth quick-jump walks up to the console and faces it, without changing mode',st['mode']=='room' and st['hover'] and st['hover']['id'].startswith('booth:'),(st['mode'],st['hover']))
+        await E("(()=>{const a=__QA.app;a.playback.play(a.catalog.releases[0],0,'cd-case',0)})()"); await page.click('#station [data-s="play"]'); pb=await E("__QA.state().playback"); q=await bq()
         ok('starting the booth pauses a playing CD',q['playing'] and not pb['playing'],(q['playing'],pb.get('playing')))
-        await page.keyboard.press(' ')
+        await page.click('#station [data-s="play"]')
         rd=await E("__QA.app.radio.qa()")
         ok('radio speakers have their own characters (two plain, one tinny, one blown)',rd['characters']==['plain','blown','tinny','plain'],rd['characters'])
-        await page.keyboard.press('Escape'); await E('__QA.step(.8)'); await E("__QA.teleport(.05,4.22,0,0)"); await E('__QA.step(.1)'); rs=(await E(S))['render']
+        await E("__QA.teleport(.05,4.22,0,0)"); await E('__QA.step(.1)'); rs=(await E(S))['render']
         print('render from the entrance',rs)
         ok('no page errors',len(errs)==0,errs[:3])
         await b.close()

@@ -46,7 +46,9 @@ Offline it still opens, with placeholder artwork and a labelled demo timer inste
 ## The Audionaut booth
 
 A permanent 9 ft × 6 ft × 8 ft station against the back wall (`src/booth.js`, quick-jump 8): a 16-step sequencer on
-the console screen, four Paper Play pattern cards on the left wing and four mutable stems on the right wing. Sound is
+the console screen, four Paper Play pattern cards on the left wing and four mutable stems on the right wing. There is
+no step-in mode: you walk up (the front strip under the header is open) and aim the centre dot at a button, a screen
+step, a card or a stem, and click. A panel with the same controls appears bottom-left while you are at the booth. Sound is
 synthesised in the browser through the shop's shared AudioContext from a positional source at the console, so it fades
 as you walk away. Nothing is saved, inscribed or paid for; the About panel links to the full studio at
 `xtrata.xyz/audionaut`. Starting the booth pauses any CD or record, and starting a CD or record stops the booth.

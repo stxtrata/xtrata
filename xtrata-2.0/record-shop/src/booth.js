@@ -30,7 +30,7 @@ export function initBooth(app){
   const {scene,art,mats:M,box}=app,F=art.font,P=app.playback;
   const {w:W,d:D,h:H}=BOOTH;
   app.STUDIO_URL=STUDIO_URL;
-  const B={playing:false,step:-1,card:0,bpm:120,grid:[],bass:[],synth:[],muted:[false,false,false,false],levels:[0,0,0,0],view:'console',hoverCell:null,dirty:true};app.booth=B;
+  const B={playing:false,step:-1,card:0,bpm:120,grid:[],bass:[],synth:[],muted:[false,false,false,false],levels:[0,0,0,0],hoverCell:null,dirty:true};app.booth=B;
   const g=new THREE.Group();g.position.set(BOOTH.x,0,BOOTH.z);scene.add(g);B.root=g;
   const basic=(c)=>new THREE.MeshBasicMaterial({color:c,toneMapped:false});
   const lit=(tex,e=.35)=>new THREE.MeshStandardMaterial({map:tex,emissiveMap:tex,emissive:0xffffff,emissiveIntensity:e,roughness:.5});
@@ -87,7 +87,7 @@ export function initBooth(app){
   const cards=CARDS.map((card,i)=>{const h=new THREE.Group();h.position.set(-.465+i*.31,1.24,.11);h.rotation.x=-.18;lw.add(h);
     const front=lit(cardTex(card),.3),body=new THREE.Mesh(new THREE.BoxGeometry(.26,.36,.014),M.black);body.userData.card=i;h.add(body);const mesh=new THREE.Mesh(new THREE.PlaneGeometry(.256,.356),front);mesh.position.z=.0072;mesh.userData.card=i;h.add(mesh);
     const gm=new THREE.MeshBasicMaterial({color:new THREE.Color(card.accent),transparent:true,opacity:0,toneMapped:false}),glow=new THREE.Mesh(new THREE.PlaneGeometry(.285,.385),gm);glow.position.z=-.009;h.add(glow);
-    return {h,mesh,front,gm};});
+    return {h,mesh,body,front,gm};});
   // ---- right wing: stems ----
   const rw=new THREE.Group();rw.position.set(W/2-.11,0,-.04);rw.rotation.y=-Math.PI/2;g.add(rw);
   app.plane(rw,1.18,.24,lit(label('STEMS','CLICK A PART TO MUTE OR UNMUTE IT','#9b7bff'),.5),0,1.94,.01);
@@ -101,7 +101,7 @@ export function initBooth(app){
       x.font=`800 48px ${F}`;x.fillStyle=m?'#7d7064':'#fff6e2';x.textBaseline='alphabetic';x.fillText(t.label,34,74);x.font=`700 24px ${F}`;x.fillStyle=m?'#d0604f':t.color;x.fillText(m?'MUTED · CLICK TO UNMUTE':'STEM '+(i+1)+' · LIVE',34,124);});
     const fm=lit(tex,.55),sm=new THREE.MeshStandardMaterial({color:0x221a14,emissive:c,emissiveIntensity:.45,roughness:.4});
     const mesh=new THREE.Mesh(new THREE.BoxGeometry(.48,.22,.065),sm);mesh.position.set(bx,by,.068);mesh.userData.stem=i;rw.add(mesh);const face=new THREE.Mesh(new THREE.PlaneGeometry(.476,.216),fm);face.position.z=.0331;face.userData.stem=i;mesh.add(face);
-    return {mesh,tex,fm,sm,pm,c};});
+    return {mesh,face,tex,fm,sm,pm,c};});
   // ---- back wall panel ----
   nc(box(g,1.78,.72,.03,M.black,0,1.66,-D/2+.095,{cast:false}));
   const aboutTex=art.panel(1024,410,(x,w,h)=>{x.fillStyle='#15100c';x.fillRect(0,0,w,h);x.fillStyle='#f2b84b';x.fillRect(0,0,w,10);
@@ -111,14 +111,11 @@ export function initBooth(app){
     ['Pick a Paper Play card, change any step on the console,','mute a stem. Everything is synthesised live in your browser —','nothing here is saved, inscribed or paid for.'].forEach((l,i)=>x.fillText(l,44,198+i*40));
     x.fillStyle='rgba(255,255,255,.07)';x.fillRect(44,330,w-88,52);x.font=`800 24px ${F}`;x.fillStyle='#f2b84b';x.fillText('THE FULL STUDIO: XTRATA.XYZ/AUDIONAUT  ·  CLICK FOR DETAILS →',70,364);});
   const about=app.plane(g,1.7,.68,lit(aboutTex,.5),0,1.66,-D/2+.112);about.userData.about=true;
-  // ---- collision, room pick ----
-  const wx0=BOOTH.x-W/2,wx1=BOOTH.x+W/2,wz0=BOOTH.z-D/2,wz1=BOOTH.z+D/2;
-  app.addCollider(wx0,wx1,-5.5,wz1+.02);
-  const roomPick=new THREE.Mesh(new THREE.BoxGeometry(W-.14,H-.4,D-.1),M.pick);roomPick.position.set(0,(H-.4)/2+.1,0);g.add(roomPick);roomPick.removeFromParent();
-  roomPick.position.add(g.position);
-  const lp=new THREE.Vector3();
-  app.addPick(roomPick,{id:'booth',title:'The Audionaut booth',get sub(){return B.playing?`Playing ${CARDS[B.card].name} · ${B.bpm} BPM`:'16-step sequencer · Paper Play cards · stems';},hint:'Click to step up to the sequencer',reach:4.2,
-    resolve(h){lp.copy(h.point);g.worldToLocal(lp);const v=lp.x<-.75?'cards':lp.x>.75?'stems':'console';return {...this,id:'booth:'+v,click:()=>B.focus(v)};},click:()=>B.focus('console')});
+  // ---- collision: the front strip under the header stays open so you can step right up to the console ----
+  const wx0=BOOTH.x-W/2,wx1=BOOTH.x+W/2,wz1=BOOTH.z+D/2;
+  app.addCollider(wx0,wx1,-5.5,BOOTH.z+.4);app.addCollider(wx0,wx0+.1,-5.5,wz1);app.addCollider(wx1-.1,wx1,-5.5,wz1);
+  for(const sx of [-1,1])app.addOccluder(.06,H-.12,D-.16,BOOTH.x+sx*(W/2-.05),H/2,BOOTH.z-.02);
+  app.addOccluder(1.18,.84,.56,BOOTH.x,.48,BOOTH.z+.06);app.addOccluder(W,.34,.12,BOOTH.x,H-.17,wz1-.06);
   // ---- sequencer state ----
   function loadCard(i,quiet){B.card=i;const c=CARDS[i];B.grid=c.steps.map(r=>r.slice());B.bass=c.bass.slice();B.synth=c.synth.slice();B.bpm=c.bpm;B.dirty=true;if(!quiet){app.foley('click');app.toast('Loaded Paper Play card '+c.code+' — '+c.name+' ('+c.bpm+' BPM).');}panel();}
   loadCard(0,true);
@@ -182,49 +179,45 @@ export function initBooth(app){
     scr.needsUpdate=true;B.dirty=false;}
   scr.userData.redraw=draw;
   function leds_(){for(let i=0;i<16;i++)leds.setColorAt(i,col.set(B.playing&&i===B.step?0xffe2a8:i%4===0?0x5a3b12:0x1d2a2c));leds.instanceColor.needsUpdate=true;}
-  // ---- station panel (bottom-left; the 3D console stays in the middle of the view) ----
-  function head(){if(app.state.mode!=='booth')return;const el=document.getElementById('station');if(!el)return;for(const b of el.querySelectorAll('.bc[data-c]'))b.classList.toggle('hd',+b.dataset.c===B.step);}
-  function panel(){if(app.state.mode!=='booth')return;const card=CARDS[B.card];
-    const grid=TRACKS.map((t,r)=>`<div class="br"><button data-s="mute:${r}" class="bl${B.muted[r]?' off':''}" style="--c:${t.color}" aria-pressed="${!B.muted[r]}" title="${B.muted[r]?'Unmute':'Mute'} ${t.label}">${t.short}</button>${B.grid[r].map((on,c)=>`<button data-s="cell:${r}:${c}" data-c="${c}" class="bc${on?' on':''}${c%4===0?' q':''}" style="--c:${t.color}" aria-label="${t.label} step ${c+1} ${on?'on':'off'}" aria-pressed="${!!on}"></button>`).join('')}</div>`).join('');
-    app.ui.station(`<h3>The Audionaut <span class="dim small">${B.playing?'playing':'ready'}</span></h3><p class="step">${esc(card.code+' '+card.name)} · ${B.bpm} BPM${B.playing&&!B.audio()?' · sound starts after your next click':''}</p>
-<div class="bgrid">${grid}</div>
-<div class="btns"><button data-s="play" class="gold">${B.playing?'■ Stop':'▶ Play'}</button><button data-s="tempo">Tempo ${B.bpm}</button><button data-s="reset">Reset card</button><button data-s="clear">Clear</button></div>
-<div class="btns bcards">${CARDS.map((c,i)=>`<button data-s="card:${i}" class="${i===B.card?'on':''}" aria-pressed="${i===B.card}" title="${esc(c.sub)}">${c.code} ${esc(c.name)}</button>`).join('')}</div>
-<div class="btns"><button data-s="view:console"${B.view==='console'?' class="on"':''}>Console</button><button data-s="view:cards"${B.view==='cards'?' class="on"':''}>Cards</button><button data-s="view:stems"${B.view==='stems'?' class="on"':''}>Stems</button><button data-s="about">About</button><button data-s="back">Step back (Esc)</button></div>`,act);
-    head();}
+  // ---- free interaction: everything is aimed at with the centre dot while you walk around; nothing locks the view ----
+  const press=id=>{btns[id].press=.14;if(id==='play')B.toggle();else if(id==='tempo')B.tempo();else if(id==='reset')B.reset();};
+  app.addPick(screen,{id:'booth:screen',reach:3.3,resolve(h){const card=CARDS[B.card];if(!h.uv)return null;const px=h.uv.x*CW,py=(1-h.uv.y)*CH,r=Math.floor((py-GT)/(CEH+RG)),inRow=r>=0&&r<4&&(py-GT)-r*(CEH+RG)<=CEH;
+    if(inRow&&px>=18&&px<=90){const t=TRACKS[r],m=B.muted[r];return {id:`booth:mute:${r}:${m}`,title:t.label+(m?' — muted':' — live'),sub:'Audionaut console',hint:'Click to '+(m?'unmute':'mute')+' it',click:()=>B.toggleMute(r)};}
+    const c=Math.floor((px-GL)/CEW);
+    if(inRow&&c>=0&&c<16&&(px-GL)-c*CEW<=CEW-5){const t=TRACKS[r],on=!!B.grid[r][c];return {id:`booth:cell:${r}:${c}:${on}`,title:`${t.label} · step ${c+1}`,sub:on?'On':'Off',hint:'Click to switch it '+(on?'off':'on'),click:()=>B.toggleStep(r,c),hover:v=>{B.hoverCell=v?[r,c]:null;B.dirty=true;}};}
+    return {id:'booth:screen:'+B.playing,title:'The Audionaut console',sub:`${card.code} ${card.name} · ${B.bpm} BPM · ${B.playing?'playing':'ready'}`,hint:'Aim at a step and click to change it'};}});
+  const BTN={play:['Play / Stop',()=>B.playing?'Playing — click to stop':'Click to start the sequencer'],tempo:['Tempo',()=>`${B.bpm} BPM — click for the next tempo`],reset:['Reset card',()=>'Put the current card’s pattern back']};
+  for(const id in btns)app.addPick(btns[id].cap,{id:'booth:btn:'+id,resolve:()=>({id:`booth:btn:${id}:${B.playing}:${B.bpm}`,title:BTN[id][0],sub:'Audionaut console',hint:BTN[id][1](),click:()=>press(id)})});
+  cards.forEach((c,i)=>{const pk={id:'booth:card:'+i,resolve:()=>{const k=CARDS[i],cur=i===B.card;return {id:`booth:card:${i}:${cur}`,title:`Paper Play ${k.code} — ${k.name}`,sub:`${k.sub} · ${k.bpm} BPM`,hint:cur?'Loaded — click to start it again from the card':'Click to load this pattern',click:()=>B.loadCard(i)};}};
+    app.addPick(c.mesh,pk);app.addPick(c.body,pk);});
+  stems.forEach((st,r)=>{const pk={id:'booth:stem:'+r,resolve:()=>{const m=B.muted[r];return {id:`booth:stem:${r}:${m}`,title:TRACKS[r].label+' stem',sub:m?'Muted':'Live',hint:'Click to '+(m?'unmute':'mute')+' it',click:()=>B.toggleMute(r)};}};
+    app.addPick(st.mesh,pk);app.addPick(st.face,pk);});
+  app.addPick(about,{id:'booth:about',title:'The Audionaut',sub:'In-store station · nothing saved, inscribed or paid for',hint:'Click for details and the link to the full studio',click:()=>app.ui.openBooth()});
+  // ---- station panel: shown bottom-left while you are at the booth, hidden when you walk away ----
+  const $st=()=>document.getElementById('station');
+  B.near=()=>{const p=app.player;return app.state.entered&&app.state.mode==='room'&&!app.state.modal&&p.x>wx0-.7&&p.x<wx1+.7&&p.z<wz1+1.7;};
+  function head(){const el=$st();if(!el||el.hidden)return;for(const b of el.querySelectorAll('.bc[data-c]'))b.classList.toggle('hd',+b.dataset.c===B.step);}
+  function panel(){if(!B.near||!B.near())return;const card=CARDS[B.card],narrow=innerWidth<760||innerHeight>innerWidth;
+    const grid=narrow?'':`<div class="bgrid">${TRACKS.map((t,r)=>`<div class="br"><button data-s="mute:${r}" class="bl${B.muted[r]?' off':''}" style="--c:${t.color}" aria-pressed="${!B.muted[r]}" title="${B.muted[r]?'Unmute':'Mute'} ${t.label}">${t.short}</button>${B.grid[r].map((on,c)=>`<button data-s="cell:${r}:${c}" data-c="${c}" class="bc${on?' on':''}${c%4===0?' q':''}" style="--c:${t.color}" aria-label="${t.label} step ${c+1} ${on?'on':'off'}" aria-pressed="${!!on}"></button>`).join('')}</div>`).join('')}</div>`;
+    app.ui.station(`<div data-booth></div><h3>The Audionaut <span class="dim small">${B.playing?'playing':'ready'}</span></h3><p class="step">${esc(card.code+' '+card.name)} · ${B.bpm} BPM</p>${grid}
+<div class="btns"><button data-s="play" class="gold">${B.playing?'■ Stop':'▶ Play'}</button><button data-s="tempo">Tempo ${B.bpm}</button><button data-s="reset">Reset card</button>${narrow?'':'<button data-s="clear">Clear</button>'}<button data-s="about">About</button></div>
+<div class="btns bcards">${CARDS.map((c,i)=>`<button data-s="card:${i}" class="${i===B.card?'on':''}" aria-pressed="${i===B.card}" title="${esc(c.sub)}">${narrow?c.code:c.code+' '+esc(c.name)}</button>`).join('')}</div>
+${narrow?'':'<p class="dim small">Aim the centre dot at the console, the cards or the stems and click. Free the pointer (Esc) to use this panel.</p>'}`,act);
+    document.body.classList.add('booth-near');head();}
   B.panel=panel;
-  function act(a){if(a==='back')return app.exitFocus();if(a==='play')return B.toggle();if(a==='tempo')return B.tempo();if(a==='reset')return B.reset();if(a==='clear')return B.clear();if(a==='about')return app.ui.openBooth();
-    const [k,p,q]=a.split(':');if(k==='mute')B.toggleMute(+p);else if(k==='cell')B.toggleStep(+p,+q);else if(k==='card')B.loadCard(+p);else if(k==='view')B.focus(p);}
-  // ---- focus views ----
-  const VIEWS={console:{look:[0,.99,.06],dir:[0,.66,.75],fit:[1.6,1.0]},cards:{look:[-1.24,1.46,-.06],dir:[.95,.1,.3],fit:[1.5,1.35]},stems:{look:[1.24,1.46,-.06],dir:[-.95,.1,.3],fit:[1.5,1.35]}};
-  B.focus=(v='console')=>{if(!VIEWS[v])v='console';B.view=v;const V=VIEWS[v],cam=app.camera,t=Math.tan(THREE.MathUtils.degToRad(cam.fov/2));
-    const tall=cam.aspect<.9,d=clamp(Math.max(V.fit[0]/2/(t*cam.aspect),V.fit[1]/2/t)*1.05,.7,v==='console'?(tall?3.4:2.6):2.1);
-    // portrait: a flatter angle keeps the camera under the booth's header, standing back in front of the booth
-    const dv=tall&&v==='console'?[0,.4,.92]:V.dir;
-    const look=g.localToWorld(new THREE.Vector3(...V.look)),dir=new THREE.Vector3(...dv).normalize(),pos=g.localToWorld(new THREE.Vector3(...V.look).addScaledVector(dir,d));
-    if(tall){const dn=new THREE.Vector3(0,-.2*d,0);look.add(dn);pos.add(dn);} // the panel covers the bottom of a portrait screen, so lift the station in the frame
-    // the station panel sits bottom-left, so on wide screens frame the station a little to the right of it
-    if(cam.aspect>1.15){const right=new THREE.Vector3().subVectors(look,pos).cross(new THREE.Vector3(0,1,0)).normalize(),sh=right.multiplyScalar(-.17*d);look.add(sh);pos.add(sh);}
-    app.setFocus('booth',pos,look,app.state.mode==='booth'?.5:.65);panel();};
-  B.onExit=()=>{B.hoverCell=null;B.dirty=true;app.canvas.style.cursor='';};
-  const ray=new THREE.Raycaster(),v2=new THREE.Vector2(),fp=[screen,...Object.values(btns).map(b=>b.cap),...cards.map(c=>c.mesh),...stems.map(s=>s.mesh),about];
-  B.pickAt=(cx,cy)=>{v2.set(cx/innerWidth*2-1,-(cy/innerHeight)*2+1);ray.setFromCamera(v2,app.camera);const h=ray.intersectObjects(fp,false)[0];if(!h)return null;const o=h.object;
-    if(o===screen){const px=h.uv.x*CW,py=(1-h.uv.y)*CH,r=Math.floor((py-GT)/(CEH+RG)),inRow=r>=0&&r<4&&(py-GT)-r*(CEH+RG)<=CEH;if(!inRow)return {screen:true};
-      if(px>=18&&px<=90)return {mute:r};const c=Math.floor((px-GL)/CEW);if(c>=0&&c<16&&(px-GL)-c*CEW<=CEW-5)return {cell:[r,c]};return {screen:true};}
-    if(o.userData.btn)return {btn:o.userData.btn};if(o.userData.card!=null)return {card:o.userData.card};if(o.userData.stem!=null)return {mute:o.userData.stem};if(o.userData.about)return {about:true};return null;};
-  B.click=(cx,cy)=>{const h=B.pickAt(cx,cy);if(!h)return null;app.audioInit();if(B.playing&&!out)setup();
-    if(h.cell)B.toggleStep(h.cell[0],h.cell[1]);else if(h.mute!=null)B.toggleMute(h.mute);else if(h.card!=null){B.loadCard(h.card);}else if(h.about)app.ui.openBooth();
-    else if(h.btn){btns[h.btn].press=.14;if(h.btn==='play')B.toggle();else if(h.btn==='tempo')B.tempo();else if(h.btn==='reset')B.reset();}return h;};
-  B.hover=(cx,cy)=>{const h=B.pickAt(cx,cy),hc=h&&h.cell?h.cell:null;if((hc&&hc.join())!==(B.hoverCell&&B.hoverCell.join())){B.hoverCell=hc;B.dirty=true;}app.setCursor(h&&!h.screen?'pointer':'');};
-  B.key=e=>{const k=e.key.toLowerCase();if(k===' '||k==='p')B.toggle();else if(k==='t')B.tempo();else if(k==='r')B.reset();else if(/^[1-4]$/.test(k))B.loadCard(+k-1);
-    else if(k==='arrowleft'||k==='arrowright'){const o=['cards','console','stems'],i=o.indexOf(B.view)+(k==='arrowright'?1:-1);B.focus(o[clamp(i,0,2)]);}else return false;return true;};
-  // projection of a screen cell / object for tests
-  B.project=(what,a,b)=>{const p=new THREE.Vector3();if(what==='cell'){const u=(GL+b*CEW+(CEW-5)/2)/CW,v=1-(GT+a*(CEH+RG)+CEH/2)/CH;p.set((u-.5)*.92,(v-.5)*.56,0);screen.localToWorld(p);}
-    else if(what==='btn')btns[a].cap.getWorldPosition(p),p.y+=.016;else if(what==='card')cards[a].mesh.getWorldPosition(p);else if(what==='stem')stems[a].mesh.getWorldPosition(p);else if(what==='about')about.getWorldPosition(p);
-    p.project(app.camera);return {x:(p.x+1)/2*innerWidth,y:(1-p.y)/2*innerHeight,z:p.z};};
+  function act(a){if(a==='play')return press('play');if(a==='tempo')return press('tempo');if(a==='reset')return press('reset');if(a==='clear')return B.clear();if(a==='about')return app.ui.openBooth();
+    const [k,p,q]=a.split(':');if(k==='mute')B.toggleMute(+p);else if(k==='cell')B.toggleStep(+p,+q);else if(k==='card')B.loadCard(+p);}
+  let wasNear=false;
+  function nearCheck(){const n=B.near();if(n&&!wasNear)panel();else if(!n&&wasNear){document.body.classList.remove('booth-near');const el=$st();if(el&&!el.hidden&&el.querySelector('[data-booth]'))app.ui.stationHide();if(B.hoverCell){B.hoverCell=null;B.dirty=true;}}wasNear=n;}
+  app.on('mode',()=>{wasNear=false;});addEventListener('resize',()=>{if(wasNear)panel();});
+  // world position of a part, for tests and the quick-jump
+  B.world=(what,a,b)=>{const p=new THREE.Vector3();if(what==='cell'){const u=(GL+b*CEW+(CEW-5)/2)/CW,v=1-(GT+a*(CEH+RG)+CEH/2)/CH;p.set((u-.5)*.92,(v-.5)*.56,0);screen.localToWorld(p);}
+    else if(what==='label'){const v=1-(GT+a*(CEH+RG)+CEH/2)/CH;p.set((54/CW-.5)*.92,(v-.5)*.56,0);screen.localToWorld(p);}
+    else if(what==='btn'){btns[a].cap.getWorldPosition(p);p.y+=.016;}else if(what==='card')cards[a].mesh.getWorldPosition(p);else if(what==='stem')stems[a].face.getWorldPosition(p);else if(what==='about')about.getWorldPosition(p);else screen.getWorldPosition(p);
+    return {x:p.x,y:p.y,z:p.z};};
   // ---- per frame ----
   let since=0;const fwd=new THREE.Vector3(),up=new THREE.Vector3();
-  B.update=dt=>{const rd=app.realDt||dt;
+  B.update=dt=>{const rd=app.realDt||dt;nearCheck();
     if(B.playing){if(out&&ac.state==='running'){tick();while(queue.length&&queue[0][1]<=ac.currentTime+.012)setStep(queue.shift()[0]);}
       else{acc+=rd;const s16=60/B.bpm/4;if(acc>s16*4)acc=s16;while(acc>=s16){acc-=s16;setStep((B.step+1)%16);}}}
     let any=false;for(let r=0;r<4;r++){if(B.levels[r]>.01){B.levels[r]*=Math.exp(-dt*7);any=true;}}
@@ -234,7 +227,7 @@ export function initBooth(app){
     if(out&&B.playing){const c=app.camera,l=ac.listener;c.getWorldDirection(fwd);up.set(0,1,0).applyQuaternion(c.quaternion);
       if(l.positionX){const t=ac.currentTime+.03;for(const [p,v] of [[l.positionX,c.position.x],[l.positionY,c.position.y],[l.positionZ,c.position.z],[l.forwardX,fwd.x],[l.forwardY,fwd.y],[l.forwardZ,fwd.z],[l.upX,up.x],[l.upY,up.y],[l.upZ,up.z]])p.linearRampToValueAtTime(v,t);}
       else{l.setPosition(c.position.x,c.position.y,c.position.z);l.setOrientation(fwd.x,fwd.y,fwd.z,up.x,up.y,up.z);}}};
-  B.qa=()=>({playing:B.playing,audio:B.audio(),step:B.step,card:B.card,bpm:B.bpm,view:B.view,muted:B.muted.slice(),on:B.grid.map(r=>r.reduce((a,b)=>a+b,0)),grid:B.grid.map(r=>r.join('')),loud:B.loud(),hover:B.hoverCell});
+  B.qa=()=>({playing:B.playing,audio:B.audio(),step:B.step,card:B.card,bpm:B.bpm,near:B.near(),muted:B.muted.slice(),on:B.grid.map(r=>r.reduce((a,b)=>a+b,0)),grid:B.grid.map(r=>r.join('')),loud:B.loud(),hover:B.hoverCell});
   B.CARDS=CARDS;B.TRACKS=TRACKS;
   draw();leds_();return B;
 }
