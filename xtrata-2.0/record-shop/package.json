@@ -1,0 +1,15 @@
+{
+  "name": "xtrata-record-shop",
+  "version": "1.0.0",
+  "private": true,
+  "description": "XTRATA MUSIC — The Record Shop. First-person 3D record shop served at /music/shop/.",
+  "scripts": {
+    "build": "node build.mjs",
+    "fixtures": "sh test/fetch-fixtures.sh",
+    "test": "sh test/run-all.sh"
+  },
+  "dependencies": {
+    "esbuild": "^0.28.2",
+    "three": "0.170.0"
+  }
+}

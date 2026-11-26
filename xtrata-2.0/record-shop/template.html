@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+<title>XTRATA MUSIC — The Record Shop</title>
+<!--
+XTRATA MUSIC — The Record Shop (single-file build). Rendering engine: three.js r170 (0.170.0), bundled below.
+/*__LICENSE__*/
+-->
+<style>
+:root{--gold:#f2b84b;--cyan:#58d7e8;--bg:rgba(16,12,10,.78);--line:rgba(242,184,75,.28);--txt:#f6ead2;--dim:#b9a987}
+*{box-sizing:border-box}html,body{margin:0;height:100%;overflow:hidden;background:#07090f;color:var(--txt);font:14px/1.4 "Helvetica Neue",Helvetica,Arial,sans-serif;-webkit-user-select:none;user-select:none;overscroll-behavior:none}
+#c{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:none;outline:none}
+body.entered[data-mode=room][data-look=locked] #c,body.entered[data-mode=room][data-look=free] #c{cursor:none}
+body.nocursor,body.nocursor *{cursor:none!important}
+[hidden]{display:none!important}
+button{font:inherit;color:var(--txt);background:rgba(40,30,22,.82);border:1px solid var(--line);border-radius:8px;padding:6px 10px;cursor:pointer;min-height:32px}
+button:hover{border-color:var(--gold)}button:focus-visible,input:focus-visible{outline:2px solid var(--cyan);outline-offset:2px}
+button.gold{background:var(--gold);color:#1b140c;border-color:var(--gold);font-weight:700}button:disabled{opacity:.45;cursor:default}
+.dim{color:var(--dim)}.small{font-size:12px}
+#hud>*{position:fixed;z-index:5}
+#brand{left:12px;top:10px;background:var(--bg);border:1px solid var(--line);border-radius:12px;padding:8px 12px;max-width:min(360px,62vw);backdrop-filter:blur(6px)}
+#brand b{color:var(--gold);letter-spacing:.08em;font-size:15px}#brand b i{color:var(--cyan);font-style:normal}#brand em{font-style:normal}#brand span{display:block;font-size:11px;color:var(--dim)}#brand #radioNow{color:var(--cyan);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}#brand #radioNow:empty{display:none}
+#zone{left:386px;top:14px;background:var(--bg);border:1px solid var(--line);border-radius:999px;padding:5px 14px;font-weight:700;color:var(--gold);letter-spacing:.06em;font-size:12px;text-transform:uppercase;pointer-events:none}
+#top{right:12px;top:10px;display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end;max-width:max(46vw,calc(100vw - 580px))}
+#jumps{left:12px;top:86px;display:flex;flex-direction:column;gap:5px}#jumps button{text-align:left;font-size:12px;padding:4px 10px;min-height:28px;background:var(--bg)}
+#carry{left:50%;bottom:calc(14px + var(--mini));transform:translateX(-50%);background:var(--bg);border:1px solid var(--gold);border-radius:999px;padding:5px 6px 5px 14px;display:flex;gap:10px;align-items:center;font-size:12px;white-space:nowrap;max-width:94vw}
+#reticle{position:fixed;left:50%;top:50%;width:7px;height:7px;margin:-3.5px;border-radius:50%;border:1.5px solid #fff;box-shadow:0 0 0 1px rgba(0,0,0,.6);z-index:4;pointer-events:none;display:none}
+body.entered[data-mode=room] #reticle{display:block}
+body{--mini:0px;--carry:0px}body.mini-on{--mini:112px}body.carry-on{--carry:44px}
+#tip{position:fixed;left:50%;bottom:calc(14px + var(--mini) + var(--carry));transform:translateX(-50%);background:var(--bg);border:1px solid var(--line);border-radius:999px;padding:5px 16px;z-index:4;pointer-events:none;max-width:min(92vw,900px);display:flex;gap:6px 12px;align-items:baseline;justify-content:center;flex-wrap:wrap;font-size:12px;line-height:1.3}
+body.mini-on #tip{top:46px;bottom:auto}body.mini-on #toasts{top:92px}
+#tip b{color:var(--gold);font-size:13px}#tip span{color:var(--txt)}#tip i{color:var(--cyan);font-style:normal}
+body:not([data-mode=room]) #tip,body:not([data-mode=room]) #jumps{display:none}
+#toasts{position:fixed;left:50%;top:48px;transform:translateX(-50%);z-index:9;display:flex;flex-direction:column;gap:6px;align-items:center;pointer-events:none;width:min(560px,92vw)}
+.toast{background:rgba(20,15,12,.92);border:1px solid var(--line);border-left:3px solid var(--gold);border-radius:8px;padding:7px 12px;font-size:13px;transition:opacity .4s}.toast.out{opacity:0}
+#cuetag{position:fixed;left:50%;bottom:132px;transform:translateX(-50%);background:rgba(10,8,6,.9);border:1px solid var(--gold);border-radius:8px;padding:4px 10px;font-size:12px;font-weight:700;color:var(--gold);z-index:6;pointer-events:none;white-space:nowrap}
+#chips button{position:fixed;left:0;top:0;z-index:6;display:flex;align-items:center;gap:6px;min-height:36px;padding:6px 12px 6px 9px;border-radius:999px;background:rgba(14,10,8,.9);border:1px solid rgba(242,184,75,.6);color:#fff6e2;font-size:12.5px;font-weight:600;letter-spacing:.02em;white-space:nowrap;box-shadow:0 2px 10px rgba(0,0,0,.55);will-change:transform}
+#chips button svg{width:18px;height:18px;flex:none;fill:none;stroke:var(--gold);stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+#chips button:hover,#chips button:focus-visible{background:var(--gold);color:#1b140c;border-color:var(--gold)}#chips button:hover svg,#chips button:focus-visible svg{stroke:#1b140c}
+#chips button.ico{padding:6px 9px}#chips button.gold{background:var(--gold);color:#1b140c;border-color:#fff3d6}#chips button.gold svg{stroke:#1b140c}#chips button.gold:hover,#chips button.gold:focus-visible{background:#ffd98a}
+body[data-mode=inspect] .toast:not(:last-child){display:none}
+#insp{position:fixed;right:10px;top:58px;bottom:10px;width:min(360px,33vw);background:var(--bg);border:1px solid var(--line);border-radius:14px;padding:12px;overflow:auto;z-index:6;backdrop-filter:blur(8px);-webkit-user-select:text;user-select:text}
+#insp header{display:flex;gap:10px}#insp header img{width:76px;height:76px;border-radius:6px;object-fit:cover}#insp h2{margin:0 0 2px;font-size:16px;color:var(--gold)}#insp p{margin:2px 0}
+.cue{font-size:11.5px;color:var(--cyan);margin:6px 0 0}
+.meta{font-size:11px;color:var(--dim);word-break:break-word}
+.trk{list-style:none;margin:8px 0;padding:0;display:flex;flex-direction:column;gap:4px}.trk button{width:100%;display:flex;gap:8px;align-items:center;text-align:left;padding:4px 6px}.trk img{width:36px;height:36px;border-radius:4px}.trk b{display:block;font-size:13px}.trk i{font-style:normal;font-size:11px;color:var(--dim)}.trk li.on button{border-color:var(--gold);background:rgba(242,184,75,.16)}
+.btns{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0}
+#station{position:fixed;left:12px;bottom:12px;width:min(330px,92vw);background:var(--bg);border:1px solid var(--line);border-radius:14px;padding:10px 12px;z-index:6;backdrop-filter:blur(8px)}
+#station h3{margin:0 0 4px;color:var(--gold);font-size:14px;display:flex;justify-content:space-between}#station p{margin:2px 0}.step{color:var(--cyan);font-size:12px}
+.trksel{display:flex;gap:4px;flex-wrap:wrap;margin:6px 0}.trksel button{min-width:30px;padding:3px 6px;min-height:26px}.trksel .on{background:var(--gold);color:#1b140c}
+.pitch{display:flex;gap:8px;align-items:center;font-size:12px}.pitch input{flex:1}
+#mini{position:fixed;left:50%;bottom:10px;transform:translateX(-50%);width:min(680px,calc(100vw - 20px));background:var(--bg);border:1px solid var(--line);border-radius:14px;padding:8px 10px;z-index:5;display:grid;grid-template-columns:54px 1fr auto;gap:4px 10px;align-items:center;backdrop-filter:blur(8px)}
+#mini img{width:54px;height:54px;border-radius:6px;grid-row:1/3}#mini .mi{min-width:0}#mini .mi b,#mini .mi span{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}#mini .src{color:var(--cyan);font-size:10px;font-weight:700;letter-spacing:.08em}#mini .mi span{font-size:11px;color:var(--dim)}#mini .mi span.src{color:var(--cyan)}
+#mini .mb{display:flex;gap:5px;grid-column:3;grid-row:1/3;flex-wrap:wrap;justify-content:flex-end;max-width:230px}#mini .mt{display:flex;gap:6px;align-items:center;font-size:11px}#mini .mt input{flex:1;min-width:60px}
+#mini .st{grid-column:1/4;margin:0;font-size:10.5px;color:var(--dim)}
+body[data-mode=vinyl] #mini,body[data-mode=cd] #mini{left:auto;right:10px;transform:none;width:min(520px,calc(100vw - 370px))}
+body[data-mode=inspect] #mini{left:10px;transform:none;width:min(560px,calc(100vw - min(360px,33vw) - 40px))}
+#pad{position:fixed;left:14px;bottom:130px;z-index:5;display:none;grid-template-columns:repeat(3,46px);grid-template-rows:repeat(2,46px);gap:4px}#pad button{padding:0;font-size:18px;touch-action:none}
+@media (pointer:coarse){body.entered[data-mode=room] #pad{display:grid}#jumps{flex-direction:row;flex-wrap:wrap;max-width:70vw}}
+#modal{position:fixed;inset:0;background:rgba(4,3,2,.66);z-index:20;display:flex;align-items:center;justify-content:center;padding:12px}
+#modalBox{position:relative;background:#17120f;border:1px solid var(--line);border-radius:16px;padding:18px;width:min(520px,100%);max-height:92vh;overflow:auto;-webkit-user-select:text;user-select:text}#modalBox.wide{width:min(780px,100%)}
+#modalBox h2{margin:0 0 6px;color:var(--gold)}.x{position:absolute;right:10px;top:10px;min-height:28px;padding:2px 9px}
+#fq{width:100%;font:inherit;font-size:16px;padding:9px 12px;border-radius:10px;border:1px solid var(--line);background:#0e0b09;color:var(--txt)}
+.chips{display:flex;gap:6px;flex-wrap:wrap;margin:8px 0}.chips .on{background:var(--gold);color:#1b140c}
+.res{display:grid;grid-template-columns:56px 1fr auto;gap:10px;align-items:center;border-top:1px solid rgba(255,255,255,.08);padding:8px 0}.res img{width:56px;height:56px;border-radius:6px}.res b,.res span{display:block}.res span{font-size:12px}.res .hit{color:var(--cyan)}.rb{display:flex;flex-direction:column;gap:4px}.rb button{min-height:26px;padding:3px 8px;font-size:12px}
+.poster{display:grid;grid-template-columns:minmax(0,300px) 1fr;gap:16px}.poster img{width:100%;border-radius:8px;border:1px solid var(--line)}.tag{color:var(--cyan);font-weight:700;letter-spacing:.08em;text-transform:uppercase;margin:0}
+.help{padding-left:18px;margin:8px 0}.help li{margin:5px 0}
+#receipt{background:#f4ecd8;color:#1c1814;border-radius:6px;padding:18px 20px;font-family:"Courier New",monospace;font-size:13px}#receipt h2{color:#1c1814;text-align:center;letter-spacing:.2em;margin:0}.rc{text-align:center;margin:4px 0}#receipt hr{border:0;border-top:1px dashed #1c1814}
+.ri{margin:8px 0}.ri b,.ri>span{display:block}.ri ol{margin:4px 0 0;padding-left:28px}.ri li{display:list-item}.ri li span{display:inline-block;min-width:55%}.ri li i{font-style:normal;float:right}
+#intro,#loader{position:fixed;inset:0;z-index:30;display:flex;align-items:center;justify-content:center;background:radial-gradient(ellipse at center,rgba(20,14,10,.82),rgba(4,3,2,.95));padding:14px}
+#intro>div,#loader>div{background:#17120f;border:1px solid var(--line);border-radius:18px;padding:22px;width:min(620px,100%);max-height:94vh;overflow:auto;text-align:left}
+#intro h1,#loader h1{margin:0;color:var(--gold);letter-spacing:.12em;font-size:24px}#intro h1 i{color:var(--cyan);font-style:normal}#enterBtn{font-size:16px;padding:10px 22px;margin-top:8px}
+@media (max-width:760px),(orientation:portrait){#insp{left:8px;right:8px;top:auto;bottom:8px;width:auto;height:44vh}#brand{left:8px;top:6px;padding:5px 10px;font-size:12px}#brand span,#brand em{display:none}#top{left:8px;right:8px;top:40px;max-width:none;flex-wrap:nowrap;overflow-x:auto;justify-content:flex-start;scrollbar-width:none}#top button{padding:4px 8px;font-size:12px;min-height:30px;white-space:nowrap;flex:none}#zone{top:8px;left:auto;right:8px;transform:none}#toasts,body.mini-on #toasts{top:148px}body[data-mode=inspect] #toasts{top:76px}body.mini-on #tip{top:76px}body.mini-on{--mini:176px}#tip{top:76px;bottom:auto;border-radius:12px;gap:2px 10px;padding:5px 12px;width:max-content}#jumps{bottom:calc(14px + var(--mini) + var(--carry))!important}#pad{bottom:calc(84px + var(--mini) + var(--carry))}
+ #jumps{top:auto;bottom:190px;flex-direction:row;flex-wrap:wrap;max-width:96vw}#station{left:8px;right:8px;width:auto;bottom:8px}.poster{grid-template-columns:1fr}
+ #mini,body[data-mode=inspect] #mini{left:8px;right:8px;transform:none;width:auto;grid-template-columns:44px 1fr}#mini img{width:44px;height:44px}#mini .mb{grid-column:1/3;grid-row:auto;max-width:none;justify-content:flex-start}
+ body[data-mode=vinyl] #mini,body[data-mode=cd] #mini,body[data-mode=inspect] #mini{display:none}.res{grid-template-columns:44px 1fr}.rb{grid-column:1/3;flex-direction:row}}
+@media print{body>*:not(#modal){display:none!important}#modal{position:static;background:none;display:block;padding:0}#modalBox{border:0;background:none;max-height:none;overflow:visible;width:auto}.noprint,.x{display:none!important}#receipt{border:1px solid #999}}
+</style>
+</head>
+<body data-mode="room" data-look="released">
+<canvas id="c" tabindex="0" aria-label="3D record shop. Use WASD or arrow keys to walk, mouse to look, click to interact."></canvas>
+<div id="reticle" aria-hidden="true"></div>
+<div id="tip" hidden></div>
+<div id="cuetag" hidden></div>
+<div id="hud">
+  <div id="brand"><b>✕ XTRATA <i>MUSIC</i></b><em> — The Record Shop</em><span id="counts"></span><span id="radioNow" aria-live="polite"></span></div>
+  <div id="zone" aria-live="polite"></div>
+  <div id="top" role="toolbar" aria-label="Shop controls">
+    <button data-act="find" title="Find (/)">🔍 Find</button><button data-act="crate" id="bCrate" title="Crate List (B)">Crate (0)</button><button data-act="shuffle" title="Shuffle displays">🔀 Shuffle</button>
+    <button data-act="weather" id="bWeather"></button><button data-act="radio" id="bRadio" title="Shop radio through the four ceiling speakers">📻 Radio</button><button data-act="look" id="bLook" title="Mouse Look (M)"></button><button data-act="help" aria-label="Help" title="Help (H)">?</button>
+  </div>
+  <nav id="jumps" aria-label="Zone jumps"></nav>
+  <div id="carry" hidden></div>
+</div>
+<div id="toasts"></div>
+<div id="chips" hidden role="toolbar" aria-label="Held item actions"></div>
+<aside id="insp" hidden aria-label="Release inspector"></aside>
+<section id="station" hidden aria-label="Listening station controls"></section>
+<section id="mini" hidden aria-label="Now playing"></section>
+<div id="pad" aria-label="Movement pad"><span></span><button data-k="w" aria-label="Walk forward">▲</button><span></span><button data-k="a" aria-label="Step left">◀</button><button data-k="s" aria-label="Walk back">▼</button><button data-k="d" aria-label="Step right">▶</button></div>
+<div id="modal" hidden><div id="modalBox" role="dialog" aria-modal="true"></div></div>
+<div id="intro" hidden><div role="dialog" aria-modal="true" aria-label="Welcome"><h1>✕ XTRATA <i>MUSIC</i></h1><p>The Record Shop — permanent on-chain records &amp; CDs from the Audionals ecosystem.</p><div id="introHelp"></div><button id="enterBtn" class="gold">Enter the shop</button></div></div>
+<div id="loader"><div><h1>✕ XTRATA MUSIC</h1><p>Stocking the shelves…</p></div></div>
+/*__DATA__*/
+<script>
+/*__JS__*/
+</script>
+</body>
+</html>

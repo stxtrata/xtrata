@@ -98,6 +98,8 @@
 /radio/lounge /music/lounge 301
 /radio/lounge.html /music/lounge 301
 /music/lounge.html /music/lounge 301
+# The 3D record shop is one static file at /music/shop/ (built by record-shop/build.mjs).
+/music/shop /music/shop/ 301
 
 # NFT preservation checker: the page lives at /nftcheck/. Other spellings go there.
 # (The page's own data calls go to /checker/lookup and /checker/requests, which are Pages Functions and are not redirected.)
