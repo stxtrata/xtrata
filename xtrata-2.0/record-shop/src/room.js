@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import {BOOTH,WALL_Z} from './booth.js';
 import {rng,lerp,clamp} from './util.js';
 
 export function buildRoom(app){
@@ -28,7 +29,11 @@ export function buildRoom(app){
   // shell
   const fl=new THREE.Mesh(new THREE.PlaneGeometry(16,11),M.floor);fl.rotation.x=-Math.PI/2;fl.receiveShadow=true;g.add(fl);
   const ce=new THREE.Mesh(new THREE.PlaneGeometry(16,11),M.ceil);ce.rotation.x=Math.PI/2;ce.position.y=H;g.add(ce);
-  box(g,16,H,.2,M.wall,0,H/2,-5.6,{cast:false});box(g,.2,H,11.4,M.wall,-8.1,H/2,0,{cast:false});box(g,.2,H,11.4,M.wall,8.1,H/2,0,{cast:false});
+  // back wall with an opening for the Audionaut booth, which is recessed into an alcove behind it
+  const ox0=BOOTH.x-BOOTH.w/2,ox1=BOOTH.x+BOOTH.w/2,oh=BOOTH.h,bz=WALL_Z-.1;
+  box(g,ox0+8,H,.2,M.wall,(ox0-8)/2,H/2,bz,{cast:false});box(g,8-ox1,H,.2,M.wall,(ox1+8)/2,H/2,bz,{cast:false});box(g,BOOTH.w,H-oh,.2,M.wall,BOOTH.x,oh+(H-oh)/2,bz,{cast:false});
+  for(const [w,x] of [[ox0+8,(ox0-8)/2],[8-ox1,(ox1+8)/2]])app.addOccluder(w,H,.2,x,H/2,bz);app.addOccluder(BOOTH.w,H-oh,.2,BOOTH.x,oh+(H-oh)/2,bz);
+  box(g,BOOTH.w+.16,.08,.05,M.black,BOOTH.x,oh+.04,WALL_Z+.02,{cast:false});for(const x of [ox0-.04,ox1+.04])box(g,.08,oh+.08,.05,M.black,x,oh/2,WALL_Z+.02,{cast:false});box(g,.2,H,11.4,M.wall,-8.1,H/2,0,{cast:false});box(g,.2,H,11.4,M.wall,8.1,H/2,0,{cast:false});
   // front wall with real glazed opening (x -0.6..7.12, y .72..3.66) and a glazed door
   const fz=5.6;
   box(g,5.5,H,.2,M.wall,-5.25,H/2,fz,{cast:false});box(g,1.2,H-2.3,.2,M.wall,-1.9,2.3+(H-2.3)/2,fz,{cast:false});box(g,.7,H,.2,M.wall,-.95,H/2,fz,{cast:false});
@@ -44,8 +49,8 @@ export function buildRoom(app){
   // beams, wainscot, skirting
   for(const z of [-4.4,-2.2,0,2.2,4.4])box(g,16,.26,.2,M.dark,0,H-.13,z,{cast:false});
   box(g,.22,.3,11,M.dark,-3,H-.15,0,{cast:false});box(g,.22,.3,11,M.dark,3,H-.15,0,{cast:false});
-  box(g,16,1,.05,M.dark,0,.5,-5.475,{cast:false});box(g,.05,1,11,M.dark,7.975,.5,0,{cast:false});box(g,.05,1,2.95,M.dark,-7.975,.5,4.02,{cast:false});
-  box(g,16,.03,.07,M.brass,0,1.015,-5.47,{cast:false});box(g,.07,.03,11,M.brass,7.97,1.015,0,{cast:false});
+  for(const [w,x] of [[ox0-.08+8,(ox0-.08-8)/2],[8-ox1-.08,(ox1+.08+8)/2]])box(g,w,1,.05,M.dark,x,.5,-5.475,{cast:false});box(g,.05,1,11,M.dark,7.975,.5,0,{cast:false});box(g,.05,1,2.95,M.dark,-7.975,.5,4.02,{cast:false});
+  for(const [w,x] of [[ox0-.08+8,(ox0-.08-8)/2],[8-ox1-.08,(ox1+.08+8)/2]])box(g,w,.03,.07,M.brass,x,1.015,-5.47,{cast:false});box(g,.07,.03,11,M.brass,7.97,1.015,0,{cast:false});
   // lights
   R.hemi=new THREE.HemisphereLight(0xffe2bd,0x2a1b10,.75);scene.add(R.hemi);
   scene.add(new THREE.AmbientLight(0xffe9d0,.22));
@@ -68,7 +73,8 @@ export function buildRoom(app){
   sign(art.neon('ON-CHAIN · FOREVER',null,'#ff5fa2',768,128),1.5,.25,-.9,3.2,-5.47,0);
   R.sign=sign;
   // posters (about eleven, varied sizes)
-  const PS=[[-3.25,1.95,-5.45,0,.9,1.2],[-1.75,1.7,-5.45,0,.7,.7],[-.35,1.95,-5.45,0,1,1.4],[1.25,1.75,-5.45,0,.8,.8],
+  // back wall: two posters either side of the booth opening (x -1.97..0.77)
+  const PS=[[-3.5,1.95,-5.45,0,.9,1.2],[-2.47,1.7,-5.45,0,.7,.7],[1.25,1.85,-5.45,0,.62,.87],[2.2,1.75,-5.45,0,.8,.8],
     [7.95,1.95,-2.7,-Math.PI/2,1,1.4],[7.95,1.75,-1.1,-Math.PI/2,.8,.8],[7.95,1.8,.6,-Math.PI/2,1.3,.87],[7.95,1.95,2.4,-Math.PI/2,.9,1.2],[7.95,1.7,4.2,-Math.PI/2,.7,.7],
     [-7.95,1.95,3.45,Math.PI/2,.9,1.2],[-7.95,1.75,4.75,Math.PI/2,.72,.72]];
   PS.forEach(([x,y,z,ry,w,h],i)=>{const c=art.mkCanvas(512,Math.round(512*h/w)),tex=art.mkTex(c);

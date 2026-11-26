@@ -18,7 +18,7 @@ export function initUI(app){
   const v3=new THREE.Vector3();
   U.cueTag=(text,obj)=>{if(!text){cue.hidden=true;return;}obj.getWorldPosition(v3);v3.project(app.camera);cue.hidden=false;if(cue.textContent!==text)cue.textContent=text;};
   // ---------- HUD ----------
-  const JUMPS=['Entrance','CD Wall','CD Player','Vinyl Crates','Turntable','Checkout','Window'];
+  const JUMPS=['Entrance','CD Wall','CD Player','Vinyl Crates','Turntable','Checkout','Window','Audionaut Booth'];
   $('jumps').innerHTML=JUMPS.map((j,i)=>`<button data-jump="${j}" title="${j} (${i+1})">${j==='Entrance'?'Entrance / Reset':j}</button>`).join('');
   function renderHUD(){const s=app.state;$('bCrate').textContent='Crate ('+app.shop.crate.length+')';{const wl=app.room.weatherLabel();$('bWeather').textContent=wl;$('bWeather').title='Outside: live local time & weather, Late-Night Rain, or Golden Hour';$('bWeather').setAttribute('aria-label','Outside: '+wl+'. Click to change.');}
     if(app.radio){const r=app.radio,n=r.now;$('bRadio').textContent='📻 Radio: '+(!r.available?'Off-air':r.on?'On':'Off');$('bRadio').setAttribute('aria-pressed',!!r.on);$('radioNow').textContent=r.on&&n?'Shop radio — '+(n.artist||'Xtrata')+' · '+n.title:'';}$('bLook').textContent='Mouse Look: '+(s.mouseLook?'On':'Off');$('bLook').setAttribute('aria-pressed',s.mouseLook);$('zone').textContent=s.zone||'';
@@ -89,7 +89,36 @@ ${R.items.map(i=>`<div class="ri"><b>${esc(i.title)}</b><span>${esc(i.artist||'�
       handler=m=>{if(m==='find')U.openFinder('');};}};
   const HELP=`<ul class="help"><li><b>Look</b> — click once, then just move the mouse (no dragging). <b>Esc</b> frees the pointer.</li><li><b>Walk</b> — WASD or arrow keys. Quick-jump buttons travel along clear aisles.</li><li><b>Aim + click</b> — the small centre dot is your hand. Click a CD spine or sleeve to pull it out; <b>E</b> grabs a vinyl sleeve.</li>
 <li><b>CDs</b> — click the cover to open the case, click a track artwork to audition it, <b>T</b> takes the disc to the CD Player.</li><li><b>Vinyl</b> — carry a sleeve to the Turntable, click the glowing pad, click the sleeve, then hold the record with the mouse and drop it on the platter. Grab the headshell, swing it over the grooves and let go.</li>
-<li><b>/</b> Find · <b>B</b> Crate List · <b>M</b> Mouse Look · <b>1–7</b> zone jumps · <b>H</b> this help.</li></ul><p class="dim small">Songs and artwork stream from each track’s on-chain Xtrata player when you are online. CDs are free 30-second previews; vinyl plays each side in full. Offline, the shop runs a demo timer with handling foley only.</p>`;
+<li><b>Audionaut booth</b> — a forking demo. Walk up and aim: press <b>FORK</b> to make a song your own, <b>VARY</b> or <b>BORROW</b> a layer, click steps to edit, and aim at any hit to see who made it. The wall shows the family tree and credits; the panel bottom-left has the same controls.</li>
+<li><b>/</b> Find · <b>B</b> Crate List · <b>M</b> Mouse Look · <b>1–8</b> zone jumps · <b>H</b> this help.</li></ul><p class="dim small">Songs and artwork stream from each track’s on-chain Xtrata player when you are online. CDs are free 30-second previews; vinyl plays each side in full. Offline, the shop runs a demo timer with handling foley only.</p>`;
+  U.openBooth=()=>{U.modal('booth',`<h2>The Audionaut — forking demo</h2>
+<p>In The Audionaut a song isn’t a finished audio file. It’s a set of instructions — which sound, which step, which note — built from reusable parts: <b>drums, bass, keys and lead</b>. Each part has a maker, and the credit travels with it.</p>
+<ul class="help"><li><b>Fork</b> — start a new song from any version. You inherit every part exactly, you become the fork’s maker, and the booth writes a fresh variation of one layer so you can hear your fork straight away.</li>
+<li><b>Vary</b> — ask for another variation of a layer: always in key, and never identical to any other version.</li>
+<li><b>Borrow</b> — bring a layer in from a different song. It plays in your song’s key and tempo and stays credited to the people who made it.</li>
+<li><b>Edit</b> — click any step on the console. Your changes are credited to your fork.</li>
+<li><b>Hear parent</b> — flip between your fork and the version it came from without the music stopping.</li></ul>
+<p>Aim at any hit to see who made it and whether it was inherited, borrowed or new. The wall shows the family tree and the credits for the version you’re on.</p>
+<p class="dim small">This is a demonstration: the makers are placeholders, everything plays live in your browser, and nothing here is saved, inscribed or paid for. The full Audionaut — the Blockchain Audional Work-Space-Station that the Audionauts unlock — is at xtrata.xyz/audionaut.</p>
+<div class="btns"><a class="btnlink gold" href="${app.STUDIO_URL}" target="_blank" rel="noopener">Open xtrata.xyz/audionaut ↗</a><button data-m="credits">Tree &amp; credits</button><button data-m="close" autofocus>Back to the booth</button></div>`,{label:'How forking works',wide:true});handler=m=>{if(m==='credits')U.openBoothCredits();};};
+  U.openBoothTopic=id=>{const B=app.booth,T=B.TOPICS,i=Math.max(1,T.findIndex(t=>t.id===id)),t=T[i];if(!t||t.id==='tree')return U.openBoothCredits();const col={LIVE:'var(--green,#35d07f)',IDEA:'#ff5fa2',PLANNED:'var(--cyan)',DEMO:'var(--gold)'}[t.status]||'var(--dim)';
+    const links={payments:[['https://xtrata.xyz/music/lounge','Xtrata Music lounge ↗']],studio:[[app.STUDIO_URL,'The Audionaut ↗'],['https://xtrata.xyz/audionaut-beta/','Try the community beta ↗']],holder:[['https://xtrata.xyz/music/artist/','Artist portal ↗']]}[t.id]||[];
+    const prev=T[i-1&&i-1>0?i-1:T.length-1],next=T[i+1<T.length?i+1:1];
+    U.modal('boothtopic',`<p class="tag" style="color:${col}">${esc(t.status)}</p><h2>${esc(t.title)}</h2><p><b>${esc(t.kicker)}</b></p><ul class="help">${t.points.map(p=>`<li>${esc(p)}</li>`).join('')}</ul>${t.note?`<p class="dim small">${esc(t.note)}</p>`:''}
+<p class="dim small">${t.status==='IDEA'?'This describes an idea, not something built.':'Status as described in the Xtrata Music guide (20 Oct 2026).'} Nothing in the booth is saved, inscribed or paid.</p>
+<div class="btns">${links.map(([h,l])=>`<a class="btnlink" href="${h}" target="_blank" rel="noopener">${esc(l)}</a>`).join('')}<button data-m="t:${prev.id}">◀ ${esc(prev.tab)}</button><button data-m="t:${next.id}">${esc(next.tab)} ▶</button><button data-m="close" autofocus>Back to the booth</button></div>`,{label:t.title,wide:true});
+    handler=m=>{if(m.startsWith('t:')){B.setTopic(m.slice(2));U.openBoothTopic(m.slice(2));}};};
+  U.openBoothCredits=()=>{const B=app.booth,S=B.studio,v=S.get(S.cur),f=S.family(v.fam),cr=S.credits(v.id),t=S.tree(v.fam);
+    const kids={};for(const n of t.nodes)(kids[n.parent||'root']=kids[n.parent||'root']||[]).push(n);
+    const li=n=>`<li><button data-m="node:${n.id}" class="${n.id===v.id?'on':''}">${esc(n.label)}</button> <span class="dim small">${n.mine?'by you':'by '+esc(B.makerLabel(n.maker))}${n.borrows.length?' · borrowed '+n.borrows.map(b=>esc(b.layer+' from '+b.fromLabel)).join(', '):''}</span>${kids[n.id]?`<ul>${kids[n.id].map(li).join('')}</ul>`:''}</li>`;
+    const bar=(name,pct,me)=>`<div class="cbar"><span>${esc(name)}</span><i><b style="width:${pct}%;background:${me?'var(--cyan)':'var(--gold)'}"></b></i><em>${pct}%</em></div>`;
+    U.modal('boothcredits',`<h2>Credits · ${esc(f.title)} ${esc(v.label)}</h2><p class="dim">Ancestry: ${cr.ancestry.map(esc).join(' ← ')}</p>
+<h3>Who made the hits and notes</h3>${cr.makers.map(m=>bar(m.name,m.pct,m.key==='you')).join('')}
+<h3>From which songs</h3>${cr.songs.map(s=>bar(s.key,s.pct,false)).join('')}
+<p>${cr.how.inherited} inherited · ${cr.how.borrowed} borrowed · ${cr.how.new} new (out of ${cr.total})</p>${cr.borrows.length?`<p>Borrowed: ${cr.borrows.map(b=>esc(`${b.layer} into ${b.into} from ${b.from}`)).join('; ')}</p>`:''}
+<h3>Family tree — click a version to hear it</h3><ul class="ftree">${(kids.root||[]).map(li).join('')}</ul>
+<p class="dim small">Shares count hits and notes, not money. Demo makers are placeholders; nothing here is inscribed or paid.</p><div class="btns"><button data-m="close" autofocus>Back to the booth</button></div>`,{label:'Credits',wide:true});
+    handler=m=>{if(m.startsWith('node:')){U.closeModal();B.select(m.slice(5));}};};
   U.openHelp=()=>{U.modal('help','<h2>How the shop works</h2>'+HELP+'<div class="btns"><button data-m="close" autofocus>Back to the shop</button></div>',{label:'Help'});handler=null;};
   $('introHelp').innerHTML=HELP;
   // ---------- mini-player ----------

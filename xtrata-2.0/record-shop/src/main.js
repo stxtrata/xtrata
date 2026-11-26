@@ -13,6 +13,7 @@ import {initShop} from './shop.js';
 import {initUI} from './ui.js';
 import {initChain} from './chain.js';
 import {initRadio} from './radio.js';
+import {initBooth,BOOTH} from './booth.js';
 
 const qs=new URLSearchParams(location.search),$=id=>document.getElementById(id);
 const app={THREE,state:{mode:'room',entered:false,locked:false,look:'released',mouseLook:true,lockDenied:qs.has('nolock')||!document.documentElement.requestPointerLock||(matchMedia('(pointer:coarse)').matches&&!matchMedia('(any-pointer:fine)').matches),weather:'live',modal:null,busy:null,zone:'Entrance'},
@@ -48,9 +49,9 @@ async function boot(){
   app.fgScene=new THREE.Scene();app.fgCam=new THREE.PerspectiveCamera(60,innerWidth/innerHeight,.02,8);
   camera.rotation.order='YXZ';
   const art=app.art=initArt(app);await art.preload();
-  buildRoom(app);initModels(app);initPlayback(app);initStock(app);initInspector(app);initDeck(app);initVinyl(app);initShop(app);initChain(app);initRadio(app);const ui=initUI(app);
+  buildRoom(app);initModels(app);initPlayback(app);initStock(app);initInspector(app);initDeck(app);initVinyl(app);initBooth(app);initShop(app);initChain(app);initRadio(app);const ui=initUI(app);
   for(const n of app.notes)app.toast(n);
-  const {state,player}=app,stock=app.stock,insp=app.inspector,deck=app.deck,vinyl=app.vinyl;
+  const {state,player}=app,stock=app.stock,insp=app.inspector,deck=app.deck,vinyl=app.vinyl,booth=app.booth;
   app.shop.shuffle((Date.now()^0x5bd1e995)>>>0,true);
   renderer.shadowMap.needsUpdate=true;
 
@@ -77,7 +78,7 @@ async function boot(){
     return out;}
   app.findPath=findPath;
   const J={'Entrance':{x:.05,z:4.22,yaw:0,pitch:0},'CD Wall':{x:-6.05,z:-.55,yaw:Math.PI/2,pitch:-.1},'CD Player':{x:-5.32,z:-3.5,yaw:0,pitch:-.3,then:()=>deck.focus()},
-    'Vinyl Crates':{x:3.1,z:1.02,yaw:0,pitch:-.6},'Turntable':{x:4.3,z:-3.45,yaw:0,pitch:-.35,then:()=>vinyl.focus()},'Checkout':{x:-4.9,z:2.72,yaw:Math.PI,pitch:-.33},'Window':{x:3.2,z:3.6,yaw:Math.PI,pitch:.04}};
+    'Vinyl Crates':{x:3.1,z:1.02,yaw:0,pitch:-.6},'Turntable':{x:4.3,z:-3.45,yaw:0,pitch:-.35,then:()=>vinyl.focus()},'Checkout':{x:-4.9,z:2.72,yaw:Math.PI,pitch:-.33},'Window':{x:3.2,z:3.6,yaw:Math.PI,pitch:.04},'Audionaut Booth':{x:BOOTH.x,z:BOOTH.z+BOOTH.d/2+.45,look:{x:BOOTH.x,y:1.02,z:BOOTH.z+.02}}};
   app.jumps=J;
   app.jump=(name,custom)=>{const t=custom||J[name];if(!t)return;if(state.modal)ui.closeModal();if(insp.item)insp.close();if(state.mode==='cd'||state.mode==='vinyl')app.exitFocus();if(stock.active)stock.cancelExtract();
     app.whenIdle(()=>{let [gi,gj]=freeCell(...cell(t.x,t.z));let gx=t.x,gz=t.z;if(blocked(gx,gz,.3)){gx=GX0+gi*GS;gz=GZ0+gj*GS;}
@@ -160,11 +161,11 @@ async function boot(){
     if(['w','a','s','d','arrowup','arrowdown','arrowleft','arrowright'].includes(k)){keys[k]=true;if(player.travel)player.travel=null;e.preventDefault();return;}
     if(e.repeat)return;
     if(k==='e')clickCentre(true);else if(k==='enter'||k===' '){e.preventDefault();clickCentre();}else if(k==='m')app.setMouseLook(!state.mouseLook);else if(k==='b')ui.openCrate();else if(k==='h'||k==='?')ui.openHelp();
-    else if(k==='r'&&app.carry)app.returnCarry();else if(/^[1-7]$/.test(k))app.jump(Object.keys(J)[+k-1]);});
+    else if(k==='r'&&app.carry)app.returnCarry();else if(/^[1-8]$/.test(k))app.jump(Object.keys(J)[+k-1]);});
   window.addEventListener('keyup',e=>{keys[e.key.toLowerCase()]=false;});
   window.addEventListener('resize',()=>{renderer.setSize(innerWidth,innerHeight);camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();if(state.mode==='vinyl'&&!vinyl.b.g&&!focus.exiting)vinyl.focus();if(state.mode==='cd')deck.focus();});
   // ---- update ----
-  const ZONES=[['CD Wall',p=>p.x<-5.1&&p.z>-3.4&&p.z<2.9],['CD Listening Booth',p=>p.x<-3.4&&p.z<=-2.9],['Vinyl Listening Bench',p=>p.x>2.3&&p.z<-2.8],['Vinyl Crates',p=>p.x>1&&p.x<5.5&&p.z>-1.5&&p.z<1.9],['Checkout',p=>p.x<-3.1&&p.z>2.1],['Feature Island',p=>p.x>-3.5&&p.x<-.4&&p.z>-3&&p.z<2],['Storefront Window',p=>p.x>.9&&p.z>2.9],['Entrance',p=>p.z>3.2&&p.x>-3&&p.x<=.9]];
+  const ZONES=[['Audionaut Booth',p=>p.x>BOOTH.x-BOOTH.w/2-.5&&p.x<BOOTH.x+BOOTH.w/2+.5&&p.z<BOOTH.z+BOOTH.d/2+1.1],['CD Wall',p=>p.x<-5.1&&p.z>-3.4&&p.z<2.9],['CD Listening Booth',p=>p.x<-3.4&&p.z<=-2.9],['Vinyl Listening Bench',p=>p.x>2.3&&p.z<-2.8],['Vinyl Crates',p=>p.x>1&&p.x<5.5&&p.z>-1.5&&p.z<1.9],['Checkout',p=>p.x<-3.1&&p.z>2.1],['Feature Island',p=>p.x>-3.5&&p.x<-.4&&p.z>-3&&p.z<2],['Storefront Window',p=>p.x>.9&&p.z>2.9],['Entrance',p=>p.z>3.2&&p.x>-3&&p.x<=.9]];
   let zt=0,bob=0;
   function update(dt,real){app.realDt=real==null?dt:real; // song time follows the wall clock even when frames are slow
     for(let i=app.anims.length-1;i>=0;i--){const a=app.anims[i];a.t+=dt;const t=Math.min(1,a.t/a.dur);a.fn(t);if(t>=1){app.anims.splice(i,1);a.res();}}
@@ -187,7 +188,7 @@ async function boot(){
     if(focus.active){focus.t=Math.min(1,focus.t+dt/focus.dur);const e=easeIO(focus.t);camera.position.lerpVectors(focus.p0,focus.p1,e);camera.quaternion.slerpQuaternions(focus.q0,focus.q1,e);if(focus.t>=1&&focus.exiting){focus.active=false;focus.exiting=false;}}
     if(!focus.active){camera.position.set(player.x,1.62+Math.sin(bob)*.012,player.z);camera.rotation.set(player.pitch,player.yaw,0);}
     camera.updateMatrixWorld(true);camera.matrixWorldInverse.copy(camera.matrixWorld).invert();
-    app.room.update(dt);stock.update(dt);app.playback.update(dt);deck.update(dt);vinyl.update(dt);insp.update(dt);app.shop.update(dt);app.radio.update(dt);
+    app.room.update(dt);stock.update(dt);app.playback.update(dt);deck.update(dt);vinyl.update(dt);insp.update(dt);app.shop.update(dt);booth.update(dt);app.radio.update(dt);
     if(app.idleQ.length&&state.mode==='room'&&!state.busy&&!focus.active&&!stock.active&&!insp.item&&!state.modal){const q=app.idleQ.splice(0);for(const f of q)f();}
     if(canAct())hoverSet(pickCentre());else if(state.entered&&state.mode==='room'&&state.look==='released'&&!state.modal&&!state.busy&&!focus.active)hoverSet(RELOCK);else if(hover&&(state.mode!=='room'||state.modal||player.travel||hover===RELOCK))hoverSet(null);
     zt+=dt;if(zt>.25){zt=0;let z='Shop Floor';for(const [n,f] of ZONES)if(f(player)){z=n;break;}if(state.mode==='cd')z='CD Listening Booth';if(state.mode==='vinyl')z='Vinyl Listening Bench';if(z!==state.zone){state.zone=z;app.emit('zone');}}
@@ -215,7 +216,7 @@ async function boot(){
         player:{x:player.x,z:player.z,yaw:player.yaw,pitch:player.pitch,travel:!!player.travel},cam:{x:camera.position.x,y:camera.position.y,z:camera.position.z},focus:focus.active,
         carry:app.carry?{kind:app.carry.kind,rel:app.carry.rel.id}:null,cd:{state:app.cd.state,rel:app.cd.rel?app.cd.rel.id:null,slot:app.cd.slot?app.cd.slot.id:null},
         hover:hover?{id:hover.id,title:hover.title,sub:hover.sub}:null,inspect:insp.item?{kind:insp.item.kind,rel:insp.item.rel.id,slot:insp.item.slot.id,open:insp.item.model.open||0,phase:insp.phase,discVisible:insp.item.kind==='cd'?insp.item.model.disc.visible:null}:null,
-        extract:stock.active?{slot:stock.active.slot.id,p:stock.active.p,dir:stock.active.dir}:null,playback:app.playback.qa(),deck:deck.qa(),vinyl:vinyl.qa(),chain:app.chain.qa?app.chain.qa():{enabled:false},radio:app.radio.qa(),crate:app.shop.crate.slice(),seed:app.shop.seed,
+        extract:stock.active?{slot:stock.active.slot.id,p:stock.active.p,dir:stock.active.dir}:null,playback:app.playback.qa(),deck:deck.qa(),vinyl:vinyl.qa(),booth:booth.qa(),chain:app.chain.qa?app.chain.qa():{enabled:false},radio:app.radio.qa(),crate:app.shop.crate.slice(),seed:app.shop.seed,
         catalog:{source:app.catalogSource,albums:cat.albums.length,singles:cat.singles.length,releases:cat.releases.length,tracks:cat.trackCount,feed:cat.feed_songs},stock:stock.count,art:{...art.stats,entries:art.entries.size},
         render:{calls:renderer.info.render.calls,tris:renderer.info.render.triangles,textures:renderer.info.memory.textures,geometries:renderer.info.memory.geometries,pr:renderer.getPixelRatio()},toast:ui.lastToast||null};},
       teleport(x,z,yaw=player.yaw,pitch=player.pitch){player.x=x;player.z=z;player.yaw=yaw;player.pitch=pitch;player.travel=null;player.vx=player.vz=0;update(0);},
