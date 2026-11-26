@@ -7,14 +7,17 @@ The whole app is one generated HTML file with three.js r170 bundled (MIT licence
 |---|---|
 | `src/` | Source modules (room, CD wall, inspector, CD deck, vinyl bench/turntable, playback, chain streaming, radio, shop UI) |
 | `template.html` | Page shell and styles |
-| `build.mjs` | Bundles everything and writes `dist/Xtrata-Record-Shop-3D.html` and `../public/music/shop/index.html` |
+| `build.mjs` | Bundles everything and writes `dist/Xtrata-Record-Shop-3D.html` and `../music/shop/index.html` |
 | `test/` | Browser suites (Python Playwright + Google Chrome) |
+
+The published page is `../music/shop/index.html`. It must not go in `public/music/`: the site's postbuild step
+replaces `dist/music` with the `music/` folder, so a page under `public/music/` never reaches the deployed site.
 
 ## Build
 
 ```sh
 npm ci
-npm run build        # regenerates ../public/music/shop/index.html
+npm run build        # regenerates ../music/shop/index.html
 ```
 
 `build.mjs` passes `tsconfigRaw:'{}'` so the bundle does not inherit the site's TypeScript settings.
