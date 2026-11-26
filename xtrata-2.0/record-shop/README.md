@@ -43,16 +43,28 @@ real downloaded inscriptions through a mocked route; nothing in the tests talks 
 
 Offline it still opens, with placeholder artwork and a labelled demo timer instead of audio.
 
-## The Audionaut booth
+## The Audionaut booth — forking demo
 
 A permanent 9 ft × 6 ft × 8 ft station set into the back wall (`src/booth.js`, quick-jump 8): its open front is flush
-with the wall and the booth sits in an alcove behind it. It has a 16-step sequencer on
-the console screen, four Paper Play pattern cards on the left wing and four mutable stems on the right wing. There is
-no step-in mode: you walk up to the opening and aim the centre dot at a button, a screen
-step, a card or a stem, and click. A panel with the same controls appears bottom-left while you are at the booth. Sound is
-synthesised in the browser through the shop's shared AudioContext from a positional source at the console, so it fades
-as you walk away. Nothing is saved, inscribed or paid for; the About panel links to the full studio at
-`xtrata.xyz/audionaut`. Starting the booth pauses any CD or record, and starting a CD or record stops the booth.
+with the wall and the booth sits in an alcove behind it. It teaches forking, reuse and attribution in a minute or two.
+
+- **Model** (`src/fork.js`, no three.js, unit-tested in `test/fork.test.mjs`): six starting songs (house, boom bap, lo-fi,
+  techno, electro, half-time), each built v1 drums → v2 bass → v3 keys → v4 lead by four placeholder demo makers, plus a
+  few demo forks (one already borrows a bassline). Every version is a full 6 × 16 snapshot, and every hit or note stores
+  the version where it was made, so any hit can say which song, version and maker it came from and whether it is
+  inherited, borrowed or new. Melodic values are scale degrees, so borrowed layers land in the new song's key; steps
+  are tempo-free, so they follow its tempo.
+- **Fork** copies a version exactly with you as maker, then writes a variation of one layer (chosen, or picked for you).
+  **Vary** does another variation; **Borrow** brings a layer from another song; clicking a step edits it. Changes to a
+  version that isn't yours start your own fork first. Variations are always in key, must differ from the parent, and
+  are checked against every version in the studio so no two are ever identical.
+- **Booth**: console grid (inherited, striped = borrowed, white dot = new, gold outline = just changed); FORK / VARY /
+  BORROW / PLAY / HEAR PARENT buttons (hear-parent switches without stopping the music); song cards on the left wall;
+  layer blocks on the right wall (choose the layer); family tree and credits on the back-wall screen (click a version
+  to hear it); RESET DEMO plate. The panel bottom-left (compact on phones) has the same controls plus a Tree & credits
+  dialog. Nothing is saved, inscribed or paid for; shares count hits and notes, not money.
+- Sound is synthesised in the browser through the shop's shared AudioContext from a positional source at the console.
+  Starting the booth pauses any CD or record, and starting a CD or record stops the booth.
 
 ## Shop radio
 

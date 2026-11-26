@@ -3,71 +3,121 @@ sys.path.insert(0,'test')
 from common import *
 R={}
 def ok(name,cond,info=''):
-    R[name]=bool(cond); print(('PASS ' if cond else 'FAIL ')+name,info if (info!='' and (not cond or len(str(info))<200)) else '')
+    R[name]=bool(cond); print(('PASS ' if cond else 'FAIL ')+name,info if (info!='' and (not cond or len(str(info))<220)) else '')
 async def main():
     async with async_playwright() as p:
         b,page,errs,reqs=await launch(p); E=page.evaluate
         await enter(page); await page.mouse.move(640,400)
-        bq=lambda: E("__QA.state().booth")
+        bq=lambda: E("__QA.app.booth.qa()")
         # layout: booth recessed behind the wall line; back-wall posters clear of the opening
         lay=await E("""(()=>{const a=__QA.app,x=-.6,w=2.74,ox0=x-w/2,ox1=x+w/2,fz=-5.5;
           const recessed=a.booth.root.position.z+1.83/2<=fz+.001,front=!__QA.blocked(x,fz+.5,.3),into=__QA.blocked(x,fz-.3,.3);
           const ps=a.room.posters.map(p=>({x:p.mesh.position.x,z:p.mesh.position.z,w:p.w}));const back=ps.filter(p=>p.z<-5.3);
           const clash=back.filter(p=>p.x+p.w/2>ox0-.08&&p.x-p.w/2<ox1+.08).length;return {recessed,front,into,n:ps.length,back:back.length,clash}})()""")
-        ok('booth is set into the back wall: its front is flush with the wall and you stand in the room in front of it',lay['recessed'] and lay['front'] and lay['into'],lay)
-        ok('all 11 posters still hang; the four on the back wall sit either side of the opening',lay['n']==11 and lay['back']==4 and lay['clash']==0,lay)
-        # free interaction: stand in the open front strip and aim with the centre dot; the view never locks
+        ok('booth is set into the back wall and you stand in the room in front of it',lay['recessed'] and lay['front'] and lay['into'],lay)
+        ok('all 11 posters still hang, none over the opening',lay['n']==11 and lay['back']==4 and lay['clash']==0,lay)
         FX,FZ=-.6,-5.0
-        async def aim(what,a=0,b=0,x=FX,z=FZ):
-            await page.mouse.move(640,400)  # back over the canvas (a panel click leaves the pointer on the panel) before setting the view
-            await E("(()=>{const w=__QA.app.booth.world('%s',%s,%s);__QA.teleport(%s,%s);__QA.lookAt(w.x,w.y,w.z)})()"%(what,a,b,x,z)); await E('__QA.step(.1)'); return (await E(S))['hover']
-        async def click(): await page.mouse.down(); await page.mouse.up(); await E('__QA.step(.1)')
-        hv=await aim('btn','"play"'); st=await E(S)
-        ok('standing at the booth: still in normal walking mode, panel shown, Play button tip',st['mode']=='room' and st['booth']['near'] and await page.locator('#station [data-booth]').count()==1 and await page.locator('#station .bc').count()==64 and hv and hv['title']=='Play / Stop',(st['mode'],hv))
-        await page.screenshot(path='test/shot_booth_console.png')
-        await click(); await page.wait_for_timeout(900); await E('__QA.step(.05)'); q=await bq()
-        ok('clicking the 3D Play button starts the sequencer through the shared audio context',q['playing'] and q['audio'] and q['step']>=0,q)
-        s1=q['step']; await page.wait_for_timeout(500); await E('__QA.step(.05)'); s2=(await bq())['step']
-        ok('playhead advances in time with the audio clock',s2!=s1,(s1,s2))
-        ok('shop radio is silenced while the booth plays nearby',await E("__QA.app.radio.muted()"))
-        g0=(await bq())['grid'][3]; hv=await aim('cell',3,1); hvc=(await bq())['hover']
-        await click(); g1=(await bq())['grid'][3]; hv2=(await E(S))['hover']
-        ok('aiming at a screen step shows its tip and outlines it; clicking toggles exactly that step',hv and hv['title']=='SYNTH · step 2' and hvc==[3,1] and g1[1]!=g0[1] and g1[:1]+g1[2:]==g0[:1]+g0[2:] and hv2['sub']!=hv['sub'],(hv,hvc,g0,g1))
-        hv=await aim('label',1); await click(); q=await bq()
-        ok('clicking a track label on the screen mutes that part',hv and 'PERC' in hv['title'] and q['muted']==[False,True,False,False],(hv,q['muted']))
-        await page.click('#station [data-s="mute:1"]'); await page.click('#station [data-s="cell:0:1"]'); q=await bq(); c=await page.locator('#station [data-s="cell:3:1"]').get_attribute('class')
-        ok('panel grid edits the same pattern and mirrors the screen',q['grid'][0][1]=='1' and q['muted'][1] is False and (('on' in c)==(g1[1]=='1')),(q['grid'][0],c))
-        # cards on the left wing, from the front strip
-        hv=await aim('card',2,0,-1.15,-5.0); await page.screenshot(path='test/shot_booth_cards.png'); await click(); await E('__QA.step(.6)'); q=await bq()
-        ok('aiming at a Paper Play card and clicking loads its pattern and tempo',hv and 'COSMIC ARPS' in hv['title'] and q['card']==2 and q['bpm']==120 and q['grid'][3]=='1011011010110101',(hv,q['card']))
-        hv=await aim('stem',2,0,-.05,-5.0); await page.screenshot(path='test/shot_booth_stems.png'); await click(); q=await bq()
-        ok('aiming at a stem on the right wall and clicking mutes it',hv and 'BASS' in hv['title'] and q['muted']==[False,False,True,False],(hv,q['muted']))
-        hv=await aim('btn','"tempo"'); await click(); q=await bq()
-        ok('3D Tempo button cycles the tempo',q['bpm']==128,q['bpm'])
-        await E("__QA.teleport(-.6,-5.0,0,-.9)"); await E('__QA.step(.1)');
-        # walking is never blocked by the booth: walk back out with S
-        z0=(await E(S))['player']['z']; await page.keyboard.down('s'); await E('__QA.step(.6)'); await page.keyboard.up('s'); z1=(await E(S))['player']['z']
-        ok('you can walk away from the console at any time (no step-in mode)',z1>z0+.5 and (await E(S))['mode']=='room',(z0,z1))
-        hv=await aim('about'); await click(); st=await E(S); href=await page.get_attribute('#modalBox a.btnlink','href'); txt=await page.inner_text('#modalBox')
-        ok('back-wall panel opens About, which explains the booth honestly and links to the full studio',st['modal']=='booth' and href=='https://xtrata.xyz/audionaut/' and 'Nothing here is saved, inscribed or paid for' in txt,href)
+        async def aim(what,a='0',bb='0',x=FX,z=FZ):
+            await page.mouse.move(640,400)
+            await E("(()=>{const w=__QA.app.booth.world('%s',%s,%s);__QA.teleport(%s,%s);__QA.lookAt(w.x,w.y,w.z)})()"%(what,a,bb,x,z)); await E('__QA.step(.1)'); return (await E(S))['hover']
+        async def click(): await page.mouse.down(); await page.mouse.up(); await E('__QA.step(.15)')
+        q0=await bq()
+        ok('starts on Night Bus v4 with demo forks already in the trees',q0['cur']=='nightbus:v4' and q0['versions']>24 and q0['yours']==0,q0)
+        # aiming at hits tells who made them
+        hv=await aim('cell','0','0'); 
+        ok('aiming at a kick: Amber (demo maker), Night Bus v1, inherited',hv and 'Amber (demo maker)' in hv['sub'] and 'Night Bus v1' in hv['sub'] and 'inherited' in hv['sub'],hv)
+        hv=await aim('cell','3','2')
+        ok('aiming at a bass note: Bex, v2',hv and 'Bex' in hv['sub'] and 'v2' in hv['sub'],hv)
+        st=await E(S)
+        ok('free interaction: still walking mode, panel shown with a 6×16 grid',st['mode']=='room' and await page.locator('#station [data-booth]').count()==1 and await page.locator('#station .bc').count()==96,st['mode'])
+        # ONE press of the big FORK button
+        hv=await aim('btn','"fork"'); await click(); await page.wait_for_timeout(700); await E('__QA.step(.05)'); q=await bq()
+        ok('one press of FORK: a new version made by you, parent v4, playing',hv and hv['title']=='FORK' and q['mine'] and q['parent']=='nightbus:v4' and q['label']=='Your fork 1' and q['playing'] and q['audio'],q)
+        ok('fork note says what happened, and a layer actually changed',q['last']>=2 and 'forked' in q['note'] and 'changed' in q['note'],q['note'])
+        ok('every version in the studio is still unique',q['unique'])
+        await E("__QA.teleport(-.6,-5.0,0,0);__QA.lookAt(-.6,1.05,-6.4)"); await E('__QA.step(.1)'); await page.screenshot(path='test/shot_booth_console.png')
+        # changed steps stand out (console + panel)
+        ch=await page.locator('#station .bc.ch').count()
+        ok('changed steps are highlighted in the panel grid',ch>=2,ch)
+        # find a changed (new) cell and check its credit
+        newcell=await E("""(()=>{const S=__QA.app.booth.studio,v=S.get(S.cur);for(const k of [...v.last.on,...v.last.chg]){const [r,s]=k.split(':').map(Number);return [r,s];}return null})()""")
+        if newcell:
+            hv=await aim('cell',str(newcell[0]),str(newcell[1]))
+            ok('aiming at a changed hit: credited to You, Your fork 1, new',hv and 'You' in hv['sub'] and 'Your fork 1' in hv['sub'] and 'new in this version' in hv['sub'],hv)
+        # hear parent without stopping
+        hv=await aim('btn','"ab"'); await click(); q=await bq()
+        ok('HEAR PARENT switches to v4 while still playing',q['ab'] and q['hearing']=='nightbus:v4' and q['playing'],q)
+        s1=q['step']; await page.wait_for_timeout(400); await E('__QA.step(.05)'); q2=await bq()
+        ok('music keeps going while switching',q2['playing'] and q2['step']!=s1,(s1,q2['step']))
+        await click(); q=await bq()
+        ok('press again: back to your fork, still playing',not q['ab'] and q['hearing']==q['cur'] and q['playing'])
+        # choose a layer on the wall, then vary it
+        hv=await aim('layer','"bass"',x=0.0,z=-5.0); await click(); q=await bq()
+        ok('layer block on the right wall chooses the bass',q['layer']=='bass',(hv,q['layer']))
+        before=await E("__QA.app.booth.studio.get(__QA.app.booth.studio.cur).cells[3].join()")
+        hv=await aim('btn','"vary"'); await click(); q=await bq(); after=await E("__QA.app.booth.studio.get(__QA.app.booth.studio.cur).cells[3].join()")
+        ok('VARY on your own fork changes the chosen layer in place',q['label']=='Your fork 1' and before!=after and 'bass' in q['note'].lower(),q['note'])
+        inkey=await E("__QA.app.booth.studio.get(__QA.app.booth.studio.cur).cells.slice(3).every(r=>r.every(v=>v==null||Number.isInteger(v)))")
+        ok('all notes are scale degrees of the song key',inkey)
+        # borrow keys from another song (choose keys with the panel chip, borrow via the 3D button)
+        await page.click('#station [data-s="layer:keys"]'); hv=await aim('btn','"borrow"'); await click(); q=await bq()
+        info=await E("""(()=>{const S=__QA.app.booth.studio,v=S.get(S.cur);const s=v.cells[4].findIndex(x=>x!=null);return {s,info:S.cellInfo(v.id,4,s),borrows:v.borrows}})()""")
+        ok('BORROW brings keys from another song, still credited to its maker, marked borrowed',q['label']=='Your fork 1' and info['borrows'] and info['borrows'][0]['layer']=='keys' and info['info']['how']=='borrowed' and info['info']['song']!='Night Bus',info)
+        ok('borrow note mentions key, tempo and credit',('A minor' in q['note']) and ('124 BPM' in q['note']) and ('credited' in q['note']),q['note'])
+        hv=await aim('cell','4',str(info['s']))
+        ok('aiming at a borrowed chord names its maker and song',hv and info['info']['song'] in hv['sub'] and 'borrowed' in hv['sub'],hv)
+        # hand edit on own fork: credited to you
+        hv=await aim('cell','0','7'); await click(); c=await E("(()=>{const S=__QA.app.booth.studio;return S.cellInfo(S.cur,0,7)})()")
+        ok('punching a step on the console credits it to your fork',c['on'] and c['how']=='new' and c['version']=='Your fork 1',c)
+        # tree on the wall: nodes clickable to hear
+        await E("__QA.teleport(-.6,-4.6,0,0);__QA.lookAt(-.6,1.66,-7.2)"); await E('__QA.step(.2)'); await page.screenshot(path='test/shot_booth_wall.png')
+        hv=await aim('node','"nightbus:v2"',x=-.6,z=-4.8)
+        await click(); q=await bq()
+        ok('clicking v2 in the family tree plays it',hv and 'v2' in hv['title'] and q['cur']=='nightbus:v2' and q['playing'],(hv,q['cur']))
+        # fork of a fork, deep ancestry and credits
+        await E("__QA.app.booth.select(__QA.app.booth.studio.families[0].id+':f2')"); await E('__QA.step(.1)')
+        for i in range(3):
+            await page.click('#station [data-s="fork"]'); await E('__QA.step(.1)')
+        q=await bq(); anc=await E("__QA.app.booth.studio.credits(__QA.app.booth.studio.cur)")
+        ok('fork of a fork of a fork: ancestry runs all the way back to v1',q['label']=='Your fork 4' and anc['ancestry'][-1]=='v1' and 'Your fork 1' in anc['ancestry'],anc['ancestry'])
+        ok('credits shares add up to 100%; the borrow made in Your fork 1 is still listed',sum(m['pct'] for m in anc['makers'])==100 and sum(x['pct'] for x in anc['songs'])==100 and any(x['layer']=='keys' and x['into']=='Your fork 1' for x in anc['borrows']),(anc['makers'],anc['borrows']))
+        await page.click('#station [data-s="credits"]'); st=await E(S); txt=await page.inner_text('#modalBox')
+        ok('Tree & credits dialog shows ancestry, makers, songs and the tree',st['modal']=='boothcredits' and 'Ancestry' in txt and 'Who made' in txt and 'Your fork 4' in txt and 'not money' in txt)
+        await page.screenshot(path='test/shot_booth_credits.png'); await page.keyboard.press('Escape'); await E('__QA.step(.1)')
+        # song cards on the left wall
+        hv=await aim('song','"dustytape"',x=-1.15,z=-5.0); await click(); q=await bq()
+        ok('song card on the left wall loads that song',hv and 'Dusty Tape' in hv['title'] and q['fam']=='dustytape' and q['cur']=='dustytape:v4',(hv,q['cur']))
+        # about copy: no claims of inscription or payment
+        await page.click('#station [data-s="about"]'); txt=await page.inner_text('#modalBox'); href=await page.get_attribute('#modalBox a.btnlink','href')
+        ok('How it works explains fork / vary / borrow and says nothing is inscribed or paid',all(w in txt for w in ['Fork','Vary','Borrow','credit','nothing here is saved, inscribed or paid for']) and href=='https://xtrata.xyz/audionaut/')
         await page.keyboard.press('Escape'); await E('__QA.step(.1)')
-        ok('panel returns after closing the dialog',await page.locator('#station [data-booth]').count()==1 and not await page.locator('#station').is_hidden())
+        # reset
+        hv=await aim('reset',x=-1.15,z=-5.0); await click(); q=await bq()
+        ok('RESET DEMO plate clears every fork for the next visitor',q['yours']==0 and q['cur']=='nightbus:v4' and q['versions']==q0['versions'],q)
+        # walk away: panel hides, radio interplay
+        await page.click('#station [data-s="play"]'); rm=await E("__QA.app.radio.muted()")
+        ok('radio is silent while the booth plays nearby',rm)
         far=await E("(()=>{__QA.teleport(4.3,3.5,0,0);return __QA.app.radio.muted()})()"); await E('__QA.step(.1)')
-        ok('walking away hides the booth panel; the booth keeps playing and no longer holds the radio silent',far is False and await page.locator('#station').is_hidden() and (await bq())['playing'],far)
-        await E("(()=>{const a=__QA.app,r=a.catalog.releases[0];a.playback.play(r,0,'cd-case',0)})()"); await E('__QA.step(.1)'); q=await bq(); rm=await E("__QA.app.radio.muted()")
-        ok('playing a CD stops the booth, and the radio is muted while it plays',not q['playing'] and rm,(q['playing'],rm))
-        await E("__QA.app.playback.pause()"); rm2=await E("__QA.app.radio.muted()")
-        ok('radio comes back when the CD stops',rm2 is False)
-        await E("__QA.setAuto(true)"); await page.click('button[data-jump="Audionaut Booth"]'); await page.wait_for_function("!__QA.state().player.travel&&__QA.state().booth.near",timeout=30000); await E("__QA.setAuto(false)"); st=await E(S)
-        ok('Audionaut Booth quick-jump walks up to the console and faces it, without changing mode',st['mode']=='room' and st['hover'] and st['hover']['id'].startswith('booth:'),(st['mode'],st['hover']))
-        await E("(()=>{const a=__QA.app;a.playback.play(a.catalog.releases[0],0,'cd-case',0)})()"); await page.click('#station [data-s="play"]'); pb=await E("__QA.state().playback"); q=await bq()
-        ok('starting the booth pauses a playing CD',q['playing'] and not pb['playing'],(q['playing'],pb.get('playing')))
-        await page.click('#station [data-s="play"]')
-        rd=await E("__QA.app.radio.qa()")
-        ok('radio speakers have their own characters (two plain, one tinny, one blown)',rd['characters']==['plain','blown','tinny','plain'],rd['characters'])
-        await E("__QA.teleport(.05,4.22,0,0)"); await E('__QA.step(.1)'); rs=(await E(S))['render']
-        print('render from the entrance',rs)
+        ok('walking away hides the panel; the booth keeps playing and no longer holds the radio silent',far is False and await page.locator('#station').is_hidden() and (await bq())['playing'])
+        await E("(()=>{const a=__QA.app,r=a.catalog.releases[0];a.playback.play(r,0,'cd-case',0)})()"); await E('__QA.step(.1)'); q=await bq()
+        ok('playing a CD stops the booth',not q['playing'])
+        await E("__QA.app.playback.pause()")
+        await E("__QA.setAuto(true)"); await page.click('button[data-jump="Audionaut Booth"]'); await page.wait_for_function("!__QA.state().player.travel&&__QA.app.booth.qa().near",timeout=30000); await E("__QA.setAuto(false)"); st=await E(S)
+        ok('Audionaut Booth quick-jump walks up to the console and faces it',st['mode']=='room' and st['hover'] and st['hover']['id'].startswith('booth:'),st['hover'])
         ok('no page errors',len(errs)==0,errs[:3])
+        await b.close()
+        # touch / phone: everything from the panel
+        b,page,errs,reqs=await launch(p,w=412,h=860,touch=True); E=page.evaluate
+        await enter(page); await E("__QA.teleport(-.6,-5.0,0,0);__QA.lookAt(-.6,1.05,-6.4)"); await E('__QA.step(.2)')
+        n=await page.locator('#station [data-booth]').count(); await page.tap('#station [data-s="fork"]'); await E('__QA.step(.1)'); q=await E("__QA.app.booth.qa()")
+        ok('phone: compact panel, Fork works from it',n==1 and q['mine'] and q['label']=='Your fork 1',q['label'])
+        await page.select_option('#bsong','concrete'); await E('__QA.step(.1)'); q=await E("__QA.app.booth.qa()")
+        ok('phone: song picker loads another song',q['fam']=='concrete',q['fam'])
+        await page.tap('#station [data-s="layer:bass"]'); await page.tap('#station [data-s="borrow"]'); q=await E("__QA.app.booth.qa()")
+        ok('phone: choose bass and Borrow',q['mine'] and 'bass' in q['note'].lower() and 'Borrowed' in q['note'],q['note'])
+        await page.tap('#station [data-s="credits"]'); st=await E(S)
+        ok('phone: tree & credits dialog opens',st['modal']=='boothcredits'); await page.screenshot(path='test/shot_booth_phone.png')
+        ok('phone: no page errors',len(errs)==0,errs[:3])
         await b.close()
     print(json.dumps({'passed':sum(R.values()),'total':len(R),'failed':[k for k,v in R.items() if not v]}))
 asyncio.run(main())

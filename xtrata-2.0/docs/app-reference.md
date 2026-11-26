@@ -104,8 +104,9 @@ Purpose: one-stop map of where code lives and which files to touch for common up
   show an inscriber's primary BNS name via a read-only BNS-V2 `get-primary` call through `/hiro/mainnet`.
   The page must live under `music/`, not `public/music/`: the
   postbuild step (`scripts/copy-static-apps.mjs`) replaces `dist/music` with `music/`, which deletes anything Vite
-  copied there from `public/`. The Audionaut booth (`record-shop/src/booth.js`) is a permanent in-shop
-  16-step sequencer: browser synthesis only, no saving, inscribing or payments, with a link to `/audionaut/`. The
+  copied there from `public/`. The Audionaut booth (`record-shop/src/booth.js`, model in `record-shop/src/fork.js`) is a
+  permanent in-shop forking demo: fork, vary, borrow and edit songs built from credited layers, with a family tree and
+  credits. Browser synthesis only; placeholder makers; no saving, inscribing or payments; links to `/audionaut/`. The
   shop radio is quiet, localised per speaker and silent while any CD, record or the booth plays.
   See `record-shop/README.md`.
 - `music/artist/` provides `/music/artist/`, royalty overview, collection list and
