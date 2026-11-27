@@ -197,12 +197,27 @@
           : new File([ex.audioBytes], metadata.title + '.weba', { type: audioMime });
       html = null;
     } else {
-      metadata.appearance = o.appearance;
-      metadata.template = window.XtrataMusicPlayer.VERSION;
-      if (o.appearance.timeline === 'waveform' && onStatus) onStatus('Preparing the waveform…');
-      const peaks =
-        o.appearance.timeline === 'waveform' ? await window.XtrataMusicPlayer.preparePeaks(ex) : [];
-      html = window.XtrataMusicPlayer.build({
+      const MP = window.XtrataMusicPlayer;
+      // "Colours from cover" is worked out here, from the artwork going into this player.
+      if (o.appearance.palette === 'cover') {
+        let coverColors = null;
+        if (coverB64)
+          coverColors = await MP.coverColors('data:' + coverMime + ';base64,' + coverB64).catch(
+            () => null
+          );
+        o.appearance = MP.normalize({ ...o.appearance, coverColors });
+      }
+      metadata.appearance = MP.compact(o.appearance);
+      metadata.template = MP.versionFor(o.appearance, metadata.lyrics);
+      // One decode of the audio gives the waveform and the loudness track for the visualiser.
+      const wantPeaks = o.appearance.timeline === 'waveform',
+        wantLevels = o.appearance.visualiser !== 'off' || o.appearance.motion === 'breathe';
+      if ((wantPeaks || wantLevels) && onStatus)
+        onStatus(wantPeaks ? 'Preparing the waveform…' : 'Reading the loudness for the visualiser…');
+      const analysis =
+        wantPeaks || wantLevels ? await MP.prepareAnalysis(ex) : { peaks: [], envelope: '' };
+      const peaks = wantPeaks ? analysis.peaks : [];
+      html = MP.build({
         audioMimeType: audioMime,
         audioBase64: audioRef ? '' : ex.audioB64,
         audioInscription: audioRef,
@@ -211,7 +226,8 @@
         imageMimeType: coverMime,
         metadata,
         appearance: o.appearance,
-        peaks
+        peaks,
+        envelope: wantLevels ? analysis.envelope : ''
       });
       playerFile = new File(
         [html],
