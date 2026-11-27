@@ -23,6 +23,7 @@ import { ensureWorklets } from "./plugin-worklets.js";
 import { voxFormants } from "./synths-voices.js";
 import { seededRandom } from "./synths/resources.js";
 import { PRO_EFFECT_TYPES } from "./pro-effects.js";
+import { ELEMENT_EFFECT_TYPES } from "./elements-fx.js";
 
 function makeDriveCurve(amount, steps = 0) {
   const curve = new Float32Array(1025);
@@ -715,6 +716,7 @@ function crushRoute(ctx, n) {
 
 export const PLUGIN_TYPES = {
   ...PRO_EFFECT_TYPES,
+  ...ELEMENT_EFFECT_TYPES,
   eq3: {
     name: "Orderbook",
     role: "EQ — 6 Band",
@@ -2761,6 +2763,7 @@ export const KIND_OF_CHAIN = { inserts: "insert", fx: "fx" };
 const measuredOversampling = new Map();
 export function pluginLatencySamples(type, params = {}, sampleRate = 48000) {
   if (PRO_EFFECT_TYPES[type]) return PRO_EFFECT_TYPES[type].latencySamples(sampleRate, params);
+  if (ELEMENT_EFFECT_TYPES[type]) return ELEMENT_EFFECT_TYPES[type].latencySamples(sampleRate, params);
   if (type === "comp" || type === "limiter") return Math.floor(sampleRate * COMP_LATENCY);
   const factor = type === "tape" || (type === "filter" && params.drive > 0) ? 2
     : (type === "clipper" || type === "drive") && params.hq === "on" ? 4 : 1;
@@ -2785,6 +2788,7 @@ export async function calibratePluginLatency(sampleRate = 48000) {
 }
 export function pluginTailSeconds(type, params = {}, env = {}) {
   if (PRO_EFFECT_TYPES[type]) return PRO_EFFECT_TYPES[type].tailSeconds(params, env);
+  if (ELEMENT_EFFECT_TYPES[type]) return ELEMENT_EFFECT_TYPES[type].tailSeconds(params, env);
   if (type === "reverbSend") return (params.decay ?? 2.2) + (params.predelay ?? 0) / 1000;
   if (type === "delaySend") {
     const beat = BEAT_DIVS.find(([id]) => id === params.time)?.[1] ?? .75;

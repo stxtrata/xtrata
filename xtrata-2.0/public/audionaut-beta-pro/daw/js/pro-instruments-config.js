@@ -1,6 +1,6 @@
 // Portable sample-instrument configuration. Audio remains in the shared asset
 // graph; source entries refer to decoded tracks or a loader-resolved Xtrata source.
-export const PRO_INSTRUMENT_IDS = Object.freeze(['drumrack', 'granulator', 'concertpiano']);
+export const PRO_INSTRUMENT_IDS = Object.freeze(['drumrack', 'granulator', 'concertpiano', 'valorem']);
 export const PAD_NAMES = Object.freeze(['Kick', 'Rim', 'Snare', 'Clap', 'Low tom', 'Mid tom', 'Closed hat', 'Shaker', 'Pedal hat', 'Cowbell', 'Open hat', 'High tom', 'Crash', 'Click', 'Ride', 'Percussion']);
 export const isProInstrument = id => PRO_INSTRUMENT_IDS.includes(id);
 const number = (value, fallback, min, max, label, integer = false) => {
@@ -16,7 +16,7 @@ export function defaultInstrumentConfig(kind) {
   if (!isProInstrument(kind)) throw new Error('Unknown sample instrument.');
   const config = { version: 1, kind, starter: 'procedural-v1', sources: [] };
   if (kind === 'drumrack') config.pads = PAD_NAMES.map((name, i) => ({ note: 36 + i, name, sourceId: null, gain: 1, pan: 0, tune: 0, chokeGroup: [6, 8, 10].includes(i) ? 'hats' : '', mode: 'oneShot' }));
-  if (kind === 'concertpiano') config.zones = [];
+  if (kind === 'concertpiano' || kind === 'valorem') config.zones = [];
   if (kind === 'granulator') Object.assign(config, { sourceId: null, rootMidi: 60 });
   return config;
 }
@@ -56,7 +56,7 @@ export function normalizeInstrumentConfig(kind, raw) {
     config.sourceId = reference(config.sourceId, 'Granulator');
     config.rootMidi = number(config.rootMidi, 60, 0, 127, 'Source root note', true);
   }
-  if (kind === 'concertpiano') {
+  if (kind === 'concertpiano' || kind === 'valorem') {
     if (!Array.isArray(config.zones) || config.zones.length > 128) throw new Error('Use at most 128 piano sample zones.');
     const ids = new Set();
     config.zones = config.zones.map((zone, i) => {

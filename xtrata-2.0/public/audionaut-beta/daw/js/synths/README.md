@@ -6,7 +6,7 @@ pickers show as the tree, so putting a module in `synths/<folder>/` files it the
 | Folder | Picker label | What belongs here | Contents |
 |---|---|---|---|
 | `bass/` | Bass | sub, acid, analog and growl bass | Whale (`bass/jibass.js`); Acidals 303, SubZero (in `synths.js`) |
-| `lead/` | Leads | mono and poly lead voices, supersaws | jiMS10, Stacker (in `synths.js`) |
+| `lead/` | Leads | mono and poly lead voices, supersaws | jiMS10, Stacker (in `synths.js`); Portwheel; jiMVREK (`lead/mvrek.js`) — two-layer trance poly; jiLOSTWAVE (`lead/lostwave.js`) — four multi-mode oscillators |
 | `pad/` | Pads & String Machines | warm sustained pads, ensembles, string machines | Layers (`pad/ensemble.js`) — string machine / pad / choir |
 | `keys/` | Pianos & Electric Pianos | piano, Rhodes/Wurli-style, clav | Privkey (`keys/tine.js`) — Rhodes / Wurli / piano / clav models |
 | `organ/` | Organs | drawbar / tonewheel / combo / church | Cathedral (`organ/tonewheel.js`) — drawbar organ with rotary |
@@ -16,7 +16,7 @@ pickers show as the tree, so putting a module in `synths/<folder>/` files it the
 | `reed/` | Brass, Winds & Bowed | brass stabs, flute/reed, bowed strings | Muneeb (`reed/winds.js`) — brass, flute, reed (clarinet↔oboe), bowed |
 | `voice/` | Voice & Choir | formant vowels, choirs, vocoder-style | Gm (`synths-voices.js`) |
 | `chip/` | Chip & Retro | PWM, NES/Game Boy-style, 8-bit | Chip-8 (`synths.js`) |
-| `wave/` | Wavetable, Phase & West-Coast | wavetable morph, CZ phase distortion, wavefolder | Szabo (`wave/morph.js`) — 12-table wavetable morph, wavefolder, FM, low-pass gate |
+| `wave/` | Wavetable, Phase & West-Coast | wavetable morph, CZ phase distortion, wavefolder | Szabo (`wave/morph.js`) — 12-table wavetable morph, wavefolder, FM, low-pass gate; jiELEMENT (`wave/element.js`) — six-frame scanned wavetables with warp |
 | `drums/` | Drum Voices | synthesised kick, snare, hat, clap, tom voices played as notes | ASIC (`drums/kit.js`) — 808 / 909 / lo-fi kit on a GM note map |
 | `fx/` | Noise, Textures & FX | granular, risers, drones, sci-fi, noise | Mempool (`fx/texture.js`) — wind, riser, drone, grain cloud, impact |
 | `glass/` | Glass & Crystal | inharmonic partials that settle into pitch: bells, shards, bloom | KILN, ANNEAL, PALINODE, FAULTGLASS, Morrowglass, VITREOUS, Lightnode, Schnorr, TIDAL GLASS, TIDELACE (`glass/*.js`) |
@@ -39,3 +39,6 @@ No folder is empty any more. Remaining folders that only hold the original synth
 
 ## Notes on the drum kit
 `drums/kit.js` follows the General-MIDI drum map (C1 kick, D2 snare, D#2 clap, F#2 closed hat, A#2 open hat, F2/A2/C3 toms, C#3 crash, D#3 ride, G#3 cowbell...), notes outside 35-59 fold onto the same drums by pitch class.
+
+## Marek collection
+`lead/mvrek.js`, `wave/element.js`, `lead/lostwave.js` and the sample instrument `keys/valorem.js` share `marek-kit.js`. See `../../MAREK_PLUGINS.md`.

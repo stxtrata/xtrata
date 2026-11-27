@@ -2,9 +2,10 @@ import { isProInstrument, normalizeInstrumentConfig, selectPianoZone } from './p
 import { createDrumRackVoice, drumStarterDuration } from './synths/drums/drumrack.js';
 import { createGranulatorVoice } from './synths/fx/granulator.js';
 import { createConcertPianoVoice } from './synths/keys/concertpiano.js';
+import { createValoremVoice } from './synths/keys/valorem.js';
 export { PRO_INSTRUMENT_IDS, PAD_NAMES, isProInstrument, defaultInstrumentConfig, normalizeInstrumentConfig, selectPianoZone } from './pro-instruments-config.js';
 export { starterCacheStats } from './pro-instruments-runtime.js';
-const factories = { drumrack: createDrumRackVoice, granulator: createGranulatorVoice, concertpiano: createConcertPianoVoice };
+const factories = { drumrack: createDrumRackVoice, granulator: createGranulatorVoice, concertpiano: createConcertPianoVoice, valorem: createValoremVoice };
 // Seconds after the nominal note gate. A one-shot's end follows the sample,
 // while a looped/gated instrument follows its release envelope. The resolver
 // may return an AudioBuffer or duration metadata when estimating before decode.
@@ -24,6 +25,8 @@ export function proInstrumentTailSeconds(instrument, note, { bufferForSource } =
     return pad.mode === 'gate' ? Math.min(remaining, Math.max(.005, P.release ?? .1)) : remaining;
   }
   if (instrument.synthId === 'granulator') return Math.max(.01, Math.min(4, P.release ?? .25));
+  // Every jiVALOREM layer fades out over the release, looped or not.
+  if (instrument.synthId === 'valorem') return Math.max(.005, Math.min(4, P.release ?? .45));
   const release = Math.max(.005, P.release ?? .22);
   if (!config.zones.length) return release;
   const zone = selectPianoZone(config, note.pitch, note.velocity ?? note.vel ?? 1);

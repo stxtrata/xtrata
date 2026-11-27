@@ -20,5 +20,11 @@ export const Kit = lazyFaces(runtime, {
   "phaser": () => import("./phaser.js"),
   "trem": () => import("./trem.js"),
   "delaySend": () => import("./delay.js"),
-  "reverbSend": () => import("./reverb.js")
+  "reverbSend": () => import("./reverb.js"),
+  "neon": () => import("./elements.js"),
+  "iron": () => import("./elements.js"),
+  "titanium": () => import("./elements.js"),
+  "carbon": () => import("./elements.js"),
+  "helium": () => import("./elements.js"),
+  "mercury": () => import("./elements.js")
 });

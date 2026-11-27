@@ -207,7 +207,7 @@ export function mount(root) {
       );
     } else {
       body.append(
-        el('h3', 'Piano sample zones'),
+        el('h3', instrument.synthId === 'valorem' ? 'Custom pack zones (layer A)' : 'Piano sample zones'),
         el(
           'p',
           'MIDI velocity runs from 1 to 127. Map softer and louder recordings to separate ranges. Every played note needs a matching zone in a custom library.'
@@ -217,7 +217,7 @@ export function mount(root) {
       body.append(
         row(
           choice('New zone sample', available().slice(1), selected, (v) => (selected = v)),
-          action('Add piano zone', () => {
+          action(instrument.synthId === 'valorem' ? 'Add pack zone' : 'Add piano zone', () => {
             if (!selected) throw Error('Import a sample first.');
             config.zones.push({
               id: crypto.randomUUID(),

@@ -338,6 +338,8 @@ export class Engine {
 
   _applyParams(it, def) {
     const P = { ...pluginDefaults(def.type), ...(def.params || {}) };
+    // Tempo-synced plugins (ELEMENTS · MERCURY) read the project tempo at apply time.
+    if (it.type.tempoSync) P.bpm = this.store.project.bpm || 120;
     const key = JSON.stringify(P);
     if (key === it.pkey) return; // unchanged — skip (curves are costly to rebuild)
     it.pkey = key;
@@ -540,6 +542,7 @@ export class Engine {
 
   syncDelayToBpm() {
     if (this.delayNode) this.applyReturns();
+    for (const chain of this.chains?.values() || []) for (const it of chain.slots?.values() || []) if (it.type?.tempoSync && it.def) this._applyParams(it, it.def);
   }
 
   // Pushes project.returns onto the shared delay and reverb. Cheap to call often (slider
@@ -781,7 +784,7 @@ export class Engine {
     release = Math.max(0.01, Math.min(12, Number.isFinite(+release) ? +release : 0.25));
     const n = { id: ++this._voiceSeq, i, pitch, time, endTime: duration == null ? Infinity : time+duration+release, source: options.source || "live", release, timers: [], visual: false, ended: false, stopping: false };
     try {
-      const note={ pitch, vel, time, dur: duration ?? live.gate ?? 0.6, held: held && duration == null, offset:options.chaseOffsetSeconds || 0 };
+      const note={ pitch, vel, time, dur: duration ?? live.gate ?? 0.6, held: held && duration == null, offset:options.chaseOffsetSeconds || 0, bpm: this.store.project.bpm || 120 };
       n.voice = isProInstrument(instrument.synthId)
         ? createProInstrumentVoice(this.ctx,this.instrumentGains[i],instrument,note,P,()=>this._voiceEnded(n),{seed:options.seed ?? hashSeed(`${this.seed}:${n.id}:${pitch}`),offline:this.offline,bufferForSource:entry=>{const a=trackAddress(this.store.project,entry.sourceTrackId);return a?.kind==='sample'?this.buffers[a.index]:null;}})
         : instrument.sampler?.enabled
