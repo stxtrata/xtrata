@@ -50,11 +50,13 @@ import type { TokenSummary } from '../lib/viewer/types';
 import { getContractId } from '../lib/contract/config';
 import {
   getTransferValidationMessage,
+  parseRecipientInput,
   validateTransferRequest
 } from '../lib/wallet/transfer';
 import TokenCardMedia from '../components/TokenCardMedia';
 import TokenContentPreview from '../components/TokenContentPreview';
 import AddressLabel from '../components/AddressLabel';
+import { useBnsAddress } from '../lib/bns/hooks';
 import { getMediaKind } from '../lib/viewer/content';
 
 const PAGE_SIZE = 16;
@@ -352,6 +354,8 @@ export default function MyWalletScreen(props: MyWalletScreenProps) {
   }, [pageIndex]);
 
   useEffect(() => {
+    // A typed recipient never carries over to a different inscription.
+    setTransferRecipient('');
     setTransferStatus(null);
     setListStatus(null);
     setCancelStatus(null);
@@ -424,17 +428,51 @@ export default function MyWalletScreen(props: MyWalletScreenProps) {
         )
       : null;
   const marketLabel = marketContractIdLabel ?? 'Select in Market module';
+  const transferRecipientParsed = parseRecipientInput(transferRecipient);
+  const transferTypedName =
+    transferRecipientParsed.kind === 'bns' ? transferRecipientParsed.name : null;
+  // Wait for typing to settle so "jim.b", "jim.bt" are not each looked up.
+  const [transferLookupName, setTransferLookupName] = useState<string | null>(null);
+  useEffect(() => {
+    const timer = setTimeout(() => setTransferLookupName(transferTypedName), 350);
+    return () => clearTimeout(timer);
+  }, [transferTypedName]);
+  const transferBnsQuery = useBnsAddress({
+    name: transferLookupName,
+    network: props.contract.network,
+    enabled: !!transferLookupName && transferLookupName === transferTypedName
+  });
+  const transferBnsResolution =
+    transferTypedName && transferLookupName === transferTypedName
+      ? {
+          name: transferTypedName,
+          status: transferBnsQuery.isError
+            ? ('error' as const)
+            : transferBnsQuery.data
+              ? transferBnsQuery.data.address
+                ? ('resolved' as const)
+                : ('missing' as const)
+              : ('loading' as const),
+          address: transferBnsQuery.data?.address ?? null
+        }
+      : null;
   const transferValidation = validateTransferRequest({
     senderAddress: walletAddress,
     recipientAddress: transferRecipient,
     tokenId: selectedToken?.id ?? null,
-    networkMismatch: !!mismatch
+    networkMismatch: !!mismatch,
+    bnsResolution: transferBnsResolution,
+    expectedNetwork: props.contract.network
   });
   const transferValidationMessage =
     getTransferValidationMessage(transferValidation);
   const recipientValidationError =
     transferValidation.reason === 'missing-recipient' ||
     transferValidation.reason === 'invalid-recipient' ||
+    transferValidation.reason === 'bns-pending' ||
+    transferValidation.reason === 'bns-not-found' ||
+    transferValidation.reason === 'bns-lookup-failed' ||
+    transferValidation.reason === 'recipient-network-mismatch' ||
     transferValidation.reason === 'self-recipient';
 
   const appendTransferLog = (message: string) => {
@@ -1008,10 +1046,11 @@ export default function MyWalletScreen(props: MyWalletScreenProps) {
                     </div>
                   </div>
                   <label className="field">
-                    <span className="field__label">Recipient address</span>
+                    <span className="field__label">Recipient address or BNS name</span>
                     <input
                       className="input"
-                      placeholder="ST..."
+                      placeholder="Stacks address or name.btc"
+                      spellCheck={false}
                       value={transferRecipient}
                       onChange={(event) => {
                         setTransferRecipient(event.target.value);
@@ -1021,6 +1060,23 @@ export default function MyWalletScreen(props: MyWalletScreenProps) {
                     />
                     {recipientValidationError && transferValidationMessage && (
                       <span className="meta-value">{transferValidationMessage}</span>
+                    )}
+                    {transferValidation.recipientName && transferValidation.recipient && (
+                      <span className="meta-value">
+                        {transferValidation.recipientName} belongs to{' '}
+                        <code>{transferValidation.recipient}</code>. Check this is the
+                        address you expect.
+                      </span>
+                    )}
+                    {transferRecipientParsed.kind === 'address' && (
+                      <span className="meta-value">
+                        Sending to{' '}
+                        <AddressLabel
+                          address={transferRecipientParsed.address}
+                          network={props.contract.network}
+                          showAddressWhenNamed
+                        />
+                      </span>
                     )}
                   </label>
                   {transferStatus && (
