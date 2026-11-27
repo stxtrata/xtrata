@@ -4,12 +4,20 @@
   const names = {
     classic: ['Classic', 'Artwork with a clear listening panel'],
     sleeve: ['Sleeve', 'Full cover with a compact control band'],
-    studio: ['Studio', 'Typography and a spacious timeline']
+    studio: ['Studio', 'Typography and a spacious timeline'],
+    vinyl: ['Vinyl', 'Your cover as a record that spins'],
+    poster: ['Poster', 'Artwork fills the player']
   };
   const fields = {
     palette: [
       'Colour palette',
-      { charcoal: 'Charcoal', paper: 'Warm paper', midnight: 'Midnight', monochrome: 'Monochrome' }
+      {
+        cover: 'From the cover',
+        charcoal: 'Charcoal',
+        paper: 'Warm paper',
+        midnight: 'Midnight',
+        monochrome: 'Monochrome'
+      }
     ],
     font: [
       'Typography',
@@ -27,12 +35,107 @@
       { gradient: 'Soft gradient', plain: 'Plain background', initials: 'Track initials' }
     ]
   };
+  // Player extras, grouped as on the inscribe page. Sizes are measured additions to a player.
+  const extras = [
+    [
+      'Artwork',
+      [
+        ['check', 'fullArt', 'Full-screen artwork', 'Tap the cover to fill the player', '+1.2 KB'],
+        ['select', 'motion', 'Artwork motion', { still: 'Still', zoom: 'Slow zoom while playing', breathe: 'Breathes with the music', tilt: 'Tilts under the pointer' }, 'up to +1.5 KB'],
+        ['select', 'backdrop', 'Backdrop', { solid: 'Solid colour', blur: 'Blurred cover', grain: 'Film grain', paper: 'Paper texture', scanlines: 'Scanlines' }, '+0.4 KB'],
+        ['check', 'artWhilePlaying', 'GIF covers move only while playing', 'Still until play is pressed', '+0.8 KB']
+      ]
+    ],
+    [
+      'Sound you can see',
+      [
+        ['select', 'waveStyle', 'Waveform style', { bars: 'Bars', mirror: 'Mirrored, played part in colour', line: 'Smooth shape', dots: 'Dotted outline' }, 'no extra'],
+        ['select', 'visualiser', 'Visualiser', { off: 'Off', bars: 'Bars over the cover', ring: 'Pulse round the cover' }, '+1.7 KB, +0.6 KB a minute']
+      ]
+    ],
+    [
+      'Lyrics',
+      [
+        ['select', 'lyricsView', 'Synced lyrics', { panel: 'Lit up in the Lyrics panel', overlay: 'Also shown over the artwork' }, '+1 KB']
+      ]
+    ],
+    [
+      'Controls',
+      [
+        ['check', 'repeat', 'Repeat button', 'Lets listeners loop the song', '+0.4 KB'],
+        ['select', 'button', 'Play button', { circle: 'Circle', square: 'Rounded square', pill: 'Pill' }, 'no extra']
+      ]
+    ],
+    [
+      'Signature touches',
+      [
+        ['text', 'note', 'Artist note', 'One line from you to the listener', 200, '+0.3 KB'],
+        ['text', 'signature', 'Signature on the cover', 'Your name or BNS name and the year', 60, '+0.2 KB'],
+        ['check', 'stamp', 'On-chain stamp', 'The inscription number on the cover', '+0.6 KB'],
+        ['text', 'cues', 'Cue markers', 'Moments to jump to, e.g. 0:45 Drop, 1:30 Verse 2', 300, '+1.1 KB']
+      ]
+    ]
+  ];
+  const clock = (t) => Math.floor(t / 60) + ':' + String(Math.floor(t % 60)).padStart(2, '0') + (t % 1 ? String(Math.round((t % 1) * 10) / 10).slice(1) : '');
+  const cuesText = (cues) => cues.map((c) => clock(c.t) + ' ' + c.label).join(', ');
+  // "0:45 Drop, 1:30 Verse 2" (or one per line). Seconds alone ("45 Drop") also work.
+  const parseCues = (text) =>
+    String(text || '')
+      .split(/[,\n]+/)
+      .map((part) => part.trim().match(/^(?:(\d{1,3}):)?(\d{1,2}(?:\.\d)?)\s+(.+)$/))
+      .filter(Boolean)
+      .map((m) => ({ t: Number(m[1] || 0) * 60 + Number(m[2]), label: m[3].trim() }));
+  const accentOf = (state) =>
+    state.accent ||
+    (state.palette === 'cover'
+      ? (state.coverColors && state.coverColors.accent) || '#c7e6a2'
+      : window.XtrataMusicPlayer.palettes[state.palette].accent);
+  const extrasOn = (a) => {
+    const d = window.XtrataMusicPlayer.extraDefaults,
+      on = [];
+    if (a.fullArt) on.push('full-screen art');
+    if (a.motion !== d.motion) on.push(fieldText('motion', a.motion).toLowerCase());
+    if (a.backdrop !== d.backdrop) on.push(fieldText('backdrop', a.backdrop).toLowerCase());
+    if (a.artWhilePlaying) on.push('GIF on play');
+    if (a.timeline === 'waveform' && a.waveStyle !== d.waveStyle) on.push(fieldText('waveStyle', a.waveStyle).toLowerCase().split(',')[0] + ' waveform');
+    if (a.visualiser !== d.visualiser) on.push('visualiser');
+    if (a.lyricsView !== d.lyricsView) on.push('lyrics over artwork');
+    if (a.repeat) on.push('repeat');
+    if (a.button !== d.button) on.push(a.button + ' button');
+    if (a.note) on.push('artist note');
+    if (a.signature) on.push('signature');
+    if (a.stamp) on.push('on-chain stamp');
+    if (a.cues.length) on.push(a.cues.length + ' cue' + (a.cues.length > 1 ? 's' : ''));
+    return on;
+  };
+  function fieldText(key, value) {
+    for (const [, rows] of extras) for (const row of rows) if (row[1] === key && row[0] === 'select') return row[3][value] || value;
+    return value;
+  }
+  // One-line summaries for the collapsed sections on the inscribe page.
+  const describe = (input) => {
+    const a = window.XtrataMusicPlayer.normalize(input);
+    return {
+      look: [names[a.style][0], fields.palette[1][a.palette], fields.font[1][a.font], a.timeline === 'waveform' ? 'waveform' : ''].filter(Boolean).join(' · '),
+      extras: extrasOn(a)
+    };
+  };
   function mount(host, value, onChange) {
     let state = window.XtrataMusicPlayer.normalize(value);
     const prefix = 'appearance-' + ++nextId + '-';
+    const row = ([kind, key, label, ...rest]) => {
+      const id = prefix + 'x-' + key;
+      if (kind === 'check')
+        return `<label class="mx-row mx-check" for="${id}"><input type="checkbox" id="${id}" data-x="${key}"><span><b>${label}</b><small>${rest[0]}</small></span><em>${rest[1]}</em></label>`;
+      if (kind === 'select')
+        return `<label class="mx-row" for="${id}"><span><b>${label}</b></span><select id="${id}" data-x="${key}">${Object.entries(rest[0])
+          .map(([v, text]) => `<option value="${v}">${text}</option>`)
+          .join('')}</select><em>${rest[1]}</em></label>`;
+      return `<label class="mx-row mx-text" for="${id}"><span><b>${label}</b><small>${rest[0]}</small></span><input type="text" id="${id}" data-xt="${key}" maxlength="${rest[1]}" autocomplete="off"><em>${rest[2]}</em></label>`;
+    };
     host.classList.add('music-appearance');
     host.innerHTML =
-      '<div class="music-style-cards" role="group" aria-label="Player style">' +
+      '<div class="music-look"><div class="music-style-cards" role="group" aria-label="Player style">' +
       Object.entries(names)
         .map(
           ([key, [label, description]]) =>
@@ -72,7 +175,7 @@
       prefix +
       'accent">Accent colour<input id="' +
       prefix +
-      'accent" type="color" data-accent aria-label="Custom accent colour"></label></div><div class="music-style-checks">' +
+      'accent" type="color" data-accent aria-label="Custom accent colour"></label></div><p class="muted music-cover-note" data-cover-note hidden>Colours are picked from the cover when the player is built. With no cover, the player uses Charcoal.</p><div class="music-style-checks">' +
       Object.entries({
         showAlbum: 'Show album name',
         showLyrics: 'Offer lyrics',
@@ -83,59 +186,111 @@
             '<label><input type="checkbox" data-check="' + key + '"> ' + label + '</label>'
         )
         .join('') +
-      '</div><div class="music-toolbar"><button class="btn ghost" type="button" data-reset>Reset this style</button><button class="btn ghost" type="button" data-palette-accent>Use palette accent</button></div><p class="muted music-style-note">Colours keep readable play-button text. Details and lyrics appear when supplied. Your appearance is saved permanently with the player.</p>';
+      '</div><div class="music-toolbar"><button class="btn ghost" type="button" data-reset>Reset this style</button><button class="btn ghost" type="button" data-palette-accent>Use palette accent</button></div></div>' +
+      '<div class="music-extras" data-extras><div class="music-extras-head"><h3>Player extras</h3><p class="muted">Optional touches. All off unless you switch them on. Once any extra is on, about 0.9 KB of shared player code is added; each size below comes on top. For scale, a minute of Balanced audio is about 1 MB.</p></div>' +
+      extras
+        .map(
+          ([group, rows]) =>
+            `<fieldset class="mx-group"><legend>${group}</legend>${rows.map(row).join('')}</fieldset>`
+        )
+        .join('') +
+      '<p class="muted mx-tip" data-wave-note>Picking a waveform style also sets Timeline to Audio waveform.</p><p class="muted mx-tip">Synced lyrics: paste timed lyrics such as <code>[01:02.50] a line</code> into Lyrics, or drop an <code>.lrc</code> file with your song.</p></div>' +
+      '<p class="muted music-style-note">Colours keep readable play-button text. Details and lyrics appear when supplied. Your appearance is saved permanently with the player.</p>';
+    // Elements are looked up once, so the page may move the look and extras blocks into its own sections.
+    const all = (sel) => [...host.querySelectorAll(sel)];
+    const el = {
+      look: host.querySelector('.music-look'),
+      extras: host.querySelector('[data-extras]'),
+      styles: all('[data-style]'),
+      options: all('[data-option]'),
+      checks: all('[data-check]'),
+      xs: all('[data-x]'),
+      xts: all('[data-xt]'),
+      wave: host.querySelector('[data-x="waveStyle"]'),
+      waveNote: host.querySelector('[data-wave-note]'),
+      coverNote: host.querySelector('[data-cover-note]'),
+      accent: host.querySelector('[data-accent]'),
+      reset: host.querySelector('[data-reset]'),
+      paletteAccent: host.querySelector('[data-palette-accent]')
+    };
     function render() {
-      host
-        .querySelectorAll('[data-style]')
-        .forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.style === state.style)));
-      host.querySelectorAll('[data-option]').forEach((el) => {
-        el.value = state[el.dataset.option];
+      el.styles.forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.style === state.style)));
+      el.options.forEach((input) => {
+        input.value = state[input.dataset.option];
       });
-      host.querySelectorAll('[data-check]').forEach((el) => {
-        el.checked = state[el.dataset.check];
+      el.checks.forEach((input) => {
+        input.checked = state[input.dataset.check];
       });
-      host.querySelector('[data-accent]').value =
-        state.accent || window.XtrataMusicPlayer.palettes[state.palette].accent;
-      host.style.setProperty(
-        '--style-accent',
-        state.accent || window.XtrataMusicPlayer.palettes[state.palette].accent
-      );
+      el.xs.forEach((input) => {
+        if (input.type === 'checkbox') input.checked = !!state[input.dataset.x];
+        else input.value = state[input.dataset.x];
+      });
+      el.xts.forEach((input) => {
+        if (document.activeElement === input) return;
+        input.value = input.dataset.xt === 'cues' ? cuesText(state.cues) : state[input.dataset.xt];
+      });
+      el.waveNote.hidden = state.timeline === 'waveform';
+      el.coverNote.hidden = state.palette !== 'cover';
+      el.accent.value = accentOf(state);
+      for (const node of [host, el.look, el.extras]) node.style.setProperty('--style-accent', accentOf(state));
     }
     function change() {
       render();
       onChange?.(state);
     }
-    host.querySelectorAll('[data-style]').forEach(
-      (el) =>
-        (el.onclick = () => {
-          state.style = el.dataset.style;
+    el.styles.forEach(
+      (b) =>
+        (b.onclick = () => {
+          state.style = b.dataset.style;
           change();
         })
     );
-    host.querySelectorAll('[data-option]').forEach(
-      (el) =>
-        (el.onchange = () => {
-          state[el.dataset.option] = el.value;
-          if (el.dataset.option === 'palette') state.accent = '';
+    el.options.forEach(
+      (input) =>
+        (input.onchange = () => {
+          state[input.dataset.option] = input.value;
+          if (input.dataset.option === 'palette') state.accent = '';
           change();
         })
     );
-    host.querySelectorAll('[data-check]').forEach(
-      (el) =>
-        (el.onchange = () => {
-          state[el.dataset.check] = el.checked;
+    el.checks.forEach(
+      (input) =>
+        (input.onchange = () => {
+          state[input.dataset.check] = input.checked;
           change();
         })
     );
-    host.querySelector('[data-accent]').onchange = (e) => {
+    el.xs.forEach(
+      (input) =>
+        (input.onchange = () => {
+          state[input.dataset.x] = input.type === 'checkbox' ? input.checked : input.value;
+          // A waveform style needs the waveform timeline, so picking one turns it on.
+          if (input.dataset.x === 'waveStyle' && input.value !== 'bars') state.timeline = 'waveform';
+          change();
+        })
+    );
+    // Text extras apply when you leave the box, so the player is not rebuilt on every key.
+    el.xts.forEach(
+      (input) =>
+        (input.onchange = () => {
+          const key = input.dataset.xt;
+          state = window.XtrataMusicPlayer.normalize({
+            ...state,
+            [key]: key === 'cues' ? parseCues(input.value) : input.value
+          });
+          input.value = key === 'cues' ? cuesText(state.cues) : state[key];
+          change();
+        })
+    );
+    el.accent.onchange = (e) => {
       state.accent = e.target.value;
       change();
     };
-    host.querySelector('[data-reset]').onclick = () => {
+    el.reset.onclick = () => {
       state = window.XtrataMusicPlayer.normalize({ style: state.style });
       change();
     };
-    host.querySelector('[data-palette-accent]').onclick = () => {
+    el.paletteAccent.onclick = () => {
       state.accent = '';
       change();
     };
@@ -145,14 +300,15 @@
       set: (value) => {
         state = window.XtrataMusicPlayer.normalize(value);
         render();
-      }
+      },
+      parts: { look: el.look, extras: el.extras }
     };
   }
   function init() {
     const section = document.createElement('section');
     section.id = 'musicAppearancePanel';
     section.innerHTML =
-      '<div class="music-appearance-heading"><div><span class="tag">Make it yours</span><h2>Choose your player</h2><p class="muted">Three styles. One permanent home for your music.</p></div></div><div id="musicStyleControls"></div><button type="button" class="btn ghost" id="musicStyleApplyAll" hidden>Apply this appearance to all tracks</button><p id="musicStyleStatus" role="status" class="muted"></p>';
+      '<div class="music-appearance-heading"><div><span class="tag">Make it yours</span><h2>Choose your player</h2><p class="muted">Five styles and a handful of optional extras. One permanent home for your music.</p></div></div><div id="musicStyleControls"></div><button type="button" class="btn ghost" id="musicStyleApplyAll" hidden>Apply this appearance to all tracks</button><p id="musicStyleStatus" role="status" class="muted"></p>';
     const workspace = document.createElement('div');
     workspace.className = 'music-design-workspace';
     const preview = document.querySelector('#preview');
@@ -219,5 +375,5 @@
     visibility();
     return { ...controls, visibility };
   }
-  window.XtrataMusicAppearance = { mount, init };
+  window.XtrataMusicAppearance = { mount, init, describe, parseCues };
 })();
