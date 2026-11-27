@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import {serve,browser,page} from './serve.mjs';
 const {srv,url}=await serve(),b=await browser(),logs=[];
 try{
-  const p=await page(b,url,{logs});
+  const p=await page(b,url,{logs});p.on('dialog',d=>d.accept()); // Clear now asks first; this scenario confirms it
   await p.addInitScript(()=>{window.reviewPort={id:'pro-test',name:'Simulated MIDI',state:'connected'};Object.defineProperty(navigator,'requestMIDIAccess',{configurable:true,value:()=>Promise.resolve({inputs:new Map([['pro-test',window.reviewPort]]),outputs:new Map()})});});
   await p.goto(`${url}/audionaut-beta/daw.html`);await p.waitForFunction(()=>document.querySelectorAll('.channel.instrument').length>=4,null,{timeout:20000});
   const results=await p.evaluate(async()=>{

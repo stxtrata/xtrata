@@ -491,6 +491,8 @@ function instrumentControls(i) {
   pasteBtn.title = "Paste MIDI notes into this sequence";
   pasteBtn.addEventListener("click", () => {
     if (!midiClipboard) return setStatus("No MIDI notes copied yet.", true);
+    const existing = store.seq.notes[i]?.length || 0;
+    if (existing && !confirm(`Replace the ${existing} note${existing === 1 ? "" : "s"} on ${store.instrument(i).name} with ${midiClipboard.length} pasted note${midiClipboard.length === 1 ? "" : "s"}?\n\nYou can undo this with ↶ Undo or ⌘/Ctrl+Z.`)) return setStatus("Paste cancelled. Nothing changed.");
     store.setNotes(i, JSON.parse(JSON.stringify(midiClipboard)));
     drawInstStrip(i);
     setStatus(
@@ -560,6 +562,8 @@ export function buildInstruments() {
         if (!targetRow) return;
         const dest = +targetRow.dataset.inst;
         if (dest === i) return;
+        const existing = store.seq.notes[dest]?.length || 0;
+        if (existing && !confirm(`Replace the ${existing} note${existing === 1 ? "" : "s"} on ${store.instrument(dest).name} with ${srcNotes.length} from ${store.instrument(i).name}?\n\nYou can undo this with ↶ Undo or ⌘/Ctrl+Z.`)) return setStatus("Copy cancelled. Nothing changed.");
         store.setNotes(dest, srcNotes);
         drawInstStrip(dest);
         setStatus(

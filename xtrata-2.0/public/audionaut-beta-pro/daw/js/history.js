@@ -46,7 +46,10 @@ function retain() {
   retainAssetIds("history", ids);
   pruneAssets();
 }
-function notify() { onChange?.(index > 0, index < entries.length); }
+const listeners = new Set();
+function notify() { onChange?.(index > 0, index < entries.length); for (const fn of listeners) fn(index > 0, index < entries.length); }
+// Extra observers (the MIDI roll's own Undo/Redo buttons). Returns an unsubscribe function.
+export function onHistoryChange(fn) { listeners.add(fn); fn(index > 0, index < entries.length); return () => listeners.delete(fn); }
 function invalidateRedo() {
   if (index < entries.length) {
     entries.splice(index);

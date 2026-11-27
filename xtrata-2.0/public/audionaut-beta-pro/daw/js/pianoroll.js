@@ -14,7 +14,7 @@ import { SYNTH_BANK, synthDefaults, parseLine } from "./synths.js";
 import { createSynthPicker } from "./synth-picker.js";
 import { changeSynth } from "./synth-selection.js";
 import { attachKeyboard, noteOn, noteOff, allOff, getOctave, setOctave, TYPED_VEL } from "./live-keys.js";
-import { beginTransaction, endTransaction } from "./history.js";
+import { beginTransaction, endTransaction, undo, redo, onHistoryChange } from "./history.js";
 import { quantizeRecordedSpan } from "./performance-recorder.js";
 import { bindRecordArm, bindRecordHint, makeQuantizeControls, setQuantizeTrack } from './record-controls.js';
 
@@ -402,8 +402,9 @@ function onWheel(e) {
 // --------------------------------------------------------------- selection ops
 function deleteSelection() {
   if (!selection.size) return;
+  const count = selection.size;
   setEditorNotes(notes().filter((n) => !selection.has(n)));
-  setRollStatus(`Deleted ${selection.size} notes.`);
+  setRollStatus(`Deleted ${count} note${count === 1 ? "" : "s"}. ↶ Undo (⌘/Ctrl+Z) brings ${count === 1 ? "it" : "them"} back.`);
   selection.clear();
   drawRoll();
 }
@@ -785,12 +786,21 @@ export function initPianoRoll() {
   $("#roll-rec").after(armHint, quantizeTools);
   syncRollRecordControls();
   $("#roll-clear").addEventListener("click", () => {
+    const count = notes().length, name = editingClip() ? "this clip" : (store.instrument(inst)?.name || "this instrument");
+    // Clearing everything asks first; the change is still undoable afterwards.
+    if (count && !confirm(`Clear all ${count} note${count === 1 ? "" : "s"} from ${name} in this sequence?\n\nYou can undo this with ↶ Undo or ⌘/Ctrl+Z.`)) return setRollStatus("Clear cancelled. Nothing changed.");
     for(const [src,held] of recording)if(held.trackId===store.instrument(inst)?.id){clearTimeout(held.timer);recording.delete(src);}
     if(!recording.size&&recordingTransaction){recordingTransaction=false;endTransaction();}
     selection.clear();
     setEditorNotes([]);
     drawRoll();
+    setRollStatus(count ? `Cleared ${count} note${count === 1 ? "" : "s"}. ↶ Undo (⌘/Ctrl+Z) brings ${count === 1 ? "it" : "them"} back.` : "Nothing to clear.");
   });
+  // Undo / Redo in the roll itself, shared with the project history (top bar ↶ ↷, ⌘/Ctrl+Z).
+  const undoBtn = $("#roll-undo"), redoBtn = $("#roll-redo");
+  onHistoryChange((canUndo, canRedo) => { undoBtn.disabled = !canUndo; redoBtn.disabled = !canRedo; });
+  undoBtn.addEventListener("click", () => setRollStatus(undo() ? "Undone." : "Nothing to undo."));
+  redoBtn.addEventListener("click", () => setRollStatus(redo() ? "Redone." : "Nothing to redo."));
   $("#roll-close").addEventListener("click", closeRoll);
   $("#roll-midi").addEventListener("click", () => setMidiEnabled(!isMidiOn()));
   document.addEventListener("live-note", onLiveNote);
