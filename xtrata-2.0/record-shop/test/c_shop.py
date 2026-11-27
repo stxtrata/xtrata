@@ -156,7 +156,10 @@ async def main():
         pad=await E("getComputedStyle(document.getElementById('pad')).display")
         p0=(await E(S))['player']; bb=await page.locator('#pad button[data-k="w"]').bounding_box()
         await cdp.send('Input.dispatchTouchEvent',{'type':'touchStart','touchPoints':[{'x':bb['x']+20,'y':bb['y']+20}]}); await E('__QA.step(1)'); await cdp.send('Input.dispatchTouchEvent',{'type':'touchEnd','touchPoints':[]}); p1=(await E(S))['player']
-        ok('19 touch: swipe looks, movement pad walks',abs(y1-y0)>.3 and pad=='grid' and p1['z']<p0['z']-1.5,(y1-y0,pad,p1['z']-p0['z']))
+        ok('19 touch: swipe looks, movement pad walks',y1-y0>.3 and pad=='grid' and p1['z']<p0['z']-1.5,(y1-y0,pad,p1['z']-p0['z']))
+        pt0=(await E(S))['player']['pitch']; await swipe(215,500,215,380); pt1=(await E(S))['player']['pitch']
+        yr0=(await E(S))['player']['yaw']; await swipe(150,400,300,400); yr1=(await E(S))['player']['yaw']
+        ok('19 touch look follows the finger like the mouse: swipe left looks left, right looks right, up looks up',y1>y0 and yr1<yr0 and pt1>pt0,(y1-y0,yr1-yr0,pt1-pt0))
         await E('''(()=>{const s=__QA.app.stock.primary['alb_2366ae7e8449'];window.SL=s;__QA.teleport(s.pos.x+1.1,s.pos.z,0,0);__QA.lookAt(s.pos.x,s.pos.y,s.pos.z)})()'''); await E('__QA.step(.2)')
         await page.touchscreen.tap(215,420); await E('__QA.step(2)'); st=await E(S)
         ok('19 centre tap pulls the aimed case',st['mode']=='inspect' and st['inspect']['rel']=='alb_2366ae7e8449',st['mode'])
