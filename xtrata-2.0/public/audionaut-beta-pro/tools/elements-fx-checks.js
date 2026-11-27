@@ -61,6 +61,13 @@ export async function verifyElements() {
     const par = await render('iron', { ratio: 1, mix: 0.5, knee: 0 }, { signal: sine(2000, 0.1) });
     let err = 0;
     for (let i = SR * 0.3; i < SR * 0.9; i++) err = Math.max(err, Math.abs(par.out.getChannelData(0)[i] - par.input.getChannelData(0)[i - lat]));
+    // Characters change timing only: with ratio 1 every character passes a tone unchanged.
+    for (const character of ['clean', 'punch', 'opto', 'vintage']) {
+      const r = await render('iron', { ratio: 1, threshold: 0, knee: 0, character }, { signal: sine(1000, 0.5) }), d = r.out.getChannelData(0);
+      const tone = (hz) => { let re = 0, im = 0; for (let i = SR / 2; i < SR; i++) { re += d[i] * Math.cos(2 * Math.PI * hz * i / SR); im += d[i] * Math.sin(2 * Math.PI * hz * i / SR); } return Math.hypot(re, im) * 4 / SR; };
+      const level = 20 * Math.log10(tone(1000) / 0.5), h3 = 20 * Math.log10(tone(3000) / tone(1000) + 1e-12);
+      assert(Math.abs(level) < 0.5 && h3 < -60, `iron ${character} is clean at ratio 1 (${level.toFixed(2)} dB, h3 ${h3.toFixed(0)} dB)`);
+    }
     rows.push({ check: 'iron', reduction: loud.meter.reduction, gainAtLoud: +quiet.toFixed(3), parallelError: err });
     assert(quiet < 0.5 && loud.meter.reduction < -6, 'iron compresses');
     assert(err < 2e-3, 'iron parallel mix aligned ' + err);
@@ -80,7 +87,14 @@ export async function verifyElements() {
       dbs.push(+(20 * Math.log10(stats(r.out, 0.5, 0.9).rms / (0.1 / Math.SQRT2))).toFixed(3));
     }
     const driven = await render('carbon', { midDrive: 1, style: 'hard' }, { signal: sine(1000, 0.6) });
-    rows.push({ check: 'carbon', flatDb: dbs, drivenPeak: +stats(driven.out).peak.toFixed(3) });
+    // Mix blends phase-matched paths: no notch at the splits at 50%.
+    const half = [];
+    for (const hz of [200, 3000]) { const r = await render('carbon', { mix: 0.5 }, { signal: sine(hz, 0.1) }); half.push(+(20 * Math.log10(stats(r.out, 0.5, 0.9).rms / (0.1 / Math.SQRT2))).toFixed(3)); }
+    assert(half.every((v) => Math.abs(v) < 0.1), 'carbon mix 50% flat at the splits ' + half);
+    const tube = await render('carbon', { lowDrive: 1, midDrive: 1, highDrive: 1, style: 'tube' }, { signal: sine(100, 0.5) });
+    let dc = 0; const td = tube.out.getChannelData(0); for (let i = SR / 2; i < SR; i++) dc += td[i] / (SR / 2);
+    assert(Math.abs(dc) < 2e-3, 'carbon removes drive DC ' + dc);
+    rows.push({ check: 'carbon', flatDb: dbs, mixHalfDb: half, dc: +dc.toFixed(5), drivenPeak: +stats(driven.out).peak.toFixed(3) });
     assert(dbs.every((v) => Math.abs(v) < 0.1), 'carbon flat sum ' + dbs);
   }
   // HELIUM: an impulse produces a decaying, stereo, deterministic tail.
@@ -102,6 +116,7 @@ export async function verifyElements() {
     const l1 = peakAt(0, 0.3, 0.45), r1 = peakAt(1, 0.3, 0.45), r2 = peakAt(1, 0.7, 0.8);
     rows.push({ check: 'mercury', firstLeft: l1, firstRight: r1.v, secondRight: r2 });
     assert(Math.abs(l1.at - 0.375) < 0.002 && l1.v > 0.3 && r1.v < 1e-3 && Math.abs(r2.at - 0.75) < 0.003 && r2.v > 0.1, 'mercury timing/ping-pong');
+    assert(pluginTailSeconds('mercury', { ...pluginDefaults('mercury'), time: '1/2' }, { bpm: 70 }) > pluginTailSeconds('mercury', { ...pluginDefaults('mercury'), time: '1/2' }, { bpm: 140 }) * 1.9, 'mercury tail follows host tempo');
     assert(Math.abs(pluginTailSeconds('mercury', { ...pluginDefaults('mercury'), bpm: 120 }) - 0.375 * Math.ceil(Math.log(1e-4) / Math.log(0.4))) < 1e-6, 'mercury tail');
   }
   return rows;

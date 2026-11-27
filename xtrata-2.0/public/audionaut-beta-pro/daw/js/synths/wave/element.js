@@ -4,7 +4,7 @@
 // position: each frame's oscillator gets an exact piecewise-linear gain curve, so the sweep is
 // a phase-coherent interpolation between neighbouring frames, as in a hardware wavetable.
 import { nativeNote, range } from '../performance-voice.js';
-import { select, cached, spread, bodyStage, cutoffEnvelope, noiseBuffer } from '../marek-kit.js';
+import { select, cachedLru, spread, bodyStage, cutoffEnvelope, noiseBuffer } from '../marek-kit.js';
 
 export const ELEMENT_TABLES = ['analog', 'formant', 'digital', 'glass', 'growl', 'organ'];
 export const ELEMENT_WARPS = ['none', 'bend', 'mirror', 'sync', 'fold', 'squash'];
@@ -51,9 +51,12 @@ function amps(key, fill) {
 }
 function shapeAt(table, x, p) {
   if (table === 'analog') {
-    const seq = [Math.sin.bind(null, 0), tri, saw, sqr, (q) => (q < 0.18 ? 1 : -0.22)];
+    // Every shape is shifted so its fundamental is in sine phase; otherwise neighbouring
+    // frames partly cancel and the fundamental dips mid-scan.
+    const wrap = (q) => q - Math.floor(q);
+    const seq = [(q) => Math.sin(2 * Math.PI * q), (q) => tri(wrap(q + 0.25)), (q) => saw(wrap(q + 0.5)), sqr, (q) => { const u = wrap(q - 0.16); return u < 0.18 ? 1 : -0.22; }];
     const s = x * 4, i = Math.min(3, Math.floor(s)), f = s - i;
-    const a = i === 0 ? Math.sin(2 * Math.PI * p) : seq[i](p), b = seq[i + 1](p);
+    const a = seq[i](p), b = seq[i + 1](p);
     return a * (1 - f) + b * f;
   }
   if (table === 'formant') {
@@ -103,7 +106,7 @@ export function elementCycle(table, x, warp, amount, n = N) {
 }
 const spectra = new Map();
 function frameSpectra(table, warp, amount) {
-  const a = warp === 'none' ? 0 : Math.round(amount * 50) / 50;
+  const a = warp === 'none' ? 0 : Math.round(amount * 20) / 20; // 21 steps keep the wave cache small
   const key = `${table}|${warp}|${a}`;
   if (!spectra.has(key)) {
     if (spectra.size > 64) spectra.delete(spectra.keys().next().value);
@@ -121,23 +124,25 @@ function frameSpectra(table, warp, amount) {
 }
 function frameWave(ctx, table, warp, amount, f) {
   const { key, frames } = frameSpectra(table, warp, amount);
-  return cached(ctx, `element:${key}:${f}`, () => ctx.createPeriodicWave(frames[f].real, frames[f].imag));
+  return cachedLru(ctx, 'element', `${key}:${f}`, () => ctx.createPeriodicWave(frames[f].real, frames[f].imag), FRAMES * 24);
 }
 
 // Exact piecewise-linear gain schedule of frame f while the position moves start → end.
-function scheduleFrame(param, f, time, p0, p1, span) {
+function scheduleFrame(param, f, time, p0, p1, span, resumeAt) {
   const w = (p) => Math.max(0, 1 - Math.abs(p * (FRAMES - 1) - f));
   const pos = (u) => p0 + (p1 - p0) * u;
   const marks = [0, 1];
   const lo = Math.min(p0, p1) * (FRAMES - 1), hi = Math.max(p0, p1) * (FRAMES - 1);
   for (let k = Math.ceil(lo); k <= Math.floor(hi); k++) if (p1 !== p0) marks.push((k / (FRAMES - 1) - p0) / (p1 - p0));
   const us = [...new Set(marks.filter((u) => u >= 0 && u <= 1))].sort((a, b) => a - b);
-  param.setValueAtTime(w(p0), time);
-  for (const u of us.slice(1)) param.linearRampToValueAtTime(w(pos(u)), time + u * span);
+  // A rebuilt voice joins the scan at its true age instead of restarting it.
+  const u0 = resumeAt != null && resumeAt > time ? Math.min(1, (resumeAt - time) / span) : 0;
+  param.setValueAtTime(w(pos(u0)), time + u0 * span);
+  for (const u of us) if (u > u0) param.linearRampToValueAtTime(w(pos(u)), time + u * span);
 }
 
 function voice(ctx, dest, note, patch) {
-  const { P, time, gate, frequency, amp, play, osc } = nativeNote(ctx, dest, note, patch, params, 0.5);
+  const { P, time, frequency, amp, play, osc, bind } = nativeNote(ctx, dest, note, patch, params, 0.5);
   const vel = Math.max(0, Math.min(1, note.vel ?? 1));
   const p0 = Math.min(1, P.posStart + vel * 0.08), p1 = P.posEnd, span = Math.max(0.01, P.posTime);
   const lo = Math.min(p0, p1) * (FRAMES - 1), hi = Math.max(p0, p1) * (FRAMES - 1);
@@ -148,16 +153,19 @@ function voice(ctx, dest, note, patch) {
   const kind = P.filterType;
   const f1 = ctx.createBiquadFilter();
   f1.type = kind === 'hp' ? 'highpass' : kind === 'bp' ? 'bandpass' : 'lowpass';
-  f1.Q.setValueAtTime(kind === 'lp24' ? Math.max(0.3, P.reso * 0.75) : P.reso, time);
-  cutoffEnvelope(ctx, f1.frequency, time, P.cutoff, kind === 'hp' ? 0 : P.fEnv, P.fDecay);
+  const nyq = ctx.sampleRate * 0.45;
+  bind('reso', f1.Q, (v) => (kind === 'lp24' ? Math.max(0.3, v * 0.75) : v));
+  bind('cutoff', f1.frequency, (v) => Math.min(nyq, v));
+  cutoffEnvelope(f1, note, kind === 'hp' ? 0 : P.fEnv, P.fDecay);
   filters.push(f1);
   if (kind === 'lp24') {
     const f2 = ctx.createBiquadFilter();
     f2.type = 'lowpass'; f2.Q.setValueAtTime(0.54, time);
-    cutoffEnvelope(ctx, f2.frequency, time, P.cutoff, P.fEnv, P.fDecay);
+    bind('cutoff', f2.frequency, (v) => Math.min(nyq, v));
+    cutoffEnvelope(f2, note, P.fEnv, P.fDecay);
     f1.connect(f2); filters.push(f2);
   }
-  const body = bodyStage(ctx, time, P.attack, P.decay, P.sustain, gate);
+  const body = bodyStage(ctx, note, P.attack, P.decay, P.sustain);
   filters.at(-1).connect(body).connect(amp);
   // Oscillators: every unison voice runs the used frames phase-coherently.
   const n = Math.max(1, Math.round(P.voices)), norm = 1 / Math.sqrt(n);
@@ -171,7 +179,7 @@ function voice(ctx, dest, note, patch) {
       o.setPeriodicWave(frameWave(ctx, P.table, P.warp, P.warpAmt, f));
       o.detune.setValueAtTime(s * P.detune, time);
       const g = ctx.createGain();
-      scheduleFrame(g.gain, f, time, p0, p1, span);
+      scheduleFrame(g.gain, f, time, p0, p1, span, note.resumeAt);
       o.connect(g).connect(sum);
       play(o);
     }

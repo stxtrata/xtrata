@@ -3,7 +3,7 @@
 // SYNC (band-limited sync cycle), AM (ring) or noise. Two filters run in series or parallel,
 // and a PUNCH stage adds an onset kick plus soft clipping for the drop.
 import { nativeNote, range } from '../performance-voice.js';
-import { select, cached, spread, bodyStage, cutoffEnvelope, driveCurve, noiseBuffer } from '../marek-kit.js';
+import { select, cachedLru, spread, bodyStage, cutoffEnvelope, decayTo, driveCurve, noiseBuffer } from '../marek-kit.js';
 
 export const LOSTWAVE_MODES = ['off', 'saw', 'square', 'hyper', 'fm', 'sync', 'am', 'noise'];
 const FM_RATIOS = ['0.5', '1', '1.5', '2', '3', '4', '7'];
@@ -41,7 +41,7 @@ const params = [
 // Hard-sync cycle: a slave saw reset by the master every period, as harmonics.
 function syncWave(ctx, ratio) {
   const r = Math.round(ratio * 20) / 20;
-  return cached(ctx, `lostwave-sync:${r}`, () => {
+  return cachedLru(ctx, 'lostwave-sync', r, () => {
     const n = 512, h = 64, real = new Float32Array(h), imag = new Float32Array(h);
     const y = new Float32Array(n);
     for (let i = 0; i < n; i++) { const q = (i / n) * r; y[i] = 2 * (q - Math.floor(q)) - 1; }
@@ -52,10 +52,11 @@ function syncWave(ctx, ratio) {
       real[k] = (2 * re) / n; imag[k] = (2 * im) / n;
     }
     return ctx.createPeriodicWave(real, imag);
-  });
+  }, 24);
 }
 
-function oscillator(ctx, P, i, f, time, into, osc, play) {
+function oscillator(ctx, P, i, f, note, into, osc, play) {
+  const time = note.time;
   const mode = P[`o${i}Mode`], level = P[`o${i}Level`];
   if (mode === 'off' || level <= 0) return;
   const hz = Math.min(ctx.sampleRate * 0.45, f * 2 ** Math.round(P[`o${i}Oct`]));
@@ -94,8 +95,7 @@ function oscillator(ctx, P, i, f, time, into, osc, play) {
   if (mode === 'fm') {
     // Frequency deviation scales with the modulator, so the timbre tracks the keyboard.
     const dev = ctx.createGain(), index = P.fmDepth * 6 * hz * ratio;
-    dev.gain.setValueAtTime(index * (1 + P.fEnv / 3), time);
-    dev.gain.setTargetAtTime(index, time + 0.001, Math.max(0.004, P.fDecay) / 3);
+    decayTo(dev.gain, index * (1 + P.fEnv / 3), index, time, P.fDecay, note.resumeAt);
     mod.connect(dev).connect(carrier.frequency);
     carrier.connect(out);
   } else {
@@ -110,13 +110,16 @@ function oscillator(ctx, P, i, f, time, into, osc, play) {
 
 const F2 = { lp: 'lowpass', hp: 'highpass', bp: 'bandpass', notch: 'notch' };
 function voice(ctx, dest, note, patch) {
-  const { P, time, gate, frequency, amp, play, osc } = nativeNote(ctx, dest, note, patch, params, 0.36);
+  const { P, time, frequency, amp, play, osc, bind } = nativeNote(ctx, dest, note, patch, params, 0.36);
   const mix = ctx.createGain(), sum = ctx.createGain();
   const f1 = ctx.createBiquadFilter(), f2 = ctx.createBiquadFilter();
-  f1.type = 'lowpass'; f1.Q.setValueAtTime(P.reso, time);
-  cutoffEnvelope(ctx, f1.frequency, time, P.cutoff, P.fEnv, P.fDecay);
+  const nyq = ctx.sampleRate * 0.45;
+  f1.type = 'lowpass';
+  bind('reso', f1.Q);
+  bind('cutoff', f1.frequency, (v) => Math.min(nyq, v));
+  cutoffEnvelope(f1, note, P.fEnv, P.fDecay);
   f2.type = F2[P.f2Type] || 'highpass';
-  f2.frequency.setValueAtTime(Math.min(ctx.sampleRate * 0.45, P.f2Cutoff), time);
+  bind('f2Cutoff', f2.frequency, (v) => Math.min(nyq, v));
   f2.Q.setValueAtTime(P.f2Type === 'lp' || P.f2Type === 'hp' ? 0.71 : 1.2, time);
   if (P.route === 'parallel') {
     const a = ctx.createGain(), b = ctx.createGain();
@@ -124,11 +127,11 @@ function voice(ctx, dest, note, patch) {
     mix.connect(f1).connect(a).connect(sum);
     mix.connect(f2).connect(b).connect(sum);
   } else mix.connect(f1).connect(f2).connect(sum);
-  for (let i = 1; i <= 4; i++) oscillator(ctx, P, i, frequency, time, mix, osc, play);
+  for (let i = 1; i <= 4; i++) oscillator(ctx, P, i, frequency, note, mix, osc, play);
   // PUNCH: an onset gain kick and gentle soft clip, scaled back so loudness stays even.
   const kick = ctx.createGain();
-  kick.gain.setValueAtTime(1 + P.punch * 1.6, time);
-  kick.gain.setTargetAtTime(1, time + 0.004, 0.012 + P.punch * 0.02);
+  if (note.resumeAt == null) kick.gain.setValueAtTime(1 + P.punch * 1.6, time);
+  decayTo(kick.gain, 1 + P.punch * 1.6, 1, time + 0.004, (0.012 + P.punch * 0.02) * 3, note.resumeAt);
   let tail = sum.connect(kick);
   const curve = driveCurve(ctx, P.punch * 0.55);
   if (curve) {
@@ -137,7 +140,7 @@ function voice(ctx, dest, note, patch) {
     trim.gain.setValueAtTime(1 / (1 + P.punch * 0.5), time);
     tail.connect(shaper).connect(trim); tail = trim;
   }
-  const body = bodyStage(ctx, time, P.attack, P.decay, P.sustain, gate);
+  const body = bodyStage(ctx, note, P.attack, P.decay, P.sustain);
   tail.connect(body).connect(amp);
 }
 

@@ -87,6 +87,35 @@ export async function verifyMarekSynths() {
     assert(tail.voices.every((v) => v.ended), msg('voice ended after release'));
     rows.push(row);
   }
+  // Held notes: cutoff and resonance move the sounding voice (no rebuild), and a control that
+  // does rebuild the voice joins the envelopes at their true age instead of restarting them.
+  for (const id of MAREK_SYNTHS) {
+    const patch = { ...synthDefaults(id), sustain: 0, decay: 1.5, fEnv: 0, cutoff: 18000, attack: 0.002 };
+    const run = async (edit) => {
+      const ctx = new OfflineAudioContext(1, 44100 * 2, 44100);
+      const v = createVoice(ctx, ctx.destination, SYNTH_BANK[id], id, { ...baseNote, held: true, dur: Infinity }, edit ? patch : { ...patch, decay: 1.52 }, null, { seed: 9 });
+      const before = v.sources.length; let live = null, after = null;
+      if (edit) ctx.suspend(1).then(async () => { live = await v.setParameters({ cutoff: 9000, reso: 2 }, ctx.currentTime); after = v.sources.length; await v.setParameters({ decay: 1.52 }, ctx.currentTime); ctx.resume(); });
+      const data = (await ctx.startRendering()).getChannelData(0);
+      return { rms: energy(data, Math.floor(1.15 * 44100), Math.floor(1.45 * 44100)).rms, live, grew: after != null && after !== before };
+    };
+    const edited = await run(true), reference = await run(false);
+    const drift = 20 * Math.log10(edited.rms / reference.rms);
+    rows.push({ id: id + '-held-edit', boundLive: edited.live === true && !edited.grew, driftDb: +drift.toFixed(2) });
+    assert(edited.live === true && !edited.grew, `${id}: cutoff/resonance move the live voice without a rebuild`);
+    assert(Math.abs(drift) < 3, `${id}: rebuilt voice keeps its envelope age (${drift.toFixed(2)} dB)`);
+  }
+  // ELEMENT: the fundamental stays present through a full scan of the analog table.
+  {
+    const r = await render('element', { ...synthDefaults('element'), table: 'analog', posStart: 0, posEnd: 1, posTime: 3, voices: 1, sub: 0, cutoff: 18000, fEnv: 0, sustain: 1, attack: 0.002 }, { notes: [{ pitch: 57, vel: 0.01, dur: 3.2 }], seconds: 3.4 });
+    const tone = (from, to) => { let re = 0, im = 0; for (let i = Math.floor(from * 44100); i < Math.floor(to * 44100); i++) { re += r.data[i] * Math.cos(2 * Math.PI * 220 * i / 44100); im += r.data[i] * Math.sin(2 * Math.PI * 220 * i / 44100); } return 20 * Math.log10(Math.hypot(re, im) + 1e-12); };
+    const levels = []; for (let t = 0.1; t < 3; t += 0.15) levels.push(tone(t, t + 0.15));
+    const span = Math.max(...levels) - Math.min(...levels);
+    rows.push({ id: 'element-fundamental', spanDb: +span.toFixed(1) });
+    // The shapes themselves differ by up to ~8 dB of fundamental (sine vs narrow pulse);
+    // phase cancellation between frames used to add a 15 dB hole on top of that.
+    assert(span < 10, 'element analog scan keeps its fundamental (' + span.toFixed(1) + ' dB span)');
+  }
   // MAVREKT: the trance gate chops the sound in time with the tempo.
   const gated = await render('mavrekt', { ...synthDefaults('mavrekt'), gateDepth: 1, gatePattern: 'offbeat', gateRate: '1/16', sustain: 1, attack: 0.002 }, { notes: [{ dur: 2, bpm: 120 }], seconds: 2.2 });
   const step = 0.125, closed = energy(gated.data, Math.floor((0.02 + 0.03) * 44100), Math.floor((0.02 + 0.2) * 44100)), open = energy(gated.data, Math.floor((0.02 + 2 * step + 0.01) * 44100), Math.floor((0.02 + 3 * step - 0.02) * 44100));
@@ -129,6 +158,15 @@ export async function verifyValorium() {
     const est = pitchOf(r.data, 44100, 0.35, 0.8);
     rows.at(-1).pitch57 = +est.toFixed(1);
     if (family !== 'bell') assert(Math.abs(1200 * Math.log2(est / 220)) < 40, `valorium ${family} pitch ${est}`);
+  }
+  // String families are on pitch at every starter root, not only in the middle of the keyboard.
+  const { valoriumStarterSample } = await import('../daw/js/synths/keys/valorium.js');
+  for (const family of ['pluck', 'guitar']) for (const root of [36, 48, 60, 72, 84, 90, 96, 102]) {
+    const b = valoriumStarterSample(new OfflineAudioContext(1, 8, 44100), family, root), d = b.getChannelData(0), sr = b.sampleRate, want = 440 * 2 ** ((root - 69) / 12);
+    let best = 0, cents = 0;
+    for (let c = -150; c <= 150; c += 2) { const f = want * 2 ** (c / 1200) / b.valoriumRate, w = 2 * Math.PI * f / sr; let re = 0, im = 0; const len = Math.min(d.length - 400, sr * 1.2); for (let i = 400; i < 400 + len; i++) { const h = 0.5 - 0.5 * Math.cos(2 * Math.PI * (i - 400) / len); re += d[i] * h * Math.cos(w * i); im += d[i] * h * Math.sin(w * i); } const a = Math.hypot(re, im); if (a > best) { best = a; cents = c; } }
+    rows.push({ tuning: family + root, cents });
+    assert(Math.abs(cents) <= 6, `valorium ${family} root ${root} is ${cents} cents off`);
   }
   for (const preset of def.presets) {
     const e = energy((await play({ ...defaults, ...preset.params })).data);

@@ -41,7 +41,7 @@ function estimateTail(project,plan,buffers,stem=null){
   const routeTail=(id,seen=new Set())=>{
     if(memo.has(id))return memo.get(id);if(seen.has(id))throw new Error('Mixer routing cannot feed back into itself.');
     const owner=chains.get(id);if(!owner)return 0;seen=new Set(seen).add(id);
-    const own=[...owner.inserts||[],...owner.fx||[]].reduce((sum,slot)=>{if(slot.enabled===false)return sum;const params=slot.params||{};return sum+Math.max(pluginTailSeconds(slot.type,params,{irSource:slot.irSource,irDuration:buffers[project.channels.findIndex(t=>t.id===slot.irSource?.sourceTrackId)]?.duration}),0,Number(params.decay)||0,Number(params.tailSeconds)||0);},0);
+    const own=[...owner.inserts||[],...owner.fx||[]].reduce((sum,slot)=>{if(slot.enabled===false)return sum;const params=slot.params||{};return sum+Math.max(pluginTailSeconds(slot.type,params,{bpm:project.bpm,irSource:slot.irSource,irDuration:buffers[project.channels.findIndex(t=>t.id===slot.irSource?.sourceTrackId)]?.duration}),0,Number(params.decay)||0,Number(params.tailSeconds)||0);},0);
     const routes=id==='master'?[]:[owner.output||'master',...(owner.auxSends||[]).filter(send=>send.amount>0).map(send=>send.busId)];
     const total=own+Math.max(0,...routes.map(next=>routeTail(next,seen)));memo.set(id,total);return total;
   };

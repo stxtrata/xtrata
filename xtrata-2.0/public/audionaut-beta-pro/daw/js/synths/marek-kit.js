@@ -16,6 +16,18 @@ export function cached(ctx, key, build) {
   if (!b.has(key)) b.set(key, build());
   return b.get(key);
 }
+// Bounded variant for families with many possible keys (waves per warp amount, gate buffers per
+// tempo): least-recently-used entries are dropped. Sounding nodes keep their own references.
+export function cachedLru(ctx, group, key, build, max) {
+  const b = bank(ctx), id = `lru:${group}`;
+  if (!b.has(id)) b.set(id, new Map());
+  const m = b.get(id);
+  if (m.has(key)) { const v = m.get(key); m.delete(key); m.set(key, v); return v; }
+  const v = build();
+  m.set(key, v);
+  while (m.size > max) m.delete(m.keys().next().value);
+  return v;
+}
 
 // Band-limited pulse of the given duty cycle as a periodic wave (cosine series).
 export function pulseWave(ctx, duty = 0.25) {
@@ -45,30 +57,32 @@ export function spread(n) {
   return Array.from({ length: n }, (_, i) => (i / (n - 1)) * 2 - 1);
 }
 
+// A voice rebuilt mid-note (an unbound control changed) keeps note.time and gets note.resumeAt.
+// Web Audio clamps events scheduled in the past to "now", which would restart every envelope.
+// decayTo() schedules an exponential approach from its true age instead.
+export function decayTo(param, from, to, start, seconds, resumeAt) {
+  const tau = Math.max(0.004, seconds) / 3;
+  if (resumeAt != null && resumeAt > start) {
+    param.setValueAtTime(to + (from - to) * Math.exp(-(resumeAt - start) / tau), resumeAt);
+    if (from !== to) param.setTargetAtTime(to, resumeAt, tau);
+    return;
+  }
+  param.setValueAtTime(from, start);
+  if (from !== to) param.setTargetAtTime(to, start, tau);
+}
+
 // Decay to sustain after the attack, on a gain stage that sits after the host envelope.
 // The host envelope (performance-voice) owns attack and release; this adds the D and S.
-export function bodyStage(ctx, time, attack, decay, sustain, gate) {
-  const g = ctx.createGain();
-  const s = Math.max(0, Math.min(1, sustain));
-  g.gain.setValueAtTime(1, time);
-  const from = time + Math.max(0.001, attack);
-  if (gate > attack && s < 1) {
-    g.gain.setValueAtTime(1, from);
-    g.gain.setTargetAtTime(s, from, Math.max(0.005, decay) / 3);
-  } else if (!Number.isFinite(gate) && s < 1) {
-    g.gain.setValueAtTime(1, from);
-    g.gain.setTargetAtTime(s, from, Math.max(0.005, decay) / 3);
-  }
+export function bodyStage(ctx, note, attack, decay, sustain) {
+  const g = ctx.createGain(), s = Math.max(0, Math.min(1, sustain));
+  decayTo(g.gain, 1, s, note.time + Math.max(0.001, attack), decay, note.resumeAt);
   return g;
 }
 
-// A filter-cutoff envelope: starts envOct octaves above the base and falls back.
-export function cutoffEnvelope(ctx, param, time, base, envOct, decay) {
-  const nyq = ctx.sampleRate * 0.45;
-  const lo = Math.min(nyq, Math.max(20, base));
-  const peak = Math.min(nyq, lo * 2 ** Math.max(0, envOct));
-  param.setValueAtTime(peak, time);
-  if (peak > lo) param.setTargetAtTime(lo, time + 0.001, Math.max(0.004, decay) / 3);
+// Filter-cutoff envelope on the filter's detune (cents): starts envOct octaves above the cutoff
+// and falls back to it. The cutoff itself stays on `frequency`, so it can be bound and moved live.
+export function cutoffEnvelope(filter, note, envOct, decay) {
+  decayTo(filter.detune, Math.max(0, envOct) * 1200, 0, note.time, decay, note.resumeAt);
 }
 
 // tanh drive curve with roughly constant loudness; null for no drive (exact pass-through).
@@ -113,7 +127,7 @@ export const GATE_RATES = { '1/8': 0.5, '1/16': 0.25, '1/32': 0.125 };
 export function gateBuffer(ctx, bpm, rate, pattern) {
   const tempo = Math.max(20, Math.min(420, Number(bpm) || 128));
   const beats = GATE_RATES[rate] ?? 0.25, steps = GATE_PATTERNS[pattern] || GATE_PATTERNS.straight;
-  return cached(ctx, `gate:${tempo}:${beats}:${pattern}`, () => {
+  return cachedLru(ctx, 'gate', `${tempo}:${beats}:${pattern}`, () => {
     const sr = ctx.sampleRate, step = (60 / tempo) * beats, per = Math.max(32, Math.round(step * sr));
     const b = ctx.createBuffer(1, per * 16, sr), d = b.getChannelData(0);
     const rise = Math.max(1, Math.round(0.003 * sr)), fall = Math.max(1, Math.min(per / 2, Math.round(0.01 * sr)));
@@ -127,20 +141,5 @@ export function gateBuffer(ctx, bpm, rate, pattern) {
       }
     }
     return b;
-  });
-}
-
-// Classic wavetable-style visual for a scope: n samples of one waveform shape over 2 cycles.
-export function cyclesFromHarmonics(imag, n = 2048, cycles = 2) {
-  const out = new Float32Array(n);
-  let peak = 1e-9;
-  for (let i = 0; i < n; i++) {
-    const ph = (2 * Math.PI * cycles * i) / n;
-    let v = 0;
-    for (let k = 1; k < imag.length; k++) if (imag[k]) v += imag[k] * Math.sin(k * ph);
-    out[i] = v;
-    peak = Math.max(peak, Math.abs(v));
-  }
-  for (let i = 0; i < n; i++) out[i] = (out[i] / peak) * 0.62;
-  return out;
+  }, 6);
 }

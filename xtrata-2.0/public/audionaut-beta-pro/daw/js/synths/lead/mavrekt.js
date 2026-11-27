@@ -47,13 +47,15 @@ function part(ctx, play, osc, frequency, time, wave, oct, voices, detune, width,
 }
 
 function voice(ctx, dest, note, patch) {
-  const { P, time, gate, frequency, amp, play, osc, bind } = nativeNote(ctx, dest, note, patch, params, 0.42);
+  const { P, time, frequency, amp, play, osc, bind } = nativeNote(ctx, dest, note, patch, params, 0.42);
   const mix = ctx.createGain();
   const filters = ['a', 'b'].map((key) => {
     const f = ctx.createBiquadFilter(), g = ctx.createGain();
     f.type = 'lowpass';
-    f.Q.setValueAtTime(P.reso, time);
-    cutoffEnvelope(ctx, f.frequency, time, P.cutoff * (key === 'b' ? 0.85 : 1), P.fEnv, P.fDecay);
+    const nyq = ctx.sampleRate * 0.45;
+    bind('reso', f.Q);
+    bind('cutoff', f.frequency, (v) => Math.min(nyq, v * (key === 'b' ? 0.85 : 1)));
+    cutoffEnvelope(f, note, P.fEnv, P.fDecay);
     bind('balance', g.gain, (v) => (key === 'a' ? Math.cos(v * Math.PI / 2) : Math.sin(v * Math.PI / 2)) * 1.2);
     f.connect(g).connect(mix);
     return f;
@@ -70,7 +72,7 @@ function voice(ctx, dest, note, patch) {
     tail.connect(shaper).connect(trim);
     tail = trim;
   }
-  const body = bodyStage(ctx, time, P.attack, P.decay, P.sustain, gate);
+  const body = bodyStage(ctx, note, P.attack, P.decay, P.sustain);
   tail.connect(body);
   tail = body;
   if (P.gateDepth > 0) {

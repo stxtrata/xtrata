@@ -51,8 +51,16 @@ function seamLoop(data, sr, startSec, endSec, fadeSec = 0.12) {
 const LOOPS = new Map();
 function osc(f, sr) { const a = (2 * Math.PI * f) / sr; return { s: 0, c: 1, ds: Math.sin(a), dc: Math.cos(a) }; }
 function step(o) { const n = o.s * o.dc + o.c * o.ds; o.c = o.c * o.dc - o.s * o.ds; o.s = n; return n; }
+// The averaging filter in the string loop shortens the period by half a sample, so the
+// string sounds at sr / (n - 0.5). stringTuning() picks the nearest whole delay and returns
+// the playback-rate correction that puts the sample exactly on pitch.
+const STRING_RATE = 32000; // sourceSample's render rate
+function stringTuning(f, sr = STRING_RATE) {
+  const n = Math.max(2, Math.round(sr / f + 0.5));
+  return { n, rate: f / (sr / (n - 0.5)) };
+}
 function karplus(data, sr, f, random, damping, bright, body) {
-  const n = Math.max(2, Math.round(sr / f)), line = new Float32Array(n);
+  const n = stringTuning(f, sr).n, line = new Float32Array(n);
   for (let i = 0; i < n; i++) line[i] = (random() * 2 - 1) * (0.6 + 0.4 * Math.sin((Math.PI * i) / n));
   let lp = 0;
   for (let i = 0; i < n; i++) { lp += bright * (line[i] - lp); line[i] = lp; }
@@ -107,6 +115,7 @@ export function valoriumStarterSample(ctx, family, root) {
     if (SUSTAINED.has(family)) LOOPS.set(key, seamLoop(data, sr, 1.1, seconds - 0.08));
   });
   buffer.valoriumLoop = SUSTAINED.has(family) ? LOOPS.get(key) : null;
+  buffer.valoriumRate = family === 'pluck' || family === 'guitar' ? stringTuning(f).rate : 1;
   return buffer;
 }
 const rootFor = (pitch) => clamp(Math.round(pitch / 6) * 6, 24, 102);
@@ -144,7 +153,7 @@ export function createValoriumVoice(ctx, destination, instrument, config, note, 
   for (const l of LAYERS) {
     const type = P[`${l}Type`], layerLevel = P[`${l}Level`] ?? 0;
     if (type === 'off' || layerLevel <= 0) continue;
-    let buffer, rootMidi, gain = 1, loop = null;
+    let buffer, rootMidi, gain = 1, loop = null, tune = 1;
     const pitch = clamp(note.pitch + (P[`${l}Tune`] || 0), 0, 127);
     if (l === 'a' && config.zones?.length) {
       const zone = selectPianoZone(config, pitch, clamp(note.vel, 0, 1));
@@ -154,11 +163,11 @@ export function createValoriumVoice(ctx, destination, instrument, config, note, 
     } else {
       rootMidi = rootFor(pitch);
       buffer = valoriumStarterSample(ctx, type, rootMidi);
-      loop = buffer.valoriumLoop;
+      loop = buffer.valoriumLoop; tune = buffer.valoriumRate || 1;
     }
     const source = ctx.createBufferSource(), g = ctx.createGain(), pan = ctx.createStereoPanner();
     source.buffer = buffer;
-    const rate = 2 ** ((pitch - rootMidi) / 12);
+    const rate = 2 ** ((pitch - rootMidi) / 12) * tune;
     source.playbackRate.value = rate;
     if (loop) { source.loop = true; source.loopStart = loop.start; source.loopEnd = loop.end; looped = true; }
     g.gain.value = layerLevel * gain; pan.pan.value = clamp(spreadOf[l] * (P.width ?? 0.5), -1, 1);

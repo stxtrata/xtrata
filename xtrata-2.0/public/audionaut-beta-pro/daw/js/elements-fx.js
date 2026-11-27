@@ -74,11 +74,13 @@ const neon = {
 };
 
 // ------------------------------------------------------------------ IRON · compressor
+// Characters shape the detector timing and knee only. (An earlier input drive stage distorted
+// loud material by up to 12% and lowered its level, so it was removed.)
 const CHARACTER = {
-  clean: { attack: 1, release: 1, knee: 0, drive: 0 },
-  punch: { attack: 2.5, release: 0.7, knee: 0, drive: 0.12 },
-  opto: { attack: 1.6, release: 2.4, knee: 10, drive: 0 },
-  vintage: { attack: 1.2, release: 1.2, knee: 4, drive: 0.35 }
+  clean: { attack: 1, release: 1, knee: 0 },
+  punch: { attack: 2.5, release: 0.7, knee: 0 },
+  opto: { attack: 1.6, release: 2.4, knee: 10 },
+  vintage: { attack: 0.6, release: 1.6, knee: 14 }
 };
 // Unity small-signal gain (slope 1 at zero), so engaging drive never jumps the level;
 // peaks are rounded off instead. asym adds even harmonics.
@@ -96,25 +98,24 @@ const iron = {
     r('release', 'Release (s)', 0.02, 1.5, 0.01, 0.2),
     r('knee', 'Knee (dB)', 0, 30, 0.5, 6),
     o('character', 'Character', [['clean', 'Clean'], ['punch', 'Punch'], ['opto', 'Opto'], ['vintage', 'Vintage']], 'clean'),
-    r('makeup', 'Makeup (dB)', -12, 24, 0.1, 0),
+    r('makeup', 'Makeup (dB)', -12, 18, 0.1, 0),
     r('mix', 'Mix', 0, 1, 0.01, 1),
-    r('out', 'Output (dB)', -18, 18, 0.1, 0)
+    r('out', 'Output (dB)', -12, 12, 0.1, 0)
   ],
   create(ctx) {
-    const input = ctx.createGain(), output = ctx.createGain(), pre = ctx.createWaveShaper(), c = ctx.createDynamicsCompressor();
+    const input = ctx.createGain(), output = ctx.createGain(), c = ctx.createDynamicsCompressor();
     const makeup = ctx.createGain(), wet = ctx.createGain(), dry = ctx.createGain(), dryDelay = ctx.createDelay(0.05), outG = ctx.createGain();
     dryDelay.delayTime.value = Math.floor(ctx.sampleRate * COMP_LATENCY) / ctx.sampleRate; // keep parallel mix phase-aligned
-    input.connect(pre).connect(c).connect(makeup).connect(wet).connect(outG);
+    input.connect(c).connect(makeup).connect(wet).connect(outG);
     input.connect(dryDelay).connect(dry).connect(outG);
     outG.connect(output);
-    return { input, output, pre, c, makeup, wet, dry, dryDelay, outG, grHistory: [] };
+    return { input, output, c, makeup, wet, dry, dryDelay, outG };
   },
   apply(ctx, n, P) {
     const ch = CHARACTER[P.character] || CHARACTER.clean;
     n.c.threshold.value = P.threshold; n.c.ratio.value = P.ratio;
     n.c.attack.value = clamp(P.attack * ch.attack, 0, 1); n.c.release.value = clamp(P.release * ch.release, 0, 1);
     n.c.knee.value = clamp(P.knee + ch.knee, 0, 40);
-    n.pre.curve = ch.drive > 0 ? satCurve(ch.drive, 1) : null;
     n.makeup.gain.value = dbToLin(P.makeup);
     n.wet.gain.value = P.mix; n.dry.gain.value = 1 - P.mix; n.outG.gain.value = dbToLin(P.out);
   },
@@ -187,7 +188,13 @@ const carbon = {
       src.connect(pre).connect(sh).connect(g).connect(sum);
       return { pre, sh, g };
     });
-    sum.connect(wet).connect(output); input.connect(dry).connect(output);
+    // The dry path takes the same three bands before the shapers, so it carries the crossover's
+    // all-pass phase and Mix never notches the split frequencies. A 10 Hz high-pass removes the
+    // DC that asymmetric (tube) drive creates.
+    const dc = biquad(ctx, 'highpass'); dc.frequency.value = 10; dc.Q.value = -3.01;
+    sum.connect(wet).connect(dc);
+    for (const src of [ap, midLp[1], highHp[1]]) src.connect(dry);
+    dry.connect(dc).connect(output);
     return { input, output, wet, dry, bands, splits: { lowLp, restHp, midLp, highHp, apLp, apHp }, sr: ctx.sampleRate, outDb: 0 };
   },
   apply(ctx, n, P) {
@@ -265,19 +272,29 @@ const helium = {
   },
   apply(ctx, n, P) {
     const key = [P.space, P.size, P.decay, P.damping].join('|');
-    if (key !== n.irKey) {
-      n.irKey = key;
-      const data = heliumImpulse(n.sr, P), buffer = ctx.createBuffer(2, data[0].length, n.sr);
+    const impulse = (shape) => {
+      const data = heliumImpulse(n.sr, shape), buffer = ctx.createBuffer(2, data[0].length, n.sr);
       buffer.copyToChannel(data[0], 0); buffer.copyToChannel(data[1], 1);
       n.irDuration = buffer.duration;
-      const live = n.convs[n.active].buffer && typeof ctx.startRendering !== 'function' && ctx.state === 'running';
-      const next = live ? 1 - n.active : n.active, t = ctx.currentTime;
-      n.convs[next].buffer = buffer;
-      if (live) { // crossfade so a parameter drag never clicks
-        n.fades[next].gain.setValueAtTime(0, t); n.fades[next].gain.linearRampToValueAtTime(1, t + 0.04);
-        n.fades[n.active].gain.setValueAtTime(n.fades[n.active].gain.value, t); n.fades[n.active].gain.linearRampToValueAtTime(0, t + 0.04);
-        n.active = next;
-      }
+      return buffer;
+    };
+    const live = !!n.convs[n.active].buffer && typeof ctx.startRendering !== 'function' && ctx.state === 'running';
+    if (key !== n.irKey && !live) { n.irKey = n.wantKey = key; n.convs[n.active].buffer = impulse(P); }
+    else if (key !== (n.wantKey ?? n.irKey)) {
+      // Live: wait until the control rests (a drag sends many values), then crossfade to the new
+      // impulse on the idle convolver and release the old one so only one keeps convolving.
+      n.wantKey = key; n.wantP = { space: P.space, size: P.size, decay: P.decay, damping: P.damping };
+      const swap = () => {
+        n.timer = null;
+        if (n.disposed || n.wantKey === n.irKey) return;
+        const next = 1 - n.active, t = ctx.currentTime, old = n.active;
+        n.convs[next].buffer = impulse(n.wantP); n.irKey = n.wantKey;
+        n.fades[next].gain.cancelScheduledValues(t); n.fades[next].gain.setValueAtTime(0, t); n.fades[next].gain.linearRampToValueAtTime(1, t + 0.04);
+        n.fades[old].gain.cancelScheduledValues(t); n.fades[old].gain.setValueAtTime(1, t); n.fades[old].gain.linearRampToValueAtTime(0, t + 0.04);
+        n.active = next; n.fading = true;
+        n.timer = setTimeout(() => { n.timer = null; n.fading = false; if (n.disposed) return; n.convs[old].buffer = null; if (n.wantKey !== n.irKey) n.timer = setTimeout(swap, 0); }, 90);
+      };
+      if (!n.fading) { clearTimeout(n.timer); n.timer = setTimeout(swap, 150); }
     }
     n.hp.frequency.value = clamp(P.lowcut, 10, n.sr * 0.45);
     n.pre.delayTime.value = P.predelay / 1000;
@@ -286,6 +303,7 @@ const helium = {
     n.P = P;
   },
   meter: (n) => ({ irDuration: n.irDuration }),
+  dispose: (n) => { n.disposed = true; clearTimeout(n.timer); },
   latencySamples: () => 0,
   tailSeconds: (p = {}) => (p.predelay ?? 18) / 1000 + (p.decay ?? 2.4) * 1.35 + 0.08
 };
@@ -352,8 +370,10 @@ const mercury = {
   },
   meter: (n) => ({ seconds: n.seconds }),
   latencySamples: () => 0,
-  tailSeconds: (p = {}) => {
-    const time = mercuryTime({ time: '1/8.', ms: 375, bpm: 120, ...p }), fb = clamp(p.feedback ?? 0.4, 0, 0.95);
+  // The host passes the project tempo in env.bpm; without it assume a slow 60 BPM so an
+  // export is never cut short.
+  tailSeconds: (p = {}, env = {}) => {
+    const time = mercuryTime({ time: '1/8.', ms: 375, ...p, bpm: env.bpm || p.bpm || 60 }), fb = clamp(p.feedback ?? 0.4, 0, 0.95);
     return Math.min(30, time * (fb > 0.001 ? Math.ceil(Math.log(1e-4) / Math.log(fb)) : 1));
   }
 };

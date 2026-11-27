@@ -33,3 +33,15 @@ Five custom plugins designed from the tools producer Marek (three artist aliases
 - VALORIUM starter roots render on first use (about 5–55 ms each, cached per audio context). The sequencer prefetches them; live playing of an unprefetched root can hitch once.
 - CARBON runs without oversampling (oversampling delay would misalign the bands), so very high drive on the high band can alias.
 - Generic panels are used for the four instruments; bespoke faces are a follow-up.
+
+## Review fixes (27 November 2026)
+
+- Held notes: cutoff and resonance (and LOSTWAVE filter 2 cutoff) now move the sounding voice. Controls that still rebuild the voice join its envelopes, gate and wavetable scan at their true age instead of restarting them. The filter envelope now runs on the filter's detune.
+- VALORIUM pluck and guitar are on pitch at every starter root (they were up to 92 cents sharp near C7).
+- CARBON's Mix blends phase-matched paths (it notched both splits by 20 dB at 50%), and a 10 Hz high-pass removes drive DC.
+- ELEMENT's analog table keeps its fundamental through a scan; warp amounts step in 21 values and the wave, gate and sync caches are bounded.
+- IRON's characters shape timing and knee only (the input drive is gone). Makeup is ±12/+18 dB and output ±12 dB.
+- MERCURY's export tail follows the project tempo (`render-mix.js` passes `bpm`).
+- HELIUM waits for a control to rest before rebuilding its impulse, and keeps only one convolver loaded.
+
+Each has a regression check in `marek-synth-checks.js` or `elements-fx-checks.js`, except the HELIUM live debounce, which only runs in a live audio context and is untested.
