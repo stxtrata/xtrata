@@ -25,7 +25,7 @@ export function proInstrumentTailSeconds(instrument, note, { bufferForSource } =
     return pad.mode === 'gate' ? Math.min(remaining, Math.max(.005, P.release ?? .1)) : remaining;
   }
   if (instrument.synthId === 'granulator') return Math.max(.01, Math.min(4, P.release ?? .25));
-  // Every jiVALOREM layer fades out over the release, looped or not.
+  // Every VALOREM layer fades out over the release, looped or not.
   if (instrument.synthId === 'valorem') return Math.max(.005, Math.min(4, P.release ?? .45));
   const release = Math.max(.005, P.release ?? .22);
   if (!config.zones.length) return release;

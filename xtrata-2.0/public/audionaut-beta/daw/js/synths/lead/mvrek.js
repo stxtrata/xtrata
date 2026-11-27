@@ -1,4 +1,4 @@
-// jiMVREK — two-layer virtual-analogue trance poly (named for mvrek, Marek's trance alias).
+// MVREK — two-layer virtual-analogue trance poly (named for mvrek, Marek's trance alias).
 // Part A and Part B each stack up to 7 / 5 detuned oscillators through their own low-pass,
 // then share a drive, a decay/sustain body, a tempo-locked 16-step trance gate and the host
 // envelope. Native nodes only, so it stays light enough for big chords.
@@ -92,14 +92,14 @@ const knob = (key, label, fmt, extra = {}) => ({ type: 'knob', key, label, fmt, 
 
 export const MVREK_SYNTHS = {
   mvrek: {
-    name: 'jiMVREK',
+    name: 'MVREK',
     tagline: 'Two-layer trance poly · supersaw parts, warm filters, tempo-locked trance gate',
     color: '#ff5fa2',
     params,
     voice,
     ui: {
       theme: { accent: '#ff5fa2', lcd: '#ffd1e6', lcdBg: '#1c0b16', edge: '#5a2846', bg: '#241020' },
-      logo: ['ji', 'MVREK'],
+      logo: ['', 'MVREK'],
       sub: 'TWO-LAYER TRANCE POLY · FOR MVREK',
       cc: { 74: 'cutoff', 71: 'reso', 73: 'attack', 72: 'release', 7: 'level', 1: 'gateDepth' },
       sections: [

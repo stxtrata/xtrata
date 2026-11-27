@@ -1,4 +1,4 @@
-// jiELEMENT — multi-frame wavetable synth (a nod to Lost Element, Marek's prog alias).
+// ELEMENT — multi-frame wavetable synth (a nod to Lost Element, Marek's prog alias).
 // Six frames per table are generated in the time domain, warped (bend, mirror, sync, fold,
 // squash), and turned into band-limited periodic waves. A note scans from a start to an end
 // position: each frame's oscillator gets an exact piecewise-linear gain curve, so the sweep is
@@ -194,7 +194,7 @@ const knob = (key, label, fmt, extra = {}) => ({ type: 'knob', key, label, fmt, 
 
 export const ELEMENT_SYNTHS = {
   element: {
-    name: 'jiELEMENT',
+    name: 'ELEMENT',
     tagline: 'Wavetable synth · six-frame tables scanned per note, five warp modes, unison',
     color: '#5fd4ff',
     params,
@@ -211,7 +211,7 @@ export const ELEMENT_SYNTHS = {
     },
     ui: {
       theme: { accent: '#5fd4ff', lcd: '#c9f1ff', lcdBg: '#06141c', edge: '#21485a', bg: '#0d1d26' },
-      logo: ['ji', 'ELEMENT'],
+      logo: ['', 'ELEMENT'],
       sub: 'WAVETABLE SYNTHESIZER · FOR LOST ELEMENT',
       cc: { 74: 'cutoff', 71: 'reso', 73: 'attack', 72: 'release', 7: 'level', 1: 'posEnd' },
       sections: [

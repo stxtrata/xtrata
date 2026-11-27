@@ -1,4 +1,4 @@
-// jiLOSTWAVE — four-oscillator hybrid lead poly (a nod to Lost Element, Marek's prog alias).
+// LOSTWAVE — four-oscillator hybrid lead poly (a nod to Lost Element, Marek's prog alias).
 // Every oscillator switches mode: classic saw/square, HYPER (up to 9 spread saws), FM, hard
 // SYNC (band-limited sync cycle), AM (ring) or noise. Two filters run in series or parallel,
 // and a PUNCH stage adds an onset kick plus soft clipping for the drop.
@@ -147,14 +147,14 @@ const oscSection = (i) => ({ title: `OSC ${i}`, items: [radio(`o${i}Mode`, 'Mode
 
 export const LOSTWAVE_SYNTHS = {
   lostwave: {
-    name: 'jiLOSTWAVE',
+    name: 'LOSTWAVE',
     tagline: 'Hybrid lead poly · four multi-mode oscillators, hyper saw, dual filters, punch',
     color: '#ffb547',
     params,
     voice,
     ui: {
       theme: { accent: '#ffb547', lcd: '#ffe7bf', lcdBg: '#1b1206', edge: '#5e4119', bg: '#231708' },
-      logo: ['ji', 'LOSTWAVE'],
+      logo: ['', 'LOSTWAVE'],
       sub: 'HYBRID LEAD POLY · FOR LOST ELEMENT',
       cc: { 74: 'cutoff', 71: 'hyperDetune', 73: 'attack', 72: 'release', 7: 'level', 1: 'fmDepth' },
       sections: [

@@ -1,4 +1,4 @@
-// Offline checks for the Marek collection synths (jiMVREK, jiELEMENT, jiLOSTWAVE).
+// Offline checks for the Marek collection synths (MVREK, ELEMENT, LOSTWAVE).
 // Runs in the browser harness through the real voice lifecycle used by the engine.
 import { SYNTH_BANK, synthDefaults, parseLine } from '../daw/js/synths.js';
 import { createVoice } from '../daw/js/synths/voice-lifecycle.js';
@@ -87,12 +87,12 @@ export async function verifyMarekSynths() {
     assert(tail.voices.every((v) => v.ended), msg('voice ended after release'));
     rows.push(row);
   }
-  // jiMVREK: the trance gate chops the sound in time with the tempo.
+  // MVREK: the trance gate chops the sound in time with the tempo.
   const gated = await render('mvrek', { ...synthDefaults('mvrek'), gateDepth: 1, gatePattern: 'offbeat', gateRate: '1/16', sustain: 1, attack: 0.002 }, { notes: [{ dur: 2, bpm: 120 }], seconds: 2.2 });
   const step = 0.125, closed = energy(gated.data, Math.floor((0.02 + 0.03) * 44100), Math.floor((0.02 + 0.2) * 44100)), open = energy(gated.data, Math.floor((0.02 + 2 * step + 0.01) * 44100), Math.floor((0.02 + 3 * step - 0.02) * 44100));
   assert(open.rms > closed.rms * 20, 'mvrek gate ' + JSON.stringify({ open, closed }));
   rows.push({ id: 'mvrek-gate', open: +open.rms.toFixed(4), closed: +closed.rms.toFixed(6) });
-  // jiELEMENT: the scan changes the spectrum over the note.
+  // ELEMENT: the scan changes the spectrum over the note.
   const scan = await render('element', { ...synthDefaults('element'), posStart: 0, posEnd: 1, posTime: 1.5, cutoff: 18000, fEnv: 0, voices: 1, sub: 0, sustain: 1 }, { notes: [{ pitch: 57, dur: 2, vel: 0.01 }], seconds: 2.2 });
   // Brightness = RMS of the first difference over RMS: rises as the scan leaves the sine frame.
   const bright = (from, to) => { let d = 0, e = 0; for (let i = Math.floor(from * 44100); i < Math.floor(to * 44100); i++) { d += (scan.data[i] - scan.data[i - 1]) ** 2; e += scan.data[i] ** 2; } return Math.sqrt(d / Math.max(1e-12, e)); };
@@ -102,7 +102,7 @@ export async function verifyMarekSynths() {
   return rows;
 }
 
-// jiVALOREM runs through the sample-instrument path used by the engine.
+// VALOREM runs through the sample-instrument path used by the engine.
 export async function verifyValorem() {
   const { createProInstrumentVoice, proInstrumentTailSeconds, normalizeInstrumentConfig, PRO_INSTRUMENT_IDS } = await import('../daw/js/pro-instruments.js');
   assert(PRO_INSTRUMENT_IDS.includes('valorem'), 'valorem registered as a sample instrument');

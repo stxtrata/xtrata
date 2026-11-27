@@ -1,4 +1,4 @@
-// Shared building blocks for the Marek collection (jiMVREK, jiELEMENT, jiLOSTWAVE).
+// Shared building blocks for the Marek collection (MVREK, ELEMENT, LOSTWAVE).
 // Everything cached here belongs to the canonical AudioContext, never to a voice host.
 import { canonicalContext } from './resources.js';
 

@@ -1,4 +1,4 @@
-// jiVALOREM — layered sample instrument (a nod to Nu Valorem, Marek's indie alias).
+// VALOREM — layered sample instrument (a nod to Nu Valorem, Marek's indie alias).
 // Up to four layers, each playing a multisampled source through synth-style shaping: shared
 // filter with envelope, drive, ADSR and stereo spread. Layer A can play a custom pack (key and
 // velocity zones of imported or Xtrata-linked samples); every layer can play the starter pack.
@@ -207,7 +207,7 @@ const layerSection = (l) => ({ title: `LAYER ${l.toUpperCase()}`, items: [radio(
 
 export const VALOREM_SYNTHS = {
   valorem: {
-    name: 'jiVALOREM',
+    name: 'VALOREM',
     tagline: 'Layered sample instrument · four layers, synth shaping, custom packs · for Nu Valorem',
     color: '#9be27a', category: 'keys',
     live: { naturalDecay: true, release: (p) => p.release }, sampleInstrument: true,
@@ -215,7 +215,7 @@ export const VALOREM_SYNTHS = {
     voice(ctx, destination, note, p) { return createValoremVoice(ctx, destination, { id: 'starter' }, defaultInstrumentConfig('valorem'), note, p); },
     ui: {
       theme: { accent: '#9be27a', lcd: '#e2f9d6', lcdBg: '#0c160a', edge: '#35512b', bg: '#132010' },
-      logo: ['ji', 'VALOREM'],
+      logo: ['', 'VALOREM'],
       sub: 'LAYERED SAMPLE INSTRUMENT · FOR NU VALOREM',
       cc: { 74: 'cutoff', 71: 'reso', 73: 'attack', 72: 'release', 7: 'level', 1: 'bLevel' },
       sections: [
