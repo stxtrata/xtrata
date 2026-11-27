@@ -98,6 +98,37 @@ try {
       check(Math.abs(crossings * 4 - 880) <= 4, 'per-voice bend shifts pitch by an octave');
     }
     {
+      // Live source budget: counts oscillators, not just notes (voice-budget.js).
+      const { pickVictim, deviceTier, voiceBudget } = await import('/audionaut-beta/daw/js/voice-budget.js');
+      const touch = { matchMedia: q => ({ matches: q.includes('coarse') }) }, mouse = { matchMedia: () => ({ matches: false }) };
+      check(deviceTier(touch) === 'phone' && deviceTier(mouse) === 'desktop' && deviceTier({}) === 'desktop', 'touch devices get the phone budget');
+      check(voiceBudget(touch).sources < voiceBudget(mouse).sources && voiceBudget(touch).notes < voiceBudget(mouse).notes, 'phone budget is smaller than desktop');
+      const fake = (id, i, pitch, released = false) => ({ id, i, pitch, time: id, voice: { released } });
+      check(pickVictim([fake(1,0,60), fake(2,1,50,true), fake(3,0,64)], 0).id === 2, 'a fading note on any instrument goes before a held one');
+      check(pickVictim([fake(1,0,60), fake(2,1,50,true), fake(3,0,64)], 0, { own: true }).id === 3, 'an instrument over its own limit only cuts its own notes');
+      check(pickVictim([fake(1,1,60), fake(2,1,64)], 0, { own: true }) === null, 'no victim when the instrument has nothing sounding');
+      const ctx = new AudioContext(); await ctx.resume();
+      const engine = new Engine({ store, contextFactory: () => ctx });
+      const rec = id => engine._synthVoices.get(id);
+      const low = rec(engine.startNote(0, 48)), cost = low.cost;
+      check(cost >= 1 && engine.voiceStats.sources === cost, 'a note reports the sources it built');
+      engine.voiceBudget = { notes: 64, perInstrument: 16, sources: cost * 3 };
+      const mid = rec(engine.startNote(0, 60)), high = rec(engine.startNote(0, 64));
+      check(engine.voiceStats.stolen === 0 && !low.stopping && !mid.stopping && !high.stopping, 'notes inside the source budget all sound');
+      engine.releaseNote(mid.id);
+      const fourth = rec(engine.startNote(0, 67));
+      check(mid.stopping && !low.stopping && !high.stopping && engine.voiceStats.stolen === 1, 'over budget, the fading note is cut first');
+      const fifth = rec(engine.startNote(0, 71));
+      check(high.stopping && !low.stopping && !fourth.stopping && !fifth.stopping, 'then the oldest held note that is not the bass note');
+      check(engine.voiceStats.sources <= cost * 3 && engine.voiceStats.peakSources <= cost * 3, 'sources in use never exceed the budget');
+      engine.panic();
+      await ctx.close();
+      const offline = new Engine({ store, offline: true, contextFactory: () => new OfflineAudioContext(2, 4410, 44100) });
+      offline.voiceBudget = { notes: 1, perInstrument: 1, sources: 1 };
+      offline.startNote(0, 48); offline.startNote(0, 60); offline.startNote(0, 64);
+      check([...offline._synthVoices.values()].filter(n => !n.stopping).length === 3 && offline.voiceStats.stolen === 0, 'export ignores the live source budget');
+    }
+    {
       const ctx = new AudioContext(); await ctx.resume();
       const engine = new Engine({ store, contextFactory: () => ctx });
       const visuals = [];

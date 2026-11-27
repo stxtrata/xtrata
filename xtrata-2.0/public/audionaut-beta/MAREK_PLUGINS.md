@@ -45,3 +45,23 @@ Five custom plugins designed from the tools producer Marek (three artist aliases
 - HELIUM waits for a control to rest before rebuilding its impulse, and keeps only one convolver loaded.
 
 Each has a regression check in `marek-synth-checks.js` or `elements-fx-checks.js`, except the HELIUM live debounce, which only runs in a live audio context and is untested.
+
+## Voice budget (live playback)
+
+`daw/js/voice-budget.js` adds a load-aware limit on top of the original note
+limits (64 notes, 16 per instrument).
+
+- **What is counted.** Each note records how many sources (oscillators and
+  sample players) it built. Measured per note: MAVREKT 3–12, LOSTWAVE 2–18,
+  ELEMENT 4–25, the older synths 1–2.
+- **Budgets.** Desktop: 64 notes, 16 per instrument, 480 sources. Touch devices
+  (`hover: none` and `pointer: coarse`): 32 notes, 10 per instrument, 160
+  sources. These numbers are first estimates and have not been tuned on real
+  phones.
+- **Which note gives way.** A note already released and fading, then the oldest
+  held note that is not the instrument's lowest, then the oldest of anything.
+  The cut uses the existing 5 ms fade.
+- **Export is unchanged.** Offline renders keep the original limits and victim
+  order, so a saved project renders the same as before.
+- **Where to see it.** Diagnostics shows sources in use, the peak, and how many
+  notes were cut. `engine.voiceBudget` can be changed at run time.

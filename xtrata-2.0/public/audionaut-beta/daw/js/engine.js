@@ -19,6 +19,7 @@ import { beatToSeconds, secondsToBeat, swingStep, unswingStep, seededRandom, has
 import { trackAddress } from './project-model.js';
 import { syncMixer as applyMixer, disposeMixer, validateRouting } from './mixer-runtime.js';
 import { createSamplerVoice } from './sampler-voice.js';
+import { voiceBudget, voiceCost, pickVictim } from './voice-budget.js';
 import {isProInstrument,createProInstrumentVoice} from './pro-instruments.js';
 import { scheduleDspBoundary } from './plugin-automation.js';
 import { automationValueAt, voiceAutomation } from './automation-runtime.js';
@@ -63,6 +64,10 @@ export class Engine {
     this._elapsedSteps = 0;
     this.maxSynthVoices = 64;
     this.maxInstrumentVoices = 16;
+    // Live playback only: a smaller, load-aware budget on touch devices (voice-budget.js).
+    this.voiceBudget = voiceBudget();
+    this.voiceStats = { stolen: 0, peakSources: 0, sources: 0 };
+    this._voiceCost = new Map();
     this.ctx = null;
     this.masterGain = null;
     this.channelGains = [];
@@ -763,15 +768,31 @@ export class Engine {
     if (!synth || !this.instrumentGains?.[i]) return 0;
     const time = Math.max(this.ctx.currentTime, Number.isFinite(options.time) ? options.time : this.ctx.currentTime);
     const active = () => [...this._synthVoices.values()].filter(n => !n.stopping && n.time <= time && (n.endTime ?? Infinity) > time);
-    {
+    const cut = victim => {
+      victim.stopping = true;
+      victim.voice.stop(time);
+      this._live.delete(victim.id);
+      this._voiceVisual(victim, false);
+    };
+    if (this.offline) {
       while (active().length >= this.maxSynthVoices || active().filter(n => n.i === i).length >= this.maxInstrumentVoices) {
         const voices = active();
         const victim = voices.find(n => n.i === i && n.voice.released) || voices.find(n => n.i === i) || voices[0];
         if (!victim) break;
-        victim.stopping = true;
-        victim.voice.stop(time);
-        this._live.delete(victim.id);
-        this._voiceVisual(victim, false);
+        cut(victim);
+      }
+    } else {
+      const budget = this.voiceBudget, notes = Math.min(this.maxSynthVoices, budget.notes), perInstrument = Math.min(this.maxInstrumentVoices, budget.perInstrument);
+      const estimate = this._voiceCost.get(i) || 4;
+      for (;;) {
+        const voices = active(), mine = voices.filter(n => n.i === i).length;
+        const used = voices.reduce((sum, n) => sum + (n.cost || 1), 0);
+        const global = voices.length >= notes || used + estimate > budget.sources;
+        if (!global && mine < perInstrument) break;
+        const victim = pickVictim(voices, i, { own: !global });
+        if (!victim) break;
+        cut(victim);
+        this.voiceStats.stolen++;
       }
     }
     const automation=options.automation||[];
@@ -798,7 +819,15 @@ export class Engine {
       return 0;
     }
     if(Number.isFinite(n.voice.endTime))n.endTime=n.voice.endTime;
+    n.cost = voiceCost(n.voice);
+    this._voiceCost.set(i, n.cost);
     this._synthVoices.set(n.id, n);
+    if (!this.offline) {
+      let sources = 0;
+      for (const v of this._synthVoices.values()) if (!v.stopping) sources += v.cost || 1;
+      this.voiceStats.sources = sources;
+      if (sources > this.voiceStats.peakSources) this.voiceStats.peakSources = sources;
+    }
     if (held) this._live.set(n.id, n);
     if (options.bend) n.voice.setBend(options.bend, time);
     for(const point of automation){if(this._automationOverrides?.has(JSON.stringify(point.target)))continue;const end=time+point.relativeEnd,start=time+point.relativeStart;if(point.target.kind==='bend'){if(point.curve==='linear')n.voice.setBend(point.fromValue,start);n.voice.setBend(point.value,end);}else n.voice.setParameters?.({[point.target.param]:point.value},end,{curve:point.curve,startTime:start,fromValues:{[point.target.param]:point.fromValue}});}
