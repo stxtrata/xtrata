@@ -1,4 +1,6 @@
 // Performance view for the current instrument. The song and transport stay in the editor.
+// Docked: a large keyboard under the studio. Instrument view: the studio steps aside and the
+// synth panel and the keyboard fill the screen together as one instrument.
 import { action, el } from './pro-ui.js';
 import { buildPianoKeys } from './keyboard-layout.js';
 import { drumKeyboard, instrumentKeyName } from './instrument-keyboard.js';
@@ -27,11 +29,13 @@ export function openExpandedKeyboard(slot, opener = document.activeElement, dire
     name = el('h2', track.name, { id: 'expanded-instrument' });
   const player = el('section', null, { className: 'expanded-key-player' });
   const close = action('Done', finish, { title: 'Close keyboard and return to the editor' });
-  const screen = action('Full screen', toggleScreen);
+  const screen = action('Instrument view', toggleScreen, { title: 'Show the synth and this keyboard together, filling the screen' });
   let playingFull = false, nativeActive = false, finished = false, viewId = 0;
   const nativeElement = () => document.fullscreenElement || document.webkitFullscreenElement;
+  // Native fullscreen covers the whole page so the synth panel stays in view with the keys.
+  const stage = document.documentElement;
   function exitNative() {
-    if (nativeElement() !== player) return;
+    if (nativeElement() !== stage) return;
     const exit = document.exitFullscreen || document.webkitExitFullscreen;
     Promise.resolve(exit?.call(document)).catch(() => {});
   }
@@ -42,11 +46,12 @@ export function openExpandedKeyboard(slot, opener = document.activeElement, dire
     viewId++;
     nativeActive = false;
     playingFull = full;
-    dialog.close();
     dialog.classList.toggle('playing-full', full);
-    screen.textContent = full ? 'Exit full screen' : 'Full screen';
-    if (full) dialog.showModal();
-    else dialog.show();
+    document.body.classList.toggle('instrument-view', full);
+    screen.textContent = full ? 'Exit instrument view' : 'Instrument view';
+    edit.hidden = full; // the synth is already on screen
+    if (!dialog.open) dialog.show();
+    if (full) showSynth();
     render();
     if (full) prepare();
     else ++loadId;
@@ -61,11 +66,11 @@ export function openExpandedKeyboard(slot, opener = document.activeElement, dire
     }
     setView(true);
     // The player also fills the studio when the host cannot enter native fullscreen.
-    const request = player.requestFullscreen || player.webkitRequestFullscreen;
+    const request = stage.requestFullscreen || stage.webkitRequestFullscreen;
     if (request) {
       const id = viewId;
       try {
-        const pending = request.call(player);
+        const pending = request.call(stage);
         pending?.then(() => {
           if (finished || id !== viewId) return;
           nativeActive = true;
@@ -75,7 +80,7 @@ export function openExpandedKeyboard(slot, opener = document.activeElement, dire
     }
   }
   function nativeChange() {
-    if (nativeElement() === player) {
+    if (nativeElement() === stage) {
       nativeActive = true;
       if (!playingFull || finished) exitNative();
     } else if (nativeActive) {
@@ -92,7 +97,7 @@ export function openExpandedKeyboard(slot, opener = document.activeElement, dire
     else finish();
   }
   function measureDock() {
-    const height = playingFull ? 0 : dialog.offsetHeight;
+    const height = dialog.offsetHeight;
     if (!finished) document.body.style.setProperty('--keyboard-dock-height', height + 'px');
   }
   const observer = new ResizeObserver(measureDock);
@@ -105,7 +110,7 @@ export function openExpandedKeyboard(slot, opener = document.activeElement, dire
     observer.disconnect();
     ctx?.removeEventListener('statechange', audioState);
     document.removeEventListener('performance-reset', performanceReset);
-    document.body.classList.remove('keyboard-docked');
+    document.body.classList.remove('keyboard-docked', 'instrument-view');
     document.body.style.removeProperty('--keyboard-dock-height');
     releaseAccessibleKey();
     handle?.dispose();
@@ -167,6 +172,10 @@ export function openExpandedKeyboard(slot, opener = document.activeElement, dire
     const {openSynthPanel} = await import('./synth-panel.js');
     openSynthPanel(i);
   });
+  // Instrument view opens the synth dock on the playing instrument (it follows instrument switches).
+  function showSynth() {
+    import('./synth-panel.js').then(({ openSynthPanel }) => { if (!finished && playingFull) openSynthPanel(slot); });
+  }
   const pedal = action('Sustain', () => setPedal(!pedalOn), {'aria-pressed':'false'});
   const status = el('output', '', {className:'live-ready', 'aria-live':'polite'});
   const retry = action('Tap to resume', prepare);
