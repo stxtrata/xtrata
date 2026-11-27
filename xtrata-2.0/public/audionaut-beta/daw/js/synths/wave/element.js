@@ -212,7 +212,7 @@ export const ELEMENT_SYNTHS = {
     ui: {
       theme: { accent: '#5fd4ff', lcd: '#c9f1ff', lcdBg: '#06141c', edge: '#21485a', bg: '#0d1d26' },
       logo: ['', 'ELEMENT'],
-      sub: 'WAVETABLE SYNTHESIZER · FOR LOST ELEMENT',
+      sub: 'WAVETABLE SYNTHESIZER',
       cc: { 74: 'cutoff', 71: 'reso', 73: 'attack', 72: 'release', 7: 'level', 1: 'posEnd' },
       sections: [
         { title: 'WAVETABLE', items: [radio('table', 'Table', ELEMENT_TABLES), { type: 'viz', id: 'scope' }] },

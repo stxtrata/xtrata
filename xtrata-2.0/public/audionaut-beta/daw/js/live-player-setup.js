@@ -5,7 +5,7 @@ import { loadSample, reloadAllSamples } from './loader.js';
 import { drumStarterSample } from './synths/drums/drumrack.js';
 import { granularStarterSample } from './synths/fx/granulator.js';
 import { pianoStarterSample } from './synths/keys/concertpiano.js';
-import { valoremStarterSample, VALOREM_FAMILIES } from './synths/keys/valorem.js';
+import { valoriumStarterSample, VALORIUM_FAMILIES } from './synths/keys/valorium.js';
 import { synthDefaults } from './synths.js';
 
 const projectLoads = new WeakMap(), channelLoads = new WeakMap();
@@ -64,14 +64,14 @@ export async function prepareLiveInstrument(track, pitches, current) {
       if (!pad.sourceId) starters.push(() => drumStarterSample(engine.ctx, i));
     });
     if (config.kind === 'granulator' && !config.sourceId) starters.push(() => granularStarterSample(engine.ctx));
-    if (config.kind === 'valorem') {
+    if (config.kind === 'valorium') {
       // Warm the starter-pack roots each layer will play (layer A uses custom zones when set).
-      const P = { ...synthDefaults('valorem'), ...(track.params || {}) };
+      const P = { ...synthDefaults('valorium'), ...(track.params || {}) };
       for (const l of ['a', 'b', 'c', 'd']) {
         const family = P[`${l}Type`];
-        if (!VALOREM_FAMILIES.includes(family) || (l === 'a' && config.zones.length)) continue;
+        if (!VALORIUM_FAMILIES.includes(family) || (l === 'a' && config.zones.length)) continue;
         const roots = new Set(pitches.map(p => Math.max(24, Math.min(102, Math.round(Math.max(0, Math.min(127, p + (P[`${l}Tune`] || 0))) / 6) * 6))));
-        for (const root of roots) starters.push(() => valoremStarterSample(engine.ctx, family, root));
+        for (const root of roots) starters.push(() => valoriumStarterSample(engine.ctx, family, root));
       }
     }
     if (config.kind === 'concertpiano' && !config.zones.length) {

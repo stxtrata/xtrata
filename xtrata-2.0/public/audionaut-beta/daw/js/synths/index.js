@@ -38,10 +38,10 @@ import { SWITCHYARD_SYNTHS } from "./keys/switchyard.js";
 import { NEVEREND_SYNTHS } from "./fx/neverend.js";
 
 // Marek collection: trance poly, wavetable, hybrid lead.
-import { MVREK_SYNTHS } from "./lead/mvrek.js";
+import { MAVREKT_SYNTHS } from "./lead/mavrekt.js";
 import { ELEMENT_SYNTHS } from "./wave/element.js";
 import { LOSTWAVE_SYNTHS } from "./lead/lostwave.js";
-import { VALOREM_SYNTHS } from "./keys/valorem.js";
+import { VALORIUM_SYNTHS } from "./keys/valorium.js";
 
 // stamp every synth in a module with the category of the folder it lives in
 const inFolder = (category, mods) =>
@@ -75,8 +75,8 @@ export const EXTRA_SYNTHS = {
   ...inFolder("mallet", CLATTERSTEP_SYNTHS),
   ...inFolder("keys", SWITCHYARD_SYNTHS),
   ...inFolder("fx", NEVEREND_SYNTHS),
-  ...inFolder("lead", MVREK_SYNTHS),
+  ...inFolder("lead", MAVREKT_SYNTHS),
   ...inFolder("wave", ELEMENT_SYNTHS),
   ...inFolder("lead", LOSTWAVE_SYNTHS),
-  ...inFolder("keys", VALOREM_SYNTHS),
+  ...inFolder("keys", VALORIUM_SYNTHS),
 };

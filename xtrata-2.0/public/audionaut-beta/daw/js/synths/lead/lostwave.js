@@ -155,7 +155,7 @@ export const LOSTWAVE_SYNTHS = {
     ui: {
       theme: { accent: '#ffb547', lcd: '#ffe7bf', lcdBg: '#1b1206', edge: '#5e4119', bg: '#231708' },
       logo: ['', 'LOSTWAVE'],
-      sub: 'HYBRID LEAD POLY · FOR LOST ELEMENT',
+      sub: 'HYBRID LEAD POLY',
       cc: { 74: 'cutoff', 71: 'hyperDetune', 73: 'attack', 72: 'release', 7: 'level', 1: 'fmDepth' },
       sections: [
         oscSection(1), oscSection(2), oscSection(3), oscSection(4),

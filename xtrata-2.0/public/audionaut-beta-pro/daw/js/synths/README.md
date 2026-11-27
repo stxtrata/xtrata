@@ -6,7 +6,7 @@ pickers show as the tree, so putting a module in `synths/<folder>/` files it the
 | Folder | Picker label | What belongs here | Contents |
 |---|---|---|---|
 | `bass/` | Bass | sub, acid, analog and growl bass | Whale (`bass/jibass.js`); Acidals 303, SubZero (in `synths.js`) |
-| `lead/` | Leads | mono and poly lead voices, supersaws | jiMS10, Stacker (in `synths.js`); Portwheel; MVREK (`lead/mvrek.js`) — two-layer trance poly; LOSTWAVE (`lead/lostwave.js`) — four multi-mode oscillators |
+| `lead/` | Leads | mono and poly lead voices, supersaws | jiMS10, Stacker (in `synths.js`); Portwheel; MAVREKT (`lead/mavrekt.js`) — two-layer trance poly; LOSTWAVE (`lead/lostwave.js`) — four multi-mode oscillators |
 | `pad/` | Pads & String Machines | warm sustained pads, ensembles, string machines | Layers (`pad/ensemble.js`) — string machine / pad / choir |
 | `keys/` | Pianos & Electric Pianos | piano, Rhodes/Wurli-style, clav | Privkey (`keys/tine.js`) — Rhodes / Wurli / piano / clav models |
 | `organ/` | Organs | drawbar / tonewheel / combo / church | Cathedral (`organ/tonewheel.js`) — drawbar organ with rotary |
@@ -41,4 +41,4 @@ No folder is empty any more. Remaining folders that only hold the original synth
 `drums/kit.js` follows the General-MIDI drum map (C1 kick, D2 snare, D#2 clap, F#2 closed hat, A#2 open hat, F2/A2/C3 toms, C#3 crash, D#3 ride, G#3 cowbell...), notes outside 35-59 fold onto the same drums by pitch class.
 
 ## Marek collection
-`lead/mvrek.js`, `wave/element.js`, `lead/lostwave.js` and the sample instrument `keys/valorem.js` share `marek-kit.js`. See `../../MAREK_PLUGINS.md`.
+`lead/mavrekt.js`, `wave/element.js`, `lead/lostwave.js` and the sample instrument `keys/valorium.js` share `marek-kit.js`. See `../../MAREK_PLUGINS.md`.

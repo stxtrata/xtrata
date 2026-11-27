@@ -1,9 +1,9 @@
-// Offline checks for the Marek collection synths (MVREK, ELEMENT, LOSTWAVE).
+// Offline checks for the Marek collection synths (MAVREKT, ELEMENT, LOSTWAVE).
 // Runs in the browser harness through the real voice lifecycle used by the engine.
 import { SYNTH_BANK, synthDefaults, parseLine } from '../daw/js/synths.js';
 import { createVoice } from '../daw/js/synths/voice-lifecycle.js';
 
-export const MAREK_SYNTHS = ['mvrek', 'element', 'lostwave'];
+export const MAREK_SYNTHS = ['mavrekt', 'element', 'lostwave'];
 function assert(ok, message) { if (!ok) throw new Error(message); }
 function energy(data, start = 0, end = data.length) {
   let sum = 0, peak = 0, bad = 0;
@@ -72,7 +72,7 @@ export async function verifyMarekSynths() {
     row.held = { during: +during.rms.toFixed(4), after: after.peak };
     assert(during.rms > 0.005 && after.peak < 1e-3, msg('held/release ' + JSON.stringify(row.held)));
     // Pitch: a plain single-oscillator patch tracks the key.
-    const plain = id === 'mvrek' ? { aVoices: 1, bVoices: 1, balance: 0, cutoff: 18000, fEnv: 0 }
+    const plain = id === 'mavrekt' ? { aVoices: 1, bVoices: 1, balance: 0, cutoff: 18000, fEnv: 0 }
       : id === 'element' ? { voices: 1, sub: 0, posStart: 0, posEnd: 0, cutoff: 18000, fEnv: 0 }
       : { o1Mode: 'saw', o2Mode: 'off', o3Mode: 'off', o4Mode: 'off', cutoff: 18000, fEnv: 0, f2Cutoff: 20, punch: 0 };
     row.pitch = {};
@@ -87,11 +87,11 @@ export async function verifyMarekSynths() {
     assert(tail.voices.every((v) => v.ended), msg('voice ended after release'));
     rows.push(row);
   }
-  // MVREK: the trance gate chops the sound in time with the tempo.
-  const gated = await render('mvrek', { ...synthDefaults('mvrek'), gateDepth: 1, gatePattern: 'offbeat', gateRate: '1/16', sustain: 1, attack: 0.002 }, { notes: [{ dur: 2, bpm: 120 }], seconds: 2.2 });
+  // MAVREKT: the trance gate chops the sound in time with the tempo.
+  const gated = await render('mavrekt', { ...synthDefaults('mavrekt'), gateDepth: 1, gatePattern: 'offbeat', gateRate: '1/16', sustain: 1, attack: 0.002 }, { notes: [{ dur: 2, bpm: 120 }], seconds: 2.2 });
   const step = 0.125, closed = energy(gated.data, Math.floor((0.02 + 0.03) * 44100), Math.floor((0.02 + 0.2) * 44100)), open = energy(gated.data, Math.floor((0.02 + 2 * step + 0.01) * 44100), Math.floor((0.02 + 3 * step - 0.02) * 44100));
-  assert(open.rms > closed.rms * 20, 'mvrek gate ' + JSON.stringify({ open, closed }));
-  rows.push({ id: 'mvrek-gate', open: +open.rms.toFixed(4), closed: +closed.rms.toFixed(6) });
+  assert(open.rms > closed.rms * 20, 'mavrekt gate ' + JSON.stringify({ open, closed }));
+  rows.push({ id: 'mavrekt-gate', open: +open.rms.toFixed(4), closed: +closed.rms.toFixed(6) });
   // ELEMENT: the scan changes the spectrum over the note.
   const scan = await render('element', { ...synthDefaults('element'), posStart: 0, posEnd: 1, posTime: 1.5, cutoff: 18000, fEnv: 0, voices: 1, sub: 0, sustain: 1 }, { notes: [{ pitch: 57, dur: 2, vel: 0.01 }], seconds: 2.2 });
   // Brightness = RMS of the first difference over RMS: rises as the scan leaves the sine frame.
@@ -102,14 +102,14 @@ export async function verifyMarekSynths() {
   return rows;
 }
 
-// VALOREM runs through the sample-instrument path used by the engine.
-export async function verifyValorem() {
+// VALORIUM runs through the sample-instrument path used by the engine.
+export async function verifyValorium() {
   const { createProInstrumentVoice, proInstrumentTailSeconds, normalizeInstrumentConfig, PRO_INSTRUMENT_IDS } = await import('../daw/js/pro-instruments.js');
-  assert(PRO_INSTRUMENT_IDS.includes('valorem'), 'valorem registered as a sample instrument');
-  const def = SYNTH_BANK.valorem, defaults = synthDefaults('valorem'), rows = [];
+  assert(PRO_INSTRUMENT_IDS.includes('valorium'), 'valorium registered as a sample instrument');
+  const def = SYNTH_BANK.valorium, defaults = synthDefaults('valorium'), rows = [];
   const play = async (patch, { notes = [baseNote], seconds = 3, held = null, config = null, buffers = {} } = {}) => {
     const ctx = new OfflineAudioContext(2, Math.ceil(44100 * seconds), 44100), t0 = performance.now();
-    const instrument = { synthId: 'valorem', params: patch, sampleInstrument: config };
+    const instrument = { synthId: 'valorium', params: patch, sampleInstrument: config };
     const voices = notes.map((n) => createProInstrumentVoice(ctx, ctx.destination, instrument, { ...baseNote, ...n }, patch, null, { bufferForSource: (s) => buffers[s.sourceTrackId](ctx) }));
     const build = performance.now() - t0;
     if (held != null) voices.forEach((v) => v.release(held, patch.release));
@@ -124,33 +124,33 @@ export async function verifyValorem() {
     const first = await play(patch), again = await play(patch);
     const e = energy(first.data);
     rows.push({ family, rms: +e.rms.toFixed(4), peak: +e.peak.toFixed(3), firstBuildMs: +first.build.toFixed(1), cachedBuildMs: +again.build.toFixed(2) });
-    assert(e.bad === 0 && e.rms > 0.003 && e.peak < 1, `valorem ${family} level ${JSON.stringify(e)}`);
+    assert(e.bad === 0 && e.rms > 0.003 && e.peak < 1, `valorium ${family} level ${JSON.stringify(e)}`);
     const r = await play({ ...patch, sustain: 1 }, { notes: [{ pitch: 57, dur: 1.4 }], seconds: 1.6 });
     const est = pitchOf(r.data, 44100, 0.35, 0.8);
     rows.at(-1).pitch57 = +est.toFixed(1);
-    if (family !== 'bell') assert(Math.abs(1200 * Math.log2(est / 220)) < 40, `valorem ${family} pitch ${est}`);
+    if (family !== 'bell') assert(Math.abs(1200 * Math.log2(est / 220)) < 40, `valorium ${family} pitch ${est}`);
   }
   for (const preset of def.presets) {
     const e = energy((await play({ ...defaults, ...preset.params })).data);
     rows.push({ preset: preset.name, rms: +e.rms.toFixed(4) });
-    assert(e.bad === 0 && e.rms > 0.002 && e.peak < 1, `valorem preset ${preset.name} ${JSON.stringify(e)}`);
+    assert(e.bad === 0 && e.rms > 0.002 && e.peak < 1, `valorium preset ${preset.name} ${JSON.stringify(e)}`);
   }
   for (const p of def.params) for (const v of p.options || [p.min, p.max]) {
     const e = energy((await play({ ...defaults, [p.key]: v }, { seconds: 1.2 })).data);
-    assert(e.bad === 0 && e.peak < 1.2, `valorem ${p.key}=${v} ${JSON.stringify(e)}`);
+    assert(e.bad === 0 && e.peak < 1.2, `valorium ${p.key}=${v} ${JSON.stringify(e)}`);
   }
   // Held sustained layers loop until key-up, then end within the release.
   const held = await play({ ...defaults, aType: 'strings', bType: 'pad' }, { notes: [{ held: true }], held: 4, seconds: 5.5 });
   const during = energy(held.data, 3 * 44100, 3.8 * 44100), after = energy(held.data, Math.floor(4.6 * 44100));
   rows.push({ held: +during.rms.toFixed(4), after: after.peak });
-  assert(during.rms > 0.01 && after.peak < 1e-3 && held.voices[0].ended, 'valorem held strings loop then release');
-  assert(proInstrumentTailSeconds({ synthId: 'valorem', params: defaults }, { pitch: 60, dur: 1 }) === defaults.release, 'valorem tail = release');
+  assert(during.rms > 0.01 && after.peak < 1e-3 && held.voices[0].ended, 'valorium held strings loop then release');
+  assert(proInstrumentTailSeconds({ synthId: 'valorium', params: defaults }, { pitch: 60, dur: 1 }) === defaults.release, 'valorium tail = release');
   // Custom pack zone on layer A: a 440 Hz sine recorded at A4 plays the requested key.
   const sine = (ctx) => { const b = ctx.createBuffer(1, 44100 * 2, 44100); for (let i = 0; i < b.length; i++) b.getChannelData(0)[i] = 0.5 * Math.sin((2 * Math.PI * 440 * i) / 44100); return b; };
-  const config = normalizeInstrumentConfig('valorem', { sources: [{ id: 's1', sourceTrackId: 'sine' }], zones: [{ id: 'z', sourceId: 's1', rootMidi: 69, lowMidi: 0, highMidi: 127 }] });
+  const config = normalizeInstrumentConfig('valorium', { sources: [{ id: 's1', sourceTrackId: 'sine' }], zones: [{ id: 'z', sourceId: 's1', rootMidi: 69, lowMidi: 0, highMidi: 127 }] });
   const custom = await play({ ...defaults, bType: 'off', sustain: 1 }, { notes: [{ pitch: 57, dur: 1.2 }], seconds: 1.5, config, buffers: { sine } });
   const est = pitchOf(custom.data, 44100, 0.3, 0.9);
   rows.push({ customZonePitch: +est.toFixed(1) });
-  assert(Math.abs(est - 220) < 3, 'valorem custom zone pitch ' + est);
+  assert(Math.abs(est - 220) < 3, 'valorium custom zone pitch ' + est);
   return rows;
 }

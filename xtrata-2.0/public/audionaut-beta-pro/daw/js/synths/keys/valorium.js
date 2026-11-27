@@ -1,4 +1,4 @@
-// VALOREM — layered sample instrument (a nod to Nu Valorem, Marek's indie alias).
+// VALORIUM — layered sample instrument (a nod to Marek's indie alias).
 // Up to four layers, each playing a multisampled source through synth-style shaping: shared
 // filter with envelope, drive, ADSR and stereo spread. Layer A can play a custom pack (key and
 // velocity zones of imported or Xtrata-linked samples); every layer can play the starter pack.
@@ -8,13 +8,13 @@ import { defaultInstrumentConfig, resolveInstrumentBuffer, selectPianoZone } fro
 import { sourceSample, frequency, clamp } from '../../pro-instruments-runtime.js';
 import { pianoStarterSample } from './concertpiano.js';
 
-export const VALOREM_FAMILIES = ['keys', 'pluck', 'guitar', 'strings', 'pad', 'choir', 'bell'];
+export const VALORIUM_FAMILIES = ['keys', 'pluck', 'guitar', 'strings', 'pad', 'choir', 'bell'];
 const SUSTAINED = new Set(['strings', 'pad', 'choir']);
 const LAYERS = ['a', 'b', 'c', 'd'];
 const range = (key, label, min, max, step, def) => ({ key, label, type: 'range', min, max, step, def });
 const select = (key, label, options, def) => ({ key, label, type: 'select', options, def });
 const layerParams = (l, type, level, tune) => [
-  select(`${l}Type`, `Layer ${l.toUpperCase()} source`, ['off', ...VALOREM_FAMILIES], type),
+  select(`${l}Type`, `Layer ${l.toUpperCase()} source`, ['off', ...VALORIUM_FAMILIES], type),
   range(`${l}Level`, `Layer ${l.toUpperCase()} level`, 0, 1, 0.01, level),
   range(`${l}Tune`, `Layer ${l.toUpperCase()} tune (st)`, -24, 24, 1, tune)
 ];
@@ -91,9 +91,9 @@ function ensemble(data, sr, f, random, { voices, harmonics, tilt, detune, vibrat
   // Gentle per-voice amplitude shimmer stands in for vibrato without phase drift at the loop.
   for (let i = 0; i < data.length; i++) data[i] = (data[i] / peak) * 0.7 * (1 + vibrato * Math.sin((2 * Math.PI * 5.2 * i) / sr));
 }
-export function valoremStarterSample(ctx, family, root) {
+export function valoriumStarterSample(ctx, family, root) {
   if (family === 'keys') return pianoStarterSample(ctx, root, 1);
-  const f = frequency(root), key = `audionaut-valorem-v1:${family}:${root}`;
+  const f = frequency(root), key = `audionaut-valorium-v1:${family}:${root}`;
   const seconds = SUSTAINED.has(family) ? 3 : family === 'bell' ? 4.5 : family === 'guitar' ? 3.5 : 2.4;
   const buffer = sourceSample(ctx, key, seconds, (data, sr, random) => {
     if (family === 'pluck') karplus(data, sr, f, random, 0.996 - Math.min(0.006, f / 400000), 0.55, false);
@@ -106,13 +106,13 @@ export function valoremStarterSample(ctx, family, root) {
     else ensemble(data, sr, f, random, { voices: 3, harmonics: 30, tilt: 0.6, detune: 7, vibrato: 0.04, attack: 0.25, formants: [[700, 130, 1], [1150, 160, 0.6], [2600, 240, 0.25]] });
     if (SUSTAINED.has(family)) LOOPS.set(key, seamLoop(data, sr, 1.1, seconds - 0.08));
   });
-  buffer.valoremLoop = SUSTAINED.has(family) ? LOOPS.get(key) : null;
+  buffer.valoriumLoop = SUSTAINED.has(family) ? LOOPS.get(key) : null;
   return buffer;
 }
 const rootFor = (pitch) => clamp(Math.round(pitch / 6) * 6, 24, 102);
 
 // ---------------------------------------------------------------- voice
-export function createValoremVoice(ctx, destination, instrument, config, note, P, onEnded, options = {}) {
+export function createValoriumVoice(ctx, destination, instrument, config, note, P, onEnded, options = {}) {
   const time = Math.max(ctx.currentTime, note.time), velocity = clamp(note.vel, 0, 1) ** (P.velocityCurve ?? 1.1);
   const attack = Math.max(0.001, P.attack ?? 0.003), release = Math.max(0.005, P.release ?? 0.45);
   const nodes = [], sources = [];
@@ -153,8 +153,8 @@ export function createValoremVoice(ctx, destination, instrument, config, note, P
       if (zone.loopEndSeconds != null) loop = { start: zone.loopStartSeconds, end: Math.min(buffer.duration, zone.loopEndSeconds) };
     } else {
       rootMidi = rootFor(pitch);
-      buffer = valoremStarterSample(ctx, type, rootMidi);
-      loop = buffer.valoremLoop;
+      buffer = valoriumStarterSample(ctx, type, rootMidi);
+      loop = buffer.valoriumLoop;
     }
     const source = ctx.createBufferSource(), g = ctx.createGain(), pan = ctx.createStereoPanner();
     source.buffer = buffer;
@@ -203,20 +203,20 @@ export function createValoremVoice(ctx, destination, instrument, config, note, P
 
 const radio = (key, label, options) => ({ type: 'radio', key, label, options: options.map((v) => [v, v.toUpperCase()]) });
 const knob = (key, label, fmt, extra = {}) => ({ type: 'knob', key, label, fmt, ...extra });
-const layerSection = (l) => ({ title: `LAYER ${l.toUpperCase()}`, items: [radio(`${l}Type`, 'Source', ['off', ...VALOREM_FAMILIES]), { type: 'row', items: [knob(`${l}Level`, 'LEVEL', 'pct'), knob(`${l}Tune`, 'TUNE', 'int')] }] });
+const layerSection = (l) => ({ title: `LAYER ${l.toUpperCase()}`, items: [radio(`${l}Type`, 'Source', ['off', ...VALORIUM_FAMILIES]), { type: 'row', items: [knob(`${l}Level`, 'LEVEL', 'pct'), knob(`${l}Tune`, 'TUNE', 'int')] }] });
 
-export const VALOREM_SYNTHS = {
-  valorem: {
-    name: 'VALOREM',
-    tagline: 'Layered sample instrument · four layers, synth shaping, custom packs · for Nu Valorem',
+export const VALORIUM_SYNTHS = {
+  valorium: {
+    name: 'VALORIUM',
+    tagline: 'Layered sample instrument · four layers, synth shaping, custom packs',
     color: '#9be27a', category: 'keys',
     live: { naturalDecay: true, release: (p) => p.release }, sampleInstrument: true,
     params,
-    voice(ctx, destination, note, p) { return createValoremVoice(ctx, destination, { id: 'starter' }, defaultInstrumentConfig('valorem'), note, p); },
+    voice(ctx, destination, note, p) { return createValoriumVoice(ctx, destination, { id: 'starter' }, defaultInstrumentConfig('valorium'), note, p); },
     ui: {
       theme: { accent: '#9be27a', lcd: '#e2f9d6', lcdBg: '#0c160a', edge: '#35512b', bg: '#132010' },
-      logo: ['', 'VALOREM'],
-      sub: 'LAYERED SAMPLE INSTRUMENT · FOR NU VALOREM',
+      logo: ['', 'VALORIUM'],
+      sub: 'LAYERED SAMPLE INSTRUMENT',
       cc: { 74: 'cutoff', 71: 'reso', 73: 'attack', 72: 'release', 7: 'level', 1: 'bLevel' },
       sections: [
         layerSection('a'), layerSection('b'), layerSection('c'), layerSection('d'),

@@ -13,14 +13,14 @@ try {
     return verifyMarekSynths();
   });
   console.log(JSON.stringify(rows, null, 2));
-  const valorem = await p.evaluate(async () => (await import('./tools/marek-synth-checks.js')).verifyValorem());
-  console.log(JSON.stringify(valorem, null, 2));
-  assert.equal(rows.filter((r) => ['mvrek', 'element', 'lostwave'].includes(r.id)).length, 3);
+  const valorium = await p.evaluate(async () => (await import('./tools/marek-synth-checks.js')).verifyValorium());
+  console.log(JSON.stringify(valorium, null, 2));
+  assert.equal(rows.filter((r) => ['mavrekt', 'element', 'lostwave'].includes(r.id)).length, 3);
   // Each synth loads on an instrument row through the store, opens its panel and plays.
   const ui = await p.evaluate(async () => {
     const out = [];
     const { SYNTH_BANK } = await import('./daw/js/synths.js');
-    for (const id of ['mvrek', 'element', 'lostwave', 'valorem']) out.push({ id, name: SYNTH_BANK[id].name, category: SYNTH_BANK[id].category, params: SYNTH_BANK[id].params.length });
+    for (const id of ['mavrekt', 'element', 'lostwave', 'valorium']) out.push({ id, name: SYNTH_BANK[id].name, category: SYNTH_BANK[id].category, params: SYNTH_BANK[id].params.length });
     return out;
   });
   console.log(JSON.stringify(ui));
