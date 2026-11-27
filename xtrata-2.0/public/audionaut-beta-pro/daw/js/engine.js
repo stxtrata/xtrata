@@ -20,6 +20,7 @@ import { trackAddress } from './project-model.js';
 import { syncMixer as applyMixer, disposeMixer, validateRouting } from './mixer-runtime.js';
 import { createSamplerVoice } from './sampler-voice.js';
 import { voiceBudget, voiceCost, pickVictim } from './voice-budget.js';
+import { normalizeVoicing } from './voicing.js';
 import {isProInstrument,createProInstrumentVoice} from './pro-instruments.js';
 import { scheduleDspBoundary } from './plugin-automation.js';
 import { automationValueAt, voiceAutomation } from './automation-runtime.js';
@@ -68,6 +69,8 @@ export class Engine {
     this.voiceBudget = voiceBudget();
     this.voiceStats = { stolen: 0, peakSources: 0, sources: 0 };
     this._voiceCost = new Map();
+    this._mono = new Map(); // instrument index -> mono/legato state (voicing.js)
+    this._monoIds = new Map(); // held note id -> instrument index
     this.ctx = null;
     this.masterGain = null;
     this.channelGains = [];
@@ -758,10 +761,96 @@ export class Engine {
     this._voiceVisual(n, false);
     this._live.delete(n.id);
     this._synthVoices.delete(n.id);
+    const mono = this._mono.get(n.i); if (mono?.current === n) mono.current = null;
     if (!this.offline && typeof document !== "undefined") document.dispatchEvent(new CustomEvent("synth-voice-ended", { detail: { id: n.id, i: n.i, pitch: n.pitch, source: n.source } }));
   }
 
+  // ---- mono and legato (voicing.js). Poly instruments go straight to _spawnVoice.
+  _monoState(i) {
+    let s = this._mono.get(i);
+    if (!s) this._mono.set(i, s = { stack: [], current: null, sounding: null, seq: null });
+    return s;
+  }
+  _monoClear(i = null, { all = false } = {}) {
+    for (const [index, s] of this._mono) if (i == null || index === i) {
+      for (const entry of s.stack) { this._monoIds.delete(entry.id); if (entry.alias) this._voiceVisual(entry.alias, false); }
+      s.stack = [];
+      if (all) { s.current = null; s.sounding = null; s.seq = null; }
+    }
+  }
+  _monoCut(n, time) {
+    if (!n || n.ended || n.stopping) return;
+    n.stopping = true; n.voice.stop(time); this._live.delete(n.id); this._voiceVisual(n, false);
+  }
   _startVoice(i, pitch, vel, options) {
+    const voicing = normalizeVoicing(this.store.instrument(i)?.voicing);
+    if (voicing.mode === "poly") return this._spawnVoice(i, pitch, vel, options);
+    this.ensureContext();
+    const time = Math.max(this.ctx.currentTime, Number.isFinite(options.time) ? options.time : this.ctx.currentTime);
+    const s = this._monoState(i);
+    if (Number.isFinite(options.duration)) {
+      // Sequenced and arpeggiated notes have a fixed length, so each one restarts
+      // the sound. Mono always slides; legato slides only into an overlapping note.
+      const prior = s.seq;
+      let from = null;
+      if (prior && prior.time <= time) {
+        const overlap = prior.end > time + 1e-4;
+        if (prior.n && !prior.n.ended && !prior.n.stopping) {
+          prior.n.voice.stop(time);
+          prior.n.endTime = Math.min(prior.n.endTime ?? Infinity, time + .01);
+          if (!this.offline) { const off = () => this._voiceVisual(prior.n, false); if (time <= this.ctx.currentTime) off(); else prior.n.timers.push(setTimeout(off, (time - this.ctx.currentTime) * 1000)); }
+        }
+        if (voicing.glide > 0 && prior.pitch !== pitch && (voicing.mode === "mono" || overlap)) from = prior.pitch - pitch;
+      }
+      const id = this._spawnVoice(i, pitch, vel, options), n = this._synthVoices.get(id);
+      if (n) {
+        if (from != null) n.voice.setGlide?.(0, time, voicing.glide, from);
+        s.seq = { pitch, time, end: time + options.duration, n };
+      }
+      return id;
+    }
+    const current = s.current && !s.current.ended && !s.current.stopping && s.stack.length ? s.current : null;
+    if (!current) this._monoClear(i);
+    if (current && voicing.mode === "legato" && current.voice.setGlide) {
+      const id = ++this._voiceSeq, alias = { id, i, pitch, visual: false, ended: false, timers: [] };
+      s.stack.push({ id, pitch, vel, alias }); this._monoIds.set(id, i);
+      current.voice.setGlide(pitch - current.pitch, time, voicing.glide);
+      s.sounding = pitch;
+      this._voiceVisual(alias, true);
+      return id;
+    }
+    const from = voicing.glide > 0 && s.sounding != null && s.sounding !== pitch && (voicing.mode === "mono" || current) ? s.sounding - pitch : null;
+    this._monoCut(current, time);
+    const id = this._spawnVoice(i, pitch, vel, options), n = this._synthVoices.get(id);
+    if (!n) return 0;
+    if (from != null) n.voice.setGlide?.(0, time, voicing.glide, from);
+    s.current = n; s.sounding = pitch; s.stack.push({ id, pitch, vel }); this._monoIds.set(id, i);
+    return id;
+  }
+  _monoRelease(i, id, atTime) {
+    this._monoIds.delete(id);
+    const s = this._mono.get(i), k = s ? s.stack.findIndex(entry => entry.id === id) : -1;
+    if (k < 0) return this._releaseVoice(id, atTime);
+    const [entry] = s.stack.splice(k, 1), wasTop = k === s.stack.length;
+    if (entry.alias) this._voiceVisual(entry.alias, false);
+    const current = s.current, alive = current && !current.ended && !current.stopping;
+    if (!s.stack.length) { if (alive) this._releaseVoice(current.id, atTime); return; }
+    if (current && entry.id === current.id) this._voiceVisual(current, false);
+    if (!wasTop) return;
+    // The newest key came up while older keys are still down: go back to the last of them.
+    const top = s.stack[s.stack.length - 1], voicing = normalizeVoicing(this.store.instrument(i)?.voicing), time = Math.max(this.ctx.currentTime, atTime);
+    if (alive && voicing.mode === "legato" && current.voice.setGlide) {
+      current.voice.setGlide(top.pitch - current.pitch, time, voicing.glide); s.sounding = top.pitch;
+      return;
+    }
+    this._monoCut(current, time);
+    const next = this._synthVoices.get(this._spawnVoice(i, top.pitch, top.vel, { held: true, time, source: current?.source }));
+    if (!next) return;
+    if (voicing.glide > 0 && s.sounding != null && s.sounding !== top.pitch) next.voice.setGlide?.(0, time, voicing.glide, s.sounding - top.pitch);
+    s.current = next; s.sounding = top.pitch;
+  }
+
+  _spawnVoice(i, pitch, vel, options) {
     this.ensureContext();
     const instrument = this.store.instrument(i);
     const synth = SYNTH_BANK[instrument?.synthId];
@@ -847,6 +936,11 @@ export class Engine {
   }
 
   releaseNote(id, atTime = this.ctx?.currentTime || 0) {
+    const mono = this._monoIds.get(id);
+    return mono == null ? this._releaseVoice(id, atTime) : this._monoRelease(mono, id, atTime);
+  }
+
+  _releaseVoice(id, atTime = this.ctx?.currentTime || 0) {
     const n = this._synthVoices.get(id);
     if (!n) return;
     this._live.delete(id);
@@ -864,9 +958,10 @@ export class Engine {
     else n.timers.push(setTimeout(off, (atTime - this.ctx.currentTime) * 1000));
   }
 
-  setNotePitchBend(id, semitones, atTime=this.ctx?.currentTime) { this._synthVoices.get(id)?.voice.setBend(semitones,atTime); }
+  setNotePitchBend(id, semitones, atTime=this.ctx?.currentTime) { const mono=this._monoIds.get(id); (mono==null?this._synthVoices.get(id):this._mono.get(mono)?.current)?.voice.setBend(semitones,atTime); }
 
   releaseAll(i = null, { immediate = false } = {}) {
+    this._monoClear(i, { all: immediate });
     const voices = immediate ? this._synthVoices : this._live;
     for (const n of [...voices.values()]) if (i == null || n.i === i) {
       if (immediate) {
@@ -1018,6 +1113,7 @@ export class Engine {
     // The musical cursor stops at the song end; finite sources and effect releases
     // already scheduled on the audio clock retain their natural tails.
     this._transportEnd=this._planOrigin+this._plan.duration;this.currentBeat=this._plan.endBeat;
+    for(const s of this._mono.values())s.seq=null;
     if(!this.offline&&typeof document!=='undefined')(typeof AUDIONAUT_STANDALONE !== 'undefined' ? document : this.editorTransport?.events ?? document).dispatchEvent(new CustomEvent('transport-stop',{detail:{time:this._transportEnd}}));
     this.isPlaying=false;this._transportPreparing=false;this._noteRecordStart=null;this._pausedBeat=null;this._transportGeneration++;this._prefetchAbort?.abort();clearTimeout(this.timer);this._automationOverrides?.clear();
     for(const timer of this._transportTimers)clearTimeout(timer);this._transportTimers.clear();

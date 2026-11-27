@@ -1,6 +1,6 @@
 import { store } from "./state.js";
 import { getMidiTarget, setMidiTarget, midiStatus, setMidiEnabled } from "./midi-input.js";
-import { getArpSettings, setArpSettings, panic } from "./live-keys.js";
+import { getArpSettings, setArpSettings, getVoicing, setVoicing, panic } from "./live-keys.js";
 
 export function initPerformanceControls() {
   const $ = id => document.getElementById(id);
@@ -22,6 +22,11 @@ export function initPerformanceControls() {
     $("arp-octaves").value = String(cfg.octaves);
     $("arp-gate").value = cfg.gate;
     $("arp-gate-value").value = `${Math.round(cfg.gate * 100)}%`;
+    const voicing = getVoicing(selected);
+    $("voice-mode").value = voicing.mode;
+    $("voice-glide").value = voicing.glide;
+    $("voice-glide").disabled = voicing.mode === "poly";
+    $("voice-glide-value").value = `${Math.round(voicing.glide * 1000)} ms`;
   };
   const syncMidi = () => {
     const state = midiStatus();
@@ -45,6 +50,9 @@ export function initPerformanceControls() {
     });
   }
   document.addEventListener("instrument-target", syncTarget);
+  $("voice-mode").addEventListener("change", () => setVoicing(getMidiTarget(), { mode: $("voice-mode").value }));
+  $("voice-glide").addEventListener("input", () => setVoicing(getMidiTarget(), { glide: +$("voice-glide").value }));
+  document.addEventListener("voicing-settings", syncTarget);
   document.addEventListener("arp-settings", syncTarget);
   document.addEventListener("midi-status", syncMidi);
   store.on("load", syncTarget);

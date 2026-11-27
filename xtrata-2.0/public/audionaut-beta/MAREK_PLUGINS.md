@@ -65,3 +65,30 @@ limits (64 notes, 16 per instrument).
   order, so a saved project renders the same as before.
 - **Where to see it.** Diagnostics shows sources in use, the peak, and how many
   notes were cut. `engine.voiceBudget` can be changed at run time.
+
+## Mono, legato and glide
+
+`daw/js/voicing.js`. A per-instrument setting, `voicing: { mode, glide }`, set
+with **Voices** and **Glide** beside the Arp controls in the Play setup menu.
+It works for every instrument, not only the Marek synths.
+
+- **Poly** (default): unchanged. Nothing is stored, and the glide value is
+  ignored, so existing projects render bit-identically.
+- **Mono**: one note at a time. Each note restarts the sound; the pitch slides
+  from the previous note over the glide time. Releasing the newest key while
+  older keys are held returns to the last of them.
+- **Legato**: one note at a time. A key pressed while another is held slides the
+  pitch without restarting the envelopes. Notes that do not overlap start
+  normally with no slide.
+- **Sequenced and arpeggiated notes** have a fixed length, so they always
+  restart the sound. Mono slides into every note; legato slides only into a
+  note that overlaps the one before it. True no-restart legato applies to held
+  keys only.
+- **How the slide is made.** Oscillator synths get a second cents signal beside
+  the pitch bend (`voice.setGlide`), so slide and wheel add up, and a voice
+  rebuilt by a parameter change carries on from the same point. Sample voices
+  (VALORIUM, the sampler, sample instruments) share one detune between bend and
+  glide. Filter key-tracking does not follow the slide.
+- **Limits.** Glide is 0–1 s on the control (stored range 0–2 s). Chords
+  sequenced on a mono instrument play only their last note.
+- **Tests.** `tools/pro-voicing-test.mjs`.

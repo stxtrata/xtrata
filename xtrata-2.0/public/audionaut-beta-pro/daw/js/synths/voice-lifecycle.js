@@ -2,6 +2,7 @@ import { synthOversampling } from "./capabilities.js";
 import { replayChasedAutomation } from "./automation-replay.js";
 import { scheduleDspBoundary } from "../plugin-automation.js";
 import { seededRandom, seedNumber } from "./resources.js";
+import { scheduleGlide } from "../voicing.js";
 import { preparedSynthVoice, prepareSynthVoice, renderSynthVoice } from "./render-pool.js";
 // A voice owns every node it creates, including modulators and scheduled sources.
 // Open native gates use Infinity as a *declaration*, never as a Web Audio timestamp:
@@ -48,11 +49,12 @@ function createNativeVoice(ctx, destination, synth, synthId, note, params, onEnd
   gate.connect(destination);
   if (note.offset > 0 && note.resumeAt != null) { gate.gain.setValueAtTime(.0001,note.resumeAt); gate.gain.linearRampToValueAtTime(1,note.resumeAt+.005); }
   nodes.add(gate);
-  let ended = false, constructed = false, pending = 0, releaseAt = null, bend = null;
+  let ended = false, constructed = false, pending = 0, releaseAt = null, bend = null, glide = null;
   const finish = () => {
     if (ended || !constructed || pending) return;
     ended = true;
     if (bend) { try { bend.stop(); } catch {} }
+    if (glide) { try { glide.stop(); } catch {} }
     for (const n of nodes) { try { n.disconnect(); } catch {} }
     nodes.clear();
     onEnded?.();
@@ -203,6 +205,17 @@ function createNativeVoice(ctx, destination, synth, synthId, note, params, onEnd
       }
       bend.offset.setTargetAtTime(Math.max(-48, Math.min(48, +semitones || 0)) * 100, at, 0.003);
     },
+    // A second cents signal beside the bend, so a slide and the wheel add up.
+    setGlide(semitones, at = ctx.currentTime, seconds = 0, from = null) {
+      if (ended || !pitchTargets.length) return;
+      if (!glide) {
+        glide = ctx.createConstantSource(); nodes.add(glide);
+        glide.offset.value = 0;
+        for (const p of pitchTargets) glide.connect(p);
+        glide.start();
+      }
+      scheduleGlide(glide.offset, ctx, 0, semitones, at, seconds, from);
+    },
     release(at = ctx.currentTime, seconds = 0.25, immediate = false) {
       const t = Math.max(ctx.currentTime, at);
       if (ended || (releaseAt != null && releaseAt <= t && !immediate)) return;
@@ -218,6 +231,7 @@ function createNativeVoice(ctx, destination, synth, synthId, note, params, onEnd
         try { s.stop(end + 0.002); s.stopAt = end + 0.002; } catch {}
       }
       if (bend) { try { bend.stop(end + 0.003); } catch {} }
+      if (glide) { try { glide.stop(end + 0.003); } catch {} }
     },
     stop(at = ctx.currentTime) { this.release(at, 0, true); },
   };
@@ -232,13 +246,16 @@ function createNativeVoice(ctx, destination, synth, synthId, note, params, onEnd
 export function createVoice(ctx, destination, synth, synthId, note, params, onEnded, options = {}) {
   if (note.offset > 0) note = {...note, time:note.time-note.offset, resumeAt:note.time, dur:Number.isFinite(note.dur)?note.dur+note.offset:note.dur};
   let current, ended = false, released = false, bend = 0, releaseAt = null, releaseSeconds = params.release ?? params.rel ?? .25;
-  let state = { ...params }, generation = 0;
+  let state = { ...params }, generation = 0, slide = null;
+  // Where the slide has got to, so a rebuilt voice carries on from the same pitch.
+  const slideAt = (t) => !slide ? 0 : t >= slide.at + slide.seconds ? slide.to : t <= slide.at ? slide.from : slide.from + (slide.to - slide.from) * (t - slide.at) / slide.seconds;
   const children = new Set();
   const finish = (child) => { children.delete(child); if (!children.size && !ended) { ended = true; onEnded?.(); } };
   const build = (patch, resumeAt) => {
     let child;
     child = createNativeVoice(ctx, destination, synth, synthId, { ...note, ...(resumeAt == null ? {} : { resumeAt }) }, patch, () => finish(child), {...options, prepared: resumeAt == null ? options.prepared : undefined});
     children.add(child); if (bend) child.setBend(bend, resumeAt ?? note.time);
+    if (slide) { const t = resumeAt ?? note.time; child.setGlide(slide.to, t, Math.max(0, slide.at + slide.seconds - t), slideAt(t)); }
     return child;
   };
   current = build(state);
@@ -247,6 +264,11 @@ export function createVoice(ctx, destination, synth, synthId, note, params, onEn
     get ended() { return ended; }, get released() { return released; }, get disposed() { return ended || (releaseAt != null && ctx.currentTime >= releaseAt); }, ready: Promise.resolve(true), latencySeconds: (options.latencySamples ?? (synthOversampling(synthId,params) === 2 ? 128 : 0)) / ctx.sampleRate,
     get tailSeconds() { return Math.max(current.tailSeconds || 0, +releaseSeconds || 0); },
     setBend(semitones, at = ctx.currentTime) { bend = semitones; for (const child of children) child.setBend(semitones, at); },
+    setGlide(semitones, at = ctx.currentTime, seconds = 0, from = null) {
+      const t = Math.max(ctx.currentTime, at);
+      slide = { from: from ?? slideAt(t), to: semitones, at: t, seconds: Math.max(0, seconds) };
+      for (const child of children) child.setGlide(semitones, t, seconds, from);
+    },
     release(at = ctx.currentTime, seconds = releaseSeconds, immediate = false) { released = true; releaseAt = at; releaseSeconds = seconds; generation++; for (const child of children) child.release(at, seconds, immediate); },
     stop(at = ctx.currentTime) { this.release(at, 0, true); },
     async setParameters(patch, at = ctx.currentTime, automation = {}) {

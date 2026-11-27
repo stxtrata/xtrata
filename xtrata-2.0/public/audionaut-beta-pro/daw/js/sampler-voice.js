@@ -1,3 +1,4 @@
+import { detuneControl } from './voicing.js';
 // Saved UI zones originally used normalized 0..1 velocity; MIDI zones use 1..127.
 export function velocityBounds(zone,unit) {
   const normalized=unit!=='midi'&&zone.highVelocity!=null&&zone.highVelocity<=1;
@@ -15,10 +16,11 @@ export function createSamplerVoice(ctx,destination,sampler,note,bufferForTrack,o
   gain.gain.setValueAtTime(0,time);gain.gain.linearRampToValueAtTime(note.vel,time+attack);
   let ended=false,released=false;
   const finish=()=>{if(ended)return;ended=true;src.disconnect();gain.disconnect();onEnded?.();};src.onended=finish;
+  const pitch=detuneControl(ctx,()=>[src.detune]);
   const voice={get ended(){return ended;},get released(){return released;},ready:Promise.resolve(true),latencySeconds:0,tailSeconds:release,
     release(at=ctx.currentTime,seconds=release){if(ended||released)return;released=true;gain.gain.cancelAndHoldAtTime?.(at);gain.gain.setTargetAtTime(0,at,Math.max(.002,seconds/5));try{src.stop(at+seconds);}catch{}},
     stop(at=ctx.currentTime){if(ended)return;released=true;try{src.stop(at);}catch{finish();}},
-    setBend(semitones,at=ctx.currentTime){src.detune.setValueAtTime(semitones*100,at);},
+    setBend(semitones,at){pitch.setBend(semitones,at);},setGlide(semitones,at,seconds,from){pitch.setGlide(semitones,at,seconds,from);},
     setParameters(patch,at=ctx.currentTime){if(Number.isFinite(patch.volume))gain.gain.setTargetAtTime(note.vel*patch.volume,at,.008);},
   };
   src.start(time,Math.min(buffer.duration-.001,Math.max(0,note.offset||0)));

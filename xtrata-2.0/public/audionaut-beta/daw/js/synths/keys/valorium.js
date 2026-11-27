@@ -1,3 +1,4 @@
+import { detuneControl } from '../../voicing.js';
 // VALORIUM — layered sample instrument (a nod to Marek's indie alias).
 // Up to four layers, each playing a multisampled source through synth-style shaping: shared
 // filter with envelope, drive, ADSR and stereo spread. Layer A can play a custom pack (key and
@@ -191,13 +192,14 @@ export function createValoriumVoice(ctx, destination, instrument, config, note, 
     for (const s of sources) { try { s.stop(endTime + 1 / ctx.sampleRate); } catch { /* stopped */ } }
   };
   for (const s of sources) s.onended = () => { if (--live <= 0) finish(); };
+  const pitch = detuneControl(ctx, () => sources.map((s) => s.detune));
   const voice = {
     get ended() { return ended; }, get released() { return released; }, get endTime() { return endTime; }, get sources() { return sources; },
     ready: Promise.resolve(true), oneShot: false, latencySeconds: 0, tailSeconds: release,
     release(at = ctx.currentTime, seconds = release) { fade(at, seconds); },
     choke(at = ctx.currentTime) { fade(at, 0.004); },
     stop(at = ctx.currentTime) { fade(at, 0.003); },
-    setBend(semitones, at = ctx.currentTime) { for (const s of sources) s.detune.setValueAtTime(clamp(semitones, -48, 48) * 100, at); },
+    setBend(semitones, at) { pitch.setBend(semitones, at); }, setGlide(semitones, at, seconds, from) { pitch.setGlide(semitones, at, seconds, from); },
     setParameters(patch, at = ctx.currentTime) {
       if (Number.isFinite(patch.level)) level.gain.setTargetAtTime(patch.level * velocity, at, 0.008);
       if (Number.isFinite(patch.cutoff)) filter.frequency.setTargetAtTime(Math.min(nyq, patch.cutoff), at, 0.008);

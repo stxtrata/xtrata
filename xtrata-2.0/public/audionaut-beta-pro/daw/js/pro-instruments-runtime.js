@@ -1,3 +1,4 @@
+import { detuneControl } from './voicing.js';
 import { ResourceCache, seededRandom, canonicalContext } from './synths/resources.js';
 export const clamp = (value, lo, hi) => Math.max(lo, Math.min(hi, value));
 export const frequency = midi => 440 * 2 ** ((midi - 69) / 12);
@@ -45,13 +46,14 @@ export function ownSampleVoice(ctx, destination, buffer, note, settings, onEnded
     envelope.gain.cancelScheduledValues(start); envelope.gain.setValueAtTime(amplitude, start); envelope.gain.linearRampToValueAtTime(0, start + duration);
     endTime = Math.min(endTime, start + duration); try { source.stop(endTime + 1 / ctx.sampleRate); } catch { finish(); }
   };
+  const pitch = detuneControl(ctx, () => [source.detune]);
   const voice = {
     get ended() { return ended; }, get released() { return released; }, get endTime() { return endTime; }, get sources() { return [source]; },
     ready: Promise.resolve(true), oneShot: !!settings.oneShot, latencySeconds: 0, tailSeconds: settings.oneShot ? buffer.duration / rate : release,
     release(at = ctx.currentTime, seconds = release) { fade(at, seconds); },
     choke(at = ctx.currentTime) { fade(at, .004, true); },
     stop(at = ctx.currentTime) { fade(at, .003, true); },
-    setBend(semitones, at = ctx.currentTime) { source.detune.setValueAtTime(clamp(semitones, -48, 48) * 100, at); },
+    setBend(semitones, at) { pitch.setBend(semitones, at); }, setGlide(semitones, at, seconds, from) { pitch.setGlide(semitones, at, seconds, from); },
     setParameters(patch, at = ctx.currentTime, automation = {}) {
       const set = (param, value, from) => { if (automation.curve === 'linear' && automation.startTime < at) { param.setValueAtTime(from ?? param.value, automation.startTime); param.linearRampToValueAtTime(value, at); } else param.setTargetAtTime(value, at, .008); };
       if (Number.isFinite(patch.level)) set(level.gain, patch.level * note.vel * (settings.zoneGain ?? 1), Number.isFinite(automation.fromValues?.level) ? automation.fromValues.level * note.vel * (settings.zoneGain ?? 1) : undefined);

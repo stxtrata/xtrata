@@ -1,3 +1,4 @@
+import { normalizeVoicing } from './voicing.js';
 import {isProInstrument,normalizeInstrumentConfig} from './pro-instruments-config.js';
 import {prepareChainSongImport} from './chain-library.js';
 import {RUNTIME_VERSION} from './runtime-version.js';
@@ -410,6 +411,7 @@ function normalizeNative(data) {
         p.instruments[i].synthId = "jims10";
       p.instruments[i].volume = finite(p.instruments[i].volume, 0.8, 0, 1.5);
       p.instruments[i].arp = normalizeArp(p.instruments[i].arp);
+      if (p.instruments[i].voicing) p.instruments[i].voicing = normalizeVoicing(p.instruments[i].voicing);
       if(inst.params){
         if(typeof inst.params!=='object'||Array.isArray(inst.params))throw new Error('Invalid instrument patch.');
         for(const def of SYNTH_BANK[p.instruments[i].synthId]?.params||[]){

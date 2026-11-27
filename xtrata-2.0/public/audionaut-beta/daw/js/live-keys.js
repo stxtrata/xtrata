@@ -14,6 +14,7 @@
 import { engine } from "./engine.js";
 import { store } from "./state.js";
 import { createArpeggiator, normalizeArp } from "./arpeggiator.js";
+import { normalizeVoicing } from "./voicing.js";
 import { beatToSeconds } from "./timeline.js";
 
 export const TYPED_VEL = 0.8;
@@ -58,6 +59,18 @@ const arp = createArpeggiator({
   stop: releaseOutput,
   position: (time) => engine.getTransportPosition?.(time),
 });
+export const getVoicing = (i) => normalizeVoicing(store.instrument(i)?.voicing);
+export function setVoicing(i, patch) {
+  if (!store.instrument(i)) return;
+  const previous = getVoicing(i), next = normalizeVoicing({ ...previous, ...patch });
+  if (next.mode !== previous.mode) {
+    // Changing mode with keys down would leave notes owned by the old mode.
+    for (const [src, n] of held) if (n.inst === i) { if (n.id) releaseOutput(n.id); held.delete(src); }
+    engine.releaseAll(i);
+  }
+  store.setInstrumentProp(i, "voicing", next);
+  return next;
+}
 export function setArpSettings(i, patch) {
   if (!store.instrument(i)) return;
   const previous = getArpSettings(i), next = normalizeArp({ ...previous, ...patch });
@@ -76,6 +89,7 @@ function refreshArp(i) {
 }
 store.on("instrument", ({ i, prop }) => {
   if (prop === "arp") refreshArp(i);
+  if (prop === "voicing") document.dispatchEvent(new CustomEvent("voicing-settings", { detail: { i, settings: getVoicing(i) } }));
   if (prop === "synthId") {
     const sources = [];
     for (const [src, n] of held) if (n.inst === i) { sources.push(src); held.delete(src); }
