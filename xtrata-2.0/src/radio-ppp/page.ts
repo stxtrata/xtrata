@@ -27,7 +27,8 @@ import { createAwardWalk, type AwardScreen } from './award-view';
 import { createReleases } from './releases';
 import { createReplace } from './replace';
 import type { PlayerView } from '../lib/listening-wallet/gift-players';
-import { copyButton } from './feedback';
+import { copyButton, copyText } from './feedback';
+import { condenseName, playerIdAddress, shortAddress } from './player-id';
 import { browserName, inAppBrowser, openInBrowserHref } from './in-app';
 import { musicWalletOptions } from './connect-choice';
 import { hasBannedWord, markPreviewed, newPreview, PLAIN_CHECKING, PLAIN_LABEL, PLAIN_NUDGE, plainLines, plainStop, previewedAlbums, previewLive, readNovice, stepPreview } from './novice';
@@ -838,13 +839,50 @@ function start(root: HTMLElement) {
     return chooserOpen;
   };
   (window as any).XtrataRadioConnectChooser = chooseConnect;
+  // The player's own address at the top of every screen, by its BNS name when it has one. A tap copies the full
+  // address. Hidden until there is a player on this device (and on the free radio, where there is none to show).
+  const idChip = document.getElementById('playerId') as HTMLButtonElement | null;
+  let idCopied = 0, idShown = '';
+  if (idChip) idChip.onclick = async () => {
+    const address = idChip.dataset.address;
+    if (!address) return;
+    const ok = await copyText(address);
+    idCopied = Date.now();
+    idChip.classList.toggle('is-copied', ok);
+    idChip.querySelector('.who-t')!.textContent = ok ? 'Copied ✓' : 'Copy failed';
+    setTimeout(() => { if (Date.now() - idCopied >= 1400) { idChip.classList.remove('is-copied'); idShown = ''; renderId(ppp.snapshot()); } }, 1500);
+  };
+  function renderId(s: Snapshot) {
+    if (!idChip) return;
+    const address = playerIdAddress(s);
+    idChip.hidden = !address;
+    if (!address) { delete idChip.dataset.address; idShown = ''; return; }
+    if (Date.now() - idCopied < 1400) return; // "Copied ✓" stays up for a moment
+    const name = nameOf(address);
+    const label = name ? condenseName(name) : shortAddress(address);
+    if (label + address === idShown) return;
+    idShown = label + address;
+    idChip.dataset.address = address;
+    idChip.classList.toggle('is-name', !!name);
+    idChip.querySelector('.who-t')!.textContent = label;
+    const about = `Your player${name ? ` · ${name}` : ''} · ${address}. Tap to copy the address.`;
+    idChip.title = about;
+    idChip.setAttribute('aria-label', about);
+  }
   function renderTop(s: Snapshot) {
+    renderId(s);
     if (!top) return;
     const set = (text: string, tone: string, title: string) => {
       top.hidden = false;
       top.className = 'ppp-top' + (tone ? ' is-' + tone : '');
       top.replaceChildren(el('span', '', 'dot'), document.createTextNode(text));
       top.title = title;
+    };
+    // "left" is dropped on a narrow screen (CSS), so the address beside it has room.
+    const setPlays = (n: number) => {
+      set('', 'on', 'Every play counts for the song’s owner');
+      const t = el('span'); t.append(`${n.toLocaleString()} plays`, el('span', ' left', 'ppp-top-left'));
+      top.append(t);
     };
     const left = s.session ? Math.min(s.session.playsLeft, s.playsLeft) : 0;
     switch (s.step) {
@@ -861,7 +899,7 @@ function start(root: HTMLElement) {
       case 'loading': return set('Xtrata Music', 'quiet', 'Checking your player');
       case 'ready':
         return s.payingOn && left > 0 && !s.giftStop
-          ? set(`${left.toLocaleString()} plays left`, 'on', 'Every play counts for the song’s owner')
+          ? setPlays(left)
           : set('Plays off · switch on', 'off', 'Plays are switched off');
     }
   }

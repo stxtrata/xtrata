@@ -865,7 +865,28 @@ d.setAttribute('data-skin','1');d.setAttribute('data-tab','listen');}catch(e){}}
     font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Roboto,"Helvetica Neue",sans-serif}
   html[data-skin]:not([data-view]) .topbar{border:0;background:rgba(12,14,19,.9);flex-wrap:nowrap;gap:8px;
     padding:calc(10px + env(safe-area-inset-top,0px)) max(20px,calc(50% - 240px)) 10px}
-  html[data-skin]:not([data-view]) .logo{display:flex;align-items:center;gap:10px;margin-right:auto;min-width:0}
+  html[data-skin]:not([data-view]) .logo{display:flex;align-items:center;gap:10px;margin-right:auto;min-width:0;flex:none}
+  /* the player's address, between the name and the plays: it gives up room first, and the rest sit on the right */
+  .who{display:inline-flex;align-items:center;gap:6px;min-width:0;min-height:36px;padding:0 11px;border:1px solid #2c3341;border-radius:999px;background:#171b23;color:#c9d1dc;font:600 13px/1 inherit;cursor:pointer;white-space:nowrap}
+  .who[hidden]{display:none}
+  .who-t{min-width:0;overflow:hidden;text-overflow:ellipsis;font-variant-numeric:tabular-nums}
+  .who svg{flex:none;width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:1.4;stroke-linejoin:round;opacity:.7}
+  .who.is-name{color:#f2efe6}
+  .who.is-copied{border-color:#7be0a4;color:#7be0a4}
+  .who:focus-visible{outline:2px solid #8fe0f2;outline-offset:2px}
+  html[data-skin]:not([data-view]) .logo:has(+ .who:not([hidden])){margin-right:0}
+  html[data-skin]:not([data-view]) .who{flex:0 1 auto;margin-right:auto;min-height:40px}
+  html[data-skin]:not([data-view]) .ppp-top{flex:none}
+  /* The address sits under the name, so nothing is squeezed: [X] Xtrata Music / jim.btc, then the plays. */
+  html[data-skin]:not([data-view]) .topbar:has(.who:not([hidden])){display:grid;grid-template-columns:auto minmax(0,1fr) auto auto;grid-template-areas:'mark name plays add' 'mark who plays add';column-gap:9px;row-gap:3px;align-items:center}
+  html[data-skin]:not([data-view]) .topbar:has(.who:not([hidden])) .logo{display:contents}
+  html[data-skin]:not([data-view]) .topbar:has(.who:not([hidden])) .logo-mark{grid-area:mark;width:36px;height:36px}
+  html[data-skin]:not([data-view]) .topbar:has(.who:not([hidden])) .logo-name{grid-area:name;font-size:16px;line-height:1.1;align-self:end}
+  html[data-skin]:not([data-view]) .topbar:has(.who:not([hidden])) .who{grid-area:who;justify-self:start;align-self:start;max-width:100%;min-height:28px;margin:0;padding:3px 10px;font-size:12.5px}
+  html[data-skin]:not([data-view]) .topbar:has(.who:not([hidden])) .ppp-top{grid-area:plays}
+  html[data-skin]:not([data-view]) .topbar:has(.who:not([hidden])) .a2hs{grid-area:add}
+  @media (max-width:520px){html[data-skin]:not([data-view]) .ppp-top-left{display:none}}
+  @media (max-width:360px){html[data-skin]:not([data-view]) .who svg{display:none}html[data-skin]:not([data-view]) .topbar{padding-left:max(12px,env(safe-area-inset-left,0px));padding-right:max(12px,env(safe-area-inset-right,0px))}}
   html[data-skin]:not([data-view]) .logo>b,html[data-skin]:not([data-view]) .logo>i,html[data-skin]:not([data-view]) .live{display:none}
   html[data-skin]:not([data-view]) .logo-mark{display:block;width:32px;height:32px;border-radius:7px;flex:none}
   html[data-skin]:not([data-view]) .logo-name{display:block;font-size:17px;font-weight:700;letter-spacing:-.2px;color:#f2efe6;white-space:nowrap}
@@ -1083,6 +1104,8 @@ d.setAttribute('data-skin','1');d.setAttribute('data-tab','listen');}catch(e){}}
 <body>
 <header class="topbar">
   <a class="logo" href="/radio"><img class="logo-mark" src="/radio/icons/app-192.png" alt="" width="32" height="32" /><b>XTRATA</b> <i>RADIO</i><span class="logo-name">Xtrata <em>Music</em></span></a>
+  <!-- This player's address, by its BNS name when it has one. A tap copies it (src/radio-ppp/page.ts renderId). -->
+  <button class="who" id="playerId" type="button" hidden><span class="who-t"></span><svg viewBox="0 0 16 16" aria-hidden="true"><rect x="5" y="5" width="8.5" height="8.5" rx="2"/><path d="M10.5 3.5v-.5A1.5 1.5 0 009 1.5H3A1.5 1.5 0 001.5 3v6A1.5 1.5 0 003 10.5h.5"/></svg></button>
   <div class="live"><b>●</b> ON AIR FROM THE CHAIN</div>
   <!-- Pay-per-play's next step, always in reach: set up, unlock, or its live state (src/radio-ppp). -->
   <button class="ppp-top" id="ppp-top" type="button" hidden></button>
@@ -1753,7 +1776,7 @@ function showUnavailable(){
 fetch('/radio/listening-wallet/config',{cache:'no-store',signal:AbortSignal.timeout(15000)})
   .then(function(r){return r.ok?r.json():{}})
   .then(function(c){
-    if(c?.enabled && (!paidHost || c.here)) return import('/radio/ppp.js?v=f9f83ba65799');
+    if(c?.enabled && (!paidHost || c.here)) return import('/radio/ppp.js?v=ca30dde688d3');
     showUnavailable();
   }).catch(showUnavailable);
 </script>
