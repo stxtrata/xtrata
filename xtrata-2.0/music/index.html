@@ -69,7 +69,7 @@
   .efield input:focus,.efield textarea:focus{outline:none;border-color:var(--acc2)}
   footer{padding:14px 22px;color:var(--mut);font-size:12px;text-align:center}
 </style>
-<link rel="stylesheet" href="music.css?v=8" />
+<link rel="stylesheet" href="music.css?v=9" />
 </head>
 <body>
 <header class="mx-header">
@@ -313,6 +313,7 @@
     <div id="hint" class="hint"></div>
 
     <div id="prog" class="prog">
+      <div id="upMap" class="mx-up" hidden></div>
       <div><span class="spin"></span><span id="progMsg">Starting…</span><span class="elapsed" id="elapsed"></span></div>
       <div class="bar indet" id="bar"><i></i></div>
       <div class="tip" id="tip"></div>
@@ -380,7 +381,7 @@
     window.XAO_CONFIG = Object.assign(d, window.XAO_CONFIG||{}); })();
 </script>
 <script src="https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.11.6/dist/ffmpeg.min.js"></script>
-<script src="music-player.js?v=4"></script>
+<script src="music-player.js?v=5"></script>
 <script src="music-diagnostics.js?v=1"></script>
 <script src="audio-processing.js?v=3"></script>
 <script src="music-sources.js?v=2"></script>
@@ -616,6 +617,7 @@ let parentCheckRun=0, parentCheckTimer=null;
 async function checkParent(){
   const box=$('#sParentCheck'); if(!box) return;
   const id=parentId(); const run=++parentCheckRun;
+  if(window.musicParentThumb) window.musicParentThumb(/^\d+$/.test(id)?id:'');
   if(!id){ box.innerHTML=''; PARENT_OK='none'; updateGo(); return; }
   if(!/^\d+$/.test(id)){ box.innerHTML='<span class="err">A parent must be a numeric token id.</span>'; PARENT_OK='bad'; updateGo(); return; }
   if(SERVER.mock){ box.innerHTML='<span class="muted">MOCK mode — ownership not checked.</span>'; PARENT_OK='unverified'; updateGo(); return; }
@@ -794,7 +796,7 @@ function updateGo(){
   if(!FILE||!PLAYER){ b.disabled=true; b.textContent='Drop a track to begin'; return; }
   if(OVERSIZE){ b.disabled=true; b.textContent='Too long for one inscription'; return; }
   if(NEEDS.length){ b.disabled=true; b.textContent='Add '+listOf(NEEDS)+' to continue'; return; }
-  if(EDITS_DIRTY){ b.disabled=true; b.textContent='Apply changes to refresh your preview and quote'; return; }
+  if(EDITS_DIRTY){ b.disabled=true; b.textContent='Updating your preview and quote…'; return; }
   if(!EST){ b.disabled=true; b.textContent='A current quote is required'; return; }
   if(!SERVER.mock && !WALLET){ b.disabled=true; b.textContent='Connect your wallet to inscribe'; return; }
   const pb=parentBlockingMessage();
@@ -893,7 +895,7 @@ function setPhase(st, job){ const p=PHASE[st]; if(!p) return;
 const ESCROW_STATES=['AWAITING_DEPOSIT','AWAITING_PARENT','FUNDED','INSCRIBING'];
 let PARENT_MSG=null, PARENT_OWNER={};
 let PARENT_ARRIVED={};
-function hideEscrow(){ const e=$('#escrow'); if(e){ e.style.display='none'; e.innerHTML=''; }
+function hideEscrow(){ const e=$('#escrow'); if(e){ e.style.display='none'; e.innerHTML=''; e.__html=''; }
   const chip=document.querySelector('.step[data-s="parent"]'); if(chip) chip.hidden=true; }
 const PARENT_OWNER_AT={};
 async function noteParentOwner(id){
@@ -901,39 +903,67 @@ async function noteParentOwner(id){
   PARENT_OWNER_AT[id]=Date.now();
   try{ const A=window.XtrataAgent; if(A&&A.ownerOf) PARENT_OWNER[id]=await A.ownerOf(id); }catch{ /* keep the last known owner */ }
 }
+// Parent escrow, step by step. After the payment the job waits for the parent, and that is easy to
+// miss, so the next thing to do is spelled out with a lit, pulsing button and the tab title says so.
+const PARENT_THUMB=(id,cls)=>'<span class="mx-pthumb '+(cls||'')+'"><img src="'+REF_BASE+'/inscription/'+esc(id)+'" alt="Inscription #'+esc(id)+'" loading="lazy" onerror="this.parentNode.classList.add(\'none\');this.remove()"><b>#'+esc(id)+'</b></span>';
+let ESCROW_SCROLLED=false, TITLE_FLASH=null, TITLE_BASE=document.title;
+function flashTitle(on){
+  if(on&&!TITLE_FLASH){ let k=0; TITLE_FLASH=setInterval(()=>{ document.title=(k++%2)?'Send your parent · Xtrata Music':'● Action needed'; },1200); }
+  if(!on&&TITLE_FLASH){ clearInterval(TITLE_FLASH); TITLE_FLASH=null; document.title=TITLE_BASE; }
+}
 function renderEscrow(job, status){
   const box=$('#escrow'); if(!box) return;
   const parents=(job.parents||[]).map(String);
-  if(!parents.length||!ESCROW_STATES.includes(job.status)){ hideEscrow(); return; }
+  if(!parents.length||!ESCROW_STATES.includes(job.status)){ hideEscrow(); flashTitle(false); document.body.classList.remove('mx-needs-parent'); return; }
   const chip=document.querySelector('.step[data-s="parent"]'); if(chip) chip.hidden=false;
   const ps=(status&&status.parents)||{held:[],missing:parents,unexpected:[]};
   if(!(ps.missing||[]).length) PARENT_MSG=null;
   const paid=(status&&status.funded)||!!job.depositReceivedUstx;
+  const pastGate=['INSCRIBING','INSCRIBED','DELIVERING','COMPLETE','COMPLETE_WITH_SKIPS'].includes(job.status);
+  const waiting=[];
   const rows=parents.map((p)=>{
-    const pastGate=['INSCRIBING','INSCRIBED','DELIVERING','COMPLETE','COMPLETE_WITH_SKIPS'].includes(job.status);
     if(pastGate||(ps.held||[]).map(String).includes(p)) PARENT_ARRIVED[p]=true;
-    const held=!!PARENT_ARRIVED[p];
     const owner=PARENT_OWNER[p];
-    if(!held) void noteParentOwner(p);
+    const arrived=!!PARENT_ARRIVED[p]||(!!owner&&owner===job.depositAddress);
+    if(!arrived){ void noteParentOwner(p); waiting.push({p,owner}); }
     let right;
-    if(held) right='<span class="ok">✓ arrived at the deposit wallet</span>';
-    else if(owner&&owner===job.depositAddress) right='<span class="ok">✓ arrived at the deposit wallet</span>';
-    else if(owner&&WALLET&&owner===WALLET) right='<span class="ok">✓ in your wallet</span> <button class="btn ghost" style="width:auto;margin:0 0 0 8px;padding:4px 10px;font-size:11.5px" onclick="sendParentNow(\''+esc(p)+'\')">Send #'+esc(p)+' now</button>';
-    else if(owner) right='<span style="color:var(--warn)">held by '+esc(shortAddr(owner))+' — send #'+esc(p)+' to the deposit address from that wallet</span>';
-    else right='<span class="muted">checking the current owner…</span>';
-    return '<div class="kv"><span>2 · Parent inscription #'+esc(p)+'</span><span>'+right+'</span></div>';
+    if(arrived) right='<span class="ok">✓ arrived — it comes back to you with your song</span>';
+    else if(owner&&WALLET&&owner===WALLET) right=paid?'<span style="color:var(--warn)">waiting for you to send it</span>':'<span class="muted">in your wallet — send it after the payment</span>';
+    else if(owner) right='<span style="color:var(--warn)">held by '+esc(shortAddr(owner))+' — send #'+esc(p)+' to the job wallet from that wallet</span>';
+    else right='<span class="muted">checking who holds it…</span>';
+    return '<div class="kv mx-prow"><span>'+PARENT_THUMB(p,'sm')+'</span><span>'+right+'</span></div>';
   }).join('');
-  box.style.display='block';
-  box.innerHTML='<div style="font-weight:700;margin-bottom:6px">Escrow checklist <span class="muted" style="font-weight:400">— two sends, any order; parent, song and change all come back to you</span></div>'
-    +'<div class="kv"><span>Deposit address</span><span class="mono" style="word-break:break-all">'+esc(job.depositAddress)+'</span></div>'
-    +'<div class="muted" style="font-size:11px;margin:2px 0 8px">🔑 Your browser created this wallet and holds the only key — Xtrata cannot spend from it'+(handoffOffered()?', unless you hand this job over below':'')+'. Emptied and destroyed when your inscription and change come back.</div>'
-    +'<div class="kv"><span>1 · STX deposit ('+stx(job.requiredUstx)+')</span><span>'+(paid?'<span class="ok">✓ arrived</span>':(status&&status.pending?'<span style="color:var(--warn)">⏳ seen — confirming…</span>':'<span class="muted">awaiting</span>'))+'</span></div>'
+  const needParent=paid&&waiting.length>0;
+  document.body.classList.toggle('mx-needs-parent',needParent);
+  flashTitle(needParent);
+  const stepState=(done,now)=>done?'done':now?'now':'next';
+  const steps=[['Pay',stepState(paid,!paid)],['Send parent',stepState(paid&&!waiting.length,needParent)],['Inscribe',stepState(false,pastGate)],['Song, parent and change back to you','next']];
+  let cta='';
+  if(needParent){
+    const w0=waiting[0], mine=w0.owner&&WALLET&&w0.owner===WALLET;
+    const sending=PARENT_MSG&&!PARENT_MSG.err&&/submitted|Waiting for wallet/.test(PARENT_MSG.text);
+    cta='<div class="mx-cta" role="alert"><div class="mx-cta-top">'+PARENT_THUMB(w0.p,'lg')+'<div><div class="mx-cta-title">One more step: send your parent #'+esc(w0.p)+'</div>'
+      +'<p>Your payment arrived ✓. The job now needs <b>#'+esc(w0.p)+'</b> in its wallet to make it this song\'s parent. It is only borrowed: <b>#'+esc(w0.p)+' comes back to you</b> with your new song and any unused STX.</p></div></div>'
+      +(mine?'<button class="btn mx-pulse" type="button" onclick="sendParentNow(\''+esc(w0.p)+'\')"'+(sending?' disabled':'')+'>'+(sending?'Sending #'+esc(w0.p)+'…':'Send #'+esc(w0.p)+' now')+'</button>'
+        :w0.owner?'<p class="mx-cta-warn">#'+esc(w0.p)+' is held by '+esc(shortAddr(w0.owner))+'. Connect that wallet, or send it from there to the job wallet below.</p>':'<p class="muted">Checking who holds #'+esc(w0.p)+'…</p>')
+      +(PARENT_MSG?('<p class="mx-cta-msg" style="color:'+(PARENT_MSG.err?'var(--bad)':'var(--ok)')+'">'+PARENT_MSG.text+'</p>'):'')
+      +((job.status==='AWAITING_PARENT'&&job.fundedAt&&SERVER.parentWindowMs)?('<p class="muted mx-cta-deadline">If it has not arrived by '+new Date(Date.parse(job.fundedAt)+SERVER.parentWindowMs).toLocaleTimeString()+', the job cancels itself and returns your payment.</p>'):'')
+      +'</div>';
+  } else if(!paid){
+    cta='<div class="mx-next"><b>Two sends.</b> First approve the payment in your wallet. Then you\'ll be asked to send parent #'+parents.map(esc).join(', #')+'. Keep this tab open.</div>';
+  }
+  const html='<ol class="mx-esteps">'+steps.map(([t,c],i)=>'<li class="'+c+'"><span>'+(c==='done'?'✓':(i+1))+'</span>'+esc(t)+'</li>').join('')+'</ol>'
+    +cta
+    +'<div class="mx-echeck"><div class="kv"><span>1 · Payment ('+stx(job.requiredUstx)+')</span><span>'+(paid?'<span class="ok">✓ arrived</span>':(status&&status.pending?'<span style="color:var(--warn)">⏳ seen — confirming…</span>':'<span class="muted">waiting for your wallet</span>'))+'</span></div>'
     +rows
-    +(PARENT_MSG?('<div style="margin-top:6px;'+(PARENT_MSG.err?'color:var(--bad)':'color:var(--ok)')+'">'+PARENT_MSG.text+'</div>'):'')
+    +'<div class="kv"><span>Job wallet</span><span class="mono" style="word-break:break-all">'+esc(job.depositAddress)+'</span></div>'
+    +'<div class="muted" style="font-size:11px;margin-top:4px">🔑 Your browser created this wallet and holds the only key — Xtrata cannot spend from it'+(handoffOffered()?', unless you hand this job over below':'')+'. It is emptied when your song, parent and change come back.</div>'
     +((ps.unexpected&&ps.unexpected.length)?('<div style="margin-top:6px;color:var(--mut);font-size:12px">Inscription #'+ps.unexpected.map(esc).join(', #')+' arrived but is not a declared parent of this job. It will be sent back to whoever sent it — <strong>your job carries on as normal</strong>.</div>'):'')
-    +'<div class="muted" style="font-size:11px;margin-top:6px">The parent is only borrowed for the mint.'
-    +((job.status==='AWAITING_PARENT'&&job.fundedAt&&SERVER.parentWindowMs)?(' If it has not arrived by '+new Date(Date.parse(job.fundedAt)+SERVER.parentWindowMs).toLocaleTimeString()+', the job cancels itself and returns your deposit.'):'')
     +'</div>';
+  box.style.display='block';
+  if(box.__html!==html){ box.innerHTML=html; box.__html=html; }
+  if(needParent&&!ESCROW_SCROLLED){ ESCROW_SCROLLED=true; try{ box.scrollIntoView({block:'center',behavior:'smooth'}); }catch(_e){} }
+  if(!needParent) ESCROW_SCROLLED=false;
 }
 async function sendParentCoreId(){
   try{
@@ -1115,6 +1145,7 @@ async function refresh(){
     renderMusicFees(job, status);
     if(st==='FEE_WAITING'){ const remaining=Number(status?.musicFees?.remainingWeight), total=Number(job.minerReserve); const pct=Number.isFinite(remaining)&&total>0?18+66*Math.max(0,Math.min(1,1-remaining/total)):18; setProg(job.progress||'Waiting within your approved fee budget…',['pay','inscribe'],pct); }
     renderEscrow(job, status);
+    if(window.musicUploadMap) window.musicUploadMap(job, status);
     const canCancel=['AWAITING_DEPOSIT','AWAITING_PARENT','FUNDED','INSCRIBING','FEE_WAITING','EXPIRED'].includes(st)&&!status?.musicFees?.pending&&status?.musicFees?.upgrade?.state!=='payment'&&!job.tokenId&&!(job.items||[]).some(i=>i.tokenId);
     $('#cancelRow').style.display=canCancel?'block':'none';
     renderDiag(job, st);
@@ -1693,10 +1724,10 @@ function sbDone(job){
   const ag=$('#sbAgain'); if(ag) ag.onclick=(e)=>{ e.preventDefault(); sbResetUI(); };
 }
 </script>
-<script src="music-appearance.js?v=3"></script>
-<script src="music-editor.js?v=9"></script>
+<script src="music-appearance.js?v=4"></script>
+<script src="music-editor.js?v=10"></script>
 <script src="music-artwork.js?v=2"></script>
 <script src="music-artwork-editor.js?v=2"></script>
-<script src="music-layout.js?v=1"></script>
+<script src="music-layout.js?v=2"></script>
 </body>
 </html>

@@ -21,7 +21,7 @@
     ],
     font: [
       'Typography',
-      { sans: 'Clean sans-serif', serif: 'Editorial serif', mono: 'Studio monospace' }
+      { sans: 'Clean sans-serif', serif: 'Editorial serif', mono: 'Studio monospace', rounded: 'Soft rounded' }
     ],
     artFit: ['Artwork framing', { contain: 'Show whole image', cover: 'Fill frame' }],
     position: [
@@ -43,14 +43,26 @@
         ['check', 'fullArt', 'Full-screen artwork', 'Tap the cover to fill the player', '+1.2 KB'],
         ['select', 'motion', 'Artwork motion', { still: 'Still', zoom: 'Slow zoom while playing', breathe: 'Breathes with the music', tilt: 'Tilts under the pointer' }, 'up to +1.5 KB'],
         ['select', 'backdrop', 'Backdrop', { solid: 'Solid colour', blur: 'Blurred cover', grain: 'Film grain', paper: 'Paper texture', scanlines: 'Scanlines' }, '+0.4 KB'],
+        ['check', 'artGlow', 'Soft glow behind the cover', 'In the accent colour', '+0.1 KB'],
         ['check', 'artWhilePlaying', 'GIF covers move only while playing', 'Still until play is pressed', '+0.8 KB']
       ]
     ],
     [
-      'Sound you can see',
+      'Timeline',
       [
-        ['select', 'waveStyle', 'Waveform style', { bars: 'Bars', mirror: 'Mirrored, played part in colour', line: 'Smooth shape', dots: 'Dotted outline' }, 'no extra'],
-        ['select', 'visualiser', 'Visualiser', { off: 'Off', bars: 'Bars over the cover', ring: 'Pulse round the cover' }, '+1.7 KB, +0.6 KB a minute']
+        ['select', 'wavePos', 'Position', { inline: 'Above the controls', below: 'Below the controls', edge: 'Along the bottom edge', cover: 'Across the artwork' }, 'no extra'],
+        ['select', 'waveSize', 'Height', { regular: 'Regular', slim: 'Slim', tall: 'Tall' }, 'no extra'],
+        ['select', 'waveStyle', 'Waveform style', { bars: 'Bars', mirror: 'Mirrored', line: 'Smooth shape', dots: 'Dotted outline', needles: 'Needles', blocks: 'Blocks' }, 'no extra'],
+        ['color', 'waveColor', 'Played colour', 'The part already heard', 'no extra'],
+        ['color', 'waveBase', 'Unplayed colour', 'The part still to come', 'no extra']
+      ]
+    ],
+    [
+      'Visualiser',
+      [
+        ['select', 'visualiser', 'Visualiser', { off: 'Off', bars: 'Bars', ring: 'Pulse round the cover' }, '+1.7 KB, +0.6 KB a minute'],
+        ['select', 'vizPos', 'Bars position', { cover: 'Over the artwork', edge: 'Along the bottom edge' }, 'no extra'],
+        ['color', 'vizColor', 'Visualiser colour', 'Bars, pulse and vinyl glow', 'no extra']
       ]
     ],
     [
@@ -60,10 +72,12 @@
       ]
     ],
     [
-      'Controls',
+      'Text and controls',
       [
-        ['check', 'repeat', 'Repeat button', 'Lets listeners loop the song', '+0.4 KB'],
-        ['select', 'button', 'Play button', { circle: 'Circle', square: 'Rounded square', pill: 'Pill' }, 'no extra']
+        ['select', 'align', 'Text alignment', { left: 'Left', center: 'Centred' }, 'no extra'],
+        ['select', 'titleSize', 'Song title size', { regular: 'Regular', large: 'Large' }, 'no extra'],
+        ['select', 'button', 'Play button', { circle: 'Circle', square: 'Rounded square', pill: 'Pill' }, 'no extra'],
+        ['check', 'repeat', 'Repeat button', 'Lets listeners loop the song', '+0.4 KB']
       ]
     ],
     [
@@ -97,8 +111,14 @@
     if (a.motion !== d.motion) on.push(fieldText('motion', a.motion).toLowerCase());
     if (a.backdrop !== d.backdrop) on.push(fieldText('backdrop', a.backdrop).toLowerCase());
     if (a.artWhilePlaying) on.push('GIF on play');
-    if (a.timeline === 'waveform' && a.waveStyle !== d.waveStyle) on.push(fieldText('waveStyle', a.waveStyle).toLowerCase().split(',')[0] + ' waveform');
-    if (a.visualiser !== d.visualiser) on.push('visualiser');
+    if (a.timeline === 'waveform' && a.waveStyle !== d.waveStyle) on.push(fieldText('waveStyle', a.waveStyle).toLowerCase() + ' waveform');
+    if (a.wavePos !== d.wavePos) on.push('timeline ' + fieldText('wavePos', a.wavePos).toLowerCase());
+    if (a.waveSize !== d.waveSize) on.push(a.waveSize + ' timeline');
+    if (a.waveColor || a.waveBase) on.push('timeline colours');
+    if (a.visualiser !== d.visualiser) on.push('visualiser' + (a.visualiser === 'bars' && a.vizPos === 'edge' ? ' along the edge' : ''));
+    if (a.artGlow) on.push('cover glow');
+    if (a.align !== d.align) on.push('centred text');
+    if (a.titleSize !== d.titleSize) on.push('large title');
     if (a.lyricsView !== d.lyricsView) on.push('lyrics over artwork');
     if (a.repeat) on.push('repeat');
     if (a.button !== d.button) on.push(a.button + ' button');
@@ -131,6 +151,8 @@
         return `<label class="mx-row" for="${id}"><span><b>${label}</b></span><select id="${id}" data-x="${key}">${Object.entries(rest[0])
           .map(([v, text]) => `<option value="${v}">${text}</option>`)
           .join('')}</select><em>${rest[1]}</em></label>`;
+      if (kind === 'color')
+        return `<div class="mx-row mx-colorrow"><span><b>${label}</b><small>${rest[0]}</small></span><span class="mx-color"><input type="color" id="${id}" data-xc="${key}" aria-label="${label}"><button type="button" class="mx-auto" data-xc-auto="${key}" aria-pressed="true">Auto</button></span><em>${rest[1]}</em></div>`;
       return `<label class="mx-row mx-text" for="${id}"><span><b>${label}</b><small>${rest[0]}</small></span><input type="text" id="${id}" data-xt="${key}" maxlength="${rest[1]}" autocomplete="off"><em>${rest[2]}</em></label>`;
     };
     host.classList.add('music-appearance');
@@ -194,7 +216,7 @@
             `<fieldset class="mx-group"><legend>${group}</legend>${rows.map(row).join('')}</fieldset>`
         )
         .join('') +
-      '<p class="muted mx-tip" data-wave-note>Picking a waveform style also sets Timeline to Audio waveform.</p><p class="muted mx-tip">Synced lyrics: paste timed lyrics such as <code>[01:02.50] a line</code> into Lyrics, or drop an <code>.lrc</code> file with your song.</p></div>' +
+      '<p class="muted mx-tip" data-wave-note>Waveform styles show when the Timeline (under Player look) is Audio waveform. Picking a style switches it on. Position, height and colours work for the plain progress bar too.</p><p class="muted mx-tip">Synced lyrics: paste timed lyrics such as <code>[01:02.50] a line</code> into Lyrics, or drop an <code>.lrc</code> file with your song.</p></div>' +
       '<p class="muted music-style-note">Colours keep readable play-button text. Details and lyrics appear when supplied. Your appearance is saved permanently with the player.</p>';
     // Elements are looked up once, so the page may move the look and extras blocks into its own sections.
     const all = (sel) => [...host.querySelectorAll(sel)];
@@ -206,6 +228,10 @@
       checks: all('[data-check]'),
       xs: all('[data-x]'),
       xts: all('[data-xt]'),
+      xcs: all('[data-xc]'),
+      xcAuto: all('[data-xc-auto]'),
+      vizPos: host.querySelector('[data-x="vizPos"]'),
+      vizColorRow: host.querySelector('[data-xc="vizColor"]'),
       wave: host.querySelector('[data-x="waveStyle"]'),
       waveNote: host.querySelector('[data-wave-note]'),
       coverNote: host.querySelector('[data-cover-note]'),
@@ -230,6 +256,15 @@
         input.value = input.dataset.xt === 'cues' ? cuesText(state.cues) : state[input.dataset.xt];
       });
       el.waveNote.hidden = state.timeline === 'waveform';
+      const autoColour = (key) =>
+        key === 'waveBase'
+          ? state.palette === 'cover'
+            ? (state.coverColors && state.coverColors.muted) || '#b9c3bd'
+            : window.XtrataMusicPlayer.palettes[state.palette].muted
+          : accentOf(state);
+      el.xcs.forEach((input) => (input.value = state[input.dataset.xc] || autoColour(input.dataset.xc)));
+      el.xcAuto.forEach((b) => b.setAttribute('aria-pressed', String(!state[b.dataset.xcAuto])));
+      el.vizPos.disabled = state.visualiser !== 'bars';
       el.coverNote.hidden = state.palette !== 'cover';
       el.accent.value = accentOf(state);
       for (const node of [host, el.look, el.extras]) node.style.setProperty('--style-accent', accentOf(state));
@@ -266,6 +301,20 @@
           state[input.dataset.x] = input.type === 'checkbox' ? input.checked : input.value;
           // A waveform style needs the waveform timeline, so picking one turns it on.
           if (input.dataset.x === 'waveStyle' && input.value !== 'bars') state.timeline = 'waveform';
+          change();
+        })
+    );
+    el.xcs.forEach(
+      (input) =>
+        (input.onchange = () => {
+          state[input.dataset.xc] = input.value;
+          change();
+        })
+    );
+    el.xcAuto.forEach(
+      (b) =>
+        (b.onclick = () => {
+          state[b.dataset.xcAuto] = '';
           change();
         })
     );
@@ -315,20 +364,27 @@
     preview.before(workspace);
     workspace.append(section, preview);
     const controls = mount(section.querySelector('#musicStyleControls'), {}, async () => {
-      if (building || SB.busy || musicJobActive()) return;
+      if (musicJobActive()) return;
       if (SB.active) {
         document.querySelector('#musicStyleStatus').textContent =
           'Defaults updated. Use “Apply this appearance to all tracks” to update the batch.';
         return;
       }
-      if (FILE) {
+      if (!FILE) return;
+      // The page's update queue rebuilds the preview and quote once changes settle, even if a
+      // rebuild is running now. Without it (older page), rebuild straight away as before.
+      if (window.musicScheduleApply) {
         markEditsDirty();
-        document.querySelector('#musicStyleStatus').textContent = 'Updating player and quote…';
-        await document.querySelector('#applyEdits').onclick();
-        document.querySelector('#musicStyleStatus').textContent = EST
-          ? 'Preview and quote updated. Audio preparation is reused.'
-          : 'Quote unavailable. Apply changes again before inscribing.';
+        window.musicScheduleApply(250);
+        return;
       }
+      if (building || SB.busy) return;
+      markEditsDirty();
+      document.querySelector('#musicStyleStatus').textContent = 'Updating player and quote…';
+      await document.querySelector('#applyEdits').onclick();
+      document.querySelector('#musicStyleStatus').textContent = EST
+        ? 'Preview and quote updated. Audio preparation is reused.'
+        : 'Quote unavailable. Apply changes again before inscribing.';
     });
     document.querySelector('#musicStyleApplyAll').onclick = async () => {
       if (building || SB.busy || musicJobActive()) return;

@@ -14,7 +14,7 @@
     style: ['classic', 'sleeve', 'studio', 'vinyl', 'poster'],
     // 'cover' uses colours picked from the artwork when the player is built (appearance.coverColors).
     palette: [...Object.keys(palettes), 'cover'],
-    font: ['sans', 'serif', 'mono'],
+    font: ['sans', 'serif', 'mono', 'rounded'],
     artFit: ['contain', 'cover'],
     position: ['center', 'top', 'bottom', 'left', 'right'],
     corners: ['soft', 'square'],
@@ -38,8 +38,14 @@
   // Player extras (v2). Every one is off by default.
   const extraChoices = {
     backdrop: ['solid', 'blur', 'grain', 'paper', 'scanlines'],
-    waveStyle: ['bars', 'mirror', 'line', 'dots'],
+    waveStyle: ['bars', 'mirror', 'line', 'dots', 'needles', 'blocks'],
+    // Where the timeline (waveform or progress bar) sits, and how tall it is.
+    wavePos: ['inline', 'below', 'edge', 'cover'],
+    waveSize: ['regular', 'slim', 'tall'],
     visualiser: ['off', 'bars', 'ring'],
+    vizPos: ['cover', 'edge'],
+    align: ['left', 'center'],
+    titleSize: ['regular', 'large'],
     motion: ['still', 'zoom', 'breathe', 'tilt'],
     lyricsView: ['panel', 'overlay'],
     button: ['circle', 'square', 'pill']
@@ -47,7 +53,12 @@
   const extraDefaults = {
     backdrop: 'solid',
     waveStyle: 'bars',
+    wavePos: 'inline',
+    waveSize: 'regular',
     visualiser: 'off',
+    vizPos: 'cover',
+    align: 'left',
+    titleSize: 'regular',
     motion: 'still',
     lyricsView: 'panel',
     button: 'circle',
@@ -55,6 +66,10 @@
     repeat: false,
     artWhilePlaying: false,
     stamp: false,
+    artGlow: false,
+    waveColor: '',
+    waveBase: '',
+    vizColor: '',
     note: '',
     signature: '',
     cues: [],
@@ -76,8 +91,10 @@
       if (typeof input[key] === 'boolean') result[key] = input[key];
     for (const key of Object.keys(extraChoices))
       result[key] = extraChoices[key].includes(input[key]) ? input[key] : extraDefaults[key];
-    for (const key of ['fullArt', 'repeat', 'artWhilePlaying', 'stamp'])
+    for (const key of ['fullArt', 'repeat', 'artWhilePlaying', 'stamp', 'artGlow'])
       result[key] = input[key] === true;
+    for (const key of ['waveColor', 'waveBase', 'vizColor'])
+      result[key] = HEX.test(input[key] || '') ? input[key].toLowerCase() : '';
     result.note = cleanText(input.note, 200);
     result.signature = cleanText(input.signature, 60);
     result.cues = (Array.isArray(input.cues) ? input.cues : [])
@@ -108,6 +125,7 @@
     for (const key of Object.keys(extraDefaults)) {
       if (key === 'coverColors' && a.palette !== 'cover') continue;
       if (key === 'waveStyle' && a.timeline !== 'waveform') continue;
+      if ((key === 'vizPos' || key === 'vizColor') && a.visualiser === 'off') continue;
       if (JSON.stringify(a[key]) !== JSON.stringify(extraDefaults[key])) out[key] = a[key];
     }
     return out;
@@ -130,6 +148,7 @@
     a.style === 'vinyl' ||
     a.style === 'poster' ||
     a.palette === 'cover' ||
+    a.font === 'rounded' ||
     Object.keys(compact(a)).length > Object.keys(defaults).length;
   const versionFor = (appearance, lyrics) => {
     const a = normalize(appearance);
@@ -656,16 +675,29 @@
             .map((v) => Math.max(0, Math.min(100, v)))
         : [];
     // v2 waveform styles colour the played part in the accent (fxWave moves the gradient stops).
-    const waveV2 = peaks.length > 0 && a.waveStyle !== 'bars';
+    // Chosen timeline colours, or a non-bar style, colour the played part (fxWave moves the stops).
+    const waveV2 = peaks.length > 0 && (a.waveStyle !== 'bars' || !!a.waveColor || !!a.waveBase);
     const wx = (i) => Math.round(((i + 0.5) * 6400) / peaks.length) / 10,
       ww = Math.max(1, 640 / peaks.length - 1);
-    const waveBody = !waveV2
+    const waveBody = !waveV2 || a.waveStyle === 'bars'
       ? peaks
           .map(
             (v, i) =>
               `<rect x="${(i * 640) / peaks.length}" y="${50 - Math.max(2, v) / 2}" width="${Math.max(1, 640 / peaks.length - 1)}" height="${Math.max(2, v)}" rx="1"/>`
           )
           .join('')
+      : a.waveStyle === 'needles'
+        ? `<path d="${peaks.map((v, i) => `M${wx(i) - 0.5} ${50 - Math.max(2, v) / 2}h1v${Math.max(2, v)}h-1z`).join('')}"/>`
+      : a.waveStyle === 'blocks'
+        ? // Blocks: four peaks per block, heights in steps, so the song reads as a chunky bar chart.
+          peaks
+            .filter((v, i) => i % 4 === 0)
+            .map((v, i, all) => {
+              const h = Math.max(12, Math.round(Math.max(...peaks.slice(i * 4, i * 4 + 4)) / 12.5) * 12.5),
+                w = 640 / all.length;
+              return `<rect x="${Math.round((i * w + 1) * 10) / 10}" y="${50 - h / 2}" width="${Math.round((w - 2) * 10) / 10}" height="${h}" rx="2"/>`;
+            })
+            .join('')
       : a.waveStyle === 'mirror'
         ? `<path d="${peaks.map((v, i) => `M${wx(i) - ww / 2} 60v${-Math.round(Math.max(2, v) * 6) / 10}h${ww}V60z`).join('')}"/><path opacity=".35" d="${peaks.map((v, i) => `M${wx(i) - ww / 2} 61v${Math.round(Math.max(1, v * 0.3) * 10) / 10}h${ww}V61z`).join('')}"/>`
         : a.waveStyle === 'line'
@@ -681,7 +713,7 @@
               })
               .join('')}"/>`;
     const wave = peaks.length
-      ? `<svg${waveV2 ? ' class="wv"' : ''} viewBox="0 0 640 100" preserveAspectRatio="none" aria-hidden="true">${waveV2 ? '<defs><linearGradient id="wp" gradientUnits="userSpaceOnUse" x1="0" x2="640" y1="0" y2="0"><stop offset="0" style="stop-color:var(--accent)"/><stop id="wpA" offset="0" style="stop-color:var(--accent)"/><stop id="wpB" offset="0" style="stop-color:var(--muted)"/><stop offset="1" style="stop-color:var(--muted)"/></linearGradient></defs>' : ''}${waveBody}</svg>`
+      ? `<svg${waveV2 ? ' class="wv"' : ''} viewBox="0 0 640 100" preserveAspectRatio="none" aria-hidden="true">${waveV2 ? '<defs><linearGradient id="wp" gradientUnits="userSpaceOnUse" x1="0" x2="640" y1="0" y2="0"><stop offset="0" style="stop-color:var(--wave-on)"/><stop id="wpA" offset="0" style="stop-color:var(--wave-on)"/><stop id="wpB" offset="0" style="stop-color:var(--wave-off)"/><stop offset="1" style="stop-color:var(--wave-off)"/></linearGradient></defs>' : ''}${waveBody}</svg>`
       : '';
     // Loudness track for the visualiser and "breathe" (see prepareAnalysis). No track, no visualiser.
     const envelope =
@@ -694,13 +726,20 @@
     const version = isV2(a, lrc.length > 0) ? VERSION2 : VERSION;
     const lyricLine = lrc.length > 0 && (a.lyricsView === 'overlay' || a.fullArt);
     const isGif = visualMime === 'image/gif';
+    // The timeline (waveform or progress bar) can sit above or below the controls, along the bottom
+    // edge of the player or across the artwork. "inline" is the v1 layout, byte for byte.
+    const pos = a.style === 'studio' && a.wavePos === 'cover' ? 'edge' : a.wavePos;
+    const timelineHtml = `<div class="timeline${pos === 'inline' ? '' : ' tl-' + pos}" id="timeline">${wave}<div class="rail"></div><input id="seekRange" aria-label="Seek playback position" type="range" min="0" max="1000" value="0"></div>`;
+    const timesHtml = '<div class="times"><span id="currentTime">0:00</span><span id="durationTime">0:00</span></div>';
+    const vizEdge = viz === 'bars' && a.vizPos === 'edge';
     const artInner = a.style === 'vinyl' ? `<div class="disc"><div class="label">${art}</div></div>` : art;
     const overlays =
       (a.stamp ? '<span class="stamp" id="xStamp">XTRATA MUSIC</span>' : '') +
       (a.signature ? `<span class="sig">${esc(a.signature)}</span>` : '') +
-      (viz === 'bars' ? `<div class="viz" aria-hidden="true">${'<i></i>'.repeat(24)}</div>` : '') +
+      (viz === 'bars' && a.vizPos === 'cover' ? `<div class="viz" aria-hidden="true">${'<i></i>'.repeat(24)}</div>` : '') +
       (viz === 'ring' && a.style !== 'vinyl' ? '<div class="ring" aria-hidden="true"></div>' : '') +
       (lyricLine ? '<p class="lline" id="lyricLine" aria-hidden="true"></p>' : '') +
+      (pos === 'cover' ? timelineHtml : '') +
       (a.fullArt
         ? '<button id="fullArtButton" class="xo" aria-label="Show artwork full screen" aria-pressed="false">⤢</button>'
         : '');
@@ -771,7 +810,8 @@
     const font = {
       sans: 'ui-sans-serif,system-ui,sans-serif',
       serif: 'Georgia,serif',
-      mono: 'ui-monospace,monospace'
+      mono: 'ui-monospace,monospace',
+      rounded: 'ui-rounded,"SF Pro Rounded","Nunito","Varela Round",system-ui,sans-serif'
     }[a.font];
     // Extras: CSS and code for what is switched on, nothing for what is not.
     const posterFit = a.style === 'poster' ? '.art{height:100%}.body{height:auto}' : '';
@@ -785,6 +825,36 @@
     const grainSvg =
       "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E";
     const layer = "#xtrataPlayer:after{content:'';position:absolute;inset:0;pointer-events:none;z-index:6;";
+    const tlH = { slim: wave ? '5cqw' : '14px', regular: wave ? '8cqw' : '24px', tall: wave ? '14cqw' : '34px' }[a.waveSize],
+      railPx = { slim: 2, regular: 4, tall: 8 }[a.waveSize],
+      vizColor = a.vizColor || 'var(--accent)';
+    const timelineCss = [
+      waveV2 || a.waveColor || a.waveBase
+        ? `#xtrataPlayer{--wave-on:${a.waveColor || 'var(--accent)'};--wave-off:${a.waveBase || 'var(--muted)'}}`
+        : '',
+      a.waveColor || a.waveBase ? '.rail{background:var(--wave-off)}.rail:after{background:var(--wave-on)}' : '',
+      a.waveSize !== 'regular' && (pos === 'inline' || pos === 'below')
+        ? `@container(min-width:341px){#timeline{height:${tlH}!important}}.rail{height:${railPx}px}`
+        : '',
+      pos === 'edge'
+        ? `#timeline{position:absolute;left:0;right:0;bottom:0;z-index:3;height:${tlH}!important;min-height:0}#timeline .rail{top:auto;bottom:0;height:${railPx}px}.body{padding-bottom:calc(${tlH} + 3%)!important}`
+        : '',
+      pos === 'cover'
+        ? `#timeline{position:absolute;left:5%;right:5%;bottom:5%;z-index:3;height:${tlH}!important;min-height:0}#timeline .rail{height:${railPx}px}.art .viz{bottom:calc(8% + ${tlH})}`
+        : '',
+      pos === 'below' ? '.controls{order:0}' : '',
+      vizEdge
+        ? `#xtrataPlayer{isolation:isolate}.viz.edge{left:0;right:0;bottom:0;height:20%;gap:.6%;z-index:${a.style === 'sleeve' ? '1;opacity:.25' : '-1;opacity:.35'}}`
+        : '',
+      a.vizColor ? `.viz i{background:${vizColor}}.ring{border-color:${vizColor}}.disc{box-shadow:0 1cqw 4cqw #0009,0 0 calc(var(--lvl,0)*5cqw) ${vizColor}}` : '',
+      a.align === 'center' ? '.identity{text-align:center}.controls{justify-content:center;flex-wrap:wrap}.extras{margin-left:0}' : '',
+      a.titleSize === 'large'
+        ? `.identity h1{font-size:clamp(18px,${a.style === 'studio' ? '9.5cqw,58px' : '7.5cqw,48px'})}`
+        : '',
+      a.artGlow
+        ? '.art img,.art .placeholder,.disc{filter:drop-shadow(0 0 3cqw color-mix(in srgb,var(--accent) 55%,transparent))}'
+        : ''
+    ];
     const css2 =
       version === VERSION
         ? ''
@@ -843,8 +913,9 @@
             lyricLine
               ? `.lline{position:absolute;left:6%;right:6%;bottom:${a.style === 'poster' ? '52%' : viz === 'bars' ? '30%' : '8%'};z-index:3;margin:0;text-align:center;font-weight:700;font-size:clamp(13px,4.4cqw,30px);line-height:1.25;color:#fff;text-shadow:0 2px 12px #000;pointer-events:none}${a.lyricsView === 'overlay' ? '' : '.lline{display:none}.full .lline{display:block}'}`
               : '',
-            a.style === 'poster' ? '.viz{bottom:auto;top:10%}.xo{bottom:auto;top:3%}.sig{top:auto;bottom:60%}' : '',
-            a.fullArt && viz === 'bars' && a.style !== 'poster' ? '.viz{right:calc(8% + 40px)}' : '',
+            a.style === 'poster' ? '.art .viz{bottom:auto;top:10%}.xo{bottom:auto;top:3%}.sig{top:auto;bottom:60%}' : '',
+            a.fullArt && viz === 'bars' && a.style !== 'poster' ? '.art .viz{right:calc(8% + 40px)}' : '',
+            ...timelineCss,
             '@media(prefers-reduced-motion:reduce){.disc,.art img{animation:none!important;transform:none!important}.viz,.ring{display:none}}'
           ].join('');
     const fx = [];
@@ -868,7 +939,7 @@
 @container(max-width:340px){.art{height:30%}.body{height:70%;padding:3%}.album{display:none}.controls{gap:4px}.controls .secondary{display:none}.extras button{padding:0 8px}.body .timeline{height:24px!important}.body h1{font-size:17px}.body .artist{font-size:12px}.body #playerStatus{font-size:11px}${a.style === 'studio' ? '.art{height:25%;width:25%}.body{height:100%;padding:5%}.identity{top:7%;left:5%}' : ''}${posterFit}}
 @container(max-width:240px){.art{height:15%}.body{height:85%;padding:3%;gap:2px}.body h1{font-size:14px;-webkit-line-clamp:1}.artist,.album,.times{display:none}.body #playerStatus{font-size:10px}.extras{gap:4px}.extras button{width:36px;min-height:36px;font-size:0;padding:0}.extras button:after{font-size:15px;content:'i'}.extras button[data-open="lyricsDialog"]:after{content:'♫'}#playToggleButton{width:36px;height:36px;min-height:36px;font-size:20px}${a.style === 'studio' ? '.art{height:20%;width:20%;top:4%;right:4%}.body{height:100%;padding:4%}.identity{top:5%;left:4%;width:66%}' : ''}${posterFit}}
 @media(prefers-reduced-motion:reduce){*{scroll-behavior:auto!important}}
-</style></head><body><main id="xtrataPlayer" class="player" tabindex="0" aria-label="${esc(title)} music player" data-xtrata-template="${version}" data-style="${a.style}"${dependencies.length ? ` data-xtrata-dependencies="${dependencies.join(',')}"` : ''}><div class="art">${artInner}${overlays}</div><div class="body"><div class="identity"><h1>${esc(title)}</h1>${artist ? `<p class="artist">${esc(artist)}</p>` : ''}${a.showAlbum && m.album ? `<p class="album">${esc(m.album)}</p>` : ''}${a.note ? `<p class="note">${esc(a.note)}</p>` : ''}</div>${cueRow}<div class="timeline" id="timeline">${wave}<div class="rail"></div><input id="seekRange" aria-label="Seek playback position" type="range" min="0" max="1000" value="0"></div><div class="times"><span id="currentTime">0:00</span><span id="durationTime">0:00</span></div><div class="controls"><button id="playToggleButton" aria-label="Play">▶</button><button class="secondary" id="restartButton">Restart</button><button class="secondary" id="muteButton" aria-pressed="false">Mute</button>${a.repeat ? '<button class="secondary" id="repeatButton" aria-pressed="false">Repeat</button>' : ''}<div class="extras">${hasDetails ? '<button data-open="detailsDialog">Details</button>' : ''}${hasLyrics ? '<button data-open="lyricsDialog">Lyrics</button>' : ''}</div></div><p id="playerStatus" role="status">Loading audio…</p></div><audio id="xtrataAudio" preload="metadata" data-xtrata-asset="audio"><source src="${audioRefId ? refUrl(audioRefId) : `data:${mime};base64,${b64(config.audioBase64)}`}" type="${mime}"></audio></main>${hasDetails ? dialog('detailsDialog', 'Track details', `${m.description ? `<p class="description">${esc(m.description)}</p>` : ''}<dl>${details.map(([k, v]) => `<div><dt>${esc(labels[k] || k.replace(/([A-Z])/g, ' $1'))}</dt><dd>${esc(v)}</dd></div>`).join('')}</dl>`) : ''}${hasLyrics ? dialog('lyricsDialog', 'Lyrics', lrc.length ? `<div class="lrc">${lrc.map((l) => `<p data-t="${l.t}">${esc(l.text) || '♪'}</p>`).join('')}</div>` : `<pre>${esc(m.lyrics)}</pre>`) : ''}<script type="application/json" id="xtrataPlayerManifest">${json(manifest)}</script><script type="application/json" id="xtrata-music-metadata">${json(m)}</script><script>(${runtime.toString()})();</script>${fxScript}</body></html>`;
+</style></head><body><main id="xtrataPlayer" class="player" tabindex="0" aria-label="${esc(title)} music player" data-xtrata-template="${version}" data-style="${a.style}"${dependencies.length ? ` data-xtrata-dependencies="${dependencies.join(',')}"` : ''}><div class="art">${artInner}${overlays}</div><div class="body"><div class="identity"><h1>${esc(title)}</h1>${artist ? `<p class="artist">${esc(artist)}</p>` : ''}${a.showAlbum && m.album ? `<p class="album">${esc(m.album)}</p>` : ''}${a.note ? `<p class="note">${esc(a.note)}</p>` : ''}</div>${pos === 'inline' ? cueRow + timelineHtml + timesHtml : pos === 'below' ? '' : cueRow + timesHtml}<div class="controls"><button id="playToggleButton" aria-label="Play">▶</button><button class="secondary" id="restartButton">Restart</button><button class="secondary" id="muteButton" aria-pressed="false">Mute</button>${a.repeat ? '<button class="secondary" id="repeatButton" aria-pressed="false">Repeat</button>' : ''}<div class="extras">${hasDetails ? '<button data-open="detailsDialog">Details</button>' : ''}${hasLyrics ? '<button data-open="lyricsDialog">Lyrics</button>' : ''}</div></div>${pos === 'below' ? cueRow + timelineHtml + timesHtml : ''}<p id="playerStatus" role="status">Loading audio…</p></div>${vizEdge ? `<div class="viz edge" aria-hidden="true">${'<i></i>'.repeat(32)}</div>` : ''}${pos === 'edge' ? timelineHtml : ''}<audio id="xtrataAudio" preload="metadata" data-xtrata-asset="audio"><source src="${audioRefId ? refUrl(audioRefId) : `data:${mime};base64,${b64(config.audioBase64)}`}" type="${mime}"></audio></main>${hasDetails ? dialog('detailsDialog', 'Track details', `${m.description ? `<p class="description">${esc(m.description)}</p>` : ''}<dl>${details.map(([k, v]) => `<div><dt>${esc(labels[k] || k.replace(/([A-Z])/g, ' $1'))}</dt><dd>${esc(v)}</dd></div>`).join('')}</dl>`) : ''}${hasLyrics ? dialog('lyricsDialog', 'Lyrics', lrc.length ? `<div class="lrc">${lrc.map((l) => `<p data-t="${l.t}">${esc(l.text) || '♪'}</p>`).join('')}</div>` : `<pre>${esc(m.lyrics)}</pre>`) : ''}<script type="application/json" id="xtrataPlayerManifest">${json(manifest)}</script><script type="application/json" id="xtrata-music-metadata">${json(m)}</script><script>(${runtime.toString()})();</script>${fxScript}</body></html>`;
   }
   window.XtrataMusicPlayer = {
     VERSION,

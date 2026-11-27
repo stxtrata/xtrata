@@ -178,3 +178,53 @@ describe('player extras (v2)', () => {
     expect(Buffer.byteLength(html)).toBeLessThan(40000);
   });
 });
+
+describe('timeline and finishing options', () => {
+  const peaks = Array.from({ length: 160 }, (_, i) => (i * 7) % 100);
+  const count = (html: string, s: string) => html.split(s).length - 1;
+  it('moves the one timeline where it is asked for, keeping a single seek control', () => {
+    const at = (wavePos: string) => player.build({ ...config, peaks, appearance: { timeline: 'waveform', wavePos } });
+    const inline = at('inline'), below = at('below'), edge = at('edge'), cover = at('cover');
+    expect(inline).toContain('xtrata-music-player-v1');
+    for (const html of [inline, below, edge, cover]) {
+      expect(count(html, 'id="timeline"')).toBe(1);
+      expect(count(html, 'id="seekRange"')).toBe(1);
+      expect(count(html, 'id="currentTime"')).toBe(1);
+    }
+    expect(below.indexOf('id="timeline"')).toBeGreaterThan(below.indexOf('id="playToggleButton"'));
+    expect(edge).toMatch(/<\/div><div class="timeline tl-edge" id="timeline">[\s\S]*<audio/);
+    expect(cover).toMatch(/<div class="art">[\s\S]*class="timeline tl-cover"[\s\S]*<div class="body">/);
+    // Studio's small cover cannot hold a timeline, so it goes along the edge instead.
+    expect(player.build({ ...config, peaks, appearance: { style: 'studio', timeline: 'waveform', wavePos: 'cover' } })).toContain('tl-edge');
+  });
+  it('colours the played and unplayed parts, for waveforms and the plain bar', () => {
+    const wave = player.build({ ...config, peaks, appearance: { timeline: 'waveform', waveColor: '#FF0000', waveBase: '#00ff00' } });
+    expect(wave).toContain('--wave-on:#ff0000;--wave-off:#00ff00');
+    expect(wave).toContain('stop-color:var(--wave-on)');
+    expect(wave).toContain('fxWave');
+    const bar = player.build({ ...config, appearance: { waveColor: '#123456' } });
+    expect(bar).toContain('.rail:after{background:var(--wave-on)}');
+    expect(player.normalize({ waveColor: 'red;}', vizColor: '#ABCDEF' })).toMatchObject({ waveColor: '', vizColor: '#abcdef' });
+  });
+  it('draws the needle and block waveforms compactly', () => {
+    const needles = player.build({ ...config, peaks, appearance: { timeline: 'waveform', waveStyle: 'needles' } });
+    const blocks = player.build({ ...config, peaks, appearance: { timeline: 'waveform', waveStyle: 'blocks' } });
+    expect(needles).toMatch(/<svg class="wv"[^>]*>.*<path d="M/);
+    expect(count(blocks, '<rect')).toBe(40);
+  });
+  it('puts visualiser bars along the bottom edge when asked, in the chosen colour', () => {
+    const html = player.build({ ...config, envelope: 'AAgg', appearance: { visualiser: 'bars', vizPos: 'edge', vizColor: '#ff00aa' } });
+    expect(html).toContain('<div class="viz edge"');
+    expect(html).not.toMatch(/<div class="art">[^]*?<div class="viz"[^]*?<div class="body">/);
+    expect(html).toContain('.viz i{background:#ff00aa}');
+  });
+  it('marks text, title, glow and the rounded font as v2 only when used', () => {
+    expect(player.versionFor({ align: 'center' }, '')).toBe('xtrata-music-player-v2');
+    expect(player.versionFor({ font: 'rounded' }, '')).toBe('xtrata-music-player-v2');
+    const html = player.build({ ...config, appearance: { align: 'center', titleSize: 'large', artGlow: true, font: 'rounded' } });
+    expect(html).toContain('.identity{text-align:center}');
+    expect(html).toContain('ui-rounded');
+    expect(html).toContain('drop-shadow');
+    expect(Object.keys(player.compact({ visualiser: 'off', vizPos: 'edge', vizColor: '#ffffff' }))).not.toContain('vizPos');
+  });
+});

@@ -190,7 +190,7 @@ const oldDirty = markEditsDirty;
 markEditsDirty = function () {
   EST = null;
   oldDirty();
-  $('#qPay').textContent = 'Apply changes to refresh quote';
+  $('#qPay').textContent = 'Updating…';
 };
 const quoteDetails = document.createElement('div');
 quoteDetails.id = 'musicQuoteDetails';

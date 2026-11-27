@@ -192,5 +192,178 @@
     route(audio.length ? audio : files);
     if (skipped) $('#hint').innerHTML = '<span style="color:var(--warn)">' + esc(skipped) + '</span>';
   };
+
+  // ---- Changes apply by themselves ----
+  // Every edit (song details, artwork, lyrics, player look, extras) goes through one queue: the
+  // preview and quote rebuild shortly after the last change, and Inscribe stays locked until they
+  // have. Nothing is lost if a change lands while a rebuild is already running.
+  const live = document.createElement('p');
+  live.id = 'mxLive';
+  live.className = 'mx-live muted';
+  live.setAttribute('role', 'status');
+  $('#go').after(live);
+  const setLive = (text, ok) => {
+    live.textContent = text;
+    live.classList.toggle('ok', !!ok);
+    const st = $('#musicStyleStatus');
+    if (st) st.textContent = text;
+  };
+  let applyTimer = 0,
+    applyRunning = false,
+    applyAgain = false;
+  const baseDirty = window.markEditsDirty;
+  async function runApply() {
+    clearTimeout(applyTimer);
+    if (applyRunning || building) {
+      applyAgain = true;
+      if (!applyRunning) applyTimer = setTimeout(runApply, 400);
+      return;
+    }
+    if (!FILE || SB.active || musicJobActive()) return;
+    if (!EDITS_DIRTY) baseDirty();
+    applyRunning = true;
+    applyAgain = false;
+    setLive('Updating your preview and quote…');
+    try {
+      await $('#applyEdits').onclick();
+    } finally {
+      applyRunning = false;
+    }
+    if (applyAgain) return runApply();
+    if (EDITS_DIRTY) setLive('Could not update the preview. Check the message under Song details.');
+    else setLive(EST ? '✓ Preview and quote are up to date' : 'Preview updated. The quote will refresh in a moment.', true);
+  }
+  function scheduleApply(delay) {
+    if (!FILE || SB.active || musicJobActive()) return;
+    clearTimeout(applyTimer);
+    setLive('Updating your preview and quote…');
+    applyTimer = setTimeout(runApply, delay == null ? 900 : delay);
+  }
+  window.musicScheduleApply = scheduleApply;
+  if (typeof baseDirty === 'function')
+    window.markEditsDirty = function () {
+      baseDirty.apply(this, arguments);
+      scheduleApply();
+    };
+  const editPanel = $('#editPanel');
+  if (editPanel) {
+    editPanel.addEventListener('input', (e) => {
+      if (e.target.matches('input[type=text],textarea')) scheduleApply(1200);
+    });
+    editPanel.addEventListener('change', () => scheduleApply(300));
+  }
+
+  // ---- Parent: a picture of the chosen inscription, to check it is the right one ----
+  const parentCheck = $('#sParentCheck');
+  const parentThumb = document.createElement('div');
+  parentThumb.id = 'sParentThumb';
+  parentThumb.className = 'mx-parent-preview';
+  parentThumb.hidden = true;
+  if (parentCheck) parentCheck.before(parentThumb);
+  let shownParent = '';
+  window.musicParentThumb = (id) => {
+    if (id === shownParent) return;
+    shownParent = id;
+    if (!id) {
+      parentThumb.hidden = true;
+      parentThumb.innerHTML = '';
+      return;
+    }
+    const url = (typeof REF_BASE === 'string' ? REF_BASE : '') + '/inscription/' + id;
+    parentThumb.hidden = false;
+    parentThumb.innerHTML =
+      '<div class="mx-parent-frame"><img alt="Inscription #' + esc(id) + '"></div><div class="mx-parent-meta"><b>#' + esc(id) + '</b><span class="muted">Check this is the one you mean.</span><a href="' + esc(url) + '" target="_blank" rel="noopener">Open full size ↗</a></div>';
+    const frame = parentThumb.querySelector('.mx-parent-frame'),
+      img = frame.querySelector('img');
+    // Images show directly. Anything else (a player, a page, a video) shows in a sealed, scaled-down frame.
+    img.onerror = () => {
+      if (shownParent !== id) return;
+      frame.innerHTML = '<iframe sandbox="allow-scripts" loading="lazy" tabindex="-1" title="Inscription #' + esc(id) + '"></iframe>';
+      frame.firstChild.src = url;
+      frame.classList.add('framed');
+    };
+    img.src = url;
+  };
+  // A note by the Inscribe button whenever a parent is set: two sends, and what comes back.
+  const parentNote = document.createElement('p');
+  parentNote.className = 'mx-parent-note';
+  parentNote.hidden = true;
+  live.after(parentNote);
+  const noteParent = () => {
+    const id = String(($('#sParent') && $('#sParent').value) || '').trim();
+    const show = /^\d+$/.test(id) && !musicJobActive();
+    if (parentNote.hidden !== !show) parentNote.hidden = !show;
+    const text = show
+      ? 'With a parent you approve two sends: the payment, then parent #' + id + '. Both are only held for the inscription: #' + id + ', your new song and any unused STX come back to your wallet.'
+      : '';
+    if (parentNote.textContent !== text) parentNote.textContent = text;
+  };
+  document.addEventListener('input', noteParent);
+  setInterval(noteParent, 1500);
+
+  // ---- On-chain upload panel: chunks and batches, always in view while a job runs ----
+  const CHUNK = 16384,
+    BATCH = 32;
+  const best = {};
+  const upMap = $('#upMap');
+  const fmtSize = (n) => (n >= 1048576 ? (n / 1048576).toFixed(2) + ' MB' : Math.max(1, Math.round(n / 1024)) + ' KB');
+  window.musicUploadMap = (job, status) => {
+    if (!upMap || !job) return;
+    const st = job.status;
+    const liveStates = ['AWAITING_DEPOSIT', 'AWAITING_PARENT', 'FUNDED', 'INSCRIBING', 'FEE_WAITING', 'INSCRIBED', 'DELIVERING'];
+    if (!liveStates.includes(st)) {
+      upMap.hidden = true;
+      return;
+    }
+    const items = Array.isArray(job.items) && job.items.length ? job.items : null;
+    const curIdx = items ? items.findIndex((i) => i.status === 'INSCRIBING') : -1;
+    const cur = items ? (curIdx >= 0 ? items[curIdx] : null) : job;
+    const bytes = cur ? cur.bytes || 0 : job.bytes || 0;
+    const total = (cur && (cur.uploadTotal || cur.chunks)) || Math.ceil(bytes / CHUNK) || 0;
+    const single = cur ? (cur.single != null ? !!cur.single : total <= BATCH) : false;
+    const batches = Math.max(1, Math.ceil(total / BATCH));
+    const key = job.jobId + ':' + (items ? curIdx : 'one');
+    const m = /(?:uploading|upload started|resuming upload)\s*·\s*(\d+)\s*\/\s*(\d+)/i.exec(job.progress || '');
+    if (m && +m[2] === total) best[key] = Math.max(best[key] || 0, +m[1]);
+    const after = ['INSCRIBED', 'DELIVERING'].includes(st);
+    let done = after ? total : best[key] || 0;
+    const sealing = !single && done >= total && total > 0 && st === 'INSCRIBING';
+    const waiting = ['AWAITING_DEPOSIT', 'AWAITING_PARENT', 'FUNDED'].includes(st) && !done;
+    const curBatch = Math.min(batches, Math.floor(done / BATCH) + 1);
+    let now;
+    if (st === 'AWAITING_DEPOSIT') now = 'Waiting for your payment';
+    else if (st === 'AWAITING_PARENT') now = 'Waiting for your parent';
+    else if (st === 'FUNDED') now = 'Starting the upload';
+    else if (st === 'FEE_WAITING') now = 'Paused for network fees';
+    else if (st === 'INSCRIBED') now = 'Sealed ✓ — finishing';
+    else if (st === 'DELIVERING') now = 'Sending it all back to you';
+    else if (single) now = 'Sending one transaction';
+    else if (sealing) now = 'Sealing the inscription';
+    else now = 'Uploading batch ' + curBatch + ' of ' + batches;
+    const segs = [];
+    for (let b = 0; b < (single ? 1 : batches); b++) {
+      const lo = b * BATCH,
+        hi = Math.min(total, lo + BATCH);
+      const filled = single ? (after ? 1 : 0) : Math.max(0, Math.min(1, (done - lo) / (hi - lo || 1)));
+      const state = filled >= 1 ? 'done' : !waiting && !after && (single || b === curBatch - 1) && st === 'INSCRIBING' ? 'now' : 'todo';
+      segs.push('<i class="' + state + '" title="' + (single ? 'All ' + total + ' chunks in one transaction' : 'Batch ' + (b + 1) + ': chunks ' + (lo + 1) + '–' + hi) + '"><em style="width:' + Math.round(filled * 100) + '%"></em></i>');
+    }
+    const songs = items
+      ? '<div class="mx-up-songs"><span>Song ' + (curIdx >= 0 ? curIdx + 1 : items.filter((i) => i.tokenId).length) + ' of ' + items.length + '</span>' +
+        items.map((i) => '<i class="' + (i.tokenId ? 'done' : i.status === 'INSCRIBING' ? 'now' : /FAIL|SKIP/.test(i.status || '') ? 'bad' : 'todo') + '"></i>').join('') +
+        '</div>'
+      : '';
+    const html =
+      '<div class="mx-up-head"><span class="mx-kicker">On-chain upload</span><span>' + (bytes ? fmtSize(bytes) : '') + '</span></div>' +
+      songs +
+      '<div class="mx-up-stats"><div><b>' + total + '</b><small>chunks of 16 KB</small></div><div><b>' + (single ? '1' : batches) + '</b><small>' + (single ? 'transaction, no batches' : 'batches of up to ' + BATCH) + '</small></div><div><b>' + done + '</b><small>on-chain so far</small></div><div><b>' + (total ? Math.round((100 * done) / total) : 0) + '%</b><small>uploaded</small></div></div>' +
+      '<div class="mx-up-bar" aria-hidden="true">' + segs.join('') + '</div>' +
+      '<div class="mx-up-now"><span class="mx-up-dot"></span>' + esc(now) + '</div>';
+    if (upMap.__html !== html) {
+      upMap.innerHTML = html;
+      upMap.__html = html;
+    }
+    upMap.hidden = !total;
+  };
   refresh();
 })();
