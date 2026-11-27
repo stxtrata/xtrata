@@ -195,17 +195,25 @@ try {
   await dockSize.tap();
   if (process.env.SCREENSHOT_DIR)
     await p.screenshot({ path: process.env.SCREENSHOT_DIR + '/docked-ipad-portrait.png' });
-  // Some Safari hosts provide only studio fullscreen. Keep the simulated viewport during rotation.
-  const player = dialog.locator('.expanded-key-player');
-  await player.evaluate(el => { el.requestFullscreen = undefined; el.webkitRequestFullscreen = undefined; });
-  const full = dialog.getByRole('button', {name:'Full screen',exact:true});
+  // Some Safari hosts provide no native fullscreen. Keep the simulated viewport during rotation.
+  const noNative = () => p.evaluate(() => { const r = document.documentElement; r.requestFullscreen = undefined; r.webkitRequestFullscreen = undefined; });
+  const withNative = () => p.evaluate(() => { const r = document.documentElement; delete r.requestFullscreen; delete r.webkitRequestFullscreen; });
+  await noNative();
+  const full = dialog.getByRole('button', {name:'Instrument view',exact:true});
   await full.tap();
-  await dialog.getByRole('button', {name:'Exit full screen'}).waitFor();
+  await dialog.getByRole('button', {name:'Exit instrument view'}).waitFor();
   await ready();
-  assert.equal(await dialog.evaluate(d => d.matches(':modal')), true);
-  assert.ok((await bed.boundingBox()).height <= 305);
+  // Instrument view: the synth panel and the keyboard share the screen as one instrument.
+  const together = async (label) => {
+    const synthBox = await p.locator('#synth-front').boundingBox(), dockBox = await dialog.boundingBox(), keys = await bed.boundingBox(), view = p.viewportSize();
+    assert.ok(synthBox && synthBox.height > 120 && synthBox.y < dockBox.y && synthBox.y + synthBox.height <= dockBox.y + 2, 'Synth above the keys in instrument view at ' + label);
+    assert.ok(keys.height >= 120 && keys.height <= view.height * 0.45 && keys.y + keys.height <= view.height + 1, 'Keys sized for playing at ' + label);
+    assert.equal(await p.locator('#channels').isVisible(), false, 'Studio steps aside at ' + label);
+  };
+  assert.equal(await dialog.evaluate(d => d.matches(':modal')), false);
+  await together('820x1180');
   await p.setViewportSize({width:1180, height:820});
-  assert.ok((await bed.boundingBox()).height > 520, 'Landscape playing surface fills the player');
+  await together('1180x820');
   if (process.env.SCREENSHOT_DIR)
     await p.screenshot({ path: process.env.SCREENSHOT_DIR + '/expanded-ipad.png' });
   await dialog.getByRole('button', { name: 'Higher octave' }).tap();
@@ -237,11 +245,12 @@ try {
   const firstKey = pitches.first();
   await hold();
   assert.equal(await held(), 2);
-  await dialog.getByRole('button', {name:'Exit full screen'}).tap();
+  await dialog.getByRole('button', {name:'Exit instrument view'}).tap();
   await full.waitFor();
   assert.equal(await held(), 0);
   assert.equal(await dialog.evaluate(d => d.matches(':modal')), false);
-  await player.evaluate(el => { delete el.requestFullscreen; delete el.webkitRequestFullscreen; });
+  assert.equal(await p.locator('#channels').isVisible(), true, 'Studio returns after instrument view');
+  await withNative();
   await full.tap();
   if (await p.evaluate(() => Boolean(document.fullscreenElement))) {
     await p.evaluate(() => document.exitFullscreen());
@@ -267,7 +276,7 @@ try {
   await p.waitForSelector('dialog.expanded-keyboard', { state: 'detached' });
   assert.equal(await held(), 0);
   await p.locator('#expand-synth-keys').tap();
-  await player.evaluate(el => { el.requestFullscreen = undefined; el.webkitRequestFullscreen = undefined; });
+  await noNative();
   await full.tap();
   await p.keyboard.press('Escape');
   await full.waitFor();
@@ -304,7 +313,8 @@ try {
   });
   await p.locator('.mobile-devices').getByRole('button',{name:'Play live',exact:true}).tap();
   await ready();
-  assert.equal(await dialog.evaluate(d => d.matches(':modal')), true);
+  assert.equal(await dialog.evaluate(d => d.matches(':modal')), false);
+  assert.ok(await p.evaluate(() => document.body.classList.contains('instrument-view')), 'Play live opens instrument view');
   assert.equal(await dialog.locator('.live-pads [data-midi]').count(), 16);
   const bank = dialog.getByRole('group',{name:'Live instruments'});
   const names = await bank.getByRole('button').allTextContents();
@@ -358,11 +368,14 @@ try {
   await ready();
   assert.equal(await pitches.first().getAttribute('data-midi'),remembered);
   if (process.env.SCREENSHOT_DIR) await p.screenshot({path: process.env.SCREENSHOT_DIR + '/live-phone.png'});
-  await dialog.getByRole('button',{name:'Edit synth'}).tap();
+  // Instrument view already shows the synth, so Edit synth is not offered there.
+  assert.equal(await dialog.getByRole('button',{name:'Edit synth'}).isVisible(), false);
+  assert.ok(await p.locator('#synth-front').isVisible(), 'Synth panel is on screen in instrument view');
+  await dialog.getByRole('button',{name:'Done'}).tap();
   await p.locator('#expand-synth-keys').tap();
   await p.locator('#play-live-synth').tap();
   await ready();
-  assert.equal(await dialog.evaluate(d=>d.matches(':modal')),true,'Play live also expands an already docked keyboard');
+  assert.ok(await p.evaluate(()=>document.body.classList.contains('instrument-view')),'Play live also expands an already docked keyboard');
   await dialog.getByRole('button',{name:'Done'}).tap();
   for (const [id, color] of [['btn-play','rgb(22, 117, 71)'],['btn-stop','rgb(172, 51, 64)']]) {
     const control = p.locator('#' + id);

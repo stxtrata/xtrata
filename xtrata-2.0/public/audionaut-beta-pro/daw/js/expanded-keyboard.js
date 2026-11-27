@@ -49,6 +49,7 @@ export function openExpandedKeyboard(slot, opener = document.activeElement, dire
     dialog.classList.toggle('playing-full', full);
     document.body.classList.toggle('instrument-view', full);
     screen.textContent = full ? 'Exit instrument view' : 'Instrument view';
+    screen.setAttribute('aria-label', screen.textContent);
     edit.hidden = full; // the synth is already on screen
     if (!dialog.open) dialog.show();
     if (full) showSynth();

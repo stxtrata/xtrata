@@ -616,14 +616,37 @@ button[data-record-track][data-record-mode=recording]::after {background:#ff4c5d
 body.instrument-view #app > :not(#synth-dock) {display:none !important}
 body.instrument-view #app {padding-bottom:0}
 body.instrument-view #synth-dock {display:flex !important;flex-direction:column;position:fixed;inset:0 0 var(--keyboard-dock-height,0px) 0;z-index:60;padding-top:env(safe-area-inset-top)}
-body.instrument-view #synth-dock .synth-dock-bar > :not(.synth-dock-tabs) {display:none}
+body.instrument-view #synth-dock .synth-dock-bar {display:none} /* the live strip below switches instruments */
 body.instrument-view #synth-dock .synth-dock-body {display:flex;flex:1 1 auto;height:auto;max-height:none;min-height:0}
 .playing-full .live-instrument-controls {display:flex;align-items:center;gap:4px;flex-wrap:wrap}
-.playing-full .live-instrument-bank,.playing-full .live-instrument-controls > button:first-of-type {display:none}
 .playing-full .expanded-keybed {height:clamp(150px,min(var(--key-depth),38dvh),400px)}
 @media (orientation:portrait) {.playing-full .expanded-keybed {height:clamp(130px,min(var(--key-depth),30dvh),340px)}}
 @media(min-width:640px) {
   .playing-full .expanded-record-controls {grid-column:1/3;grid-row:2;justify-content:flex-start}
   .playing-full .live-instrument-controls {grid-column:3/-1;grid-row:2;justify-content:flex-end}
   .playing-full .expanded-keybed {grid-row:3}
+}
+/* The large keyboard replaces the synth panel's own test keys (and its HIDE button) here. */
+body.instrument-view #synth-dock .sfp-oct,body.instrument-view #synth-dock .sfp-keys,body.instrument-view #synth-dock #sfp-close {display:none}
+body.instrument-view #synth-dock .sfp .sfp-keys-bar {justify-content:center}
+/* Phones: pack the player controls into wrapped rows so the keys keep most of the height. */
+@media(max-width:639px) {
+  .playing-full .expanded-key-player {flex-direction:row;flex-wrap:wrap;align-items:center;gap:4px}
+  .playing-full .expanded-keyboard header,.playing-full header {flex:1 0 100%}
+  .playing-full .expanded-key-controls {flex:1 1 auto;justify-content:flex-start;gap:4px}
+  .playing-full .expanded-key-controls label {display:none}
+  .playing-full .expanded-record-controls {flex:0 1 auto;gap:4px}
+  .playing-full .expanded-record-controls .record-arm-hint {display:none}
+  .playing-full .live-instrument-controls {flex:0 1 auto}
+  .playing-full .expanded-keybed {flex:1 0 100%;order:4}
+  .playing-full .expanded-key-controls {order:1}
+  .playing-full .live-instrument-controls {order:2}
+  .playing-full .expanded-record-controls {order:3;flex:1 0 100%;justify-content:flex-start;flex-wrap:nowrap;overflow-x:auto}
+  .playing-full .record-quantize-tools {flex-wrap:nowrap}
+  .playing-full .record-quantize-tools label {font-size:0;gap:0}
+  .playing-full .record-quantize-tools select,.playing-full .record-quantize-tools input {font-size:12px}
+  .playing-full .record-quantize-tools input {width:3.6em}
+  .playing-full .expanded-record-controls button.record-arm-btn {min-width:64px}
+  /* the synth's envelope strip would cover the panel on a phone */
+  body.instrument-view #synth-dock .sfp .sfp-keys-bar {display:none}
 }
