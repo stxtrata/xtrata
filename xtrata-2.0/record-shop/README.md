@@ -74,10 +74,16 @@ with the wall and the booth sits in an alcove behind it. It teaches forking, reu
 
 ## Shop radio
 
-Quiet background (`radioVolume` defaults to 0.16) through four ceiling speakers with a steep distance roll-off, so you
-mostly hear the nearest one. Back-left and front-right sound plain, front-left (by the checkout) is tinny and breaking
-up, back-right (above the vinyl bench) has blown tweeters and sounds muffled. It goes silent while a CD (case or
-player), a record or the booth is playing, and fades back in afterwards.
+Quiet background (`radioVolume` defaults to 0.09) through four ceiling speakers in the corners. Each speaker is only
+heard near it: full volume within about 1.2 m (measured across the floor) and silent beyond about 4.5 m, so the middle of
+the shop is quiet; the panners only give direction. Back-left and front-right sound plain, front-left (by the checkout)
+is tinny and breaking up, back-right (above the vinyl bench) has blown tweeters and sounds muffled. It fades out
+whenever a CD (in its case or the CD player), a record or the Audionaut booth is playing — anywhere in the shop — and
+fades back in afterwards.
+
+## Touch
+
+Dragging on the view looks the same way as the mouse: drag left to look left, up to look up. The pad bottom-left walks.
 
 ## Posters
 

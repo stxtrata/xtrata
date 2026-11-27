@@ -135,7 +135,7 @@ async function boot(){
       clickCentre();}
     else if(state.mode==='inspect')insp.pointerDown(e);else if(state.mode==='vinyl'&&!focus.exiting)vinyl.pointerDown(e);});
   window.addEventListener('pointermove',e=>{cursorX=e.clientX;cursorY=e.clientY;overCanvas=e.target===canvas;if(!state.entered||state.modal)return;
-    if(state.mode==='room'){if(touch&&e.pointerId===touch.id){turn(-(e.clientX-touch.x)*2.2,-(e.clientY-touch.y)*2.2);touch.x=e.clientX;touch.y=e.clientY;}
+    if(state.mode==='room'){if(touch&&e.pointerId===touch.id){turn((e.clientX-touch.x)*2.2,(e.clientY-touch.y)*2.2);touch.x=e.clientX;touch.y=e.clientY;}
       else if(e.pointerType!=='touch'&&!focus.active&&(state.look==='locked'||(state.look==='free'&&overCanvas)))turn(e.movementX||0,e.movementY||0);}
     else if(state.mode==='inspect'){if(overCanvas||downOnCanvas)insp.pointerMove(e);}else if(state.mode==='cd'){if(overCanvas)deck.hover(e.clientX,e.clientY);}else if(state.mode==='vinyl')vinyl.pointerMove(e);});
   window.addEventListener('pointerup',e=>{const was=downOnCanvas;downOnCanvas=false;if(!state.entered)return;

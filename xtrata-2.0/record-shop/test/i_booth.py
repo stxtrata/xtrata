@@ -121,7 +121,7 @@ async def main():
         await page.click('#station [data-s="play"]'); rm=await E("__QA.app.radio.muted()")
         ok('radio is silent while the booth plays nearby',rm)
         far=await E("(()=>{__QA.teleport(4.3,3.5,0,0);return __QA.app.radio.muted()})()"); await E('__QA.step(.1)')
-        ok('walking away hides the panel; the booth keeps playing and no longer holds the radio silent',far is False and await page.locator('#station').is_hidden() and (await bq())['playing'])
+        ok('walking away hides the panel; the booth keeps playing and the room music stays silent while it does',far is True and await page.locator('#station').is_hidden() and (await bq())['playing'])
         await E("(()=>{const a=__QA.app,r=a.catalog.releases[0];a.playback.play(r,0,'cd-case',0)})()"); await E('__QA.step(.1)'); q=await bq()
         ok('playing a CD stops the booth',not q['playing'])
         await E("__QA.app.playback.pause()")

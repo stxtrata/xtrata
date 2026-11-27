@@ -58,6 +58,15 @@ async def main():
             await E("(()=>{const a=__QA.app,ps=a.room.posters.filter(p=>p.content.type==='%s'&&(p.content.type!=='print'||p.content.print.found)),p=ps[0],m=p.mesh.position,n=new __QA.THREE.Vector3(0,0,1).applyQuaternion(p.mesh.quaternion);__QA.setAuto(true);__QA.teleport(m.x+n.x*1.7,m.z+n.z*1.7,0,0);__QA.lookAt(m.x,m.y,m.z)})()"%ty); await page.wait_for_timeout(700); await page.screenshot(path='test/shot_poster_%s.png'%ty)
         await page.click('#bRadio'); await page.wait_for_timeout(900); r3=(await E(S))['radio']; await page.click('#bRadio'); await page.wait_for_function("__QA.state().radio.on&&!__QA.state().radio.paused",timeout=30000)
         ok('radio button switches it off and on',not r3['on'] and r3['paused'])
+        # each speaker is heard only near it: measure the real signal leaving the four speakers
+        async def lvl(x,z):
+            await E("__QA.teleport(%s,%s,0,0)"%(x,z)); await E('__QA.step(.05)'); await page.wait_for_timeout(1300); await E('__QA.step(.05)'); r=(await E(S))['radio']; return r['level'],r['near']
+        await page.wait_for_function("__QA.state().radio.state==='playing'&&__QA.state().radio.time>.5",timeout=60000)
+        nearL,ng1=await lvl(-7.0,-4.7); midL,ng2=await lvl(0,0); front,ng3=await lvl(6.9,4.6)
+        ok('radio is localised: heard under a corner speaker, silent in the middle of the shop',nearL>.0005 and midL<nearL*.02 and ng1[0]>.8 and max(ng2)==0 and ng3[3]>.8,(nearL,midL,ng1,ng2,ng3))
+        await E("__QA.app.booth.start()"); await page.wait_for_timeout(1500); await E('__QA.step(.05)'); r=(await E(S))['radio']
+        ok('the Audionaut booth playing silences the room music anywhere in the shop',r['muted'] and r['duck']==0,r)
+        await E("__QA.app.booth.stop()"); await E('__QA.step(.05)')
         # pick up a 2-track CD: every song's opening is cued at once, without downloading whole songs
         n0=len(HITS)
         await E("(()=>{const a=__QA.app,s=a.stock.primary['alb_146ecd98f790'];__QA.teleport(s.pos.x+1,s.pos.z,0,0);a.stock.extract(s)})()")
