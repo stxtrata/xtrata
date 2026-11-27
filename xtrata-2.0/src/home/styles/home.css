@@ -2379,6 +2379,63 @@
       min-width: 68px;
     }
 
+    .transfer-recipient-check,
+    .transfer-confirm {
+      display: grid;
+      gap: 4px;
+      padding: 8px 10px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--surface-soft);
+      color: var(--ink);
+      font-size: 12px;
+      line-height: 1.4;
+    }
+
+    .transfer-recipient-check[hidden],
+    .transfer-confirm[hidden] {
+      display: none;
+    }
+
+    .transfer-recipient-check[data-tone='ok'] {
+      border-color: var(--green);
+      background: var(--green-soft);
+    }
+
+    .transfer-recipient-check[data-tone='warn'] {
+      border-color: var(--amber);
+      background: var(--amber-soft);
+    }
+
+    .transfer-recipient-check__address {
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 12px;
+      overflow-wrap: anywhere;
+      word-break: break-all;
+    }
+
+    .transfer-recipient-check__hint {
+      color: var(--muted);
+    }
+
+    .transfer-confirm {
+      border-color: var(--blue);
+      background: var(--blue-soft);
+      gap: 6px;
+    }
+
+    .transfer-confirm__warning {
+      color: var(--rose);
+      font-weight: 700;
+    }
+
+    .transfer-confirm__actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 2px;
+    }
+
     .wallet-action-stack {
       position: relative;
       z-index: 30;

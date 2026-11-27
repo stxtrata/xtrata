@@ -800,7 +800,7 @@
                 <label class="field">
                   <span class="label">Send selected inscription</span>
                   <div class="field-inline">
-                    <input class="input" id="transferRecipientInput" autocomplete="off" placeholder="ST..." />
+                    <input class="input" id="transferRecipientInput" autocomplete="off" spellcheck="false" placeholder="Stacks address or name.btc" />
                     <button class="btn" id="transferButton" type="button" disabled>Send</button>
                     <div class="wallet-action-stack">
                       <button class="btn" id="listForSaleButton" type="button" disabled>List for sale</button>
@@ -816,6 +816,8 @@
                     </div>
                   </div>
                 </label>
+                <div class="transfer-recipient-check" id="transferRecipientCheck" aria-live="polite" hidden></div>
+                <div class="transfer-confirm" id="transferConfirm" role="group" aria-label="Confirm transfer" hidden></div>
                 <span class="field-note" id="transferStatus">Select one of your inscriptions to send.</span>
               </div>
             </aside>

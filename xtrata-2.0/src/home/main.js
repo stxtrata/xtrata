@@ -176,13 +176,14 @@
     } from '/src/lib/mint/attempt-cache.ts';
     import { bytesToHex } from '/src/lib/utils/encoding.ts';
     import { formatBytes, truncateMiddle } from '/src/lib/utils/format.ts';
-    import { resolveBnsNames } from '/src/lib/bns/resolver.ts';
+    import { resolveBnsAddress, resolveBnsNames } from '/src/lib/bns/resolver.ts';
     import {
       loadWalletHoldingsIndex,
       loadWalletHoldingsPage
     } from '/src/lib/viewer/wallet-index.ts';
     import {
       getTransferValidationMessage,
+      parseRecipientInput,
       validateTransferRequest
     } from '/src/lib/wallet/transfer.ts';
     import { getWalletLookupState } from '/src/lib/wallet/lookup.ts';
@@ -550,6 +551,8 @@
       explorerHomeLink: $('explorerHomeLink'),
       explorerFilterInputs: [...document.querySelectorAll('[data-explorer-filter]')],
       transferRecipientInput: $('transferRecipientInput'),
+      transferRecipientCheck: $('transferRecipientCheck'),
+      transferConfirm: $('transferConfirm'),
       transferButton: $('transferButton'),
       transferStatus: $('transferStatus'),
       fullscreenViewer: $('fullscreenViewer'),
@@ -716,6 +719,16 @@
       walletLookupAbortController: null,
       walletViewRequestId: 0,
       transferPending: false,
+      // The inscription (contract:id) the typed recipient was entered for. A
+      // recipient never follows the person to a different inscription.
+      transferRecipientBinding: null,
+      transferRecipientClearedNotice: false,
+      // Lookup for what is in the recipient box: a BNS name resolved to its
+      // address, or an address checked for its BNS name.
+      transferLookup: null,
+      // Set by Send; the wallet only opens from the Confirm button, and only
+      // while this still matches the inscription and the recipient on screen.
+      transferReview: null,
       adminStatus: null,
       selectedFile: null,
       prepared: null,
@@ -4090,18 +4103,294 @@
         : 'Using connected wallet when available.';
     };
 
+    const getTransferBindingKey = () =>
+      state.selectedTokenId === null || state.selectedTokenId === undefined
+        ? null
+        : `${getContractId(state.contract)}:${state.selectedTokenId.toString()}`;
+
+    let transferLookupTimer = null;
+    let transferLookupSeq = 0;
+
+    const resetTransferRecipient = () => {
+      dom.transferRecipientInput.value = '';
+      state.transferRecipientBinding = null;
+      state.transferLookup = null;
+      state.transferReview = null;
+      transferLookupSeq += 1;
+      if (transferLookupTimer) {
+        clearTimeout(transferLookupTimer);
+        transferLookupTimer = null;
+      }
+    };
+
+    const getTransferBnsResolution = () =>
+      state.transferLookup?.kind === 'bns'
+        ? {
+            name: state.transferLookup.name,
+            status: state.transferLookup.status,
+            address: state.transferLookup.address ?? null
+          }
+        : null;
+
+    const getCurrentTransferValidation = (selectedToken, senderAddress) =>
+      validateTransferRequest({
+        senderAddress,
+        recipientAddress: dom.transferRecipientInput.value,
+        tokenId: selectedToken?.id ?? null,
+        networkMismatch: !!getMismatch(),
+        bnsResolution: getTransferBnsResolution(),
+        expectedNetwork: state.contract.network
+      });
+
+    const runTransferRecipientLookup = async (parsed, seq) => {
+      const network = state.contract.network;
+      try {
+        if (parsed.kind === 'bns') {
+          const resolved = await resolveBnsAddress({ name: parsed.name, network });
+          if (seq !== transferLookupSeq) return;
+          state.transferLookup = {
+            kind: 'bns',
+            name: parsed.name,
+            status: resolved.address ? 'resolved' : 'missing',
+            address: resolved.address ?? null
+          };
+        } else {
+          const result = await resolveBnsNames({ address: parsed.address, network });
+          if (seq !== transferLookupSeq) return;
+          state.transferLookup = {
+            kind: 'address',
+            address: parsed.address,
+            status: 'resolved',
+            names: Array.isArray(result?.names) ? result.names : [],
+            primary: result?.primary ?? null
+          };
+        }
+      } catch (error) {
+        if (seq !== transferLookupSeq) return;
+        // A failed lookup is not "no name": say we could not check.
+        state.transferLookup = { ...state.transferLookup, status: 'error' };
+        debugLog('transfer', 'recipient lookup failed', {
+          kind: parsed.kind,
+          error: error instanceof Error ? error.message : String(error)
+        });
+      }
+      updateTransferControls();
+    };
+
+    const scheduleTransferRecipientLookup = () => {
+      if (transferLookupTimer) {
+        clearTimeout(transferLookupTimer);
+        transferLookupTimer = null;
+      }
+      const seq = ++transferLookupSeq;
+      const parsed = parseRecipientInput(dom.transferRecipientInput.value);
+      if (parsed.kind === 'bns') {
+        state.transferLookup = { kind: 'bns', name: parsed.name, status: 'loading', address: null };
+      } else if (parsed.kind === 'address') {
+        state.transferLookup = {
+          kind: 'address',
+          address: parsed.address,
+          status: 'loading',
+          names: [],
+          primary: null
+        };
+      } else {
+        state.transferLookup = null;
+        return;
+      }
+      transferLookupTimer = setTimeout(() => {
+        transferLookupTimer = null;
+        void runTransferRecipientLookup(parsed, seq);
+      }, 350);
+    };
+
+    const appendTransferCheckLine = (host, parts, className) => {
+      const line = document.createElement('div');
+      line.className = className ?? 'transfer-recipient-check__line';
+      for (const part of parts) {
+        if (typeof part === 'string') {
+          line.append(document.createTextNode(part));
+        } else {
+          line.append(part);
+        }
+      }
+      host.append(line);
+      return line;
+    };
+
+    const strongText = (text) => {
+      const el = document.createElement('strong');
+      el.textContent = text;
+      return el;
+    };
+
+    const fullAddressText = (address) => {
+      const el = document.createElement('code');
+      el.className = 'transfer-recipient-check__address';
+      el.textContent = address;
+      return el;
+    };
+
+    const renderTransferRecipientCheck = () => {
+      const host = dom.transferRecipientCheck;
+      if (!host) return;
+      host.replaceChildren();
+      host.dataset.tone = '';
+      const lookup = state.transferLookup;
+      if (!lookup) {
+        host.hidden = true;
+        return;
+      }
+      host.hidden = false;
+      if (lookup.kind === 'bns') {
+        if (lookup.status === 'loading') {
+          appendTransferCheckLine(host, ['Looking up ', strongText(lookup.name), '...']);
+        } else if (lookup.status === 'resolved' && lookup.address) {
+          host.dataset.tone = 'ok';
+          appendTransferCheckLine(host, [strongText(lookup.name), ' belongs to this address:']);
+          appendTransferCheckLine(host, [fullAddressText(lookup.address)]);
+          appendTransferCheckLine(
+            host,
+            ['Check this is the address you expect before sending.'],
+            'transfer-recipient-check__hint'
+          );
+        } else if (lookup.status === 'error') {
+          host.dataset.tone = 'warn';
+          appendTransferCheckLine(host, [
+            'Could not look up ',
+            strongText(lookup.name),
+            ' right now. Try again in a moment, or paste the address instead.'
+          ]);
+        } else {
+          host.dataset.tone = 'warn';
+          appendTransferCheckLine(host, [
+            'No address found for ',
+            strongText(lookup.name),
+            '. Check the spelling.'
+          ]);
+        }
+        return;
+      }
+      if (lookup.status === 'loading') {
+        appendTransferCheckLine(host, ['Checking this address for a BNS name...']);
+      } else if (lookup.status === 'error') {
+        host.dataset.tone = 'warn';
+        appendTransferCheckLine(host, [
+          'Could not check this address for a BNS name right now. Double-check the address before sending.'
+        ]);
+      } else {
+        const names = Array.isArray(lookup.names) ? lookup.names : [];
+        const primary = lookup.primary ?? names[0] ?? null;
+        if (primary) {
+          host.dataset.tone = 'ok';
+          const extra = names.filter((name) => name !== primary).length;
+          appendTransferCheckLine(host, [
+            'This address is ',
+            strongText(primary),
+            extra > 0 ? ` (and ${extra} more name${extra === 1 ? '' : 's'})` : ''
+          ]);
+          appendTransferCheckLine(
+            host,
+            ['Check this is who you mean to send to.'],
+            'transfer-recipient-check__hint'
+          );
+        } else {
+          appendTransferCheckLine(host, [
+            'No BNS name found for this address. Double-check it before sending.'
+          ]);
+        }
+      }
+    };
+
+    const getAddressPrimaryName = (address) => {
+      const lookup = state.transferLookup;
+      if (lookup?.kind !== 'address' || lookup.status !== 'resolved') return null;
+      if (!addressesEqual(lookup.address, address)) return null;
+      return lookup.primary ?? lookup.names?.[0] ?? null;
+    };
+
+    const renderTransferConfirm = () => {
+      const host = dom.transferConfirm;
+      if (!host) return;
+      host.replaceChildren();
+      const review = state.transferReview;
+      if (!review) {
+        host.hidden = true;
+        return;
+      }
+      host.hidden = false;
+      appendTransferCheckLine(
+        host,
+        ['Send inscription ', strongText(formatTokenId(review.tokenId)), ' to:'],
+        'transfer-confirm__line'
+      );
+      if (review.name) {
+        appendTransferCheckLine(host, [strongText(review.name)], 'transfer-confirm__line');
+      }
+      appendTransferCheckLine(host, [fullAddressText(review.recipient)], 'transfer-confirm__line');
+      appendTransferCheckLine(
+        host,
+        ['Transfers cannot be undone.'],
+        'transfer-confirm__line transfer-confirm__warning'
+      );
+      const actions = document.createElement('div');
+      actions.className = 'transfer-confirm__actions';
+      const confirm = document.createElement('button');
+      confirm.className = 'btn';
+      confirm.type = 'button';
+      confirm.textContent = 'Confirm send';
+      confirm.disabled = state.busy || state.transferPending;
+      confirm.addEventListener('click', () => transferSelectedToken());
+      const cancel = document.createElement('button');
+      cancel.className = 'btn secondary';
+      cancel.type = 'button';
+      cancel.textContent = 'Cancel';
+      cancel.disabled = state.transferPending;
+      cancel.addEventListener('click', () => {
+        state.transferReview = null;
+        updateTransferControls();
+      });
+      actions.append(confirm, cancel);
+      host.append(actions);
+    };
+
     const updateTransferControls = () => {
+      // The recipient belongs to the inscription it was typed for. Moving to a
+      // different inscription clears it, so Send can never fire a pasted
+      // address at an inscription the person did not mean.
+      const bindingKey = getTransferBindingKey();
+      if (dom.transferRecipientInput.value.trim() && !state.transferPending) {
+        if (state.transferRecipientBinding === null) {
+          state.transferRecipientBinding = bindingKey;
+        } else if (state.transferRecipientBinding !== bindingKey) {
+          resetTransferRecipient();
+          state.transferRecipientClearedNotice = bindingKey !== null;
+        }
+      }
       const selectedToken = getSelectedToken();
       const walletAddress = state.walletSession.address ?? null;
       const walletOwnsToken =
         !!selectedToken && !!walletAddress && addressesEqual(selectedToken.owner, walletAddress);
-      const transferValidation = validateTransferRequest({
-        senderAddress: walletOwnsToken ? walletAddress : null,
-        recipientAddress: dom.transferRecipientInput.value,
-        tokenId: selectedToken?.id ?? null,
-        networkMismatch: !!getMismatch()
-      });
+      const transferValidation = getCurrentTransferValidation(
+        selectedToken,
+        walletOwnsToken ? walletAddress : null
+      );
+      if (
+        state.transferReview &&
+        !state.transferPending &&
+        (!transferValidation.ok ||
+          state.transferReview.bindingKey !== bindingKey ||
+          state.transferReview.recipient !== transferValidation.recipient)
+      ) {
+        state.transferReview = null;
+      }
       let message = getTransferValidationMessage(transferValidation);
+      if (
+        state.transferRecipientClearedNotice &&
+        transferValidation.reason === 'missing-recipient'
+      ) {
+        message = 'Recipient cleared because you picked a different inscription. Enter it again for this one.';
+      }
       if (!selectedToken) {
         message = 'Select an inscription to send.';
       } else if (!walletAddress) {
@@ -4117,12 +4406,39 @@
         state.busy ||
         state.transferPending ||
         !walletOwnsToken ||
-        !transferValidation.ok;
+        !transferValidation.ok ||
+        !!state.transferReview;
       dom.transferRecipientInput.disabled = state.transferPending;
       if (!state.transferPending) {
-        dom.transferStatus.textContent =
-          message ?? 'Ready to send the selected inscription.';
+        dom.transferStatus.textContent = state.transferReview
+          ? 'Check the details, then confirm.'
+          : message ?? 'Ready to send the selected inscription.';
       }
+      renderTransferRecipientCheck();
+      renderTransferConfirm();
+    };
+
+    // Send only opens the review. The wallet opens from Confirm send.
+    const reviewSelectedTransfer = () => {
+      const selectedToken = getSelectedToken();
+      const senderAddress = state.walletSession.address ?? null;
+      const walletOwnsToken =
+        !!selectedToken && !!senderAddress && addressesEqual(selectedToken.owner, senderAddress);
+      const validation = getCurrentTransferValidation(
+        selectedToken,
+        walletOwnsToken ? senderAddress : null
+      );
+      if (!walletOwnsToken || !selectedToken || !validation.ok || !validation.recipient) {
+        updateTransferControls();
+        return;
+      }
+      state.transferReview = {
+        bindingKey: getTransferBindingKey(),
+        tokenId: selectedToken.id,
+        recipient: validation.recipient,
+        name: validation.recipientName ?? getAddressPrimaryName(validation.recipient)
+      };
+      updateTransferControls();
     };
 
     const isMatureMobileWalletView = () =>
@@ -8836,13 +9152,12 @@ const openCuratedGallery = async (galleryId, options = {}) => {
       const senderAddress = state.walletSession.address ?? null;
       const walletOwnsToken =
         !!selectedToken && !!senderAddress && addressesEqual(selectedToken.owner, senderAddress);
-      const validation = validateTransferRequest({
-        senderAddress: walletOwnsToken ? senderAddress : null,
-        recipientAddress: dom.transferRecipientInput.value,
-        tokenId: selectedToken?.id ?? null,
-        networkMismatch: !!getMismatch()
-      });
+      const validation = getCurrentTransferValidation(
+        selectedToken,
+        walletOwnsToken ? senderAddress : null
+      );
       if (!walletOwnsToken || !selectedToken || !validation.ok || !senderAddress) {
+        state.transferReview = null;
         dom.transferStatus.textContent =
           selectedToken && senderAddress && !walletOwnsToken
             ? 'Only the connected owner can send this inscription.'
@@ -8850,8 +9165,21 @@ const openCuratedGallery = async (galleryId, options = {}) => {
         updateTransferControls();
         return;
       }
+      // The wallet opens only for exactly what the person reviewed.
+      const review = state.transferReview;
+      if (
+        !review ||
+        review.bindingKey !== getTransferBindingKey() ||
+        review.tokenId !== selectedToken.id ||
+        review.recipient !== validation.recipient
+      ) {
+        state.transferReview = null;
+        updateTransferControls();
+        return;
+      }
 
-      const recipient = validation.recipient ?? dom.transferRecipientInput.value.trim();
+      const recipient = validation.recipient;
+      const recipientLabel = review.name ? `${review.name} (${recipient})` : recipient;
       const network = state.walletSession.network ?? state.contract.network;
       const callOptions = buildTransferCall({
         contract: state.contract,
@@ -8874,7 +9202,7 @@ const openCuratedGallery = async (galleryId, options = {}) => {
       state.transferPending = true;
       dom.transferStatus.textContent = 'Waiting for wallet confirmation...';
       updateControls();
-      appendLog(`Transferring ${formatTokenId(selectedToken.id)} to ${recipient}.`);
+      appendLog(`Transferring ${formatTokenId(selectedToken.id)} to ${recipientLabel}.`);
 
       try {
         showContractCall({
@@ -8882,6 +9210,8 @@ const openCuratedGallery = async (galleryId, options = {}) => {
           stxAddress: senderAddress,
           onFinish: (payload) => {
             state.transferPending = false;
+            state.transferReview = null;
+            resetTransferRecipient();
             dom.transferStatus.textContent = `Transfer submitted: ${payload.txId}`;
             appendLog(`Transfer submitted: ${payload.txId}`);
             updateControls();
@@ -8889,6 +9219,7 @@ const openCuratedGallery = async (galleryId, options = {}) => {
           },
           onCancel: () => {
             state.transferPending = false;
+            state.transferReview = null;
             dom.transferStatus.textContent = 'Transfer cancelled or failed in wallet.';
             appendLog('Transfer cancelled or failed in wallet.');
             updateControls();
@@ -8898,6 +9229,7 @@ const openCuratedGallery = async (galleryId, options = {}) => {
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
         state.transferPending = false;
+        state.transferReview = null;
         dom.transferStatus.textContent = `Transfer failed: ${message}`;
         appendLog(`Transfer failed: ${message}`);
         updateControls();
@@ -15856,8 +16188,16 @@ const openCuratedGallery = async (galleryId, options = {}) => {
     // inside the collapsed Advanced block still show up outside it.
     dom.addParentsButton.addEventListener('click', () => { applyParentInput(); syncTextCard(); });
     dom.clearParentsButton.addEventListener('click', () => { clearParentIds(); syncTextCard(); });
-    dom.transferRecipientInput.addEventListener('input', updateTransferControls);
-    dom.transferButton.addEventListener('click', transferSelectedToken);
+    dom.transferRecipientInput.addEventListener('input', () => {
+      state.transferRecipientBinding = dom.transferRecipientInput.value.trim()
+        ? getTransferBindingKey()
+        : null;
+      state.transferRecipientClearedNotice = false;
+      state.transferReview = null;
+      scheduleTransferRecipientLookup();
+      updateTransferControls();
+    });
+    dom.transferButton.addEventListener('click', reviewSelectedTransfer);
     // "List for sale" jumps to the Market page with the selected inscription
     // prefilled in the sell form (any currency, optional sponsorship).
     const listForSaleButton = $('listForSaleButton');
