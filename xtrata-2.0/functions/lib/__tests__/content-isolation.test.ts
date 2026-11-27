@@ -144,7 +144,8 @@ describe('content isolation guard', () => {
   it('is wired into every content middleware, after the radio guard', () => {
     for (const dir of ['runtime', 'i', 'inscription']) {
       const source = readFileSync(new URL(`../../${dir}/_middleware.ts`, import.meta.url), 'utf8');
-      expect(source).toMatch(/onRequest = \[radioHostGuard, contentIsolationGuard\]/);
+      // Radio guard first (its sandbox wins); content isolation last, wrapping the raw handler.
+      expect(source).toMatch(/onRequest = \[radioHostGuard,[^\]]*\bcontentIsolationGuard\];/);
     }
   });
 });
