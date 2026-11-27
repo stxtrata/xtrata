@@ -43,6 +43,7 @@ async function open(over: object = {}, skin = true, view = '') {
     <div class="ppp-switch" hidden></div><div class="ppp-key"></div><p class="ppp-frame-label"></p><div class="ppp-frame"></div><div class="ppp-actions"></div><p class="ppp-msg"></p><p class="ppp-err"></p>
     <details class="ppp-recent"><ol class="ppp-recent-list"></ol><details class="ppp-history"></details></details><details class="ppp-wallets"><dl class="ppp-facts"></dl><div class="ppp-actions ppp-actions2"></div></details>
     <details class="ppp-more"><div class="ppp-body"></div></details><details class="ppp-shelf" hidden><summary></summary><div class="ppp-shelf-body"></div></details><details class="ppp-gifts"><div class="ppp-gift-body"></div></details><details class="ppp-fold ppp-release" hidden><summary></summary><div class="ppp-release-body"></div></details></section>`;
+  document.body.insertAdjacentHTML('beforeend', '<button id="ppp-top" hidden></button><button class="who" id="playerId" type="button" hidden><span class="who-t"></span></button>');
   document.body.insertAdjacentHTML('beforeend', '<section id="shelfBox"></section><details id="findBox"><div id="findBody"></div></details>');
   // The radio's own hooks (public/radio.html): the ON AIR lamp and the note under the receiver.
   document.body.insertAdjacentHTML('beforeend', '<div id="onair" hidden><b>ON AIR</b><span class="onair-sub"></span></div><div class="nudge" id="pppNudge" hidden><span class="nudge-txt"><b class="nudge-t"></b><span class="nudge-s"></span></span><button type="button">Start</button></div>');
@@ -155,5 +156,38 @@ describe('Browse: My albums', () => {
       await new Promise((r) => setTimeout(r, 20));
       expect(seen.some((e) => e.type === 'xtrata:radio-listen' || e.type === 'xtrata:radio-panel')).toBe(false);
     }
+  });
+});
+
+describe('the player address at the top of every screen', () => {
+  it('shows the player\'s own address shortened, and a tap copies the whole of it', async () => {
+    const copied: string[] = [];
+    const clip = vi.spyOn(navigator, 'clipboard', 'get').mockReturnValue({ writeText: async (t: string) => { copied.push(t); } } as any);
+    await start();
+    const chip = document.getElementById('playerId') as HTMLButtonElement;
+    expect(chip.hidden).toBe(false);
+    expect(chip.textContent).toBe(`${ROOT.slice(0, 6)}…${ROOT.slice(-4)}`);
+    expect(chip.getAttribute('aria-label')).toContain(ROOT);
+    chip.click();
+    await vi.waitFor(() => expect(copied).toEqual([ROOT]));
+    await vi.waitFor(() => expect(chip.textContent).toBe('Copied ✓'));
+    clip.mockRestore();
+  });
+
+  it('stays the player\'s own address while an album\'s wallet is open', async () => {
+    await start({ slot: 2, listening: 'SPALBUM2' });
+    expect((document.getElementById('playerId') as HTMLButtonElement).dataset.address).toBe(ROOT);
+  });
+
+  it('is hidden on the free radio, where there is no player to show', async () => {
+    await start({ step: 'elsewhere' });
+    expect((document.getElementById('playerId') as HTMLButtonElement).hidden).toBe(true);
+  });
+
+  it('the plays count drops "left" on a narrow screen without losing the number', async () => {
+    await start({ step: 'ready', session: { playsLeft: 277, plays: 0, spent: 0n, budgetLeft: 900_000n, expires: 0 }, playsLeft: 277, payingOn: true, giftStop: null });
+    const top = document.getElementById('ppp-top')!;
+    expect(top.textContent).toBe('277 plays left');
+    expect(top.querySelector('.ppp-top-left')!.textContent).toBe(' left');
   });
 });
