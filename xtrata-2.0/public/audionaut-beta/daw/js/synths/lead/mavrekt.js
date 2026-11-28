@@ -2,6 +2,7 @@
 // Part A and Part B each stack up to 7 / 5 detuned oscillators through their own low-pass,
 // then share a drive, a decay/sustain body, a tempo-locked 16-step trance gate and the host
 // envelope. Native nodes only, so it stays light enough for big chords.
+import { unisonPart } from '../unison-worklet.js';
 import { nativeNote, range } from '../performance-voice.js';
 import { select, shapeOsc, spread, bodyStage, cutoffEnvelope, driveCurve, gateBuffer, GATE_PATTERNS, GATE_RATES } from '../marek-kit.js';
 
@@ -32,9 +33,11 @@ const params = [
   range('level', 'Level', 0, 1, 0.01, 0.75)
 ];
 
-function part(ctx, play, osc, frequency, time, wave, oct, voices, detune, width, into) {
+function part(ctx, play, osc, frequency, time, wave, oct, voices, detune, width, into, slot) {
   const n = Math.max(1, Math.round(voices)), base = frequency * 2 ** Math.round(oct);
   const norm = 1 / Math.sqrt(n);
+  // Experiment (unison-worklet.js): the whole stack in one worklet node when that engine is on.
+  if (unisonPart(ctx, { play, frequency: base, wave, voices: n, detune, width, into, index: slot })) return;
   for (const s of spread(n)) {
     const o = shapeOsc(ctx, osc('sawtooth', Math.min(ctx.sampleRate * 0.45, base)), wave);
     o.detune.setValueAtTime(s * detune, time);
@@ -60,8 +63,8 @@ function voice(ctx, dest, note, patch) {
     f.connect(g).connect(mix);
     return f;
   });
-  part(ctx, play, osc, frequency, time, P.aWave, P.aOct, P.aVoices, P.aDetune, P.width, filters[0]);
-  part(ctx, play, osc, frequency, time, P.bWave, P.bOct, P.bVoices, P.bDetune, P.width * 0.8, filters[1]);
+  part(ctx, play, osc, frequency, time, P.aWave, P.aOct, P.aVoices, P.aDetune, P.width, filters[0], 0);
+  part(ctx, play, osc, frequency, time, P.bWave, P.bOct, P.bVoices, P.bDetune, P.width * 0.8, filters[1], 1);
   let tail = mix;
   const curve = driveCurve(ctx, P.drive);
   if (curve) {

@@ -120,3 +120,37 @@ instrument with no active slot builds no extra nodes.
   per note, not a live control). Changes apply to the next note, not to notes
   already sounding. The LFO rate uses the tempo at the note's start.
 - **Tests.** `tools/pro-modulation-test.mjs`.
+
+## Experiment: unison oscillator worklet
+
+`daw/js/synths/unison-worklet.js`. One AudioWorklet node plays a whole unison
+stack in place of an oscillator, gain and panner per unison voice. **Off by
+default.** Turn it on with `?osc=worklet`, the "Experimental oscillator engine"
+button in Diagnostics, or `localStorage["audionaut:osc-engine"] = "worklet"`.
+Only MAVREKT uses it. With it off, or before the processor has loaded, MAVREKT
+builds its native oscillators exactly as before.
+
+Measured in headless desktop Chrome (`tools/pro-osc-engine-test.mjs`), heaviest
+MAVREKT patch (7 + 5 unison voices):
+
+| | Native | Worklet |
+|---|---|---|
+| Nodes per note | 45 | 13 |
+| Time to build an 8-note chord | 7.5–8.8 ms | 2.4–3.3 ms |
+| Time to render 10 s of that chord | 760–930 ms | 565–665 ms |
+| Level, averaged over 4 s | -22.3 dB | -22.2 dB |
+| Peak in the first 100 ms | -5.2 dB | -12.3 dB |
+| Loudest aliasing, C5 / C6 / C7 | -145 / -122 / -122 dB | -48 / -42 / -36 dB |
+
+- **Faster.** Notes build about three times faster and render with roughly
+  15–40% less work. Not measured on a phone.
+- **Different attack.** Native oscillators all start in phase, which gives a
+  loud blast at the start of each note; the worklet starts each unison voice at
+  its own seeded phase, as hardware supersaws do.
+- **Dirtier at the top.** The worklet band-limits with PolyBLEP. The browser's
+  own oscillators are effectively alias-free; the worklet's aliasing sits
+  36–48 dB under the note between C5 and C7. Oversampling would fix this at
+  some cost in speed.
+- **Voice budget.** A worklet stack counts as one source, so the phone budget
+  admits more worklet notes than native ones.
+- **Not decided.** Keep, improve (oversample) or remove after listening.

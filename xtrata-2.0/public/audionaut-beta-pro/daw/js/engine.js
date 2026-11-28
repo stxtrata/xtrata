@@ -22,6 +22,7 @@ import { createSamplerVoice } from './sampler-voice.js';
 import { voiceBudget, voiceCost, pickVictim } from './voice-budget.js';
 import { normalizeVoicing } from './voicing.js';
 import { normalizeMod, modActive } from './modulation.js';
+import { oscEngineEnabled, prepareOscEngine } from './synths/unison-worklet.js';
 import {isProInstrument,createProInstrumentVoice} from './pro-instruments.js';
 import { scheduleDspBoundary } from './plugin-automation.js';
 import { automationValueAt, voiceAutomation } from './automation-runtime.js';
@@ -91,6 +92,7 @@ export class Engine {
       const context = this.contextFactory ? this.contextFactory() : new (window.AudioContext || window.webkitAudioContext)({latencyHint:'interactive'});
       if(typeof context.startRendering==='function')assertOfflineRenderSupported();
       this.ctx=context;
+      if (oscEngineEnabled()) void prepareOscEngine(context); // experiment: synths fall back to native oscillators until it loads
       this.masterGain = this.ctx.createGain();
       this.masterGain.gain.value = this.store.project.masterVolume;
       this.masterGain.connect(this.ctx.destination);

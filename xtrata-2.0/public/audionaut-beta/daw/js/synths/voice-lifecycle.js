@@ -123,6 +123,9 @@ function createNativeVoice(ctx, destination, synth, synthId, note, params, onEnd
     const source = sources.find(record => record.node === node);
     if (source) source.pitched = true;
   };
+  // Nodes a synth builds itself (an AudioWorklet) join the voice's ownership and pitch control here.
+  const adoptedPitch = [];
+  context.adoptNode = (node, { pitch } = {}) => { nodes.add(node); if (pitch) adoptedPitch.push(pitch); return node; };
   const names = new Set();
   for (let prototype = ctx; prototype; prototype = Object.getPrototypeOf(prototype)) for (const key of Object.getOwnPropertyNames(prototype)) names.add(key);
   for (const property of names) {
@@ -204,6 +207,7 @@ function createNativeVoice(ctx, destination, synth, synthId, note, params, onEnd
       const frequency = s.frequency ?? s.node.frequency?.value ?? 0;
       if (s.node.detune && (frequency >= 20 || s.pitched || (!s.node.loop && !!s.node.buffer))) pitchTargets.push(s.node.detune);
     }
+    pitchTargets.push(...adoptedPitch);
     if (mod) modulation = attachModulation(ctx, mod, { note, startAt: note.resumeAt ?? note.time, age: note.resumeAt != null ? note.resumeAt - note.time : 0, targets: modTargets(synth, nodes, bindings, pitchTargets, stage.targets) });
   } catch (error) {
     for (const s of sources) { try { s.stop(ctx.currentTime); } catch {} }
