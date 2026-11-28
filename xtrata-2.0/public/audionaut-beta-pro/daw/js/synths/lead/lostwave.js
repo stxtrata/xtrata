@@ -5,7 +5,8 @@
 import { nativeNote, range } from '../performance-voice.js';
 import { select, cachedLru, spread, bodyStage, cutoffEnvelope, decayTo, driveCurve, noiseBuffer } from '../marek-kit.js';
 
-export const LOSTWAVE_MODES = ['off', 'saw', 'square', 'hyper', 'fm', 'sync', 'am', 'noise'];
+export const LOSTWAVE_MODES = ['off', 'saw', 'square', 'hyper', 'fm', 'sync', 'am', 'noise', 'pwm'];
+const F1 = { lp: 'lowpass', hp: 'highpass', bp: 'bandpass' };
 const FM_RATIOS = ['0.5', '1', '1.5', '2', '3', '4', '7'];
 const oscParams = (i, mode, oct, level) => [
   select(`o${i}Mode`, `Osc ${i} mode`, LOSTWAVE_MODES, mode),
@@ -35,8 +36,27 @@ const params = [
   range('sustain', 'Sustain', 0, 1, 0.01, 0.85),
   range('attack', 'Attack', 0.002, 1.5, 0.001, 0.003),
   range('release', 'Release', 0.02, 2.5, 0.01, 0.3),
-  range('level', 'Level', 0, 1, 0.01, 0.75)
+  range('level', 'Level', 0, 1, 0.01, 0.75),
+  // Added after the first release. Defaults reproduce the original sound.
+  ...[1, 2, 3, 4].map((i) => range(`o${i}Uni`, `Osc ${i} unison`, 1, 5, 1, 1)),
+  range('uniDetune', 'Unison detune (cents)', 0, 50, 0.5, 14),
+  select('f1Type', 'Filter 1 type', Object.keys(F1), 'lp')
 ];
+
+// Unison for the single-oscillator modes. One voice builds exactly the original graph.
+function stack(ctx, P, i, make, out, time, play) {
+  const n = Math.max(1, Math.min(5, Math.round(P[`o${i}Uni`] || 1)));
+  if (n === 1) { const o = make(); o.connect(out); play(o); return; }
+  // Panned voices lose 3 dB against one centred oscillator; make that up so the level holds.
+  const norm = Math.SQRT2 / Math.sqrt(n);
+  for (const s of spread(n)) {
+    const o = make(), pan = ctx.createStereoPanner(), g = ctx.createGain();
+    o.detune.setValueAtTime(s * P.uniDetune, time);
+    pan.pan.setValueAtTime(s * P.width, time);
+    g.gain.setValueAtTime(norm, time);
+    o.connect(g).connect(pan).connect(out); play(o);
+  }
+}
 
 // Hard-sync cycle: a slave saw reset by the master every period, as harmonics.
 function syncWave(ctx, ratio) {
@@ -64,8 +84,21 @@ function oscillator(ctx, P, i, f, note, into, osc, play) {
   out.gain.setValueAtTime(level, time);
   out.connect(into);
   if (mode === 'saw' || mode === 'square') {
-    const o = osc(mode === 'saw' ? 'sawtooth' : 'square', hz);
-    o.connect(out); play(o); return;
+    stack(ctx, P, i, () => osc(mode === 'saw' ? 'sawtooth' : 'square', hz), out, time, play);
+    return;
+  }
+  if (mode === 'pwm') {
+    // Pulse-width modulation: a saw minus a delayed copy of itself is a pulse, and
+    // slowly moving the delay moves the width.
+    const pre = ctx.createGain(), delay = ctx.createDelay(0.06), inv = ctx.createGain(), lfo = ctx.createOscillator(), depth = ctx.createGain();
+    pre.gain.setValueAtTime(0.7, time); inv.gain.setValueAtTime(-1, time);
+    delay.delayTime.setValueAtTime(Math.min(0.058, 0.5 / hz), time);
+    lfo.type = 'triangle'; lfo.frequency.setValueAtTime(0.45 + i * 0.13, time);
+    depth.gain.setValueAtTime(Math.min(0.02, 0.34 / hz), time);
+    lfo.connect(depth).connect(delay.delayTime);
+    stack(ctx, P, i, () => osc('sawtooth', hz), pre, time, play);
+    pre.connect(out); pre.connect(delay).connect(inv).connect(out);
+    play(lfo); return;
   }
   if (mode === 'hyper') {
     const n = Math.max(1, Math.round(P.hyperVoices)), norm = 1 / Math.sqrt(n);
@@ -80,9 +113,9 @@ function oscillator(ctx, P, i, f, note, into, osc, play) {
     return;
   }
   if (mode === 'sync') {
-    const o = osc('sine', hz);
-    o.setPeriodicWave(syncWave(ctx, P.syncRatio));
-    o.connect(out); play(o); return;
+    const wave = syncWave(ctx, P.syncRatio);
+    stack(ctx, P, i, () => { const o = osc('sine', hz); o.setPeriodicWave(wave); return o; }, out, time, play);
+    return;
   }
   if (mode === 'noise') {
     const src = ctx.createBufferSource();
@@ -114,7 +147,7 @@ function voice(ctx, dest, note, patch) {
   const mix = ctx.createGain(), sum = ctx.createGain();
   const f1 = ctx.createBiquadFilter(), f2 = ctx.createBiquadFilter();
   const nyq = ctx.sampleRate * 0.45;
-  f1.type = 'lowpass';
+  f1.type = F1[P.f1Type] || 'lowpass';
   bind('reso', f1.Q);
   bind('cutoff', f1.frequency, (v) => Math.min(nyq, v));
   cutoffEnvelope(f1, note, P.fEnv, P.fDecay);
@@ -146,7 +179,7 @@ function voice(ctx, dest, note, patch) {
 
 const radio = (key, label, options) => ({ type: 'radio', key, label, options: options.map((v) => [v, v.toUpperCase()]) });
 const knob = (key, label, fmt, extra = {}) => ({ type: 'knob', key, label, fmt, ...extra });
-const oscSection = (i) => ({ title: `OSC ${i}`, items: [radio(`o${i}Mode`, 'Mode', LOSTWAVE_MODES), { type: 'row', items: [knob(`o${i}Oct`, 'OCT', 'int'), knob(`o${i}Level`, 'LEVEL', 'pct')] }] });
+const oscSection = (i) => ({ title: `OSC ${i}`, items: [radio(`o${i}Mode`, 'Mode', LOSTWAVE_MODES), { type: 'row', items: [knob(`o${i}Oct`, 'OCT', 'int'), knob(`o${i}Level`, 'LEVEL', 'pct'), knob(`o${i}Uni`, 'UNISON', 'int')] }] });
 
 export const LOSTWAVE_SYNTHS = {
   lostwave: {
@@ -163,7 +196,7 @@ export const LOSTWAVE_SYNTHS = {
       sections: [
         oscSection(1), oscSection(2), oscSection(3), oscSection(4),
         { title: 'HYPER · FM · SYNC', items: [{ type: 'xy', x: { key: 'cutoff', label: 'CUTOFF', fmt: 'hz' }, y: { key: 'hyperDetune', label: 'DENSITY', fmt: 'cents' } }, { type: 'row', items: [knob('hyperVoices', 'VOICES', 'int'), knob('width', 'WIDTH', 'pct')] }, radio('fmRatio', 'Ratio', FM_RATIOS), { type: 'row', items: [knob('fmDepth', 'FM/AM', 'pct'), knob('syncRatio', 'SYNC', 'num2')] }] },
-        { title: 'FILTERS', items: [{ type: 'row', items: [knob('reso', 'RESO', 'num1'), knob('fEnv', 'ENV', 'num1'), knob('fDecay', 'F.DECAY', 'ms')] }, radio('f2Type', 'Filter 2', ['lp', 'hp', 'bp', 'notch']), knob('f2Cutoff', 'F2 CUT', 'hz', { curve: 'log' }), radio('route', 'Routing', ['serial', 'parallel'])] },
+        { title: 'FILTERS', items: [radio('f1Type', 'Filter 1', Object.keys(F1)), { type: 'row', items: [knob('reso', 'RESO', 'num1'), knob('fEnv', 'ENV', 'num1'), knob('fDecay', 'F.DECAY', 'ms'), knob('uniDetune', 'UNI DET', 'cents')] }, radio('f2Type', 'Filter 2', ['lp', 'hp', 'bp', 'notch']), knob('f2Cutoff', 'F2 CUT', 'hz', { curve: 'log' }), radio('route', 'Routing', ['serial', 'parallel'])] },
         { title: 'PUNCH & AMP', items: [knob('punch', 'PUNCH', 'pct', { big: true }), { type: 'row', items: [
           { type: 'fader', key: 'attack', label: 'A', fmt: 'ms' },
           { type: 'fader', key: 'decay', label: 'D', fmt: 'ms' },
@@ -182,6 +215,12 @@ export const LOSTWAVE_SYNTHS = {
       { name: 'Sync Screamer', params: { o1Mode: 'sync', o1Level: 0.8, syncRatio: 4.2, o2Mode: 'saw', o2Oct: 0, o3Mode: 'off', cutoff: 5200, reso: 3, punch: 0.7, attack: 0.008 } },
       { name: 'Prog House Stab', params: { hyperVoices: 5, hyperDetune: 18, o2Mode: 'square', o2Oct: 1, o2Level: 0.3, o3Mode: 'off', cutoff: 2400, reso: 2.5, fEnv: 2.4, fDecay: 0.22, decay: 0.32, sustain: 0.2, release: 0.35, punch: 0.5 } },
       { name: 'Detuned Bell', params: { o1Mode: 'am', o1Level: 0.6, fmRatio: '3', fmDepth: 0.6, o2Mode: 'fm', o2Oct: 1, o2Level: 0.35, o3Mode: 'off', f2Type: 'lp', f2Cutoff: 9000, decay: 1.4, sustain: 0.1, release: 1.2, punch: 0.15 } },
+      { name: 'PWM Strings', params: { o1Mode: 'pwm', o1Level: 0.7, o1Uni: 3, o2Mode: 'pwm', o2Oct: 1, o2Level: 0.35, o2Uni: 2, o3Mode: 'off', uniDetune: 12, cutoff: 5200, fEnv: 0.3, attack: 0.3, sustain: 1, release: 1, punch: 0, width: 1 } },
+      { name: 'Square Stack', params: { o1Mode: 'square', o1Uni: 5, o1Level: 0.7, o2Mode: 'saw', o2Oct: -1, o2Uni: 3, o2Level: 0.4, o3Mode: 'off', uniDetune: 18, cutoff: 3600, reso: 2, fEnv: 1.6, fDecay: 0.3, punch: 0.45, width: 0.9 } },
+      { name: 'Sync Choir', params: { o1Mode: 'sync', o1Uni: 4, o1Level: 0.7, syncRatio: 3.1, o2Mode: 'off', o3Mode: 'off', uniDetune: 16, cutoff: 4200, reso: 1.8, fEnv: 0.6, attack: 0.12, sustain: 0.9, release: 0.7, punch: 0.1, width: 1 } },
+      { name: 'Band Lead', params: { hyperVoices: 7, hyperDetune: 24, o2Mode: 'pwm', o2Oct: 0, o2Level: 0.35, o3Mode: 'off', f1Type: 'bp', cutoff: 1800, reso: 2.6, fEnv: 2, fDecay: 0.5, f2Cutoff: 90, punch: 0.4, release: 0.4 } },
+      { name: 'High Pass Shimmer', params: { hyperVoices: 9, hyperDetune: 34, o1Oct: 1, o2Mode: 'saw', o2Oct: 2, o2Uni: 3, o2Level: 0.25, o3Mode: 'off', f1Type: 'hp', cutoff: 1200, reso: 1, fEnv: 0, f2Type: 'lp', f2Cutoff: 11000, attack: 0.2, sustain: 1, release: 1.2, punch: 0, width: 1 } },
+      { name: 'Hollow Bass', params: { o1Mode: 'pwm', o1Oct: -1, o1Level: 0.8, o2Mode: 'square', o2Oct: -2, o2Level: 0.5, o3Mode: 'off', width: 0.2, cutoff: 900, reso: 2.2, fEnv: 2.2, fDecay: 0.18, f2Cutoff: 30, decay: 0.25, sustain: 0.5, punch: 0.6, release: 0.12 } },
       { name: 'Wide Bass', params: { o1Oct: -1, hyperVoices: 5, hyperDetune: 12, width: 0.5, o2Mode: 'square', o2Oct: -2, o2Level: 0.6, o3Mode: 'off', o4Mode: 'noise', o4Level: 0.05, cutoff: 1400, fEnv: 1.8, fDecay: 0.2, f2Cutoff: 30, punch: 0.6, release: 0.15 } }
     ],
     lines: [

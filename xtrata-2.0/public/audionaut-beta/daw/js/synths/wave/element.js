@@ -3,12 +3,14 @@
 // squash), and turned into band-limited periodic waves. A note scans from a start to an end
 // position: each frame's oscillator gets an exact piecewise-linear gain curve, so the sweep is
 // a phase-coherent interpolation between neighbouring frames, as in a hardware wavetable.
+import { lfoHz, lfoPhase, lfoTable } from '../../modulation.js';
 import { nativeNote, range } from '../performance-voice.js';
 import { select, cachedLru, spread, bodyStage, cutoffEnvelope, noiseBuffer } from '../marek-kit.js';
 
 export const ELEMENT_TABLES = ['analog', 'formant', 'digital', 'glass', 'growl', 'organ'];
 export const ELEMENT_WARPS = ['none', 'bend', 'mirror', 'sync', 'fold', 'squash'];
 const FRAMES = 6, N = 512, H = 64;
+const ELEMENT_LFO_RATES = ['2 bars', '1 bar', '1/2', '1/4', '1/8', '1/8T', '1/16'];
 
 const params = [
   select('table', 'Wavetable', ELEMENT_TABLES, 'analog'),
@@ -31,7 +33,11 @@ const params = [
   range('sustain', 'Sustain', 0, 1, 0.01, 0.75),
   range('attack', 'Attack', 0.002, 1.5, 0.001, 0.01),
   range('release', 'Release', 0.02, 2.5, 0.01, 0.45),
-  range('level', 'Level', 0, 1, 0.01, 0.75)
+  range('level', 'Level', 0, 1, 0.01, 0.75),
+  // Added after the first release. With the LFO depth at 0 the original graph is built.
+  range('lfoDepth', 'Position LFO depth', 0, 1, 0.01, 0),
+  select('lfoRate', 'Position LFO rate', ELEMENT_LFO_RATES, '1/4'),
+  select('lfoShape', 'Position LFO shape', ['sine', 'triangle', 'ramp', 'saw'], 'sine')
 ];
 
 // ---------------------------------------------------------------- table generation
@@ -141,11 +147,35 @@ function scheduleFrame(param, f, time, p0, p1, span, resumeAt) {
   for (const u of us) if (u > u0) param.linearRampToValueAtTime(w(pos(u)), time + u * span);
 }
 
+// Live position: when the position LFO is on, each frame's level is read from the moving
+// position through a small lookup, instead of being scheduled once per note.
+const WINDOW = 1001, windows = [];
+function frameWindow(f) {
+  if (!windows[f]) { const c = windows[f] = new Float32Array(WINDOW); for (let i = 0; i < WINDOW; i++) c[i] = Math.max(0, 1 - Math.abs((i / (WINDOW - 1)) * (FRAMES - 1) - f)); }
+  return windows[f];
+}
+function livePosition(ctx, note, P, p0, p1, span, used, play, end) {
+  const time = note.time, at = note.resumeAt != null && note.resumeAt > time ? note.resumeAt : time;
+  const bus = ctx.createGain(), base = ctx.createConstantSource(), u0 = Math.min(1, (at - time) / span), x = (p) => 2 * p - 1;
+  base.offset.setValueAtTime(x(p0 + (p1 - p0) * u0), at);
+  if (u0 < 1 && p1 !== p0) base.offset.linearRampToValueAtTime(x(p1), time + span);
+  base.connect(bus); play(base);
+  const l = { shape: P.lfoShape, sync: true, div: P.lfoRate, lock: 'bar' }, hz = lfoHz(l, note.bpm), { buffer, cycles, cycle } = lfoTable(P.lfoShape, ctx.sampleRate);
+  const lfo = ctx.createBufferSource(), depth = ctx.createGain();
+  lfo.buffer = buffer; lfo.loop = true; lfo.playbackRate.setValueAtTime(hz * cycle / ctx.sampleRate, at);
+  depth.gain.setValueAtTime(P.lfoDepth, at); // position swings by ±depth/2
+  lfo.connect(depth).connect(bus);
+  const phase = (((lfoPhase(l, note.beat) + (at - time) * hz) % cycles) + cycles) % cycles;
+  play(lfo, at, end, phase * cycle / ctx.sampleRate);
+  return new Map(used.map((f) => { const shaper = ctx.createWaveShaper(); shaper.curve = frameWindow(f); bus.connect(shaper); return [f, shaper]; }));
+}
+
 function voice(ctx, dest, note, patch) {
-  const { P, time, frequency, amp, play, osc, bind } = nativeNote(ctx, dest, note, patch, params, 0.5);
+  const { P, time, frequency, amp, play, osc, bind, end } = nativeNote(ctx, dest, note, patch, params, 0.5);
   const vel = Math.max(0, Math.min(1, note.vel ?? 1));
   const p0 = Math.min(1, P.posStart + vel * 0.08), p1 = P.posEnd, span = Math.max(0.01, P.posTime);
-  const lo = Math.min(p0, p1) * (FRAMES - 1), hi = Math.max(p0, p1) * (FRAMES - 1);
+  const live = P.lfoDepth > 0, swing = live ? P.lfoDepth / 2 : 0;
+  const lo = Math.max(0, Math.min(p0, p1) - swing) * (FRAMES - 1), hi = Math.min(1, Math.max(p0, p1) + swing) * (FRAMES - 1);
   const used = [];
   for (let f = Math.max(0, Math.floor(lo)); f <= Math.min(FRAMES - 1, Math.ceil(hi)); f++) used.push(f);
   // Filter
@@ -169,6 +199,7 @@ function voice(ctx, dest, note, patch) {
   filters.at(-1).connect(body).connect(amp);
   // Oscillators: every unison voice runs the used frames phase-coherently.
   const n = Math.max(1, Math.round(P.voices)), norm = 1 / Math.sqrt(n);
+  const windowsFor = live ? livePosition(ctx, note, P, p0, p1, span, used, play, end) : null;
   for (const s of spread(n)) {
     const pan = ctx.createStereoPanner(), sum = ctx.createGain();
     pan.pan.setValueAtTime(s * P.width, time);
@@ -179,7 +210,8 @@ function voice(ctx, dest, note, patch) {
       o.setPeriodicWave(frameWave(ctx, P.table, P.warp, P.warpAmt, f));
       o.detune.setValueAtTime(s * P.detune, time);
       const g = ctx.createGain();
-      scheduleFrame(g.gain, f, time, p0, p1, span, note.resumeAt);
+      if (live) { g.gain.setValueAtTime(0, time); windowsFor.get(f).connect(g.gain); }
+      else scheduleFrame(g.gain, f, time, p0, p1, span, note.resumeAt);
       o.connect(g).connect(sum);
       play(o);
     }
@@ -224,7 +256,7 @@ export const ELEMENT_SYNTHS = {
       cc: { 74: 'cutoff', 71: 'reso', 73: 'attack', 72: 'release', 7: 'level', 1: 'posEnd' },
       sections: [
         { title: 'WAVETABLE', items: [radio('table', 'Table', ELEMENT_TABLES), { type: 'viz', id: 'scope' }] },
-        { title: 'SCAN', items: [{ type: 'xy', x: { key: 'posStart', label: 'START', fmt: 'pct' }, y: { key: 'posEnd', label: 'END', fmt: 'pct' } }, knob('posTime', 'TIME', 'ms')] },
+        { title: 'SCAN', items: [{ type: 'xy', x: { key: 'posStart', label: 'START', fmt: 'pct' }, y: { key: 'posEnd', label: 'END', fmt: 'pct' } }, { type: 'row', items: [knob('posTime', 'TIME', 'ms'), knob('lfoDepth', 'LFO', 'pct')] }, radio('lfoRate', 'LFO rate', ELEMENT_LFO_RATES), radio('lfoShape', 'LFO shape', ['sine', 'triangle', 'ramp', 'saw'])] },
         { title: 'WARP', items: [radio('warp', 'Warp', ELEMENT_WARPS), knob('warpAmt', 'AMOUNT', 'pct', { big: true })] },
         { title: 'UNISON & MIX', items: [{ type: 'row', items: [knob('voices', 'VOICES', 'int'), knob('detune', 'DETUNE', 'cents'), knob('width', 'WIDTH', 'pct')] }, { type: 'row', items: [knob('sub', 'SUB', 'pct'), knob('noise', 'NOISE', 'pct')] }] },
         { title: 'FILTER', items: [radio('filterType', 'Type', ['lp12', 'lp24', 'hp', 'bp']), { type: 'row', items: [knob('cutoff', 'CUTOFF', 'hz', { curve: 'log', big: true }), knob('reso', 'RESO', 'num1')] }, { type: 'row', items: [knob('fEnv', 'ENV', 'num1'), knob('fDecay', 'F.DECAY', 'ms')] }] },
@@ -246,6 +278,11 @@ export const ELEMENT_SYNTHS = {
       { name: 'Glass Pluck', params: { table: 'glass', posStart: 0.8, posEnd: 0.1, posTime: 0.35, voices: 1, cutoff: 7000, fEnv: 1.5, fDecay: 0.2, decay: 0.45, sustain: 0, release: 0.5, sub: 0 } },
       { name: 'Formant Lead', params: { table: 'formant', posStart: 0.15, posEnd: 0.9, posTime: 0.9, warp: 'bend', warpAmt: 0.4, voices: 2, detune: 6, cutoff: 5200, attack: 0.02 } },
       { name: 'Sync Lead', params: { table: 'analog', posStart: 0.5, posEnd: 0.55, warp: 'sync', warpAmt: 0.15, voices: 3, detune: 11, cutoff: 9000, fEnv: 0.6 } },
+      { name: 'Wobble Bass', params: { table: 'growl', posStart: 0.5, posEnd: 0.5, lfoDepth: 0.9, lfoRate: '1/8', lfoShape: 'sine', voices: 2, detune: 9, width: 0.3, sub: 0.5, cutoff: 1800, reso: 3, fEnv: 0.6, filterType: 'lp24', release: 0.15 } },
+      { name: 'Breathing Pad', params: { table: 'formant', posStart: 0.5, posEnd: 0.5, lfoDepth: 0.8, lfoRate: '2 bars', lfoShape: 'triangle', voices: 4, detune: 14, width: 1, attack: 0.7, decay: 2, sustain: 0.9, release: 2, cutoff: 5200, fEnv: 0.2 } },
+      { name: 'Talking Lead', params: { table: 'formant', posStart: 0.3, posEnd: 0.6, posTime: 0.4, lfoDepth: 0.5, lfoRate: '1/4', lfoShape: 'sine', warp: 'bend', warpAmt: 0.3, voices: 2, detune: 6, cutoff: 6200, attack: 0.01 } },
+      { name: 'Ramp Sequence', params: { table: 'digital', posStart: 0.5, posEnd: 0.5, lfoDepth: 1, lfoRate: '1/2', lfoShape: 'ramp', voices: 2, detune: 8, cutoff: 7400, reso: 1.6, fEnv: 0.4, sub: 0.2, sustain: 0.9 } },
+      { name: 'Glass Tremor', params: { table: 'glass', posStart: 0.6, posEnd: 0.4, posTime: 2, lfoDepth: 0.35, lfoRate: '1/16', lfoShape: 'triangle', voices: 3, detune: 10, width: 0.9, cutoff: 9000, attack: 0.05, release: 0.9 } },
       { name: 'Digital Organ', params: { table: 'organ', posStart: 0.3, posEnd: 0.8, posTime: 2.5, warp: 'squash', warpAmt: 0.25, voices: 1, sub: 0, cutoff: 12000, fEnv: 0, attack: 0.005, sustain: 1, release: 0.15 } }
     ],
     lines: [

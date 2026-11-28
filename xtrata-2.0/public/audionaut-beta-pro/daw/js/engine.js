@@ -900,7 +900,7 @@ export class Engine {
       const note={ pitch, vel, time, dur: duration ?? live.gate ?? 0.6, held: held && duration == null, offset:options.chaseOffsetSeconds || 0, bpm: this.store.project.bpm || 120 };
       // Modulation kit (modulation.js). `beat` lets a bar-locked LFO start in step with the song.
       const mod = instrument.mod && modActive(instrument.mod) ? normalizeMod(instrument.mod) : null;
-      if (mod) { const position = Number.isFinite(options.beat) ? null : this.getMusicalPosition(time); note.beat = Number.isFinite(options.beat) ? options.beat : position?.playing ? position.beat : null; }
+      { const position = Number.isFinite(options.beat) ? null : this.getMusicalPosition(time); note.beat = Number.isFinite(options.beat) ? options.beat : position?.playing ? position.beat : null; }
       n.voice = isProInstrument(instrument.synthId)
         ? createProInstrumentVoice(this.ctx,this.instrumentGains[i],instrument,note,P,()=>this._voiceEnded(n),{seed:options.seed ?? hashSeed(`${this.seed}:${n.id}:${pitch}`),offline:this.offline,mod,bufferForSource:entry=>{const a=trackAddress(this.store.project,entry.sourceTrackId);return a?.kind==='sample'?this.buffers[a.index]:null;}})
         : instrument.sampler?.enabled

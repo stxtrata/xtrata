@@ -154,3 +154,43 @@ MAVREKT patch (7 + 5 unison voices):
 - **Voice budget.** A worklet stack counts as one source, so the phone budget
   admits more worklet notes than native ones.
 - **Not decided.** Keep, improve (oversample) or remove after listening.
+
+## Synth expansions, round two
+
+Every new control defaults to the original behaviour. All 24 original presets
+were rendered before and after at three pitches and match to within render
+noise (worst difference -83 dB, on LOSTWAVE). Tests:
+`tools/pro-synth-expansion-test.mjs`.
+
+**MAVREKT** (18 presets, was 8)
+- Two more shapes per part: `sine` and `noise`.
+- `aFilter` / `bFilter`: low-pass, high-pass or band-pass per part.
+- New presets: Uplift Lead, Acid Line, Sub Roller, Air Pad, Thin Strings, Bell
+  Pluck, Rolling Gate, Band Sweep, Hard Square, Noise Riser.
+
+**LOSTWAVE** (14 presets, was 8)
+- `o1Uni`..`o4Uni`: up to 5 unison voices on any saw, square, sync or PWM
+  oscillator, with a shared `uniDetune`. Hyper mode keeps its own voice count.
+- New `pwm` mode: a saw minus a delayed copy of itself, with the delay moved by
+  a slow built-in LFO.
+- `f1Type`: filter 1 can be low-pass, high-pass or band-pass.
+- New presets: PWM Strings, Square Stack, Sync Choir, Band Lead, High Pass
+  Shimmer, Hollow Bass.
+
+**ELEMENT** (13 presets, was 8)
+- Position LFO: `lfoDepth`, `lfoRate` (2 bars to 1/16), `lfoShape`. It moves
+  the wavetable position in time with the tempo and starts from the song
+  position, so it lands the same way on playback and export.
+- With the LFO on, each frame's level is read from the moving position through
+  a lookup, and every frame the LFO can reach has an oscillator running. A full
+  sweep with 4 unison voices is 24 oscillators plus the sub (the heaviest
+  preset measures 27 sources).
+- New presets: Wobble Bass, Breathing Pad, Talking Lead, Ramp Sequence, Glass
+  Tremor.
+
+**Still open from the original proposals:** second oscillator per MAVREKT part
+and per-part envelopes; LOSTWAVE shape controls per oscillator, vowel mode,
+filter characters and step modulator; ELEMENT second wavetable oscillator,
+32-frame tables, table import, second filter and macros. Wavetable position is
+driven by ELEMENT's own LFO and is not yet a target in the shared modulation
+kit.

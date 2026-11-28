@@ -75,10 +75,13 @@ function table(shape, sampleRate) {
   }
   const buffer = new AudioBuffer({ length: data.length, sampleRate, numberOfChannels: 1 });
   buffer.copyToChannel(data, 0);
-  const entry = { buffer, cycles };
+  const entry = { buffer, cycles, cycle: CYCLE };
   tables.set(key, entry);
   return entry;
 }
+
+// For a synth that runs its own tempo LFO (ELEMENT's position LFO).
+export const lfoTable = (shape, sampleRate) => table(MOD_SHAPES.includes(shape) ? shape : 'sine', sampleRate);
 
 // Output stage for the targets every instrument has. Returns the node a voice
 // should connect to instead of `destination`, plus the targets it adds.

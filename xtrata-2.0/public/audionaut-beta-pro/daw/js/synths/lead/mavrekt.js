@@ -4,9 +4,11 @@
 // envelope. Native nodes only, so it stays light enough for big chords.
 import { unisonPart } from '../unison-worklet.js';
 import { nativeNote, range } from '../performance-voice.js';
-import { select, shapeOsc, spread, bodyStage, cutoffEnvelope, driveCurve, gateBuffer, GATE_PATTERNS, GATE_RATES } from '../marek-kit.js';
+import { select, shapeOsc, spread, bodyStage, cutoffEnvelope, driveCurve, gateBuffer, noiseBuffer, GATE_PATTERNS, GATE_RATES } from '../marek-kit.js';
 
-const WAVES = ['saw', 'square', 'triangle', 'pulse'];
+const WAVES = ['saw', 'square', 'triangle', 'pulse', 'sine', 'noise'];
+const STACKED = ['saw', 'square', 'triangle', 'pulse']; // shapes the experimental worklet can play
+const FILTERS = { lp: 'lowpass', hp: 'highpass', bp: 'bandpass' };
 const params = [
   select('aWave', 'A wave', WAVES, 'saw'),
   range('aOct', 'A octave', -2, 2, 1, 0),
@@ -28,6 +30,9 @@ const params = [
   range('gateDepth', 'Trance gate depth', 0, 1, 0.01, 0),
   select('gateRate', 'Gate rate', Object.keys(GATE_RATES), '1/16'),
   select('gatePattern', 'Gate pattern', Object.keys(GATE_PATTERNS), 'anthem'),
+  // Added after the first release. Defaults reproduce the original sound.
+  select('aFilter', 'A filter type', Object.keys(FILTERS), 'lp'),
+  select('bFilter', 'B filter type', Object.keys(FILTERS), 'lp'),
   range('attack', 'Attack', 0.002, 1.5, 0.001, 0.004),
   range('release', 'Release', 0.02, 2.5, 0.01, 0.35),
   range('level', 'Level', 0, 1, 0.01, 0.75)
@@ -36,8 +41,15 @@ const params = [
 function part(ctx, play, osc, frequency, time, wave, oct, voices, detune, width, into, slot) {
   const n = Math.max(1, Math.round(voices)), base = frequency * 2 ** Math.round(oct);
   const norm = 1 / Math.sqrt(n);
+  if (wave === 'noise') {
+    const src = ctx.createBufferSource(), g = ctx.createGain();
+    src.buffer = noiseBuffer(ctx); src.loop = true;
+    g.gain.setValueAtTime(0.5, time);
+    src.connect(g).connect(into); play(src);
+    return;
+  }
   // Experiment (unison-worklet.js): the whole stack in one worklet node when that engine is on.
-  if (unisonPart(ctx, { play, frequency: base, wave, voices: n, detune, width, into, index: slot })) return;
+  if (STACKED.includes(wave) && unisonPart(ctx, { play, frequency: base, wave, voices: n, detune, width, into, index: slot })) return;
   for (const s of spread(n)) {
     const o = shapeOsc(ctx, osc('sawtooth', Math.min(ctx.sampleRate * 0.45, base)), wave);
     o.detune.setValueAtTime(s * detune, time);
@@ -54,7 +66,7 @@ function voice(ctx, dest, note, patch) {
   const mix = ctx.createGain();
   const filters = ['a', 'b'].map((key) => {
     const f = ctx.createBiquadFilter(), g = ctx.createGain();
-    f.type = 'lowpass';
+    f.type = FILTERS[P[`${key}Filter`]] || 'lowpass';
     const nyq = ctx.sampleRate * 0.45;
     bind('reso', f.Q);
     bind('cutoff', f.frequency, (v) => Math.min(nyq, v * (key === 'b' ? 0.85 : 1)));
@@ -111,7 +123,7 @@ export const MAVREKT_SYNTHS = {
         { title: 'PART A', items: [sel('aWave', 'Wave', WAVES), { type: 'row', items: [knob('aOct', 'OCT', 'int'), knob('aVoices', 'VOICES', 'int'), knob('aDetune', 'DETUNE', 'cents')] }] },
         { title: 'PART B', items: [sel('bWave', 'Wave', WAVES), { type: 'row', items: [knob('bOct', 'OCT', 'int'), knob('bVoices', 'VOICES', 'int'), knob('bDetune', 'DETUNE', 'cents')] }] },
         { title: 'LAYER', items: [{ type: 'xy', x: { key: 'balance', label: 'A ⇄ B', fmt: 'pct' }, y: { key: 'width', label: 'WIDTH', fmt: 'pct' } }] },
-        { title: 'FILTER', items: [{ type: 'row', items: [knob('cutoff', 'CUTOFF', 'hz', { curve: 'log', big: true }), knob('reso', 'RESO', 'num1', { big: true })] }, { type: 'row', items: [knob('fEnv', 'ENV', 'num1'), knob('fDecay', 'F.DECAY', 'ms'), knob('drive', 'DRIVE', 'pct')] }] },
+        { title: 'FILTER', items: [{ type: 'row', items: [knob('cutoff', 'CUTOFF', 'hz', { curve: 'log', big: true }), knob('reso', 'RESO', 'num1', { big: true })] }, { type: 'row', items: [knob('fEnv', 'ENV', 'num1'), knob('fDecay', 'F.DECAY', 'ms'), knob('drive', 'DRIVE', 'pct')] }, sel('aFilter', 'Part A type', Object.keys(FILTERS)), sel('bFilter', 'Part B type', Object.keys(FILTERS))] },
         { title: 'TRANCE GATE', items: [knob('gateDepth', 'DEPTH', 'pct', { big: true }), sel('gateRate', 'Rate', Object.keys(GATE_RATES)), { type: 'radio', key: 'gatePattern', label: 'Pattern', options: Object.keys(GATE_PATTERNS).map((v) => [v, v.toUpperCase()]) }] },
         { title: 'AMP', items: [{ type: 'row', items: [
           { type: 'fader', key: 'attack', label: 'A', fmt: 'ms' },
@@ -131,6 +143,16 @@ export const MAVREKT_SYNTHS = {
       { name: 'Offbeat Bass', params: { aOct: -1, aVoices: 2, aDetune: 6, bWave: 'square', bOct: -2, bVoices: 1, balance: 0.5, cutoff: 420, reso: 2.6, fEnv: 2.6, fDecay: 0.12, decay: 0.16, sustain: 0.15, release: 0.08, width: 0.15, drive: 0.35 } },
       { name: 'Hoover Lead', params: { aWave: 'pulse', aVoices: 5, aDetune: 40, bWave: 'saw', bOct: -1, bDetune: 30, balance: 0.55, cutoff: 2600, reso: 1.2, fEnv: 1.2, drive: 0.6, attack: 0.03 } },
       { name: 'Classic Arp Saw', params: { aVoices: 2, aDetune: 8, bVoices: 1, bOct: 1, balance: 0.2, cutoff: 1500, reso: 4.5, fEnv: 2.8, fDecay: 0.25, decay: 0.3, sustain: 0.25, release: 0.18, width: 0.5 } },
+      { name: 'Uplift Lead', params: { aVoices: 7, aDetune: 30, bVoices: 3, bDetune: 12, bOct: 1, balance: 0.3, width: 0.85, cutoff: 9800, reso: 1.1, fEnv: 0.5, drive: 0.2, attack: 0.006, release: 0.5 } },
+      { name: 'Acid Line', params: { aVoices: 1, aDetune: 0, bWave: 'square', bVoices: 1, bOct: 0, balance: 0.2, width: 0.1, cutoff: 380, reso: 9.5, fEnv: 3.6, fDecay: 0.16, drive: 0.5, decay: 0.2, sustain: 0.1, release: 0.1 } },
+      { name: 'Sub Roller', params: { aWave: 'sine', aOct: -1, aVoices: 1, aDetune: 0, bWave: 'saw', bOct: -1, bVoices: 2, bDetune: 7, balance: 0.3, width: 0.1, cutoff: 600, reso: 1.4, fEnv: 1.6, fDecay: 0.14, drive: 0.25, decay: 0.2, sustain: 0.6, release: 0.08 } },
+      { name: 'Air Pad', params: { aVoices: 5, aDetune: 16, bWave: 'noise', balance: 0.22, bFilter: 'bp', cutoff: 3800, reso: 1.8, fEnv: 0.2, attack: 0.5, decay: 1.6, sustain: 0.9, release: 1.6, width: 1 } },
+      { name: 'Thin Strings', params: { aVoices: 5, aDetune: 14, bVoices: 3, bDetune: 10, bOct: 1, balance: 0.4, aFilter: 'hp', cutoff: 900, reso: 0.7, fEnv: 0, attack: 0.25, sustain: 1, release: 0.9, width: 1 } },
+      { name: 'Bell Pluck', params: { aWave: 'sine', aVoices: 1, aDetune: 0, bWave: 'triangle', bOct: 2, bVoices: 2, bDetune: 5, balance: 0.35, cutoff: 6400, reso: 0.9, fEnv: 1.2, fDecay: 0.3, decay: 0.7, sustain: 0, release: 0.8, width: 0.6 } },
+      { name: 'Rolling Gate', params: { aVoices: 5, aDetune: 20, bVoices: 3, bOct: 0, balance: 0.45, cutoff: 4600, fEnv: 0.6, gateDepth: 1, gateRate: '1/16', gatePattern: 'rolling', attack: 0.02, sustain: 1, release: 0.5, width: 0.9 } },
+      { name: 'Band Sweep', params: { aVoices: 7, aDetune: 24, bVoices: 5, bDetune: 16, bOct: 0, balance: 0.5, aFilter: 'bp', bFilter: 'bp', cutoff: 1400, reso: 3.2, fEnv: 2.8, fDecay: 1.4, attack: 0.05, sustain: 0.9, release: 0.8, width: 1 } },
+      { name: 'Hard Square', params: { aWave: 'square', aVoices: 3, aDetune: 10, bWave: 'pulse', bOct: -1, bVoices: 3, bDetune: 14, balance: 0.45, cutoff: 3200, reso: 2, fEnv: 1.5, fDecay: 0.2, drive: 0.55, decay: 0.3, sustain: 0.6, release: 0.2 } },
+      { name: 'Noise Riser', params: { aWave: 'noise', bWave: 'saw', bVoices: 5, bDetune: 28, bOct: 1, balance: 0.35, aFilter: 'bp', cutoff: 2200, reso: 4, fEnv: 0, attack: 1.4, sustain: 1, release: 0.6, width: 1 } },
       { name: 'Big Room Stab', params: { aVoices: 7, aDetune: 22, bWave: 'square', bOct: 0, bVoices: 5, bDetune: 18, balance: 0.5, cutoff: 3000, fEnv: 2.2, fDecay: 0.2, drive: 0.45, decay: 0.35, sustain: 0.3, release: 0.4, width: 1 } }
     ],
     lines: [
