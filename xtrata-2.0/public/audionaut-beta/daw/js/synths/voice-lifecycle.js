@@ -3,6 +3,7 @@ import { replayChasedAutomation } from "./automation-replay.js";
 import { scheduleDspBoundary } from "../plugin-automation.js";
 import { seededRandom, seedNumber } from "./resources.js";
 import { scheduleGlide } from "../voicing.js";
+import { modActive, modOutput, attachModulation } from "../modulation.js";
 import { preparedSynthVoice, prepareSynthVoice, renderSynthVoice } from "./render-pool.js";
 // A voice owns every node it creates, including modulators and scheduled sources.
 // Open native gates use Infinity as a *declaration*, never as a Web Audio timestamp:
@@ -38,6 +39,37 @@ function sustainBuffer(ctx, original, gate) {
   return { start: (start + fade) / sr, end: end / sr };
 }
 
+// What the modulation kit can move on a built voice: the host targets, every
+// pitched source, and each live control. A control bound to a filter's cutoff is
+// moved through that filter's detune, so the swing is in octaves, not hertz.
+function modTargets(synth, nodes, bindings, pitchTargets, host = new Map()) {
+  const targets = new Map(host);
+  if (pitchTargets.length) targets.set("@pitch", pitchTargets.map((param) => ({ param, depth: 1200 })));
+  const filters = [...nodes].filter((n) => n && n.frequency && n.detune && n.Q && typeof n.getFrequencyResponse === "function");
+  for (const [key, list] of bindings) {
+    const def = (Array.isArray(synth.params) ? synth.params : []).find((p) => p.key === key), out = [];
+    for (const { target, map } of list) {
+      if (!target || typeof target === "function" || typeof target.setValueAtTime !== "function") continue;
+      const filter = filters.find((n) => n.frequency === target);
+      if (filter) { out.push({ param: filter.detune, depth: 4800 }); continue; }
+      if (!def || !Number.isFinite(def.min) || !Number.isFinite(def.max)) continue;
+      const depth = (map(def.max) - map(def.min)) / 2;
+      if (Number.isFinite(depth) && depth) out.push({ param: target, depth });
+    }
+    if (out.length) targets.set(key, out);
+  }
+  return targets;
+}
+
+// The targets a synth offers, found by building one silent voice.
+export function probeModTargets(synth, synthId, params) {
+  try {
+    const ctx = new OfflineAudioContext(2, 128, 44100);
+    const voice = createNativeVoice(ctx, ctx.destination, synth, synthId, { pitch: 60, vel: .8, time: 0, dur: .05, bpm: 120 }, params, () => {}, { seed: 1, probe: true });
+    return voice.modTargetKeys || [];
+  } catch { return []; }
+}
+
 function createNativeVoice(ctx, destination, synth, synthId, note, params, onEnded, options = {}) {
   const nodes = new Set(), sources = [], pitchTargets = [];
   const bindings = new Map(), replayers = [];
@@ -46,7 +78,10 @@ function createNativeVoice(ctx, destination, synth, synthId, note, params, onEnd
   // This is an analysis/render window; the resulting source loops until key-up.
   const renderSpan = Math.min(6, Math.max(4, (params.attack || 0) + 1.5));
   const gate = ctx.createGain();
-  gate.connect(destination);
+  const mod = modActive(options.mod) ? options.mod : null, stage = mod ? modOutput(ctx, mod, destination) : null;
+  let modulation = null;
+  gate.connect(stage ? stage.input : destination);
+  if (stage) for (const n of stage.nodes) nodes.add(n);
   if (note.offset > 0 && note.resumeAt != null) { gate.gain.setValueAtTime(.0001,note.resumeAt); gate.gain.linearRampToValueAtTime(1,note.resumeAt+.005); }
   nodes.add(gate);
   let ended = false, constructed = false, pending = 0, releaseAt = null, bend = null, glide = null;
@@ -55,6 +90,7 @@ function createNativeVoice(ctx, destination, synth, synthId, note, params, onEnd
     ended = true;
     if (bend) { try { bend.stop(); } catch {} }
     if (glide) { try { glide.stop(); } catch {} }
+    modulation?.dispose();
     for (const n of nodes) { try { n.disconnect(); } catch {} }
     nodes.clear();
     onEnded?.();
@@ -168,6 +204,7 @@ function createNativeVoice(ctx, destination, synth, synthId, note, params, onEnd
       const frequency = s.frequency ?? s.node.frequency?.value ?? 0;
       if (s.node.detune && (frequency >= 20 || s.pitched || (!s.node.loop && !!s.node.buffer))) pitchTargets.push(s.node.detune);
     }
+    if (mod) modulation = attachModulation(ctx, mod, { note, startAt: note.resumeAt ?? note.time, age: note.resumeAt != null ? note.resumeAt - note.time : 0, targets: modTargets(synth, nodes, bindings, pitchTargets, stage.targets) });
   } catch (error) {
     for (const s of sources) { try { s.stop(ctx.currentTime); } catch {} }
     for (const n of nodes) { try { n.disconnect(); } catch {} }
@@ -177,6 +214,7 @@ function createNativeVoice(ctx, destination, synth, synthId, note, params, onEnd
   const voice = {
     gate, sources, nodes,
     bindings,
+    get modTargetKeys() { return [...modTargets(synth, nodes, bindings, pitchTargets).keys()].filter((key) => !key.startsWith('@')); },
     tailSeconds: Number.isFinite(note.dur) ? Math.max(0, ...sources.map(s => (s.stopAt ?? (s.startAt + (s.node.buffer?.duration || 0))) - note.time - note.dur)) : Math.max(0, params.release ?? params.rel ?? .25),
     setParameters(patch, at = ctx.currentTime, automation = {}) {
       if (Object.keys(patch).some((key) => !bindings.has(key))) return false;
@@ -232,6 +270,7 @@ function createNativeVoice(ctx, destination, synth, synthId, note, params, onEnd
       }
       if (bend) { try { bend.stop(end + 0.003); } catch {} }
       if (glide) { try { glide.stop(end + 0.003); } catch {} }
+      modulation?.stop(end + 0.003);
     },
     stop(at = ctx.currentTime) { this.release(at, 0, true); },
   };

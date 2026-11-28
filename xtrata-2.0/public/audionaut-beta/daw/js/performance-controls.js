@@ -1,3 +1,4 @@
+import { initModPanel } from "./mod-panel.js";
 import { store } from "./state.js";
 import { getMidiTarget, setMidiTarget, midiStatus, setMidiEnabled } from "./midi-input.js";
 import { getArpSettings, setArpSettings, getVoicing, setVoicing, panic } from "./live-keys.js";
@@ -53,6 +54,7 @@ export function initPerformanceControls() {
   $("voice-mode").addEventListener("change", () => setVoicing(getMidiTarget(), { mode: $("voice-mode").value }));
   $("voice-glide").addEventListener("input", () => setVoicing(getMidiTarget(), { glide: +$("voice-glide").value }));
   document.addEventListener("voicing-settings", syncTarget);
+  initModPanel({ getTarget: getMidiTarget, button: $("mod-open") });
   document.addEventListener("arp-settings", syncTarget);
   document.addEventListener("midi-status", syncMidi);
   store.on("load", syncTarget);

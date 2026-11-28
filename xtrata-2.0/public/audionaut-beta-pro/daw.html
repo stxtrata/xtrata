@@ -153,6 +153,7 @@
         <button id="live-panic" type="button" title="Stop every note, arpeggiator and preview">Panic</button>
         <label title="Poly: every note sounds. Mono: one note at a time, each restarts the sound. Legato: one note at a time, overlapping notes slide without restarting.">Voices <select id="voice-mode"><option value="poly">Poly</option><option value="mono">Mono</option><option value="legato">Legato</option></select></label>
         <label title="How long the pitch takes to slide between notes in Mono and Legato">Glide <input id="voice-glide" type="range" min="0" max="1" step="0.01" value="0" /><output id="voice-glide-value">0 ms</output></label>
+        <button id="mod-open" type="button" title="Two LFOs and four routing slots for the chosen instrument">Modulation</button>
         <label class="chk"><input id="arp-enabled" type="checkbox" /> Arp</label>
         <label>Rate <select id="arp-rate"><option value="1">1/4</option><option value="2">1/8</option><option value="4" selected>1/16</option><option value="8">1/32</option></select></label>
         <label>Order <select id="arp-mode"><option value="up">Up</option><option value="down">Down</option><option value="updown">Up / down</option><option value="random">Random</option></select></label>

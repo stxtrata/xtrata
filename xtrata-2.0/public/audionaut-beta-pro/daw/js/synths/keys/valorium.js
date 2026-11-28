@@ -1,3 +1,4 @@
+import { modActive, modOutput, attachModulation } from '../../modulation.js';
 import { detuneControl } from '../../voicing.js';
 // VALORIUM — layered sample instrument (a nod to Marek's indie alias).
 // Up to four layers, each playing a multisampled source through synth-style shaping: shared
@@ -142,7 +143,9 @@ export function createValoriumVoice(ctx, destination, instrument, config, note, 
     shaper.curve = curve; shaper.oversample = '2x'; trim.gain.value = 1 / (1 + P.drive * 0.8);
     tail.connect(shaper).connect(trim); tail = trim; nodes.push(shaper, trim);
   }
-  tail.connect(body).connect(env).connect(level).connect(destination);
+  const mod = modActive(options.mod) ? options.mod : null, stage = mod ? modOutput(ctx, mod, destination) : null;
+  if (stage) nodes.push(...stage.nodes);
+  tail.connect(body).connect(env).connect(level).connect(stage ? stage.input : destination);
   const age = Math.max(0, note.offset || 0);
   env.gain.setValueAtTime(Math.min(1, age / attack), time);
   if (age < attack) env.gain.linearRampToValueAtTime(1, time + attack - age);
@@ -180,8 +183,11 @@ export function createValoriumVoice(ctx, destination, instrument, config, note, 
     if (!loop) endTime = Math.max(endTime, time + (buffer.duration - offset) / rate);
   }
   if (looped) endTime = Infinity;
+  // Modulation kit: pitch, filter cutoff (in octaves) and level, plus the host tremolo and pan.
+  const modulation = mod ? attachModulation(ctx, mod, { note, startAt: time, age, targets: new Map([...stage.targets,
+    ['@pitch', sources.map((s) => ({ param: s.detune, depth: 1200 }))], ['cutoff', [{ param: filter.detune, depth: 4800 }]], ['level', [{ param: level.gain, depth: level.gain.value / 2 }]]]) }) : null;
   let ended = false, released = false, releaseAt = null, live = sources.length;
-  const finish = () => { if (ended) return; ended = true; for (const n of nodes) { try { n.disconnect(); } catch { /* gone */ } } onEnded?.(); };
+  const finish = () => { if (ended) return; ended = true; modulation?.dispose(); for (const n of nodes) { try { n.disconnect(); } catch { /* gone */ } } onEnded?.(); };
   const fade = (at, seconds) => {
     if (ended || (releaseAt != null && releaseAt <= at)) return;
     released = true; releaseAt = at;

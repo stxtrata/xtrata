@@ -21,6 +21,7 @@ import { syncMixer as applyMixer, disposeMixer, validateRouting } from './mixer-
 import { createSamplerVoice } from './sampler-voice.js';
 import { voiceBudget, voiceCost, pickVictim } from './voice-budget.js';
 import { normalizeVoicing } from './voicing.js';
+import { normalizeMod, modActive } from './modulation.js';
 import {isProInstrument,createProInstrumentVoice} from './pro-instruments.js';
 import { scheduleDspBoundary } from './plugin-automation.js';
 import { automationValueAt, voiceAutomation } from './automation-runtime.js';
@@ -895,11 +896,14 @@ export class Engine {
     const n = { id: ++this._voiceSeq, i, pitch, time, endTime: duration == null ? Infinity : time+duration+release, source: options.source || "live", release, timers: [], visual: false, ended: false, stopping: false };
     try {
       const note={ pitch, vel, time, dur: duration ?? live.gate ?? 0.6, held: held && duration == null, offset:options.chaseOffsetSeconds || 0, bpm: this.store.project.bpm || 120 };
+      // Modulation kit (modulation.js). `beat` lets a bar-locked LFO start in step with the song.
+      const mod = instrument.mod && modActive(instrument.mod) ? normalizeMod(instrument.mod) : null;
+      if (mod) { const position = Number.isFinite(options.beat) ? null : this.getMusicalPosition(time); note.beat = Number.isFinite(options.beat) ? options.beat : position?.playing ? position.beat : null; }
       n.voice = isProInstrument(instrument.synthId)
-        ? createProInstrumentVoice(this.ctx,this.instrumentGains[i],instrument,note,P,()=>this._voiceEnded(n),{seed:options.seed ?? hashSeed(`${this.seed}:${n.id}:${pitch}`),offline:this.offline,bufferForSource:entry=>{const a=trackAddress(this.store.project,entry.sourceTrackId);return a?.kind==='sample'?this.buffers[a.index]:null;}})
+        ? createProInstrumentVoice(this.ctx,this.instrumentGains[i],instrument,note,P,()=>this._voiceEnded(n),{seed:options.seed ?? hashSeed(`${this.seed}:${n.id}:${pitch}`),offline:this.offline,mod,bufferForSource:entry=>{const a=trackAddress(this.store.project,entry.sourceTrackId);return a?.kind==='sample'?this.buffers[a.index]:null;}})
         : instrument.sampler?.enabled
         ? createSamplerVoice(this.ctx,this.instrumentGains[i],instrument.sampler,note,id=>{const a=trackAddress(this.store.project,id);return a?.kind==='sample'?this.buffers[a.index]:null;},()=>this._voiceEnded(n))
-        : createVoice(this.ctx, this.instrumentGains[i], synth, instrument.synthId,note,P,()=>this._voiceEnded(n),{seed:options.seed ?? hashSeed(`${this.seed}:${n.id}:${pitch}`),prepared:options.prepared});
+        : createVoice(this.ctx, this.instrumentGains[i], synth, instrument.synthId,note,P,()=>this._voiceEnded(n),{seed:options.seed ?? hashSeed(`${this.seed}:${n.id}:${pitch}`),prepared:options.prepared,mod});
     } catch (error) {
       if(this.offline)throw error;
       this.lastVoiceError=error.message;
@@ -1242,7 +1246,7 @@ export class Engine {
     const address=trackAddress(this.store.project,event.trackId),time=event.time;
     if(event.type==='note'&&address?.kind==='instrument'&&this.instrumentAudible(address.index)){
       const automation=this._eventAutomation(event);
-      const id=this._startVoice(address.index,event.pitch,event.velocity,{time,duration:event.duration,source:'transport',held:false,seed:event.seed,chaseOffsetSeconds:event.chaseOffsetSeconds,prepared:event.prepared,automation});
+      const id=this._startVoice(address.index,event.pitch,event.velocity,{time,duration:event.duration,beat:event.beat,source:'transport',held:false,seed:event.seed,chaseOffsetSeconds:event.chaseOffsetSeconds,prepared:event.prepared,automation});
       for(const p of event.expression||[])if(p.type==='bend')this.setNotePitchBend(id,p.value,Math.max(time,time+beatToSeconds(this.store.project,event.beat+(p.offset||0))-beatToSeconds(this.store.project,event.beat)-(event.rangeChaseSeconds||0)));
       return id;
     }

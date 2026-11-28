@@ -92,3 +92,31 @@ It works for every instrument, not only the Marek synths.
 - **Limits.** Glide is 0–1 s on the control (stored range 0–2 s). Chords
   sequenced on a mono instrument play only their last note.
 - **Tests.** `tools/pro-voicing-test.mjs`.
+
+## Modulation kit
+
+`daw/js/modulation.js` and the editor `daw/js/mod-panel.js`. Two LFOs and four
+routing slots per instrument, opened with **Modulation** beside the Arp
+controls in the Play setup menu. Stored as `mod: { lfos, slots }`; an
+instrument with no active slot builds no extra nodes.
+
+- **LFOs.** Sine, triangle, saw down, ramp up, square, random steps. Rate is
+  free (0.05–30 Hz) or a tempo division from 4 bars to 1/32, with triplets.
+  A tempo LFO starts on each note or on the song bar. Bar lock uses the note's
+  song position, so playback and export line up; it needs the song playing.
+- **Sources.** LFO 1, LFO 2, velocity, key position.
+- **Targets on every instrument.** Pitch (±12 semitones at 100%), Volume
+  (tremolo: dips only, the peak is the normal level) and Pan.
+- **Targets a synth adds.** Each control it can already change on a held note.
+  A filter cutoff is moved through the filter's detune, so the swing is in
+  octaves (±4 at 100%); other controls move across half their range. Found by
+  building one silent voice (`probeModTargets`).
+- **Coverage.** MAVREKT, LOSTWAVE and ELEMENT offer cutoff, resonance and
+  their other live controls. VALORIUM offers cutoff and level. Older synths
+  that have no live controls, and the pre-rendered ones (fm4, kiln, anneal,
+  palinode, lantern), get pitch, volume and pan only. The sampler and the other
+  sample instruments are not covered yet.
+- **Not yet.** ELEMENT's wavetable position is not a target (it is scheduled
+  per note, not a live control). Changes apply to the next note, not to notes
+  already sounding. The LFO rate uses the tempo at the note's start.
+- **Tests.** `tools/pro-modulation-test.mjs`.
