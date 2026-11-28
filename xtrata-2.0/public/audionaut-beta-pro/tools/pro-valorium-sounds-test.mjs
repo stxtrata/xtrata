@@ -52,7 +52,9 @@ try {
     check(/not loaded/.test(threw), 'export refuses to play a recorded sound that is not loaded');
     const entry = await S.loadRecordedSound(violin, null), plucked = await S.loadRecordedSound(harp, null);
     report.octaves = { violinSection: entry.octave, harp: plucked.octave, low: entry.low };
-    check(entry.octave === 12 && entry.low === 55 && plucked.octave === 0, 'octave labels are corrected from the recordings (violin section starts at G3, not G2)');
+    check(entry.octave === 0 && entry.low === 55 && plucked.octave === 0 && S.RECORDED_BY_KEY.get(violin).low === 55, 'the catalogue has the violin section starting at G3, and the recordings agree');
+    // Whole catalogue: no instrument's recordings disagree with its roots any more.
+    { let wrong = []; for (const sound of S.RECORDED_SOUNDS) { const e = await S.loadRecordedSound(sound.key, null); if (e.octave !== 0) wrong.push(`${sound.key} ${e.octave}`); S.clearRecordedCache(); } report.octaveMismatches = wrong; check(wrong.length <= 3, `catalogue roots match the recordings (${wrong.length} left: ${wrong.join(', ')})`); await S.loadRecordedSound(violin, null); await S.loadRecordedSound(harp, null); }
     const sine = (f) => { const b = new AudioBuffer({ numberOfChannels: 1, length: 22050, sampleRate: 44100 }), d = b.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.sin(2 * Math.PI * f * i / 44100) + .6 * Math.sin(4 * Math.PI * f * i / 44100); return b; };
     check([33, 48, 60, 72, 91].every(m => Math.abs(S.detectMidi(sine(hz(m))) - m) < .1) && S.trueRoot(48, sine(hz(60))) === 60 && S.trueRoot(60, sine(hz(60.2))) === 60 && S.trueRoot(60, sine(hz(65))) === 60, 'pitch detection finds the note and only ever moves a root by whole octaves');
     check(entry.zones.length === 5 && entry.zones.every(z => z.loop && z.loop.end > z.loop.start + .3) && plucked.zones.every(z => !z.loop), 'sustained sounds get a loop, plucked ones do not');

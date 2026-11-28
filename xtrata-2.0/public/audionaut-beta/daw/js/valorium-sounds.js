@@ -84,9 +84,10 @@ export function detectMidi(buffer) {
   }
   return null;
 }
-// Some source libraries call middle C "C3" and some "C4", so the catalogue's root can be an
-// octave away from where a recording sounds (115 of the 230 instruments are an octave low, 22
-// an octave high). Trust the catalogue's note name but take the octave from the recording.
+// Source libraries disagree on whether middle C is "C3" or "C4", so a catalogue root can be an
+// octave away from where a recording sounds. The shipped catalogue has been corrected with
+// tools/pack-root-audit.mjs; this check stays as a guard for packs added or regenerated later.
+// It trusts the catalogue's note name and takes only the octave from the recording.
 export function trueRoot(catalogueRoot, buffer) {
   const heard = detectMidi(buffer);
   if (heard == null) return catalogueRoot;

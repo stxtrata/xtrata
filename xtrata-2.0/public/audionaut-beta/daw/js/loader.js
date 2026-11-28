@@ -355,6 +355,19 @@ export function assignDecodedSample(ch, source, result, { reset = true, dirty = 
   tickets.set(ch, Symbol());
   engine.silenceChannel(ch);
   engine.setBuffer(ch, result.audioBuffer);
+  // The pack catalogue's root octaves were corrected (tools/pack-root-audit.mjs). A project saved
+  // before that still names its notes from the old root. Playback uses stored rates, so the sound
+  // is unchanged; move the note labels by the same octaves so they say what is heard.
+  const oldRoot = channel.source?.type === "pack" && channel.source.value === source.value ? channel.source.rootMidi : null,
+    newRoot = result.source?.type === "pack" ? result.source.rootMidi : null,
+    octaves = oldRoot != null && newRoot != null ? newRoot - oldRoot : 0;
+  if (!reset && octaves && octaves % 12 === 0) {
+    const moved = (note) => Math.max(0, Math.min(127, note + octaves));
+    if (channel.sampleMidi != null) channel.sampleMidi = moved(channel.sampleMidi);
+    for (const seq of store.project.sequences)
+      for (const step of seq.steps[ch] || [])
+        if (step && typeof step === "object" && step.sampleMidi != null) step.sampleMidi = moved(step.sampleMidi);
+  }
   channel.source = assetSource(result.source || {
     type: source.type,
     value: source.type === "ordinal" ? ordinalId(source.value) : source.value,

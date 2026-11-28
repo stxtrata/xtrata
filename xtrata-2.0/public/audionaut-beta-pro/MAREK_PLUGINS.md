@@ -214,12 +214,10 @@ kit.
   A layer with a recorded sound plays it from the nearest recorded note in
   place of its built-in sound; the layer's level, tune, filter, envelope and
   modulation still apply. Clearing it restores the built-in sound.
-- **Octave correction.** The pack catalogue's root notes are an octave out for
-  137 of the 230 instruments (115 low, 22 high), because the source libraries
-  disagree on whether middle C is C3 or C4. VALORIUM measures each recording's
-  pitch when it loads and applies one whole-octave correction per instrument.
-  The catalogue itself is unchanged, so anything else that pitches a pack sound
-  from its catalogue root still has the error.
+- **Octave check.** VALORIUM measures each recording's pitch when it loads and
+  applies one whole-octave correction per instrument if the catalogue root is
+  out. The catalogue has since been corrected (see below), so this is now a
+  guard for packs added later.
 - **Sustain.** Recordings are 0.3–3 s long. Sustained articulations get a
   crossfaded loop so a held key keeps sounding; plucked and struck ones ring
   out and stop.
@@ -233,3 +231,33 @@ kit.
 - **Not yet.** More than four layers, a synth as a layer, per-layer filters and
   envelopes, the per-layer trance gate, velocity layers, and recorded content
   from Marek.
+
+## Pack catalogue octave correction
+
+`tools/pack-root-audit.mjs` (report, or `--write` to patch) and
+`tools/pro-pack-roots-test.mjs`.
+
+- **What was wrong.** The source libraries disagree on whether middle C is
+  "C3" or "C4". The catalogue took each note name at face value, so the root of
+  many pitched sounds was an octave away from where the recording sounds.
+- **What changed.** `daw/js/pack-catalogue.js` only: the root note and the note
+  in the label of 908 of the 1,360 pitched sounds, across 181 of 265
+  instruments (153 raised an octave, 28 lowered). Only whole octaves move; the
+  note name is trusted. Asset ids, hashes and the `.audpack` files are
+  untouched, so integrity checks still pass.
+- **How it was decided.** Every pitched sound was decoded and its pitch
+  measured. Each instrument gets one correction: the clear majority reading
+  when it has three or more readable notes, otherwise only a reading that
+  agrees with what the same source library needed elsewhere.
+- **Left alone.** Seven instruments with no clear reading: three brass section
+  chord sets (a chord has no single pitch), Sneakybass Finger and Pluck, and
+  Horse Pulse Hard and Nail.
+- **Saved projects.** Playback of a sample channel uses the stored rate, not
+  the root, so existing projects sound the same. When such a project loads,
+  `assignDecodedSample` moves the channel's and steps' note labels by the same
+  octaves so they name what is heard. Sampler zones saved inside an instrument
+  keep the root they were saved with.
+- **Regenerating.** The catalogue is generated outside this repository
+  (audionaut-library). If it is regenerated, run the audit with `--write`
+  again or carry the fix into the generator.
+- VALORIUM's own octave check stays as a guard for packs added later.
