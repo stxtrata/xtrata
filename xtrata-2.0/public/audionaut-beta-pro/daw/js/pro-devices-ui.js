@@ -13,6 +13,8 @@ import { registerBlob } from './assets.js';
 import { loadSample } from './loader.js';
 import { el, action, row, number, choice, textField, status } from './pro-ui.js';
 import { openEffects } from './pro-mixer-ui.js';
+import { RECORDED_SOUNDS, RECORDED_BY_KEY, RECORDED_LAYERS, loadRecordedSound } from './valorium-sounds.js';
+import { openSoundBrowser } from './valorium-browser.js';
 
 export function mount(root) {
   let instrumentId = (isProInstrument(store.instrument(getMidiTarget())?.synthId) ? store.instrument(getMidiTarget()) : store.project.instruments.find((t) => isProInstrument(t.synthId)))?.id,
@@ -206,6 +208,30 @@ export function mount(root) {
         )
       );
     } else {
+      if (instrument.synthId === 'valorium') {
+        // Recorded instruments from the built-in CC0 packs, one per layer (valorium-sounds.js).
+        body.append(el('h3', 'Recorded sounds'), el('p', `${RECORDED_SOUNDS.length} recorded instruments from the built-in public-domain (CC0) packs. A layer with a recorded sound plays it in place of its built-in sound; clear it to go back.`));
+        const index = store.project.instruments.findIndex((t) => t.id === instrumentId), P = { ...synthDefaults('valorium'), ...(instrument.params || {}) };
+        for (const layer of RECORDED_LAYERS) {
+          const key = config.recorded?.[layer], sound = key && RECORDED_BY_KEY.get(key);
+          const name = sound ? `${sound.name} · ${sound.category}` : key ? 'Missing sound (not in the installed packs)' : 'Built-in sound';
+          body.append(row(
+            el('span', `Layer ${layer.toUpperCase()}: ${name}`, { className: 'pro-stat', 'data-recorded-layer': layer }),
+            action('Browse…', () => openSoundBrowser({ title: `Layer ${layer.toUpperCase()} sound`, current: key || '', onPick: (picked) => {
+              config.recorded = { ...(config.recorded || {}), [layer]: picked };
+              save();
+              // A silent layer would make the choice inaudible: switch it on.
+              const patch = {};
+              if (P[`${layer}Type`] === 'off') patch[`${layer}Type`] = 'piano';
+              if (!(P[`${layer}Level`] > 0)) patch[`${layer}Level`] = 0.8;
+              if (Object.keys(patch).length) store.setInstrumentProp(index, 'params', { ...P, ...patch });
+              loadRecordedSound(picked, engine.ensureContext()).then(() => status(`Layer ${layer.toUpperCase()} now plays ${RECORDED_BY_KEY.get(picked).name}.`), (error) => status(error.message, true));
+              paint();
+            } })),
+            ...(key ? [action('Clear', () => { const next = { ...(config.recorded || {}) }; delete next[layer]; config.recorded = next; save(); paint(); })] : [])
+          ));
+        }
+      }
       body.append(
         el('h3', instrument.synthId === 'valorium' ? 'Custom pack zones (layer A)' : 'Piano sample zones'),
         el(

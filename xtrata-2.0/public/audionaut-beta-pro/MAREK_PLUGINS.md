@@ -194,3 +194,42 @@ filter characters and step modulator; ELEMENT second wavetable oscillator,
 32-frame tables, table import, second filter and macros. Wavetable position is
 driven by ELEMENT's own LFO and is not yet a target in the shared modulation
 kit.
+
+## VALORIUM recorded sounds and browser
+
+`daw/js/valorium-sounds.js` (catalogue, loading) and `daw/js/valorium-browser.js`
+(the browser). Tests: `tools/pro-valorium-sounds-test.mjs`.
+
+- **Source.** No new audio was added. The Audionaut already ships 22 sample
+  packs in `daw/media/packs/`; 16 of them are CC0. VALORIUM offers the pitched,
+  CC0-marked sounds from those 16: **230 instruments in 13 categories**
+  (strings, brass, woodwinds, pianos, organs and harpsichords, mallets, harps,
+  guitars, basses, saxophones, plucked and world instruments). The recordings
+  come from the Versilian Community Sample Library, VS Chamber Orchestra
+  Community Edition, Karoryfer Samples and FreePats, and each keeps its credit.
+- **Left out on purpose.** The CC-BY packs (electric pianos, choirs, a grand
+  piano, a rock kit, extras) need attribution, and the "classic" drum-machine
+  pack has an unverified licence. None of them appear in the browser.
+- **How a layer uses one.** `sampleInstrument.recorded = { a: '<pack>/<sound>' }`.
+  A layer with a recorded sound plays it from the nearest recorded note in
+  place of its built-in sound; the layer's level, tune, filter, envelope and
+  modulation still apply. Clearing it restores the built-in sound.
+- **Octave correction.** The pack catalogue's root notes are an octave out for
+  137 of the 230 instruments (115 low, 22 high), because the source libraries
+  disagree on whether middle C is C3 or C4. VALORIUM measures each recording's
+  pitch when it loads and applies one whole-octave correction per instrument.
+  The catalogue itself is unchanged, so anything else that pitches a pack sound
+  from its catalogue root still has the error.
+- **Sustain.** Recordings are 0.3–3 s long. Sustained articulations get a
+  crossfaded loop so a held key keeps sounding; plucked and struck ones ring
+  out and stop.
+- **Loading.** Sounds load when chosen and when a project opens. A live note
+  played before its sound has loaded uses the layer's built-in sound; export
+  loads everything first and fails with a clear message if it cannot, so it
+  never substitutes a different sound. Up to 32 instruments stay in memory.
+- **Browser.** Opened with "Browse…" beside each layer in the VALORIUM panel
+  (New instruments). Category list, search across name and category, favourites
+  (kept in this browser's storage), and a "Hear" button.
+- **Not yet.** More than four layers, a synth as a layer, per-layer filters and
+  envelopes, the per-layer trance gate, velocity layers, and recorded content
+  from Marek.

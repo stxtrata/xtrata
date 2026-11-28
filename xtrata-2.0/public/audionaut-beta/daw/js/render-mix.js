@@ -1,3 +1,4 @@
+import { prepareRecorded } from './valorium-sounds.js';
 import { oscEngineEnabled, prepareOscEngine } from './synths/unison-worklet.js';
 import {isProInstrument,proInstrumentTailSeconds} from './pro-instruments.js';
 // Playback and export share one musical event plan. Output encoding runs in a worker.
@@ -99,6 +100,7 @@ export async function renderMix(project,buffers,{scope='song',range,tail='auto',
       for(const link of renderer._mixer?.links||[])if(leaves.has(link.from)&&link.from!==id){try{link.source.disconnect(link.delay);}catch{}}
     }};
     onProgress({phase:'prepare',progress:0});
+    await prepareRecorded(project,context,{signal}); // VALORIUM recorded sounds must be decoded before notes are scheduled
     if(oscEngineEnabled())await prepareOscEngine(context); // experiment: unison worklet must be registered before notes are scheduled
     await Promise.race([renderer.preparePlan(plan,{all:true,signal,onProgress:progress=>onProgress({phase:'prepare',progress})}),cancelled]);abort(signal);
     isolateStem();

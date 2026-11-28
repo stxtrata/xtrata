@@ -23,6 +23,7 @@ import { voiceBudget, voiceCost, pickVictim } from './voice-budget.js';
 import { normalizeVoicing } from './voicing.js';
 import { normalizeMod, modActive } from './modulation.js';
 import { oscEngineEnabled, prepareOscEngine } from './synths/unison-worklet.js';
+import { prefetchRecorded } from './valorium-sounds.js';
 import {isProInstrument,createProInstrumentVoice} from './pro-instruments.js';
 import { scheduleDspBoundary } from './plugin-automation.js';
 import { automationValueAt, voiceAutomation } from './automation-runtime.js';
@@ -54,6 +55,7 @@ export class Engine {
       this._planDirty = true;
       if (this.ctx && (['channel','instrument','channels','instruments','load'].includes(event)||event==='project'&&['buses','master','mixerVersion','masterVolume'].includes(payload?.prop))) {
         this.ensureChannelChains(); this.ensureInstrumentChains(); this.syncMixer();
+        if(['instrument','instruments','load'].includes(event))void prefetchRecorded(this.store.project,this.ctx); // VALORIUM recorded sounds
         if(event==='instrument' && payload?.prop==='params')for(const n of this._synthVoices.values())if(n.i===payload.i)n.voice.setParameters?.(this.store.instrument(n.i).params||{},this.ctx.currentTime);
       }
     });
@@ -92,6 +94,7 @@ export class Engine {
       const context = this.contextFactory ? this.contextFactory() : new (window.AudioContext || window.webkitAudioContext)({latencyHint:'interactive'});
       if(typeof context.startRendering==='function')assertOfflineRenderSupported();
       this.ctx=context;
+      if (!this.offline) void prefetchRecorded(this.store.project, context);
       if (oscEngineEnabled()) void prepareOscEngine(context); // experiment: synths fall back to native oscillators until it loads
       this.masterGain = this.ctx.createGain();
       this.masterGain.gain.value = this.store.project.masterVolume;

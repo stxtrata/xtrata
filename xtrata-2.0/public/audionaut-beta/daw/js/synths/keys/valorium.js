@@ -1,3 +1,4 @@
+import { RECORDED_BY_KEY, recordedReady, recordedZone, loadRecordedSound } from '../../valorium-sounds.js';
 import { modActive, modOutput, attachModulation } from '../../modulation.js';
 import { detuneControl } from '../../voicing.js';
 // VALORIUM — layered sample instrument (a nod to Marek's indie alias).
@@ -159,7 +160,16 @@ export function createValoriumVoice(ctx, destination, instrument, config, note, 
     if (type === 'off' || layerLevel <= 0) continue;
     let buffer, rootMidi, gain = 1, loop = null, tune = 1;
     const pitch = clamp(note.pitch + (P[`${l}Tune`] || 0), 0, 127);
-    if (l === 'a' && config.zones?.length) {
+    const wanted = config.recorded?.[l], recorded = wanted ? recordedReady(wanted) : null;
+    if (wanted && !recorded && RECORDED_BY_KEY.has(wanted)) {
+      // Export must never swap in a different sound; live play uses the layer's built-in sound until the recording has loaded.
+      if (options.offline) throw new Error(`VALORIUM sound "${RECORDED_BY_KEY.get(wanted).name}" is not loaded.`);
+      loadRecordedSound(wanted, ctx).catch(() => {});
+    }
+    if (recorded) {
+      const zone = recordedZone(recorded, pitch);
+      buffer = zone.buffer; rootMidi = zone.rootMidi; loop = zone.loop; gain = 0.9;
+    } else if (l === 'a' && config.zones?.length) {
       const zone = selectPianoZone(config, pitch, clamp(note.vel, 0, 1));
       if (!zone) throw new Error('No custom pack zone covers this note and velocity. Add a matching key/velocity zone.');
       buffer = resolveInstrumentBuffer(config, zone.sourceId, options.bufferForSource); rootMidi = zone.rootMidi; gain = zone.gain;

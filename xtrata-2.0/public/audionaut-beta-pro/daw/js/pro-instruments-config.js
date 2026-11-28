@@ -56,6 +56,15 @@ export function normalizeInstrumentConfig(kind, raw) {
     config.sourceId = reference(config.sourceId, 'Granulator');
     config.rootMidi = number(config.rootMidi, 60, 0, 127, 'Source root note', true);
   }
+  if (kind === 'valorium') {
+    // Recorded sounds per layer (valorium-sounds.js): { a: '<pack>/<sound>', ... }.
+    const picked = {};
+    if (config.recorded != null) {
+      if (typeof config.recorded !== 'object' || Array.isArray(config.recorded)) throw new Error('VALORIUM recorded sounds must be listed per layer.');
+      for (const layer of ['a', 'b', 'c', 'd']) { const key = config.recorded[layer]; if (key == null || key === '') continue; if (typeof key !== 'string' || key.length > 160 || !/^[a-z0-9]+\/[a-z0-9-]+$/.test(key)) throw new Error('Invalid VALORIUM recorded sound.'); picked[layer] = key; }
+    }
+    if (Object.keys(picked).length) config.recorded = picked; else delete config.recorded;
+  } else delete config.recorded;
   if (kind === 'concertpiano' || kind === 'valorium') {
     if (!Array.isArray(config.zones) || config.zones.length > 128) throw new Error('Use at most 128 piano sample zones.');
     const ids = new Set();
